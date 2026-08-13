@@ -1,6 +1,226 @@
 "use client";
-import {useEffect,useState} from "react";
-import {addCrewMember,archiveCrew,createCrew,getCrews,removeCrewMember,setCrewLead,updateCrew} from "@/lib/services/crews";
-import {employeeName,type Employee} from "@/types/employee";import type {CrewWithRelations} from "@/types/crew";
-export function CrewManager({employees,close,changed}:{employees:Employee[];close:()=>void;changed:()=>Promise<void>}){const[rows,setRows]=useState<CrewWithRelations[]>([]);const[name,setName]=useState("");const[selected,setSelected]=useState<CrewWithRelations|null>(null);const[error,setError]=useState<string|null>(null);const[busy,setBusy]=useState(false);async function load(){setRows(await getCrews());await changed()}useEffect(()=>{void getCrews().then(setRows).catch((x:unknown)=>setError(msg(x)))},[]);async function run(fn:()=>Promise<unknown>){setBusy(true);setError(null);try{await fn();await load();if(selected)setSelected((await getCrews()).find(c=>c.id===selected.id)??null)}catch(x){console.error("Crew action failed",x);setError(msg(x))}finally{setBusy(false)}}const sorted=[...employees.filter(e=>e.employment_status==="Active")].sort((a,b)=>(a.department==="Scrub Technicians"?-1:0)-(b.department==="Scrub Technicians"?-1:0));return <div className="fixed inset-0 z-[95] overflow-y-auto bg-[#07190a]/70 p-5"><section className="mx-auto max-w-5xl rounded-2xl bg-white p-6"><button onClick={close} className="float-right text-xl">×</button><h2 className="text-xl font-extrabold text-[#143d1a]">Manage Crews</h2>{error&&<p className="mt-3 text-sm font-bold text-red-700">{error}</p>}<div className="mt-5 flex gap-2"><input className={input} value={name} onChange={e=>setName(e.target.value)} placeholder="Crew name"/><button disabled={busy||!name.trim()} className={primary} onClick={()=>void run(async()=>{await createCrew({crew_name:name.trim(),crew_lead_id:null,status:"Active",notes:null});setName("")})}>Create Crew</button></div><div className="mt-6 grid gap-4 md:grid-cols-2">{rows.map(c=><article key={c.id} className="rounded-xl border p-4"><button className="w-full text-left" onClick={()=>setSelected(c)}><p className="font-extrabold text-[#143d1a]">{c.crew_name}</p><p className="mt-1 text-sm">Lead: {c.crew_lead?employeeName(c.crew_lead):"Unassigned"}</p><p className="text-xs text-neutral-500">{c.members.map(m=>employeeName(m.employee)).join(", ")||"No members"}</p><p className="mt-2 text-xs font-bold">{c.members.length} members · {c.status}</p></button></article>)}</div>{selected&&<div className="mt-6 rounded-xl bg-neutral-50 p-5"><div className="flex gap-2"><input className={input} value={selected.crew_name} onChange={e=>setSelected({...selected,crew_name:e.target.value})}/><button className={primary} disabled={busy} onClick={()=>void run(()=>updateCrew(selected.id,{crew_name:selected.crew_name,status:selected.status,notes:selected.notes}))}>Save Crew</button><button className={secondary} disabled={busy} onClick={()=>void run(()=>archiveCrew(selected.id))}>Archive</button></div><label className="mt-4 block text-sm font-bold">Crew Lead<select className={`${input} mt-2`} value={selected.crew_lead_id??""} onChange={e=>void run(()=>setCrewLead(selected.id,e.target.value||null))}><option value="">Unassigned</option>{sorted.map(e=><option key={e.id} value={e.id}>{employeeName(e)} — {e.department}</option>)}</select></label><label className="mt-4 block text-sm font-bold">Add Crew Member<select className={`${input} mt-2`} value="" onChange={e=>{if(e.target.value)void run(()=>addCrewMember(selected.id,e.target.value))}}><option value="">Select employee</option>{sorted.filter(e=>!selected.members.some(m=>m.employee_id===e.id)).map(e=><option key={e.id} value={e.id}>{employeeName(e)} — {e.department}</option>)}</select></label><div className="mt-4 space-y-2">{selected.members.map(m=><div key={m.id} className="flex justify-between rounded-lg bg-white p-3 text-sm"><span>{employeeName(m.employee)}</span><button disabled={busy} onClick={()=>void run(()=>removeCrewMember(m.id))} className="font-bold text-red-700">Remove</button></div>)}</div></div>}</section></div>}
-function msg(x:unknown){return x instanceof Error?x.message:"Crew operation failed."}const input="h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm";const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";const secondary="rounded-lg border px-4 py-2.5 text-sm font-bold text-[#143d1a]";
+import { useEffect, useState } from "react";
+import {
+  addCrewMember,
+  archiveCrew,
+  createCrew,
+  getCrews,
+  removeCrewMember,
+  setCrewLead,
+  updateCrew,
+} from "@/lib/services/crews";
+import { employeeName, type Employee } from "@/types/employee";
+import type { CrewWithRelations } from "@/types/crew";
+import { CrewLaborSummary } from "@/components/time/CrewLaborSummary";
+export function CrewManager({
+  employees,
+  close,
+  changed,
+}: {
+  employees: Employee[];
+  close: () => void;
+  changed: () => Promise<void>;
+}) {
+  const [rows, setRows] = useState<CrewWithRelations[]>([]);
+  const [name, setName] = useState("");
+  const [selected, setSelected] = useState<CrewWithRelations | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function load() {
+    setRows(await getCrews());
+    await changed();
+  }
+  useEffect(() => {
+    void getCrews()
+      .then(setRows)
+      .catch((x: unknown) => setError(msg(x)));
+  }, []);
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await load();
+      if (selected)
+        setSelected(
+          (await getCrews()).find((c) => c.id === selected.id) ?? null,
+        );
+    } catch (x) {
+      console.error("Crew action failed", x);
+      setError(msg(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const sorted = [
+    ...employees.filter((e) => e.employment_status === "Active"),
+  ].sort(
+    (a, b) =>
+      (a.department === "Scrub Technicians" ? -1 : 0) -
+      (b.department === "Scrub Technicians" ? -1 : 0),
+  );
+  return (
+    <div className="fixed inset-0 z-[95] overflow-y-auto bg-[#07190a]/70 p-5">
+      <section className="mx-auto max-w-5xl rounded-2xl bg-white p-6">
+        <button onClick={close} className="float-right text-xl">
+          ×
+        </button>
+        <h2 className="text-xl font-extrabold text-[#143d1a]">Manage Crews</h2>
+        {error && (
+          <p className="mt-3 text-sm font-bold text-red-700">{error}</p>
+        )}
+        <div className="mt-5 flex gap-2">
+          <input
+            className={input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Crew name"
+          />
+          <button
+            disabled={busy || !name.trim()}
+            className={primary}
+            onClick={() =>
+              void run(async () => {
+                await createCrew({
+                  crew_name: name.trim(),
+                  crew_lead_id: null,
+                  status: "Active",
+                  notes: null,
+                });
+                setName("");
+              })
+            }
+          >
+            Create Crew
+          </button>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {rows.map((c) => (
+            <article key={c.id} className="rounded-xl border p-4">
+              <button
+                className="w-full text-left"
+                onClick={() => setSelected(c)}
+              >
+                <p className="font-extrabold text-[#143d1a]">{c.crew_name}</p>
+                <p className="mt-1 text-sm">
+                  Lead: {c.crew_lead ? employeeName(c.crew_lead) : "Unassigned"}
+                </p>
+                <p className="text-xs text-neutral-500">
+                  {c.members.map((m) => employeeName(m.employee)).join(", ") ||
+                    "No members"}
+                </p>
+                <p className="mt-2 text-xs font-bold">
+                  {c.members.length} members · {c.status}
+                </p>
+              </button>
+            </article>
+          ))}
+        </div>
+        {selected && (
+          <div className="mt-6 rounded-xl bg-neutral-50 p-5">
+            <div className="flex gap-2">
+              <input
+                className={input}
+                value={selected.crew_name}
+                onChange={(e) =>
+                  setSelected({ ...selected, crew_name: e.target.value })
+                }
+              />
+              <button
+                className={primary}
+                disabled={busy}
+                onClick={() =>
+                  void run(() =>
+                    updateCrew(selected.id, {
+                      crew_name: selected.crew_name,
+                      status: selected.status,
+                      notes: selected.notes,
+                    }),
+                  )
+                }
+              >
+                Save Crew
+              </button>
+              <button
+                className={secondary}
+                disabled={busy}
+                onClick={() => void run(() => archiveCrew(selected.id))}
+              >
+                Archive
+              </button>
+            </div>
+            <label className="mt-4 block text-sm font-bold">
+              Crew Lead
+              <select
+                className={`${input} mt-2`}
+                value={selected.crew_lead_id ?? ""}
+                onChange={(e) =>
+                  void run(() =>
+                    setCrewLead(selected.id, e.target.value || null),
+                  )
+                }
+              >
+                <option value="">Unassigned</option>
+                {sorted.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {employeeName(e)} — {e.department}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-4 block text-sm font-bold">
+              Add Crew Member
+              <select
+                className={`${input} mt-2`}
+                value=""
+                onChange={(e) => {
+                  if (e.target.value)
+                    void run(() => addCrewMember(selected.id, e.target.value));
+                }}
+              >
+                <option value="">Select employee</option>
+                {sorted
+                  .filter(
+                    (e) =>
+                      !selected.members.some((m) => m.employee_id === e.id),
+                  )
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {employeeName(e)} — {e.department}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <div className="mt-4 space-y-2">
+              {selected.members.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex justify-between rounded-lg bg-white p-3 text-sm"
+                >
+                  <span>{employeeName(m.employee)}</span>
+                  <button
+                    disabled={busy}
+                    onClick={() => void run(() => removeCrewMember(m.id))}
+                    className="font-bold text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <CrewLaborSummary crewId={selected.id} />
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+function msg(x: unknown) {
+  return x instanceof Error ? x.message : "Crew operation failed.";
+}
+const input =
+  "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm";
+const primary =
+  "rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
+const secondary =
+  "rounded-lg border px-4 py-2.5 text-sm font-bold text-[#143d1a]";

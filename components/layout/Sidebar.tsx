@@ -39,6 +39,8 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "" },
       { label: "Sales", href: "/employees/sales", marker: "" },
       { label: "Administration / Management", href: "/employees/administration", marker: "" },
+      { label: "Time Clock", href: "/time-clock", marker: "" },
+      { label: "Payroll Preparation", href: "/payroll-prep", marker: "" },
     ],
   },
   { label: "Invoices", href: "/invoices", marker: "I" },

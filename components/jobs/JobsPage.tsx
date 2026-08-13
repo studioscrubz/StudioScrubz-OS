@@ -12,6 +12,7 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
+import { JobLaborSummary } from "@/components/time/JobLaborSummary";
 import type { CrewWithRelations } from "@/types/crew";
 import {
   JOB_STATUSES,
@@ -413,6 +414,7 @@ function JobModal({
         ]}
       />
       <JobMileageSummary jobId={job.id} />
+      <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - job.proposal.result.estimatedProfit)} price={job.price} />
       <div className="mt-6 flex flex-wrap gap-2">
         {nextStatuses(job.status).map((x) => (
           <button

@@ -1,0 +1,5 @@
+export const DEFAULT_DAILY_REGULAR_HOURS=8;
+export function calculatePaidHours(clockIn:string,clockOut:string,breakMinutes:number){const elapsed=(Date.parse(clockOut)-Date.parse(clockIn))/36e5;if(!Number.isFinite(elapsed)||elapsed<0)throw new Error("Clock-out must be after clock-in.");const paid=elapsed-Math.max(0,breakMinutes)/60;if(paid<0)throw new Error("Break minutes cannot exceed elapsed time.");return round(paid)}
+export function allocateDailyOvertime(hours:number,regularHoursAlreadyAllocated:number,dailyLimit=DEFAULT_DAILY_REGULAR_HOURS){const regular=round(Math.min(hours,Math.max(0,dailyLimit-regularHoursAlreadyAllocated)));return{regularHours:regular,overtimeHours:round(Math.max(0,hours-regular))}}
+export function calculatePay(regularHours:number,overtimeHours:number,hourlyRate:number,overtimeRate:number){const regularPay=round(regularHours*hourlyRate),overtimePay=round(overtimeHours*overtimeRate);return{regularPay,overtimePay,grossPay:round(regularPay+overtimePay)}}
+function round(n:number){return Math.round(n*10000)/10000}
