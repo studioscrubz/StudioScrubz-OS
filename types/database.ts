@@ -14,10 +14,12 @@ import type {MileageEntry,MileageInput,MileageUpdate} from "@/types/mileage";
 import type {TimeEntry,TimeEntryInput,TimeEntryUpdate} from "@/types/timeEntry";
 import type {ServiceAgreement,AgreementInput,AgreementUpdate} from "@/types/agreement";
 import type {ServiceOccurrence} from "@/types/serviceOccurrence";
+import type {UserProfile} from "@/types/auth";
 
 export interface Database {
   public: {
     Tables: {
+      user_profiles:{Row:UserProfile;Insert:UserProfile;Update:Pick<UserProfile,"display_name">;Relationships:[]};
       clients: {
         Row: Client;
         Insert: ClientInput & { id?: string; created_at?: string; updated_at?: string; archived_at?: string | null };

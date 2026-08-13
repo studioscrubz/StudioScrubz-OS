@@ -1,5 +1,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { ArchiveDeleteCheck, ArchivedRecord, ArchiveRecordType } from "@/types/archive";
+import { getCurrentProfile, getCurrentUser } from "@/lib/services/auth";
+import { canPermanentlyDelete } from "@/lib/auth/permissions";
 
 type DbError = { message: string; code?: string };
 type QueryResult = { data: unknown; error: DbError | null; count?: number | null };
@@ -8,6 +10,7 @@ interface ArchiveQuery extends PromiseLike<QueryResult> {
   not(column: string, operator: string, value: unknown): ArchiveQuery;
   eq(column: string, value: unknown): ArchiveQuery;
   update(values: Record<string, unknown>): ArchiveQuery;
+  delete(): ArchiveQuery;
   order(column: string, options?: { ascending?: boolean }): ArchiveQuery;
 }
 interface ArchiveDb { from(table: string): ArchiveQuery }
@@ -75,8 +78,16 @@ export async function canPermanentlyDeleteRecord(record: ArchivedRecord): Promis
 }
 
 export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): Promise<void> {
-  void record;
-  throw new Error("Permanent deletion requires Master Admin authentication and will be enabled during the security phase.");
+  const user = await getCurrentUser();
+  if (!user) throw new Error("You must be signed in to permanently delete archived records.");
+  const profile = await getCurrentProfile(user.id);
+  if (!canPermanentlyDelete(profile)) throw new Error("Master Admin authorization is required for permanent deletion.");
+  const check = await canPermanentlyDeleteRecord(record);
+  if (!check.allowed) throw new Error(check.reason ?? "This record cannot be permanently deleted.");
+  const config = configFor(record.type);
+  const { error } = await archiveDb().from(config.table).delete().eq("id", record.id).not("archived_at", "is", null);
+  if (error?.code === "23503") throw new Error("This record cannot be permanently deleted because it is linked to existing business records.");
+  if (error) throw new Error("Permanent deletion was rejected. Verify Master Admin security policies are active.");
 }
 
 function archiveDb() { return getSupabaseClient() as unknown as ArchiveDb; }

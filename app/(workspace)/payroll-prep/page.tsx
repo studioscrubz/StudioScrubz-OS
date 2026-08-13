@@ -1,1 +1,1 @@
-import {PayrollPrepPage} from "@/components/time/PayrollPrepPage";export default function Page(){return <PayrollPrepPage/>}
+import {PayrollPrepPage} from "@/components/time/PayrollPrepPage";import {SensitiveRoute} from "@/components/auth/SensitiveRoute";export default function Page(){return <SensitiveRoute area="payroll"><PayrollPrepPage/></SensitiveRoute>}

@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BrandMark } from "./AppShell";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { canAccessArchives, canAccessFinances, canAccessPayrollPrep } from "@/lib/auth/permissions";
 
 type NavLink = { label: string; href: string; marker: string };
 type NavGroup = { label: string; marker: string; children: NavLink[] };
@@ -64,8 +67,17 @@ function isGroup(item: NavLink | NavGroup): item is NavGroup {
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const auth = useAuth();
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const visibleItems = navItems.flatMap((item) => {
+    if (isGroup(item) && item.label === "Finances" && !canAccessFinances(auth.profile)) return [];
+    if (!isGroup(item) && item.label === "Archives" && !canAccessArchives(auth.profile)) return [];
+    if (isGroup(item) && item.label === "Employees") return [{ ...item, children: item.children.filter((child) => child.href !== "/payroll-prep" || canAccessPayrollPrep(auth.profile)) }];
+    return [item];
+  });
   const initiallyOpen = Object.fromEntries(
-    navItems.filter(isGroup).map((group) => [group.label, group.children.some((item) => item.href === pathname)]),
+    visibleItems.filter(isGroup).map((group) => [group.label, group.children.some((item) => item.href === pathname)]),
   );
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initiallyOpen);
 
@@ -90,7 +102,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             if (isGroup(item)) {
               const active = item.children.some((child) => child.href === pathname);
               const open = openGroups[item.label] ?? false;
@@ -120,7 +132,9 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
       </nav>
 
       <div className="border-t border-white/10 p-3">
-        <button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-white/65 transition hover:bg-white/[.07] hover:text-white">
+        {signOutError && <p role="alert" className="mb-2 rounded-lg bg-red-950/40 px-3 py-2 text-xs text-red-100">{signOutError}</p>}
+        <div className="mb-2 px-3 text-xs text-white/65"><p className="font-bold text-white">{auth.profile?.display_name || auth.profile?.email || "StudioScrubz User"}</p><p>{auth.profile?.role}</p></div>
+        <button type="button" onClick={() => { setSignOutError(null); void auth.signOut().then(() => router.replace("/login")).catch((error: unknown) => { console.error("Sign out failed", error); setSignOutError(error instanceof Error ? error.message : "Sign out failed. Please try again."); }); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-white/65 transition hover:bg-white/[.07] hover:text-white">
           <NavMarker value="↗" />
           Sign Out
         </button>

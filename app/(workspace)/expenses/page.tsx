@@ -1,1 +1,1 @@
-import {ExpensesPage} from "@/components/expenses/ExpensesPage";export default function Page(){return <ExpensesPage/>}
+import {ExpensesPage} from "@/components/expenses/ExpensesPage";import {SensitiveRoute} from "@/components/auth/SensitiveRoute";export default function Page(){return <SensitiveRoute area="finances"><ExpensesPage/></SensitiveRoute>}

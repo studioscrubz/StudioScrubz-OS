@@ -1,7 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 
-let browserClient: ReturnType<typeof createClient<Database>> | undefined;
+let browserClient: ReturnType<typeof createBrowserClient<Database>> | undefined;
 
 export function getSupabaseClient() {
   if (browserClient) return browserClient;
@@ -13,13 +13,7 @@ export function getSupabaseClient() {
     throw new Error("Supabase is not configured. Add the required public environment variables.");
   }
 
-  browserClient = createClient<Database>(url, publishableKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+  browserClient = createBrowserClient<Database>(url, publishableKey);
 
   return browserClient;
 }

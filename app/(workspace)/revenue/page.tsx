@@ -1,2 +1,3 @@
 import {RevenuePage} from "@/components/revenue/RevenuePage";
-export default function Page(){return <RevenuePage/>}
+import {SensitiveRoute} from "@/components/auth/SensitiveRoute";
+export default function Page(){return <SensitiveRoute area="finances"><RevenuePage/></SensitiveRoute>}
