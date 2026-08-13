@@ -1,2 +1,2 @@
-import { PlaceholderPage } from "@/components/pages/PlaceholderPage";
-export default function Page() { return <PlaceholderPage title="Proposal Calculator" description="Build polished service proposals for prospective work." placeholder="Proposal calculator tools will be built in a future phase." />; }
+import { ProposalBuilder } from "@/components/proposals/ProposalBuilder";
+export default function Page(){return <><header className="mb-7 border-b border-[#143d1a]/10 pb-7"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">Proposal Calculator</h1><p className="mt-3 text-neutral-600">Create service proposals from StudioScrubz estimates and walkthroughs.</p></header><ProposalBuilder/></>}

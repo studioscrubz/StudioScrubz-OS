@@ -7,6 +7,7 @@ import type { EstimateDivision, EstimateStatus, EstimateWithRelations } from "@/
 import { WalkthroughFormModal } from "@/components/walkthroughs/WalkthroughFormModal";
 import { getWalkthroughsForEstimates } from "@/lib/services/walkthroughs";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
+import { ProposalLinkSummary } from "@/components/proposals/ProposalLinkSummary";
 
 type DivisionFilter = "All" | EstimateDivision;
 type StatusFilter = "All" | EstimateStatus;
@@ -53,6 +54,7 @@ export function OpenEstimatesPage() {
       <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_150px_140px_180px_180px]"><label><span className="sr-only">Search estimates</span><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search estimates" className={filterClass} /></label><Filter label="Division" value={division} set={(v) => setDivision(v as DivisionFilter)} options={["All", "Residential", "Commercial"]} /><Filter label="Status" value={status} set={(v) => setStatus(v as StatusFilter)} options={["All", "Open", "Archived"]} /><Filter label="Archive" value={archive} set={(v) => setArchive(v as ArchiveFilter)} options={["Active Records", "Archived Records", "All Records"]} /><Filter label="Sort" value={sort} set={(v) => setSort(v as SortOption)} options={["Newest", "Oldest", "Customer Name", "Estimate Number", "Price High to Low", "Price Low to High"]} /></div>
       {loading ? <Loading /> : filtered.length === 0 ? <Empty hasRecords={estimates.length > 0} /> : <EstimateTable estimates={filtered} walkthroughs={walkthroughs} archivingId={archivingId} view={setViewing} edit={setEditing} archive={archiveRecord} createWalkthrough={setWalkthroughEstimate} viewWalkthrough={setViewingWalkthrough} />}
     </section>
+    <ProposalLinkSummary source="estimate" />
     {viewing && <DetailModal estimate={viewing} close={() => setViewing(null)} />}
     {editing && <EditModal estimate={editing} close={() => setEditing(null)} saved={() => { setEditing(null); void refresh("Estimate updated successfully."); }} />}
     {walkthroughEstimate && <WalkthroughFormModal initialEstimate={walkthroughEstimate} onClose={() => setWalkthroughEstimate(null)} onSaved={() => { setWalkthroughEstimate(null); void refresh("Walkthrough created and linked successfully."); }} onViewDuplicate={(item) => { setWalkthroughEstimate(null); setViewingWalkthrough(item); }} />}

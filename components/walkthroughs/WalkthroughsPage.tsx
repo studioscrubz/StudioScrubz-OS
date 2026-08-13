@@ -5,6 +5,7 @@ import { WalkthroughFormModal, displayClient } from "./WalkthroughFormModal";
 import { archiveWalkthrough, getWalkthroughs, updateWalkthroughStatus } from "@/lib/services/walkthroughs";
 import type { EstimateDivision } from "@/types/estimate";
 import { WALKTHROUGH_STATUSES, type WalkthroughStatus, type WalkthroughWithRelations } from "@/types/walkthrough";
+import { ProposalLinkSummary } from "@/components/proposals/ProposalLinkSummary";
 
 type DivisionFilter = "All" | EstimateDivision;
 type StatusFilter = "All" | WalkthroughStatus;
@@ -37,6 +38,7 @@ export function WalkthroughsPage() {
     <section aria-label="Walkthrough summary" className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4"><Summary label="Total Walkthroughs" value={loading ? "—" : summary.total} /><Summary label="Scheduled" value={loading ? "—" : summary.scheduled} /><Summary label="Completed" value={loading ? "—" : summary.completed} /><Summary label="Proposal Ready" value={loading ? "—" : summary.proposalReady} /></section>
     <section className="mt-6 rounded-2xl border border-[#143d1a]/10 bg-white p-4 shadow-[0_8px_25px_rgba(20,61,26,.04)]"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(250px,1fr)_170px_170px_160px]"><label><span className="sr-only">Search walkthroughs</span><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, property, estimate, or assignee" className={filterClass} /></label><Filter label="Division" value={division} set={(v) => setDivision(v as DivisionFilter)} options={["All", "Residential", "Commercial"]} /><Filter label="Status" value={status} set={(v) => setStatus(v as StatusFilter)} options={["All", ...WALKTHROUGH_STATUSES]} /><Filter label="Date" value={dateFilter} set={(v) => setDateFilter(v as DateFilter)} options={["All", "Today", "Upcoming", "Past"]} /></div></section>
     {loading ? <Loading /> : <Pipeline walkthroughs={filtered} updatingId={updatingId} open={setActive} changeStatus={changeStatus} archive={archiveItem} />}
+    <ProposalLinkSummary source="walkthrough" />
     {creating && <WalkthroughFormModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); void refresh("Walkthrough created successfully."); }} onViewDuplicate={(item) => { setCreating(false); setActive(item); }} />}
     {active && <WalkthroughFormModal walkthrough={active} onClose={() => setActive(null)} onSaved={() => { setActive(null); void refresh("Walkthrough updated successfully."); }} />}
   </>;
