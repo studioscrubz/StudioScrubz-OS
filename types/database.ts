@@ -3,6 +3,7 @@ import type { Property, PropertyInput } from "@/types/property";
 import type { Estimate, EstimateInsert, EstimateUpdate } from "@/types/estimate";
 import type { Walkthrough, WalkthroughInput, WalkthroughUpdate } from "@/types/walkthrough";
 import type { Proposal, ProposalHistory, ProposalInsert, ProposalUpdate } from "@/types/proposal";
+import type { Job, JobInsert, JobUpdate } from "@/types/job";
 
 export interface Database {
   public: {
@@ -45,6 +46,13 @@ export interface Database {
         { foreignKeyName: "proposals_walkthrough_id_fkey"; columns: ["walkthrough_id"]; isOneToOne: false; referencedRelation: "walkthroughs"; referencedColumns: ["id"] },
       ] };
       proposal_history: { Row: ProposalHistory; Insert: Omit<ProposalHistory, "id" | "created_at"> & { id?: string; created_at?: string }; Update: never; Relationships: [{ foreignKeyName: "proposal_history_proposal_id_fkey"; columns: ["proposal_id"]; isOneToOne: false; referencedRelation: "proposals"; referencedColumns: ["id"] }] };
+      jobs: { Row: Job; Insert: JobInsert & { id?: string; created_at?: string; updated_at?: string }; Update: JobUpdate; Relationships: [
+        { foreignKeyName: "jobs_proposal_id_fkey"; columns: ["proposal_id"]; isOneToOne: false; referencedRelation: "proposals"; referencedColumns: ["id"] },
+        { foreignKeyName: "jobs_estimate_id_fkey"; columns: ["estimate_id"]; isOneToOne: false; referencedRelation: "estimates"; referencedColumns: ["id"] },
+        { foreignKeyName: "jobs_walkthrough_id_fkey"; columns: ["walkthrough_id"]; isOneToOne: false; referencedRelation: "walkthroughs"; referencedColumns: ["id"] },
+        { foreignKeyName: "jobs_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+        { foreignKeyName: "jobs_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
+      ] };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

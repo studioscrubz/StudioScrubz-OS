@@ -5,10 +5,10 @@ import type { Walkthrough } from "@/types/walkthrough";
 
 export const PROPOSAL_STATUSES = ["Draft", "Ready for Approval", "Approved", "Sent", "Viewed", "Accepted", "Declined", "Expired", "Archived"] as const;
 export const APPROVAL_STATUSES = ["Not Submitted", "Pending Approval", "Approved", "Changes Requested", "Rejected"] as const;
-export const ACCEPTANCE_METHODS = ["Text Confirmation", "Email Confirmation", "Phone Confirmation", "Signed Proposal", "In Person", "Manual Entry"] as const;
+export const ACCEPTANCE_METHODS = ["Text Message", "Email", "Phone Call", "Signed Proposal", "In Person", "Other"] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 export type ProposalApprovalStatus = (typeof APPROVAL_STATUSES)[number];
-export type ProposalAcceptanceMethod = (typeof ACCEPTANCE_METHODS)[number];
+export type ProposalAcceptanceMethod = Exclude<(typeof ACCEPTANCE_METHODS)[number], "Other"> | `Other: ${string}`;
 export type ProposalScopeItem = { id: string; text: string };
 export type ProposalAdjustment = { id: string; label: string; amount: number };
 export type ProposalTerms = { paymentTerms: string; cancellationPolicy: string; accessRequirements: string; specialConditions: string };
