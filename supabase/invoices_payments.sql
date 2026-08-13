@@ -30,7 +30,7 @@ create index if not exists invoices_issue_date_idx on public.invoices(issue_date
 create index if not exists invoices_due_date_idx on public.invoices(due_date);
 create index if not exists invoices_created_at_idx on public.invoices(created_at desc);
 create index if not exists invoices_archived_at_idx on public.invoices(archived_at);
-create unique index if not exists invoices_one_active_per_job_idx on public.invoices(job_id) where archived_at is null;
+create unique index if not exists invoices_one_active_per_job_idx on public.invoices(job_id) where archived_at is null and status <> 'Cancelled';
 create or replace function public.set_invoices_updated_at() returns trigger language plpgsql security invoker set search_path='' as $$ begin new.updated_at=now(); return new; end; $$;
 revoke all on function public.set_invoices_updated_at() from public;
 drop trigger if exists invoices_set_updated_at on public.invoices;

@@ -1,0 +1,10 @@
+import type {Client} from "@/types/client";import type {Property} from "@/types/property";import type {Job} from "@/types/job";import type {Employee} from "@/types/employee";
+export const EXPENSE_CATEGORIES=["Cleaning Supplies","Equipment","Vehicle / Fuel","Marketing / Advertising","Insurance","Licenses / Permits","Software / Subscriptions","Office Supplies","Repairs / Maintenance","Contract Labor","Professional Services","Rent / Storage","Utilities","Meals","Travel","Training","Bank / Processing Fees","Miscellaneous"] as const;
+export const EXPENSE_PAYMENT_METHODS=["Cash","Check","Credit Card","Debit Card","ACH","Zelle","Venmo","Cash App","Apple Pay","Bank Transfer","Other"] as const;
+export const EXPENSE_STATUSES=["Active","Voided","Archived"] as const;
+export type ExpenseCategory=(typeof EXPENSE_CATEGORIES)[number];export type ExpensePaymentMethod=(typeof EXPENSE_PAYMENT_METHODS)[number];export type ExpenseStatus=(typeof EXPENSE_STATUSES)[number];
+export type Expense={id:string;expense_number:string;expense_date:string;category:ExpenseCategory;description:string;vendor:string|null;amount:number;payment_method:ExpensePaymentMethod|null;client_id:string|null;property_id:string|null;job_id:string|null;employee_id:string|null;receipt_url:string|null;reference_number:string|null;notes:string|null;is_tax_deductible:boolean;status:ExpenseStatus;created_at:string;updated_at:string;archived_at:string|null};
+export type ExpenseInput=Omit<Expense,"id"|"expense_number"|"created_at"|"updated_at"|"archived_at"|"status"|"receipt_url">;export type ExpenseUpdate=Partial<ExpenseInput&Pick<Expense,"status"|"archived_at">>;
+export type ExpenseWithRelations=Expense&{client:Client|null;property:Property|null;job:Job|null;employee:Employee|null};
+export type ExpenseSummary={thisMonth:number;thisYear:number;average:number;taxDeductible:number;largest:number};
+export type ExpenseCategorySummary={category:string;total:number;percentage:number};

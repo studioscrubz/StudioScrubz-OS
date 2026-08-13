@@ -1,5 +1,6 @@
 import type { InvoiceWithRelations } from "@/types/invoice";
 import type { PaymentMethod } from "@/types/payment";
+import type {ExpenseCategorySummary,ExpenseWithRelations} from "@/types/expense";
 
 export const REVENUE_PERIODS=["Today","This Week","This Month","Last Month","This Quarter","This Year","Last Year","All Time","Custom Range"] as const;
 export type RevenuePeriod=(typeof REVENUE_PERIODS)[number];
@@ -16,4 +17,5 @@ export type MonthlyMetric={current:number;previous:number;change:number|null};
 export type MonthlyPerformance={collected:MonthlyMetric;invoicesIssued:MonthlyMetric;paymentsReceived:MonthlyMetric;outstanding:MonthlyMetric};
 export type CompletedWorkValue={total:number;average:number;count:number};
 export type RevenuePaymentRecord={id:string;paymentDate:string;amount:number;method:PaymentMethod;invoiceId:string;invoiceNumber:string;clientId:string;clientName:string;service:string;division:"Residential"|"Commercial"};
-export type RevenueReport={range:RevenueDateRange;summary:RevenueSummary;payments:RevenuePaymentRecord[];invoices:InvoiceWithRelations[];overTime:RevenueDataPoint[];byClient:ClientRevenueSummary[];byService:ServiceRevenueSummary[];byDivision:DivisionRevenueSummary[];byMethod:PaymentMethodSummary[];outstandingInvoices:InvoiceWithRelations[];pastDue:PastDueSummary;recentPayments:RevenuePaymentRecord[];monthly:MonthlyPerformance;completedWork:CompletedWorkValue;topCustomers:ClientRevenueSummary[]};
+export type ProfitDataPoint={key:string;label:string;revenue:number;expenses:number;profit:number};
+export type RevenueReport={range:RevenueDateRange;summary:RevenueSummary;operatingExpenses:number;operatingProfit:number;profitMargin:number|null;expenses:ExpenseWithRelations[];expensesByCategory:ExpenseCategorySummary[];profitOverTime:ProfitDataPoint[];payments:RevenuePaymentRecord[];invoices:InvoiceWithRelations[];overTime:RevenueDataPoint[];byClient:ClientRevenueSummary[];byService:ServiceRevenueSummary[];byDivision:DivisionRevenueSummary[];byMethod:PaymentMethodSummary[];outstandingInvoices:InvoiceWithRelations[];pastDue:PastDueSummary;recentPayments:RevenuePaymentRecord[];monthly:MonthlyPerformance;completedWork:CompletedWorkValue;topCustomers:ClientRevenueSummary[]};
