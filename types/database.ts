@@ -6,6 +6,8 @@ import type { Proposal, ProposalHistory, ProposalInsert, ProposalUpdate } from "
 import type { Job, JobInsert, JobUpdate } from "@/types/job";
 import type { Employee, EmployeeInput, EmployeeUpdate } from "@/types/employee";
 import type { Crew, CrewInput, CrewMember, CrewUpdate } from "@/types/crew";
+import type { Invoice, InvoiceUpdate } from "@/types/invoice";
+import type { Payment, PaymentInsert } from "@/types/payment";
 
 export interface Database {
   public: {
@@ -59,6 +61,8 @@ export interface Database {
       employees:{Row:Employee;Insert:EmployeeInput&{id?:string;employee_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:EmployeeUpdate;Relationships:[]};
       crews:{Row:Crew;Insert:CrewInput&{id?:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:CrewUpdate;Relationships:[{foreignKeyName:"crews_crew_lead_id_fkey";columns:["crew_lead_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
       crew_members:{Row:Omit<CrewMember,"employee">;Insert:{id?:string;crew_id:string;employee_id:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"crew_members_crew_id_fkey";columns:["crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]},{foreignKeyName:"crew_members_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
+      invoices:{Row:Invoice;Insert:Omit<Invoice,"id"|"created_at"|"updated_at"|"archived_at"|"sent_at"|"paid_at">&{id?:string;created_at?:string;updated_at?:string;archived_at?:string|null;sent_at?:string|null;paid_at?:string|null};Update:InvoiceUpdate;Relationships:[{foreignKeyName:"invoices_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"invoices_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"invoices_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"invoices_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]}]};
+      payments:{Row:Payment;Insert:PaymentInsert&{id?:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"payments_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"payments_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"payments_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
