@@ -2,15 +2,11 @@ import type { CrewWithRelations } from "@/types/crew";
 import type { JobWithRelations } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 export type DashboardMetrics = {
-  activeClients: number;
   openEstimates: number;
   upcomingWalkthroughs: number;
   pendingProposals: number;
-  activeJobs: number;
   jobsToday: number;
   employeesClockedIn: number;
-  timeAwaitingApproval: number;
-  outstandingBalance?: number;
   pastDueInvoices?: number;
 };
 export type DashboardAttentionItem = {

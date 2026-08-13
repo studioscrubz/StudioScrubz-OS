@@ -41,6 +41,11 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         await createEstimate(estimatePayload(client.id, property.id, customer, division, result, notes, "Open"));
         await getEstimates();
         setSuccess("Estimate saved successfully and is available in Open Estimates.");
+        setCustomer({ ...blankCustomer });
+        setDivision("Residential");
+        setResidential({ ...defaultResidential, addOns: [] });
+        setCommercial({ ...defaultCommercial, additionalServices: [] });
+        setNotes("");
       }
       onSaved?.();
     } catch (caught) { console.error("Estimate save workflow failed", caught); setError(caught instanceof Error ? caught.message : "The estimate could not be saved. Please try again."); }

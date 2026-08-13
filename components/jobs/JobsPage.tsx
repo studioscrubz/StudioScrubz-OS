@@ -312,7 +312,7 @@ function JobModal({
           rows={[
             ["Client", job.client_name || "—"],
             ["Property", job.property_name || "—"],
-            ["Proposal", job.proposal.proposal_number],
+            ["Proposal", job.proposal?.proposal_number ?? "—"],
             ["Estimate", job.estimate_id || "—"],
             ["Walkthrough", job.walkthrough_id || "—"],
           ]}
@@ -414,7 +414,7 @@ function JobModal({
         ]}
       />
       <JobMileageSummary jobId={job.id} />
-      <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - job.proposal.result.estimatedProfit)} price={job.price} />
+      <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />
       <div className="mt-6 flex flex-wrap gap-2">
         {nextStatuses(job.status).map((x) => (
           <button

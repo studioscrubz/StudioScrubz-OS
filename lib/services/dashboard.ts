@@ -16,13 +16,10 @@ import type { WalkthroughWithRelations } from "@/types/walkthrough";
 export async function getFinancialOperationalMetrics() {
   const { data, error } = await getSupabaseClient()
     .from("invoices")
-    .select("status,balance_due")
+    .select("status")
     .is("archived_at", null);
   if (error) throw error;
   return {
-    outstandingBalance: (data ?? [])
-      .filter((x) => !["Paid", "Cancelled", "Archived"].includes(x.status))
-      .reduce((sum, x) => sum + Number(x.balance_due), 0),
     pastDueInvoices: (data ?? []).filter((x) => x.status === "Past Due").length,
   };
 }
@@ -125,11 +122,6 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const today = localDate();
   const queries = [
     db
-      .from("clients")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "Active")
-      .is("archived_at", null),
-    db
       .from("estimates")
       .select("id", { count: "exact", head: true })
       .eq("status", "Open")
@@ -154,16 +146,6 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     db
       .from("jobs")
       .select("id", { count: "exact", head: true })
-      .in("status", [
-        "Ready to Schedule",
-        "Scheduled",
-        "Crew Assigned",
-        "In Progress",
-      ])
-      .is("archived_at", null),
-    db
-      .from("jobs")
-      .select("id", { count: "exact", head: true })
       .eq("scheduled_date", today)
       .not("status", "in", "(Cancelled,Archived)")
       .is("archived_at", null),
@@ -173,24 +155,16 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       .eq("status", "Open")
       .is("clock_out", null)
       .is("archived_at", null),
-    db
-      .from("time_entries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "Completed")
-      .is("archived_at", null),
   ];
   const results = await Promise.all(queries);
   const failed = results.find((r) => r.error);
   if (failed?.error) throw failed.error;
   return {
-    activeClients: results[0].count ?? 0,
-    openEstimates: results[1].count ?? 0,
-    upcomingWalkthroughs: results[2].count ?? 0,
-    pendingProposals: results[3].count ?? 0,
-    activeJobs: results[4].count ?? 0,
-    jobsToday: results[5].count ?? 0,
-    employeesClockedIn: results[6].count ?? 0,
-    timeAwaitingApproval: results[7].count ?? 0,
+    openEstimates: results[0].count ?? 0,
+    upcomingWalkthroughs: results[1].count ?? 0,
+    pendingProposals: results[2].count ?? 0,
+    jobsToday: results[3].count ?? 0,
+    employeesClockedIn: results[4].count ?? 0,
   };
 }
 export async function getTodaysJobs() {

@@ -1,0 +1,3 @@
+-- Phase 16 supplemental review-only migration.
+alter table public.jobs alter column proposal_id drop not null;alter table public.jobs add column if not exists service_occurrence_id uuid references public.service_occurrences(id) on delete set null;
+drop index if exists public.jobs_one_active_per_proposal_idx;create unique index if not exists jobs_one_active_one_time_per_proposal_idx on public.jobs(proposal_id) where proposal_id is not null and service_occurrence_id is null and archived_at is null;create unique index if not exists jobs_one_active_per_occurrence_idx on public.jobs(service_occurrence_id) where service_occurrence_id is not null and archived_at is null;

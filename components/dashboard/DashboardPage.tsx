@@ -5,6 +5,7 @@ import { getDashboardData } from "@/lib/services/dashboard";
 import { completeJob, startJob } from "@/lib/services/jobs";
 import type { DashboardData } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
+import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
 export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export function DashboardPage() {
   return (
     <>
       <Header />
+      <DashboardRecurringServices />
       {error && (
         <div className="mt-5 flex items-center justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
           <span>{error}</span>
@@ -70,18 +72,14 @@ export function DashboardPage() {
       )}
       {data && (
         <>
-          <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-10">
+          <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
             {[
-              ["Active Clients", data.metrics.activeClients],
               ["Open Estimates", data.metrics.openEstimates],
               ["Upcoming Walkthroughs", data.metrics.upcomingWalkthroughs],
               ["Pending Proposals", data.metrics.pendingProposals],
-              ["Active Jobs", data.metrics.activeJobs],
               ["Jobs Today", data.metrics.jobsToday],
-              ["Outstanding Balance", data.metrics.outstandingBalance ?? 0],
               ["Past Due Invoices", data.metrics.pastDueInvoices ?? 0],
               ["Employees Clocked In", data.metrics.employeesClockedIn],
-              ["Time Awaiting Approval", data.metrics.timeAwaitingApproval],
             ].map(([l, v]) => (
               <Metric key={String(l)} label={String(l)} value={Number(v)} />
             ))}
