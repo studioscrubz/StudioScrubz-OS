@@ -1,7 +1,7 @@
 import type {CrewWithRelations} from "@/types/crew";
 import type {JobWithRelations} from "@/types/job";
 import type {WalkthroughWithRelations} from "@/types/walkthrough";
-export type DashboardMetrics={activeClients:number;openEstimates:number;upcomingWalkthroughs:number;pendingProposals:number;activeJobs:number;jobsToday:number};
+export type DashboardMetrics={activeClients:number;openEstimates:number;upcomingWalkthroughs:number;pendingProposals:number;activeJobs:number;jobsToday:number;outstandingBalance?:number;pastDueInvoices?:number};
 export type DashboardAttentionItem={id:string;type:string;record:string;description:string;action:string;href:string};
 export type DashboardProposalMetrics={draft:number;ready:number;approved:number;sentViewed:number;accepted:number;declined:number;acceptanceRate:number|null};
 export type DashboardEstimateMetrics={open:number;residential:number;commercial:number;createdThisMonth:number};
