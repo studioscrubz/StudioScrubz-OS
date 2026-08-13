@@ -29,20 +29,3 @@ export type ClientInput = {
   status: ClientStatus;
   notes: string | null;
 };
-
-export interface Database {
-  public: {
-    Tables: {
-      clients: {
-        Row: Client;
-        Insert: ClientInput & { id?: string; created_at?: string; updated_at?: string; archived_at?: string | null };
-        Update: Partial<ClientInput> & { updated_at?: string; archived_at?: string | null };
-        Relationships: [];
-      };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
-  };
-}
