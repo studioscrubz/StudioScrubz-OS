@@ -1,0 +1,26 @@
+-- Review only. Do not execute automatically.
+create extension if not exists pgcrypto;
+create table if not exists public.employees (
+ id uuid primary key default gen_random_uuid(), employee_number text not null unique, first_name text not null, last_name text not null,
+ preferred_name text, email text, phone text, department text not null check(department in ('Scrub Technicians','Sales','Administration','Management')),
+ job_title text, employment_status text not null default 'Active' check(employment_status in ('Active','Inactive','On Leave','Terminated','Archived')),
+ employment_type text check(employment_type in ('Full-Time','Part-Time','On-Call','1099','Temporary')), hourly_rate numeric not null default 0,
+ commission_rate numeric not null default 0, hire_date date, notes text, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), archived_at timestamptz
+);
+create index if not exists employees_department_idx on public.employees(department); create index if not exists employees_employment_status_idx on public.employees(employment_status);
+create index if not exists employees_created_at_idx on public.employees(created_at desc); create index if not exists employees_archived_at_idx on public.employees(archived_at);
+create table if not exists public.crews (id uuid primary key default gen_random_uuid(),crew_name text not null unique,crew_lead_id uuid references public.employees(id) on delete set null,status text not null default 'Active' check(status in ('Active','Inactive','Archived')),notes text,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),archived_at timestamptz);
+create index if not exists crews_crew_lead_id_idx on public.crews(crew_lead_id);create index if not exists crews_status_idx on public.crews(status);create index if not exists crews_created_at_idx on public.crews(created_at desc);create index if not exists crews_archived_at_idx on public.crews(archived_at);
+create table if not exists public.crew_members(id uuid primary key default gen_random_uuid(),crew_id uuid not null references public.crews(id) on delete cascade,employee_id uuid not null references public.employees(id) on delete restrict,created_at timestamptz not null default now(),unique(crew_id,employee_id));
+create index if not exists crew_members_crew_id_idx on public.crew_members(crew_id);create index if not exists crew_members_employee_id_idx on public.crew_members(employee_id);
+create or replace function public.set_phase8_updated_at() returns trigger language plpgsql security invoker set search_path='' as $$ begin new.updated_at=now();return new;end;$$;revoke all on function public.set_phase8_updated_at() from public;
+drop trigger if exists employees_set_updated_at on public.employees;create trigger employees_set_updated_at before update on public.employees for each row execute function public.set_phase8_updated_at();
+drop trigger if exists crews_set_updated_at on public.crews;create trigger crews_set_updated_at before update on public.crews for each row execute function public.set_phase8_updated_at();
+alter table public.employees enable row level security;alter table public.crews enable row level security;alter table public.crew_members enable row level security;
+grant select,insert,update on public.employees,public.crews to anon,authenticated;grant select,insert,delete on public.crew_members to anon,authenticated;
+drop policy if exists "Temporary employees access" on public.employees;drop policy if exists "Temporary employees read" on public.employees;drop policy if exists "Temporary employees create" on public.employees;drop policy if exists "Temporary employees update" on public.employees;
+create policy "Temporary employees read" on public.employees for select to anon,authenticated using(true);create policy "Temporary employees create" on public.employees for insert to anon,authenticated with check(true);create policy "Temporary employees update" on public.employees for update to anon,authenticated using(true) with check(true);
+drop policy if exists "Temporary crews access" on public.crews;drop policy if exists "Temporary crews read" on public.crews;drop policy if exists "Temporary crews create" on public.crews;drop policy if exists "Temporary crews update" on public.crews;
+create policy "Temporary crews read" on public.crews for select to anon,authenticated using(true);create policy "Temporary crews create" on public.crews for insert to anon,authenticated with check(true);create policy "Temporary crews update" on public.crews for update to anon,authenticated using(true) with check(true);
+drop policy if exists "Temporary crew members read" on public.crew_members;drop policy if exists "Temporary crew members add" on public.crew_members;drop policy if exists "Temporary crew members remove" on public.crew_members;
+create policy "Temporary crew members read" on public.crew_members for select to anon,authenticated using(true);create policy "Temporary crew members add" on public.crew_members for insert to anon,authenticated with check(true);create policy "Temporary crew members remove" on public.crew_members for delete to anon,authenticated using(true);

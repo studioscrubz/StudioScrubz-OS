@@ -1,2 +1,1 @@
-import { PlaceholderPage } from "@/components/pages/PlaceholderPage";
-export default function Page() { return <PlaceholderPage title="Sales" description="Support the StudioScrubz sales team and its workflow." placeholder="Sales employee records will be built in a future phase." />; }
+import {EmployeeDirectory} from "@/components/employees/EmployeeDirectory";export default function Page(){return <EmployeeDirectory departments={["Sales"]} title="Sales" description="Support the StudioScrubz sales team and its workflow." directory={false}/>}

@@ -13,7 +13,7 @@ export type Job = {
   id: string; job_number: string; proposal_id: string; estimate_id: string | null; walkthrough_id: string | null;
   client_id: string; property_id: string; division: EstimateDivision; client_name: string | null; property_name: string | null;
   service_name: string | null; frequency: Frequency; status: JobStatus; scheduled_date: string | null; start_time: string | null;
-  estimated_duration: number | null; assigned_crew_name: string | null; crew_lead_name: string | null; assigned_team: JobAssignedTeam;
+  estimated_duration: number | null; assigned_crew_id:string|null; assigned_crew_name: string | null; crew_lead_name: string | null; assigned_team: JobAssignedTeam;
   price: number; deposit: number; balance: number; labor_hours: number; recommended_crew_size: number;
   scope: ProposalScopeItem[]; checklist: JobChecklistItem[]; photos: JobPhoto[]; access_instructions: string | null;
   internal_notes: string | null; completed_at: string | null; created_at: string; updated_at: string; archived_at: string | null;
