@@ -44,6 +44,7 @@ const navItems: Array<NavLink | NavGroup> = [
   { label: "Invoices", href: "/invoices", marker: "I" },
   { label: "Revenue", href: "/revenue", marker: "R" },
   { label: "Expenses", href: "/expenses", marker: "X" },
+  { label: "Vehicles", href: "/vehicles", marker: "V" },
   { label: "Settings", href: "/settings", marker: "S" },
 ];
 
