@@ -21,3 +21,4 @@ export type Job = {
 export type JobInsert = Omit<Job, "id" | "job_number" | "created_at" | "updated_at" | "archived_at"> & { job_number?: string; archived_at?: string | null };
 export type JobUpdate = Partial<Omit<Job, "id" | "job_number" | "proposal_id" | "created_at" | "updated_at">>;
 export type JobWithRelations = Job & { proposal: Proposal; client: Client; property: Property };
+export type CrewConflict = Pick<JobWithRelations,"id"|"job_number"|"client_name"|"property_name"|"scheduled_date"|"start_time"|"estimated_duration">;
