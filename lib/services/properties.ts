@@ -24,6 +24,7 @@ export async function getPropertyClients(): Promise<Client[]> {
 }
 
 export async function createProperty(input: PropertyInput): Promise<Property> {
+  if (!input.client_id) throw new Error("Select a Client before creating a Property.");
   const { data, error } = await getSupabaseClient().from("properties").insert(input).select().single();
   if (error) throw error;
   return data;
@@ -42,6 +43,7 @@ export async function archiveProperty(id: string): Promise<Property> {
 }
 
 export async function findPotentialDuplicateProperties(input: PropertyInput): Promise<Property[]> {
+  if (!input.client_id) return [];
   const { data, error } = await getSupabaseClient().from("properties").select("*").eq("client_id", input.client_id);
   if (error) throw error;
 

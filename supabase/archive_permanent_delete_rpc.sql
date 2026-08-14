@@ -13,8 +13,6 @@ set search_path = ''
 as $$
 declare
   v_deleted integer := 0;
-  v_dependency_message constant text :=
-    'This record cannot be permanently deleted because it is linked to existing business records.';
 begin
   if (select auth.uid()) is null or not public.is_master_admin() then
     raise exception 'Master Admin authorization is required for permanent deletion.';
@@ -25,61 +23,30 @@ begin
       if not exists (select 1 from public.clients where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.properties where client_id = p_record_id)
-        or exists (select 1 from public.estimates where client_id = p_record_id)
-        or exists (select 1 from public.walkthroughs where client_id = p_record_id)
-        or exists (select 1 from public.proposals where client_id = p_record_id)
-        or exists (select 1 from public.jobs where client_id = p_record_id)
-        or exists (select 1 from public.invoices where client_id = p_record_id)
-        or exists (select 1 from public.payments where client_id = p_record_id)
-        or exists (select 1 from public.expenses where client_id = p_record_id)
-        or exists (select 1 from public.mileage_entries where client_id = p_record_id)
-        or exists (select 1 from public.service_agreements where client_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.clients where id = p_record_id and archived_at is not null;
 
     when 'Properties' then
       if not exists (select 1 from public.properties where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.estimates where property_id = p_record_id)
-        or exists (select 1 from public.walkthroughs where property_id = p_record_id)
-        or exists (select 1 from public.proposals where property_id = p_record_id)
-        or exists (select 1 from public.jobs where property_id = p_record_id)
-        or exists (select 1 from public.invoices where property_id = p_record_id)
-        or exists (select 1 from public.expenses where property_id = p_record_id)
-        or exists (select 1 from public.mileage_entries where property_id = p_record_id)
-        or exists (select 1 from public.service_agreements where property_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.properties where id = p_record_id and archived_at is not null;
 
     when 'Estimates' then
       if not exists (select 1 from public.estimates where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.walkthroughs where estimate_id = p_record_id)
-        or exists (select 1 from public.proposals where estimate_id = p_record_id)
-        or exists (select 1 from public.jobs where estimate_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.estimates where id = p_record_id and archived_at is not null;
 
     when 'Walkthroughs' then
       if not exists (select 1 from public.walkthroughs where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.proposals where walkthrough_id = p_record_id)
-        or exists (select 1 from public.jobs where walkthrough_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.walkthroughs where id = p_record_id and archived_at is not null;
 
     when 'Proposals' then
       if not exists (select 1 from public.proposals where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.jobs where proposal_id = p_record_id)
-        or exists (select 1 from public.invoices where proposal_id = p_record_id)
-        or exists (select 1 from public.service_agreements where proposal_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.proposal_history where proposal_id = p_record_id;
       delete from public.proposals where id = p_record_id and archived_at is not null;
 
@@ -87,49 +54,25 @@ begin
       if not exists (select 1 from public.jobs where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.invoices where job_id = p_record_id)
-        or exists (select 1 from public.payments where job_id = p_record_id)
-        or exists (select 1 from public.expenses where job_id = p_record_id)
-        or exists (select 1 from public.mileage_entries where job_id = p_record_id)
-        or exists (select 1 from public.time_entries where job_id = p_record_id)
-        or exists (select 1 from public.service_occurrences where job_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.jobs where id = p_record_id and archived_at is not null;
 
     when 'Employees' then
       if not exists (select 1 from public.employees where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.crews where crew_lead_id = p_record_id)
-        or exists (select 1 from public.crew_members where employee_id = p_record_id)
-        or exists (select 1 from public.expenses where employee_id = p_record_id)
-        or exists (select 1 from public.vehicles where assigned_employee_id = p_record_id)
-        or exists (select 1 from public.mileage_entries where employee_id = p_record_id)
-        or exists (select 1 from public.time_entries where employee_id = p_record_id)
-        or exists (select 1 from public.user_profiles where employee_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
+      delete from public.crew_members where employee_id = p_record_id;
       delete from public.employees where id = p_record_id and archived_at is not null;
 
     when 'Crews' then
       if not exists (select 1 from public.crews where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (select 1 from public.jobs where assigned_crew_id = p_record_id)
-        or exists (select 1 from public.vehicles where assigned_crew_id = p_record_id)
-        or exists (select 1 from public.mileage_entries where crew_id = p_record_id)
-        or exists (select 1 from public.time_entries where crew_id = p_record_id)
-        or exists (select 1 from public.service_agreements where assigned_crew_id = p_record_id)
-        or exists (select 1 from public.service_occurrences where assigned_crew_id = p_record_id)
-      then raise exception '%', v_dependency_message; end if;
       delete from public.crew_members where crew_id = p_record_id;
       delete from public.crews where id = p_record_id and archived_at is not null;
 
     when 'Invoices' then
       if not exists (select 1 from public.invoices where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
-      end if;
-      if exists (select 1 from public.payments where invoice_id = p_record_id) then
-        raise exception '%', v_dependency_message;
       end if;
       delete from public.invoices where id = p_record_id and archived_at is not null;
 
@@ -142,9 +85,6 @@ begin
     when 'Vehicles' then
       if not exists (select 1 from public.vehicles where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
-      end if;
-      if exists (select 1 from public.mileage_entries where vehicle_id = p_record_id) then
-        raise exception '%', v_dependency_message;
       end if;
       delete from public.vehicles where id = p_record_id and archived_at is not null;
 
@@ -164,16 +104,6 @@ begin
       if not exists (select 1 from public.service_agreements where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
-      if exists (
-        select 1 from public.service_occurrences
-        where agreement_id = p_record_id and job_id is not null
-      ) or exists (
-        select 1
-        from public.jobs j
-        join public.service_occurrences so
-          on so.id = j.service_occurrence_id
-        where so.agreement_id = p_record_id
-      ) then raise exception '%', v_dependency_message; end if;
       delete from public.service_occurrences where agreement_id = p_record_id;
       delete from public.service_agreements where id = p_record_id and archived_at is not null;
 

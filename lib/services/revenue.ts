@@ -25,20 +25,22 @@ import {
 const invoiceSelect =
   "*, job:jobs!invoices_job_id_fkey(*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)), proposal:proposals!invoices_proposal_id_fkey(*), client:clients!invoices_client_id_fkey(*), property:properties!invoices_property_id_fkey(*)";
 const paymentSelect =
-  "id,amount,payment_date,payment_method,invoice:invoices!payments_invoice_id_fkey(id,invoice_number,client_id,client_name,service_name,job:jobs!invoices_job_id_fkey(division))";
+  "id,amount,payment_date,payment_method,client_id,job_id,invoice:invoices!payments_invoice_id_fkey(id,invoice_number,client_id,client_name,service_name,job:jobs!invoices_job_id_fkey(division))";
 type RawPayment = {
   id: string;
   amount: number;
   payment_date: string;
   payment_method: PaymentMethod;
+  client_id: string | null;
+  job_id: string | null;
   invoice: {
     id: string;
     invoice_number: string;
-    client_id: string;
+    client_id: string | null;
     client_name: string | null;
     service_name: string | null;
-    job: { division: "Residential" | "Commercial" };
-  };
+    job: { division: "Residential" | "Commercial" } | null;
+  } | null;
 };
 
 export async function getRevenueReport(
@@ -171,6 +173,7 @@ export function getRevenueByClient(
 ): ClientRevenueSummary[] {
   const map = new Map<string, ClientRevenueSummary>();
   for (const invoice of invoices) {
+    if (!invoice.client_id) continue;
     const row = map.get(invoice.client_id) ?? {
       clientId: invoice.client_id,
       clientName: invoice.client_name || "Unnamed client",
@@ -217,7 +220,7 @@ export function getRevenueByService(
       totals: 0,
     };
     row.collected += p.amount;
-    row.ids.add(p.invoiceId);
+    row.ids.add(p.invoiceId ?? `payment:${p.id}`);
     map.set(p.service, row);
   }
   for (const i of invoices) {
@@ -249,7 +252,7 @@ export function getRevenueByDivision(
       division,
       collected,
       percentage: total ? (collected / total) * 100 : 0,
-      invoiceCount: invoices.filter((x) => x.job.division === division).length,
+      invoiceCount: invoices.filter((x) => x.job?.division === division).length,
     };
   });
 }
@@ -435,12 +438,12 @@ function mapPayment(x: RawPayment): RevenuePaymentRecord {
     paymentDate: x.payment_date,
     amount: Number(x.amount),
     method: x.payment_method,
-    invoiceId: x.invoice.id,
-    invoiceNumber: x.invoice.invoice_number,
-    clientId: x.invoice.client_id,
-    clientName: x.invoice.client_name || "Unnamed client",
-    service: x.invoice.service_name || "Unspecified service",
-    division: x.invoice.job.division,
+    invoiceId: x.invoice?.id ?? null,
+    invoiceNumber: x.invoice?.invoice_number ?? "Deleted Invoice",
+    clientId: x.invoice?.client_id ?? x.client_id ?? `deleted-client:${x.id}`,
+    clientName: x.invoice?.client_name || "Deleted Client",
+    service: x.invoice?.service_name || "Unlinked payment",
+    division: x.invoice?.job?.division ?? null,
   };
 }
 function groupKey(date: string, group: RevenueGroup) {

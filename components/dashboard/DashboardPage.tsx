@@ -230,7 +230,7 @@ function Upcoming({ rows }: { rows: DashboardData["upcomingWalkthroughs"] }) {
                 <Badge text={w.status} />
               </div>
               <p className="mt-1 text-sm">
-                {client(w.client)} · {w.property.address}
+                {client(w.client)} · {w.property?.address||"Deleted Property"}
               </p>
               <p className="text-xs text-neutral-500">{w.division}</p>
             </div>
@@ -505,7 +505,8 @@ function client(c: {
   first_name: string | null;
   last_name: string | null;
   company_name: string | null;
-}) {
+} | null) {
+  if (!c) return "Deleted Client";
   return (
     [c.first_name, c.last_name].filter(Boolean).join(" ") ||
     c.company_name ||

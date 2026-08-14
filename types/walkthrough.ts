@@ -30,8 +30,8 @@ export type WalkthroughMeasurements = {
 export type Walkthrough = {
   id: string;
   estimate_id: string | null;
-  client_id: string;
-  property_id: string;
+  client_id: string | null;
+  property_id: string | null;
   division: EstimateDivision;
   walkthrough_date: string | null;
   walkthrough_time: string | null;
@@ -51,7 +51,7 @@ export type Walkthrough = {
 };
 export type WalkthroughInput = Omit<Walkthrough, "id" | "created_at" | "updated_at" | "archived_at"> & { archived_at?: string | null };
 export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | "updated_at">>;
-export type WalkthroughWithRelations = Walkthrough & { client: Client; property: Property; estimate: Estimate | null };
+export type WalkthroughWithRelations = Walkthrough & { client: Client | null; property: Property | null; estimate: Estimate | null };
 export type AvailableEstimate = EstimateWithRelations;
 
 export const EMPTY_MEASUREMENTS: WalkthroughMeasurements = { overallCondition: "", squareFeet: null, bedrooms: null, bathrooms: null, floors: null, restrooms: null, kitchenAreas: null, specialtyAreas: "", accessRestrictions: "", parkingLoading: "", waterAccess: "", powerAccess: "", securityAlarm: "", pets: "", heavySoilBuildup: false, damageObserved: "", hazardsObserved: "" };

@@ -66,6 +66,7 @@ export async function findOrCreateEstimateProperty(clientId: string, customer: C
 }
 
 export async function updateEstimateRelationships(estimate: EstimateWithRelations, customer: CustomerInformation, division: EstimateDivision): Promise<{ client: Client; property: Property }> {
+  if (!estimate.client_id || !estimate.property_id || !estimate.client) throw new Error("This historical Estimate has a deleted Client or Property relationship.");
   const clientInput: ClientInput = { client_type: division, first_name: clean(customer.firstName), last_name: clean(customer.lastName), company_name: division === "Commercial" ? clean(customer.companyName) : null, phone: clean(customer.phone), email: clean(customer.email), status: estimate.client.status, notes: estimate.client.notes };
   const { data: client, error: clientError } = await getSupabaseClient().from("clients").update(clientInput).eq("id", estimate.client_id).select().single();
   if (clientError) throw new Error(`Client update failed: ${clientError.message}`);

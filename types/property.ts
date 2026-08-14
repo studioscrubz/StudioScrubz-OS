@@ -5,7 +5,7 @@ export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
 export type Property = {
   id: string;
-  client_id: string;
+  client_id: string | null;
   property_name: string | null;
   property_type: PropertyType;
   address: string;
@@ -25,7 +25,7 @@ export type Property = {
 };
 
 export type PropertyInput = {
-  client_id: string;
+  client_id: string | null;
   property_name: string | null;
   property_type: PropertyType;
   address: string;
@@ -41,4 +41,4 @@ export type PropertyInput = {
   notes: string | null;
 };
 
-export type PropertyWithClient = Property & { client: Client };
+export type PropertyWithClient = Property & { client: Client | null };

@@ -33,8 +33,8 @@ export type Job = {
   service_occurrence_id: string | null;
   estimate_id: string | null;
   walkthrough_id: string | null;
-  client_id: string;
-  property_id: string;
+  client_id: string | null;
+  property_id: string | null;
   division: EstimateDivision;
   client_name: string | null;
   property_name: string | null;

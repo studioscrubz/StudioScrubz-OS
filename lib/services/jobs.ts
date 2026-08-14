@@ -106,6 +106,8 @@ export async function createJobFromProposal(
     throw new Error("Only accepted proposals can create jobs.");
   if (proposal.frequency !== "One-Time")
     throw new Error("Recurring proposals must create a Service Agreement.");
+  if (!proposal.client_id || !proposal.property_id)
+    throw new Error("This Proposal has a deleted Client or Property relationship and cannot create a Job.");
   const existing = await getJobForProposal(proposalId);
   if (existing) return existing;
   const input = {
@@ -138,7 +140,7 @@ export async function createJobFromProposal(
     photos: [],
     access_instructions:
       proposal.result.terms.accessRequirements ||
-      proposal.property.access_instructions,
+      proposal.property?.access_instructions || null,
     internal_notes: proposal.notes,
     completed_at: null,
   };

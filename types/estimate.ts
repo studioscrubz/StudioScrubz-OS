@@ -84,8 +84,8 @@ export type EstimateResult = {
 export type Estimate = {
   id: string;
   estimate_number: string;
-  client_id: string;
-  property_id: string;
+  client_id: string | null;
+  property_id: string | null;
   division: EstimateDivision;
   customer_first_name: string | null;
   customer_last_name: string | null;
@@ -104,4 +104,4 @@ export type Estimate = {
 
 export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at"> & { archived_at?: string | null };
 export type EstimateUpdate = Partial<Omit<Estimate, "id" | "created_at" | "updated_at">>;
-export type EstimateWithRelations = Estimate & { client: Client; property: Property };
+export type EstimateWithRelations = Estimate & { client: Client | null; property: Property | null };

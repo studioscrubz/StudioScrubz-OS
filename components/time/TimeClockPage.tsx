@@ -84,7 +84,7 @@ export function TimeClockPage() {
           .filter((x) => {
             const hay = [
               employeeName(x.employee),
-              x.employee.employee_number,
+              x.employee?.employee_number,
               x.time_entry_number,
               x.job?.job_number,
               x.crew?.crew_name,
@@ -649,7 +649,7 @@ function Empty({ text }: { text: string }) {
 }
 function pick(x: TimeEntryWithRelations): TimeEntryInput {
   return {
-    employee_id: x.employee_id,
+    employee_id: x.employee_id ?? "",
     job_id: x.job_id,
     crew_id: x.crew_id,
     work_date: x.work_date,

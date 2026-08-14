@@ -86,6 +86,8 @@ export async function createJobFromOccurrence(
   if (["Skipped", "Cancelled"].includes(occurrence.status))
     throw new Error("Skipped or cancelled occurrences cannot create Jobs.");
   const a = await getAgreementById(occurrence.agreement_id);
+  if (!a.client_id || !a.property_id || !a.client || !a.property)
+    throw new Error("This Agreement has a deleted Client or Property relationship and cannot create a Job.");
   const assignedCrew = a.assigned_crew_id ? await getCrewById(a.assigned_crew_id) : null;
   const existing = await db
     .from("jobs")

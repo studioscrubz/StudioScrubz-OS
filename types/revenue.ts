@@ -81,12 +81,12 @@ export type RevenuePaymentRecord = {
   paymentDate: string;
   amount: number;
   method: PaymentMethod;
-  invoiceId: string;
+  invoiceId: string | null;
   invoiceNumber: string;
   clientId: string;
   clientName: string;
   service: string;
-  division: "Residential" | "Commercial";
+  division: "Residential" | "Commercial" | null;
 };
 export type ProfitDataPoint = {
   key: string;

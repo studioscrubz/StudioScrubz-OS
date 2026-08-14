@@ -105,7 +105,7 @@ export function VehiclesPage() {
         .filter((x) => {
           const hay = [
             x.mileage_number,
-            vehicleLabel(x.vehicle),
+            x.vehicle?vehicleLabel(x.vehicle):"Deleted Vehicle",
             x.trip_purpose,
             x.job?.job_number,
             x.client?.company_name,
@@ -358,7 +358,7 @@ export function VehiclesPage() {
                 <tr key={x.id} className="border-t">
                   <td className="p-3 font-bold">{x.mileage_number}</td>
                   <td className="p-3">{x.trip_date}</td>
-                  <td className="p-3">{vehicleLabel(x.vehicle)}</td>
+                  <td className="p-3">{x.vehicle?vehicleLabel(x.vehicle):"Deleted Vehicle"}</td>
                   <td className="p-3">
                     {x.trip_purpose}
                     <p className="text-xs text-neutral-500">
@@ -1129,7 +1129,7 @@ function sortMileage(
   if (s === "Deduction High to Low")
     return b.deductible_amount - a.deductible_amount;
   if (s === "Vehicle")
-    return vehicleLabel(a.vehicle).localeCompare(vehicleLabel(b.vehicle));
+    return (a.vehicle?vehicleLabel(a.vehicle):"Deleted Vehicle").localeCompare(b.vehicle?vehicleLabel(b.vehicle):"Deleted Vehicle");
   return b.trip_date.localeCompare(a.trip_date);
 }
 function exportCsv(rows: MileageWithRelations[]) {
@@ -1154,7 +1154,7 @@ function exportCsv(rows: MileageWithRelations[]) {
       ...rows.map((x) => [
         x.trip_date,
         x.mileage_number,
-        vehicleLabel(x.vehicle),
+        x.vehicle?vehicleLabel(x.vehicle):"Deleted Vehicle",
         x.employee ? `${x.employee.first_name} ${x.employee.last_name}` : "",
         x.crew?.crew_name || "",
         x.job?.job_number || "",
