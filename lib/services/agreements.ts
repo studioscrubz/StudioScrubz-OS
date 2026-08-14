@@ -83,6 +83,8 @@ export async function createAgreementFromProposal(proposalId: string) {
     billing_type: "Per Visit",
     billing_amount: p.result.perVisitTotal,
     payment_terms: p.result.terms.paymentTerms,
+    agreement_terms: null,
+    cancellation_terms: null,
     scope: p.result.scope,
     special_instructions: p.result.terms.accessRequirements,
     assigned_crew_id: null,
@@ -102,15 +104,22 @@ export async function updateAgreement(id: string, input: AgreementUpdate) {
   if (error) throw error;
   return data as AgreementWithRelations;
 }
-export const activateAgreement = (id: string) =>
-  updateAgreement(id, { status: "Active" });
-export const pauseAgreement = (id: string) =>
-  updateAgreement(id, { status: "Paused" });
-export const resumeAgreement = activateAgreement;
-export const completeAgreement = (id: string) =>
-  updateAgreement(id, { status: "Completed" });
-export const cancelAgreement = (id: string) =>
-  updateAgreement(id, { status: "Cancelled" });
+async function transition(id: string, allowed: ServiceAgreement["status"][], status: ServiceAgreement["status"], extra: AgreementUpdate = {}) {
+  const current = await getAgreementById(id);
+  if (!allowed.includes(current.status)) throw new Error(`A ${current.status} agreement cannot be changed to ${status}.`);
+  return updateAgreement(id, { ...extra, status });
+}
+export async function markAgreementSent(id: string, sentTo: string, sentBy: string, token: string, tokenExpiresAt: string) {
+  if (!sentTo.trim()) throw new Error("A client email address is required.");
+  if (!token) throw new Error("A secure agreement access token is required.");
+  return transition(id, ["Draft", "Sent"], "Sent", { sent_at: new Date().toISOString(), sent_to: sentTo.trim(), sent_by: sentBy.trim() || null, client_access_token: token, client_access_token_expires_at: tokenExpiresAt });
+}
+export const markAgreementAccepted = (id: string) => transition(id, ["Sent"], "Accepted", { accepted_at: new Date().toISOString() });
+export const activateAgreement = (id: string) => transition(id, ["Accepted"], "Active");
+export const pauseAgreement = (id: string) => transition(id, ["Active"], "Paused");
+export const resumeAgreement = (id: string) => transition(id, ["Paused"], "Active");
+export const completeAgreement = (id: string) => transition(id, ["Active"], "Completed");
+export const cancelAgreement = (id: string) => transition(id, ["Active", "Paused"], "Cancelled");
 export const archiveAgreement = (id: string) =>
   updateAgreement(id, {
     status: "Archived",
@@ -163,6 +172,9 @@ export async function getAgreementFinancialSummary(
 async function completedJobs(ids:string[]){const{count,error}=await getSupabaseClient().from("jobs").select("id",{count:"exact",head:true}).in("id",ids).eq("status","Completed");if(error)throw error;return count??0}
 export function monthlyRecurringRevenue(a: ServiceAgreement) {
   if (a.status !== "Active") return 0;
+  return estimatedMonthlyAmount(a);
+}
+export function estimatedMonthlyAmount(a: ServiceAgreement) {
   if (a.billing_type === "Monthly") return a.billing_amount;
   if (a.billing_type === "Weekly") return (a.billing_amount * 52) / 12;
   if (a.billing_type === "Biweekly") return (a.billing_amount * 26) / 12;

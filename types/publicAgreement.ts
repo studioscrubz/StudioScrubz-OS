@@ -1,0 +1,35 @@
+import type { AgreementBillingType, AgreementFrequency, AgreementStatus, Weekday } from "@/types/agreement";
+
+export type PublicAgreement = {
+  agreement_number: string;
+  status: AgreementStatus;
+  client_name: string;
+  property_location: string;
+  service_name: string;
+  scope: string;
+  frequency: AgreementFrequency;
+  days_of_week: Weekday[];
+  default_start_time: string | null;
+  start_date: string;
+  end_date: string | null;
+  billing_type: AgreementBillingType;
+  billing_amount: number;
+  payment_terms: string | null;
+  agreement_terms: string | null;
+  cancellation_terms: string | null;
+  special_instructions: string | null;
+  client_signed_at: string | null;
+  client_signed_name: string | null;
+  client_signature: string | null;
+  client_consent_text: string | null;
+  client_consent_at: string | null;
+  business_name: string;
+  tagline: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  website: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+};

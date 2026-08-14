@@ -110,6 +110,8 @@ export interface Database {
       add_operational_crew_member:{Args:{p_crew_id:string;p_employee_id:string};Returns:string};
       remove_operational_crew_member:{Args:{p_member_id:string};Returns:undefined};
       master_admin_permanently_delete_archived_record:{Args:{p_record_type:string;p_record_id:string};Returns:string};
+      get_service_agreement_by_token:{Args:{p_token:string};Returns:import("@/types/publicAgreement").PublicAgreement};
+      accept_service_agreement_by_token:{Args:{p_token:string;p_signed_name:string;p_signature:string;p_consent:boolean};Returns:import("@/types/publicAgreement").PublicAgreement};
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
