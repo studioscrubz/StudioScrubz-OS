@@ -14,6 +14,7 @@ import { getClients } from "@/lib/services/clients";
 import { getProperties } from "@/lib/services/properties";
 import { getActiveCrews } from "@/lib/services/crews";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
+import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import { AGREEMENT_BILLING_TYPES, AGREEMENT_FREQUENCIES, AGREEMENT_STATUSES, type AgreementInput, type AgreementWithRelations } from "@/types/agreement";
 import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 import type { Client } from "@/types/client";
@@ -108,7 +109,7 @@ function SendAgreementModal({ agreement, settings, sender, close, sent }: { agre
   const [token, setToken] = useState(hasValidToken ? agreement.client_access_token || "" : "");
   const [reviewUrl, setReviewUrl] = useState("");
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  useEffect(() => { const nextToken = token || generateSecureToken(); if (!token) setToken(nextToken); setReviewUrl(`${window.location.origin}/agreement/${nextToken}`); }, [token]);
+  useEffect(() => { const nextToken = token || generateSecureToken(); if (!token) setToken(nextToken); setReviewUrl(`${getPublicSiteUrl()}/agreement/${nextToken}`); }, [token]);
   async function submit() {
     if (!email.trim()) { setError("Client email is required."); return; } if (!token || !reviewUrl) { setError("The secure review link is still being prepared."); return; }
     setBusy(true); setError(null);
