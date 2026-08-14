@@ -109,6 +109,7 @@ export interface Database {
       manage_operational_crew:{Args:{p_crew_id:string|null;p_crew_name:string;p_crew_lead_id:string|null;p_status:string;p_notes:string|null;p_archive?:boolean};Returns:Crew};
       add_operational_crew_member:{Args:{p_crew_id:string;p_employee_id:string};Returns:string};
       remove_operational_crew_member:{Args:{p_member_id:string};Returns:undefined};
+      master_admin_permanently_delete_archived_record:{Args:{p_record_type:string;p_record_id:string};Returns:string};
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

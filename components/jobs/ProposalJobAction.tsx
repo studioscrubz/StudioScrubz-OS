@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createJobFromProposal, getJobForProposal } from "@/lib/services/jobs";
 import type { JobWithRelations } from "@/types/job";
@@ -8,6 +9,7 @@ import type { JobWithRelations } from "@/types/job";
 export const PROPOSAL_JOB_CREATED_EVENT = "studioscrubz:proposal-job-created";
 
 export function ProposalJobAction({ proposalId }: { proposalId: string }) {
+  const router = useRouter();
   const [job, setJob] = useState<JobWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,6 +43,7 @@ export function ProposalJobAction({ proposalId }: { proposalId: string }) {
       const linked = (await getJobForProposal(proposalId)) ?? created;
       setJob(linked);
       window.dispatchEvent(new Event(PROPOSAL_JOB_CREATED_EVENT));
+      router.push(`/jobs?jobId=${linked.id}`);
     } catch (cause) {
       console.error("Job creation failed", cause);
       setFailed(true);

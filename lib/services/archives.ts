@@ -86,12 +86,11 @@ export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): P
   if (!user) throw new Error("You must be signed in to permanently delete archived records.");
   const profile = await getCurrentProfile(user.id);
   if (!canPermanentlyDelete(profile)) throw new Error("Master Admin authorization is required for permanent deletion.");
-  const check = await canPermanentlyDeleteRecord(record);
-  if (!check.allowed) throw new Error(check.reason ?? "This record cannot be permanently deleted.");
-  const config = configFor(record.type);
-  const { error } = await archiveDb().from(config.table).delete().eq("id", record.id).not("archived_at", "is", null);
-  if (error?.code === "23503") throw new Error("This record cannot be permanently deleted because it is linked to existing business records.");
-  if (error) throw new Error("Permanent deletion was rejected. Verify Master Admin security policies are active.");
+  const { error } = await getSupabaseClient().rpc("master_admin_permanently_delete_archived_record", {
+    p_record_type: record.type,
+    p_record_id: record.id,
+  });
+  if (error) throw new Error(error.message || "Permanent deletion was rejected.");
 }
 
 function archiveDb() { return getSupabaseClient() as unknown as ArchiveDb; }

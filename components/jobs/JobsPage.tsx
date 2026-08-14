@@ -15,7 +15,6 @@ import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
 import { JobLaborSummary } from "@/components/time/JobLaborSummary";
 import type { CrewWithRelations } from "@/types/crew";
 import {
-  JOB_STATUSES,
   type JobStatus,
   type JobWithRelations,
 } from "@/types/job";
@@ -36,7 +35,6 @@ const columns: JobStatus[] = [
   "In Progress",
   "Completed",
   "Cancelled",
-  "Archived",
 ];
 export function JobsPage() {
   const [rows, setRows] = useState<JobWithRelations[]>([]);
@@ -95,9 +93,18 @@ export function JobsPage() {
       setBusy(null);
     }
   }
+  const workflowRows = useMemo(
+    () =>
+      rows.filter(
+        (job) =>
+          job.archived_at === null &&
+          columns.includes(job.status),
+      ),
+    [rows],
+  );
   const filtered = useMemo(
     () =>
-      rows
+      workflowRows
         .filter((j) => {
           const hay = [
             j.job_number,
@@ -127,9 +134,9 @@ export function JobsPage() {
           );
         })
         .sort((a, b) => compare(a, b, sort)),
-    [division, rows, schedule, search, sort, status],
+    [division, schedule, search, sort, status, workflowRows],
   );
-  const active = rows.filter((j) => !j.archived_at);
+  const active = workflowRows;
   const metrics = [
     ["Total Jobs", active.length],
     [
@@ -166,7 +173,7 @@ export function JobsPage() {
           <Select
             value={status}
             set={(v) => setStatus(v as typeof status)}
-            options={["All", ...JOB_STATUSES]}
+            options={["All", ...columns]}
           />
           <Select
             value={division}
@@ -197,7 +204,7 @@ export function JobsPage() {
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
         <div className="mt-6 overflow-x-auto pb-5">
-          <div className="grid min-w-[1850px] grid-cols-7 gap-4">
+          <div className="grid min-w-[1580px] grid-cols-6 gap-4">
             {columns.map((column) => (
               <section key={column} className="rounded-2xl bg-[#eef1ed] p-3">
                 <h2 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#143d1a]">

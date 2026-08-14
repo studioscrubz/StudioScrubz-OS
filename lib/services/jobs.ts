@@ -14,18 +14,28 @@ import { isMasterAdmin } from "@/lib/auth/permissions";
 
 const select =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
+const workflowStatuses: Exclude<JobStatus, "Archived">[] = [
+  "Ready to Schedule",
+  "Scheduled",
+  "Crew Assigned",
+  "In Progress",
+  "Completed",
+  "Cancelled",
+];
 export async function getJobs(): Promise<JobWithRelations[]> {
   if (!(await master())) {
     const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
     if (error) throw error;
-    return data.map(operationalJob);
+    return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived");
   }
-  const { data, error } = await getSupabaseClient()
-    .from("jobs")
-    .select(select)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data as JobWithRelations[];
+  const [jobsResult, invoicesResult] = await Promise.all([
+    getSupabaseClient().from("jobs").select(select).is("archived_at", null).in("status", workflowStatuses).order("created_at", { ascending: false }),
+    getSupabaseClient().from("invoices").select("job_id").is("archived_at", null).neq("status", "Cancelled"),
+  ]);
+  if (jobsResult.error) throw jobsResult.error;
+  if (invoicesResult.error) throw invoicesResult.error;
+  const invoicedJobIds = new Set((invoicesResult.data ?? []).map((invoice) => invoice.job_id));
+  return (jobsResult.data as JobWithRelations[]).filter((job) => job.status !== "Completed" || !invoicedJobIds.has(job.id));
 }
 export async function getJobsForDateRange(
   start: string,
@@ -34,11 +44,12 @@ export async function getJobsForDateRange(
   if (!(await master())) {
     const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", { p_start: start, p_end: end });
     if (error) throw error;
-    return data.map(operationalJob).sort((a,b)=>(a.scheduled_date??"").localeCompare(b.scheduled_date??"")||(a.start_time??"").localeCompare(b.start_time??""));
+    return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived").sort((a,b)=>(a.scheduled_date??"").localeCompare(b.scheduled_date??"")||(a.start_time??"").localeCompare(b.start_time??""));
   }
   const { data, error } = await getSupabaseClient()
     .from("jobs")
     .select(select)
+    .is("archived_at", null)
     .gte("scheduled_date", start)
     .lte("scheduled_date", end)
     .order("scheduled_date")
