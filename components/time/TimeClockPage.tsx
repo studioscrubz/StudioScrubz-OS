@@ -23,7 +23,12 @@ import {
 import { employeeName, type Employee } from "@/types/employee";
 import type { CrewWithRelations } from "@/types/crew";
 import type { JobWithRelations } from "@/types/job";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 export function TimeClockPage() {
+  const { profile } = useAuth();
+  const canReviewPayroll = hasPermission(profile, "payrollPrep.view");
+  const canCorrectTime = hasPermission(profile, "employees.manage");
   const [rows, setRows] = useState<TimeEntryWithRelations[]>([]),
     [employees, setEmployees] = useState<Employee[]>([]),
     [crews, setCrews] = useState<CrewWithRelations[]>([]),
@@ -120,9 +125,9 @@ export function TimeClockPage() {
           <button className={primary} onClick={() => setModal("clock")}>
             Clock In Employee
           </button>
-          <button className={secondary} onClick={() => setModal("manual")}>
+          {canCorrectTime && <button className={secondary} onClick={() => setModal("manual")}>
             Add Time Entry
-          </button>
+          </button>}
         </div>
       </header>
       {error && <Alert text={error} />} {notice && <Alert text={notice} good />}
@@ -272,16 +277,16 @@ export function TimeClockPage() {
                 <td className="p-3">{n(x.regular_hours)}</td>
                 <td className="p-3">{n(x.overtime_hours)}</td>
                 <td className="p-3 font-bold">{n(x.total_hours)}</td>
-                <td className="p-3">{money(x.gross_pay)}</td>
+                <td className="p-3">{canReviewPayroll ? money(x.gross_pay) : "—"}</td>
                 <td className="p-3">{x.status}</td>
                 <td className="p-3">
                   <div className="flex gap-1">
-                    {["Open", "Completed"].includes(x.status) && (
+                    {canCorrectTime && ["Open", "Completed"].includes(x.status) && (
                       <button className={secondary} onClick={() => setModal(x)}>
                         Edit
                       </button>
                     )}
-                    {x.status === "Completed" && (
+                    {canReviewPayroll && x.status === "Completed" && (
                       <>
                         <button
                           className={secondary}
@@ -308,7 +313,7 @@ export function TimeClockPage() {
                         </button>
                       </>
                     )}
-                    {x.status !== "Archived" && (
+                    {canReviewPayroll && x.status !== "Archived" && (
                       <button
                         className={secondary}
                         onClick={() =>

@@ -8,6 +8,7 @@ export type UserProfile = {
   display_name: string | null;
   role: UserRole;
   is_active: boolean;
+  employee_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -18,4 +19,12 @@ export type AuthState = {
   profile: UserProfile | null;
   loading: boolean;
   error: string | null;
+};
+export type UserProfileInput = {
+  auth_user_id: string;
+  email: string;
+  display_name: string;
+  role: UserRole;
+  employee_id: string | null;
+  is_active: boolean;
 };

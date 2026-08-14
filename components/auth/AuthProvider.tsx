@@ -6,7 +6,8 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentProfile, signOut as signOutService } from "@/lib/services/auth";
 import type { AuthState, UserProfile } from "@/types/auth";
 import type { Session } from "@supabase/supabase-js";
-import { canManageSystem } from "@/lib/auth/permissions";
+import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/auth/AccessDenied";
 
 type AuthContextValue = AuthState & { refreshProfile: () => Promise<void>; signOut: () => Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -48,7 +49,8 @@ export function ProtectedWorkspace({ children }: { children: ReactNode }) {
   const auth = useAuth(); const router = useRouter(); const pathname = usePathname();
   useEffect(() => { if (!auth.loading && !auth.user) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`); }, [auth.loading, auth.user, pathname, router]);
   if (auth.loading || !auth.user) return <AuthLoading />;
-  if (auth.error || !auth.profile || !canManageSystem(auth.profile)) return <AccessBlocked message={auth.error ?? "Your account is not authorized for this version of StudioScrubz OS."} signOut={auth.signOut} />;
+  if (auth.error || !auth.profile) return <AccessBlocked message={auth.error ?? "Your account is not authorized for this version of StudioScrubz OS."} signOut={auth.signOut} />;
+  if (pathname !== "/access-denied" && !hasPermission(auth.profile, permissionForPath(pathname))) return <AccessDenied />;
   return <>{children}</>;
 }
 function AuthLoading() { return <main className="grid min-h-screen place-items-center bg-[#f5f6f4]"><div className="text-center"><div className="mx-auto size-12 animate-pulse rounded-xl bg-[#d4af37]"/><p className="mt-4 text-sm font-bold text-[#143d1a]">Verifying StudioScrubz OS access…</p></div></main>; }

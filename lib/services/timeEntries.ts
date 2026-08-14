@@ -14,9 +14,12 @@ import type {
   TimeEntryInput,
   TimeEntryWithRelations,
 } from "@/types/timeEntry";
+import { getCurrentProfile } from "@/lib/services/auth";
+import { isMasterAdmin } from "@/lib/auth/permissions";
 const select =
   "*, employee:employees!time_entries_employee_id_fkey(*), job:jobs!time_entries_job_id_fkey(*), crew:crews!time_entries_crew_id_fkey(*)";
 export async function getTimeEntries(): Promise<TimeEntryWithRelations[]> {
+  if (!(await master())) return getOperationalTimeEntries();
   const { data, error } = await getSupabaseClient()
     .from("time_entries")
     .select(select)
@@ -25,6 +28,7 @@ export async function getTimeEntries(): Promise<TimeEntryWithRelations[]> {
   return data as TimeEntryWithRelations[];
 }
 export async function getOpenTimeEntries() {
+  if (!(await master())) return (await getOperationalTimeEntries()).filter((entry)=>entry.status==="Open"&&!entry.clock_out&&!entry.archived_at);
   const { data, error } = await getSupabaseClient()
     .from("time_entries")
     .select(select)
@@ -44,6 +48,10 @@ export async function getTimeEntriesForJob(jobId: string) {
 export async function clockInEmployee(
   input: Omit<TimeEntryInput, "clock_out" | "break_minutes">,
 ): Promise<TimeEntry> {
+  if (!(await master())) {
+    const {data,error}=await getSupabaseClient().rpc("clock_in_operational",{p_employee_id:input.employee_id,p_job_id:input.job_id,p_crew_id:input.crew_id,p_entry_type:input.entry_type,p_clock_in:input.clock_in,p_notes:input.notes});
+    if(error)throw error;return operationalEntry(data);
+  }
   const existing = await getOpenForEmployee(input.employee_id);
   if (existing)
     throw new Error(
@@ -79,6 +87,10 @@ export async function clockOutEmployee(
   clockOut: string,
   breakMinutes: number,
 ) {
+  if (!(await master())) {
+    const {data,error}=await getSupabaseClient().rpc("clock_out_operational",{p_time_entry_id:id,p_clock_out:clockOut,p_break_minutes:breakMinutes});
+    if(error)throw error;return operationalEntry(data);
+  }
   const entry = await getById(id);
   if (entry.status !== "Open" || entry.clock_out)
     throw new Error("This time entry is not currently open.");
@@ -96,6 +108,7 @@ export async function clockOutEmployee(
   return getById(id);
 }
 export async function createManualTimeEntry(input: TimeEntryInput) {
+  if (!(await master())) return saveOperational(null,input);
   if (!input.clock_out)
     throw new Error("Manual completed entries require a clock-out time.");
   calculatePaidHours(input.clock_in, input.clock_out, input.break_minutes ?? 0);
@@ -122,6 +135,7 @@ export async function createManualTimeEntry(input: TimeEntryInput) {
   throw new Error("A unique time entry number could not be generated.");
 }
 export async function updateTimeEntry(id: string, input: TimeEntryInput) {
+  if (!(await master())) return saveOperational(id,input);
   const before = await getById(id);
   if (input.clock_out)
     calculatePaidHours(
@@ -155,6 +169,7 @@ export async function updateTimeEntry(id: string, input: TimeEntryInput) {
   return getById(id);
 }
 export async function approveTimeEntry(id: string) {
+  if (!(await master())) return reviewOperational(id,"Approved",null);
   const entry = await getById(id);
   if (!entry.clock_out)
     throw new Error("Clock out this entry before approval.");
@@ -171,6 +186,7 @@ export async function approveTimeEntry(id: string) {
   return getById(id);
 }
 export async function rejectTimeEntry(id: string, notes: string) {
+  if (!(await master())) return reviewOperational(id,"Rejected",notes);
   const entry = await getById(id);
   const { error } = await getSupabaseClient()
     .from("time_entries")
@@ -186,6 +202,7 @@ export async function rejectTimeEntry(id: string, notes: string) {
   return getById(id);
 }
 export async function archiveTimeEntry(id: string) {
+  if (!(await master())) return reviewOperational(id,"Archived",null);
   const entry = await getById(id);
   const { error } = await getSupabaseClient()
     .from("time_entries")
@@ -352,6 +369,7 @@ async function filtered(
   column: "employee_id" | "job_id" | "crew_id",
   id: string,
 ) {
+  if (!(await master())) return (await getOperationalTimeEntries()).filter((entry)=>entry[column]===id);
   const { data, error } = await getSupabaseClient()
     .from("time_entries")
     .select(select)
@@ -361,6 +379,7 @@ async function filtered(
   return data as TimeEntryWithRelations[];
 }
 async function getById(id: string) {
+  if (!(await master())) {const entry=(await getOperationalTimeEntries()).find((row)=>row.id===id);if(!entry)throw new Error("Time entry not found or access denied.");return entry}
   const { data, error } = await getSupabaseClient()
     .from("time_entries")
     .select(select)
@@ -412,3 +431,8 @@ function number() {
   const d = new Date();
   return `TIME-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
 }
+async function master(){return isMasterAdmin(await getCurrentProfile())}
+async function getOperationalTimeEntries(){const{data,error}=await getSupabaseClient().from("time_entries_operational_safe").select("*").order("clock_in",{ascending:false});if(error)throw error;return data.map(operationalEntry)}
+function operationalEntry(row:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}):TimeEntryWithRelations{return{...row,hourly_rate_snapshot:0,overtime_rate_snapshot:0,regular_pay:0,overtime_pay:0,gross_pay:0,employee:{id:row.employee_id,employee_number:row.employee_number,first_name:row.employee_name,last_name:"",preferred_name:null,email:null,phone:null,department:"Scrub Technicians",job_title:null,employment_status:"Active",employment_type:null,hourly_rate:0,overtime_rate:0,commission_rate:0,hire_date:null,notes:null,created_at:row.created_at,updated_at:row.updated_at,archived_at:null},job:null,crew:null}}
+async function saveOperational(id:string|null,input:TimeEntryInput){const{data,error}=await getSupabaseClient().rpc("save_operational_time_entry",{p_time_entry_id:id,p_employee_id:input.employee_id,p_job_id:input.job_id,p_crew_id:input.crew_id,p_entry_type:input.entry_type,p_clock_in:input.clock_in,p_clock_out:input.clock_out??null,p_break_minutes:input.break_minutes??0,p_notes:input.notes});if(error)throw error;return operationalEntry(data)}
+async function reviewOperational(id:string,status:"Approved"|"Rejected"|"Archived",notes:string|null){const{data,error}=await getSupabaseClient().rpc("review_operational_time_entry",{p_time_entry_id:id,p_status:status,p_notes:notes});if(error)throw error;return operationalEntry(data)}

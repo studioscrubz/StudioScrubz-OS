@@ -7,6 +7,8 @@ import {
 } from "@/components/jobs/ProposalJobAction";
 import { ProposalAgreementAction } from "@/components/agreements/ProposalAgreementAction";
 import { getJobProposalIds } from "@/lib/services/jobs";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import {
   ACCEPTANCE_METHODS,
   APPROVAL_STATUSES,
@@ -335,6 +337,9 @@ function Card({
   history: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
 }) {
+  const { profile } = useAuth();
+  const canApprove = hasPermission(profile, "proposals.approve");
+  const canSend = hasPermission(profile, "proposals.send");
   function promptAction(kind: "changes" | "reject" | "decline" | "renew") {
     const value =
       window.prompt(
@@ -403,7 +408,7 @@ function Card({
             />
           </>
         )}
-        {p.status === "Ready for Approval" &&
+        {canApprove && p.status === "Ready for Approval" &&
           p.approval_status === "Pending Approval" && (
             <>
               <Action
@@ -425,7 +430,7 @@ function Card({
               />
             </>
           )}
-        {p.status === "Approved" && p.approval_status === "Approved" && (
+        {canSend && p.status === "Approved" && p.approval_status === "Approved" && (
           <>
             <Action t="Text Client Proposal" f={() => send("Text")} />
             <Action t="Email Client Proposal" f={() => send("Email")} />

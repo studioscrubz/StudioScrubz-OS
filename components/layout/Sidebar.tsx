@@ -6,59 +6,61 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BrandMark } from "./AppShell";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { canAccessArchives, canAccessFinances, canAccessPayrollPrep } from "@/lib/auth/permissions";
+import { hasPermission, type Permission } from "@/lib/auth/permissions";
 
-type NavLink = { label: string; href: string; marker: string };
-type NavGroup = { label: string; marker: string; children: NavLink[] };
+type NavLink = { label: string; href: string; marker: string; permission: Permission };
+type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
 
 const navItems: Array<NavLink | NavGroup> = [
-  { label: "Dashboard", href: "/", marker: "D" },
-  { label: "Clients", href: "/clients", marker: "C" },
-  { label: "Properties", href: "/properties", marker: "P" },
-  { label: "Walkthroughs", href: "/walkthroughs", marker: "W" },
+  { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
+  { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
+  { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
+  { label: "Walkthroughs", href: "/walkthroughs", marker: "W", permission: "walkthroughs.view" },
   {
     label: "Estimates",
     marker: "E",
     children: [
-      { label: "Estimate Calculator", href: "/estimates", marker: "" },
-      { label: "Open Estimates", href: "/open-estimates", marker: "" },
+      { label: "Estimate Calculator", href: "/estimates", marker: "", permission: "estimates.create" },
+      { label: "Open Estimates", href: "/open-estimates", marker: "", permission: "estimates.view" },
     ],
   },
   {
     label: "Proposals",
     marker: "P",
     children: [
-      { label: "Proposal Calculator", href: "/proposals", marker: "" },
-      { label: "Open Proposals", href: "/open-proposals", marker: "" },
+      { label: "Proposal Calculator", href: "/proposals", marker: "", permission: "proposals.create" },
+      { label: "Open Proposals", href: "/open-proposals", marker: "", permission: "proposals.view" },
     ],
   },
-  { label: "Jobs", href: "/jobs", marker: "J" },
-  { label: "Service Agreements", href: "/agreements", marker: "A" },
-  { label: "Schedule", href: "/schedule", marker: "S" },
+  { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
+  { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
+  { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
   {
     label: "Employees",
     marker: "E",
     children: [
-      { label: "Employee Directory", href: "/employees", marker: "" },
-      { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "" },
-      { label: "Sales", href: "/employees/sales", marker: "" },
-      { label: "Administration / Management", href: "/employees/administration", marker: "" },
-      { label: "Time Clock", href: "/time-clock", marker: "" },
-      { label: "Payroll Preparation", href: "/payroll-prep", marker: "" },
+      { label: "Employee Directory", href: "/employees", marker: "", permission: "employees.view" },
+      { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "", permission: "employees.view" },
+      { label: "Sales", href: "/employees/sales", marker: "", permission: "employees.view" },
+      { label: "Administration / Management", href: "/employees/administration", marker: "", permission: "employees.view" },
+      { label: "Time Clock", href: "/time-clock", marker: "", permission: "timeClock.view" },
     ],
   },
-  { label: "Invoices", href: "/invoices", marker: "I" },
+  { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
   {
     label: "Finances",
     marker: "F",
+    permission: "finances.view",
     children: [
-      { label: "Revenue", href: "/revenue", marker: "" },
-      { label: "Expenses", href: "/expenses", marker: "" },
-      { label: "Vehicles", href: "/vehicles", marker: "" },
+      { label: "Revenue", href: "/revenue", marker: "", permission: "finances.view" },
+      { label: "Expenses", href: "/expenses", marker: "", permission: "expenses.view" },
+      { label: "Vehicles", href: "/vehicles", marker: "", permission: "vehicles.view" },
+      { label: "Payroll Preparation", href: "/payroll-prep", marker: "", permission: "payrollPrep.view" },
     ],
   },
-  { label: "Archives", href: "/archives", marker: "A" },
-  { label: "Settings", href: "/settings", marker: "S" },
+  { label: "Archives", href: "/archives", marker: "A", permission: "archives.view" },
+  { label: "User Management", href: "/users", marker: "U", permission: "users.manage" },
+  { label: "Settings", href: "/settings", marker: "S", permission: "settings.manage" },
 ];
 
 function isGroup(item: NavLink | NavGroup): item is NavGroup {
@@ -70,12 +72,12 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const auth = useAuth();
   const [signOutError, setSignOutError] = useState<string | null>(null);
-  const visibleItems = navItems.flatMap((item) => {
-    if (isGroup(item) && item.label === "Finances" && !canAccessFinances(auth.profile)) return [];
-    if (!isGroup(item) && item.label === "Archives" && !canAccessArchives(auth.profile)) return [];
-    if (isGroup(item) && item.label === "Employees") return [{ ...item, children: item.children.filter((child) => child.href !== "/payroll-prep" || canAccessPayrollPrep(auth.profile)) }];
-    return [item];
-  });
+  const visibleItems = navItems.reduce<Array<NavLink | NavGroup>>((items, item) => {
+    if (!isGroup(item)) return hasPermission(auth.profile, item.permission) ? [...items, item] : items;
+    if (item.permission && !hasPermission(auth.profile, item.permission)) return items;
+    const children = item.children.filter((child) => hasPermission(auth.profile, child.permission));
+    return children.length ? [...items, { ...item, children }] : items;
+  }, []);
   const initiallyOpen = Object.fromEntries(
     visibleItems.filter(isGroup).map((group) => [group.label, group.children.some((item) => item.href === pathname)]),
   );
@@ -93,7 +95,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="mt-5 border-l-2 border-[#d4af37] pl-3 text-xs leading-relaxed text-white/65">
-            <p className="font-bold text-white/90">Master Admin</p>
+            <p className="font-bold text-white/90">{auth.profile?.role ?? "StudioScrubz User"}</p>
             <p>Operations</p>
           </div>
         </div>

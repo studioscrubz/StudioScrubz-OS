@@ -80,9 +80,9 @@ export type JobUpdate = Partial<
   Omit<Job, "id" | "job_number" | "proposal_id" | "created_at" | "updated_at">
 >;
 export type JobWithRelations = Job & {
-  proposal: Proposal;
-  client: Client;
-  property: Property;
+  proposal: Proposal | null;
+  client: Client | null;
+  property: Property | null;
 };
 export type CrewConflict = Pick<
   JobWithRelations,

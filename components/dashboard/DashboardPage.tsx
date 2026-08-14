@@ -6,7 +6,10 @@ import { completeJob, startJob } from "@/lib/services/jobs";
 import type { DashboardData } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
 export function DashboardPage() {
+  const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function DashboardPage() {
   return (
     <>
       <Header />
-      <DashboardRecurringServices />
+      {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
       {error && (
         <div className="mt-5 flex items-center justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
           <span>{error}</span>
@@ -80,7 +83,7 @@ export function DashboardPage() {
               ["Jobs Today", data.metrics.jobsToday],
               ["Past Due Invoices", data.metrics.pastDueInvoices ?? 0],
               ["Employees Clocked In", data.metrics.employeesClockedIn],
-            ].map(([l, v]) => (
+            ].filter(([label]) => label !== "Past Due Invoices" || hasPermission(profile, "invoices.view")).map(([l, v]) => (
               <Metric key={String(l)} label={String(l)} value={Number(v)} />
             ))}
           </section>
@@ -88,7 +91,7 @@ export function DashboardPage() {
             <Panel title="Attention Required">
               {data.attention.length ? (
                 <div className="space-y-3">
-                  {data.attention.map((a) => (
+                  {data.attention.filter((item) => hasPermission(profile, permissionForPath(item.href))).map((a) => (
                     <div
                       key={a.id}
                       className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4"
@@ -114,7 +117,7 @@ export function DashboardPage() {
             </Panel>
             <QuickActions />
           </section>
-          <Panel title="Today's Operations" className="mt-6">
+          {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
                 {data.todaysJobs.map((j) => (
@@ -129,14 +132,14 @@ export function DashboardPage() {
             ) : (
               <Empty text="No jobs scheduled today." />
             )}
-          </Panel>
+          </Panel>}
           <section className="mt-6 grid gap-6 xl:grid-cols-2">
-            <Upcoming rows={data.upcomingWalkthroughs} />
-            <ProposalPipeline data={data} />
-            <EstimateActivity data={data} />
-            <JobPipeline data={data} />
-            <CrewStatus data={data} />
-            <SchedulePreview data={data} />
+            {hasPermission(profile, "walkthroughs.view") && <Upcoming rows={data.upcomingWalkthroughs} />}
+            {hasPermission(profile, "proposals.view") && <ProposalPipeline data={data} />}
+            {hasPermission(profile, "estimates.view") && <EstimateActivity data={data} />}
+            {hasPermission(profile, "jobs.view") && <JobPipeline data={data} />}
+            {hasPermission(profile, "crews.view") && <CrewStatus data={data} />}
+            {hasPermission(profile, "schedule.view") && <SchedulePreview data={data} />}
             <Recent rows={data.recent} />
           </section>
         </>
