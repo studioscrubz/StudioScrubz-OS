@@ -15,7 +15,6 @@ const navItems: Array<NavLink | NavGroup> = [
   { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
-  { label: "Walkthroughs", href: "/walkthroughs", marker: "W", permission: "walkthroughs.view" },
   {
     label: "Estimates",
     marker: "E",
@@ -24,6 +23,7 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Open Estimates", href: "/open-estimates", marker: "", permission: "estimates.view" },
     ],
   },
+  { label: "Walkthroughs", href: "/walkthroughs", marker: "W", permission: "walkthroughs.view" },
   {
     label: "Proposals",
     marker: "P",
@@ -60,7 +60,15 @@ const navItems: Array<NavLink | NavGroup> = [
   },
   { label: "Archives", href: "/archives", marker: "A", permission: "archives.view" },
   { label: "User Management", href: "/users", marker: "U", permission: "users.manage" },
-  { label: "Settings", href: "/settings", marker: "S", permission: "settings.manage" },
+  {
+    label: "Settings",
+    marker: "S",
+    permission: "settings.manage",
+    children: [
+      { label: "Service Catalog", href: "/settings/services", marker: "", permission: "settings.manage" },
+      { label: "Business Settings", href: "/settings/business", marker: "", permission: "settings.manage" },
+    ],
+  },
 ];
 
 function isGroup(item: NavLink | NavGroup): item is NavGroup {

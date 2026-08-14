@@ -1,0 +1,4 @@
+import { getSupabaseClient } from "@/lib/supabase/client";
+import type { BusinessSettings, BusinessSettingsUpdate } from "@/types/businessSettings";
+export async function getBusinessSettings(){const{data,error}=await getSupabaseClient().from("business_settings_workflow").select("*").limit(1).maybeSingle();if(error)throw new Error(`Business settings could not be loaded: ${error.message}`);if(!data)throw new Error("Business settings have not been configured.");return data as BusinessSettings}
+export async function updateBusinessSettings(input:BusinessSettingsUpdate){const current=await getBusinessSettings();const{data,error}=await getSupabaseClient().from("business_settings").update(input).eq("id",current.id).select().single();if(error)throw new Error(`Business settings could not be saved: ${error.message}`);return data as BusinessSettings}

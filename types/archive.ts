@@ -1,7 +1,7 @@
 export const ARCHIVE_RECORD_TYPES = [
   "Clients", "Properties", "Estimates", "Walkthroughs", "Proposals", "Jobs",
   "Employees", "Crews", "Invoices", "Expenses", "Vehicles", "Mileage",
-  "Time Entries", "Service Agreements",
+  "Time Entries", "Service Agreements", "Services", "Service Add-Ons",
 ] as const;
 
 export type ArchiveRecordType = (typeof ARCHIVE_RECORD_TYPES)[number];

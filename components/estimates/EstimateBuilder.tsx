@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { calculateCommercialEstimate, calculateResidentialEstimate, COMMERCIAL_SERVICES, COMMERCIAL_TYPES, RESIDENTIAL_ADD_ONS } from "@/lib/pricing/estimates";
+import { useEffect, useMemo, useState } from "react";
+import { calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
+import { getServiceCatalog } from "@/lib/services/serviceCatalog";
+import { getBusinessSettings } from "@/lib/services/businessSettings";
 import type { CalculatorInput, CommercialCalculatorInput, Condition, CustomerInformation, EstimateDivision, EstimateResult, EstimateWithRelations, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
+import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 
 const frequencies: Frequency[] = ["One-Time", "Weekly", "Biweekly", "Monthly"];
 const conditions: Condition[] = ["Light", "Average", "Heavy", "Extreme"];
@@ -22,10 +25,15 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [catalog,setCatalog]=useState<ServiceCatalogBundle|null>(null);
+  const [catalogLoading,setCatalogLoading]=useState(true);
   const calculatorInput: CalculatorInput = division === "Residential" ? residential : commercial;
-  const result = useMemo(() => division === "Residential" ? calculateResidentialEstimate(residential) : calculateCommercialEstimate(commercial), [commercial, division, residential]);
+  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);if(!estimate){setResidential(x=>({...x,taxRatePercent:settings.default_tax_rate}));setCommercial(x=>({...x,taxRatePercent:settings.default_tax_rate}));setNotes(settings.default_estimate_notes??"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
+  const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:division === "Residential" ? calculateResidentialEstimate(residential,catalog) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, division, residential]);
+  const result=calculation.result;
 
   async function save() {
+    if(!result){setError(calculation.error??"Pricing is not ready.");return}
     const validation = validateCustomer(customer);
     if (validation) { setError(validation); return; }
     setSaving(true); setError(null); setSuccess(null);
@@ -71,17 +79,17 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       <div className="space-y-6">
         <Section title="Estimate Calculator" subtitle="Choose a division and configure the service.">
           <DivisionToggle value={division} set={(value) => setDivision(value)} />
-          <div className="mt-6">{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} /> : <CommercialFields value={commercial} set={setCommercial} />}</div>
+          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:calculation.error?<Alert kind="error" text={calculation.error}/>:catalog&&<div className="mt-6">{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} catalog={catalog} /> : <CommercialFields value={commercial} set={setCommercial} catalog={catalog} />}</div>}
         </Section>
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
       </div>
-      <EstimateSummary result={result} frequency={calculatorInput.frequency} saving={saving} save={save} editing={Boolean(estimate)} />
+      {result?<EstimateSummary result={result} frequency={calculatorInput.frequency} saving={saving} save={save} editing={Boolean(estimate)} />:<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
     </div>
   </div>;
 }
 
-function ResidentialFields({ value, set }: { value: ResidentialCalculatorInput; set: (value: ResidentialCalculatorInput) => void }) { return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-  <SelectField label="Service Type" value={value.serviceType} options={["Standard", "Deep", "Move-In / Move-Out"]} set={(v) => set({ ...value, serviceType: v as ResidentialCalculatorInput["serviceType"] })} />
+function ResidentialFields({ value, set,catalog }: { value: ResidentialCalculatorInput; set: (value: ResidentialCalculatorInput) => void;catalog:ServiceCatalogBundle }) { const services=catalog.services.filter(x=>x.division!=="Commercial").map(x=>x.service_name.replace(/ Cleaning$/,""));const addons=catalog.addons.filter(x=>x.division!=="Commercial").map(x=>x.addon_name);return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <SelectField label="Service Type" value={value.serviceType} options={services} set={(v) => set({ ...value, serviceType: v as ResidentialCalculatorInput["serviceType"] })} />
   <SelectField label="Frequency" value={value.frequency} options={frequencies} set={(v) => set({ ...value, frequency: v as Frequency })} />
   <SelectField label="Condition" value={value.condition} options={conditions} set={(v) => set({ ...value, condition: v as Condition })} />
   <NumberField label="Square Feet" value={value.squareFeet} set={(v) => set({ ...value, squareFeet: v })} />
@@ -89,13 +97,13 @@ function ResidentialFields({ value, set }: { value: ResidentialCalculatorInput; 
   <NumberField label="Bathrooms" step="0.5" value={value.bathrooms} set={(v) => set({ ...value, bathrooms: v })} />
   <Check label="Occupied property" checked={value.occupied} set={(v) => set({ ...value, occupied: v })} /><Check label="Pets / heavy pet hair" checked={value.pets} set={(v) => set({ ...value, pets: v })} />
   <NumberField label="Additional Discount %" value={value.additionalDiscountPercent} set={(v) => set({ ...value, additionalDiscountPercent: v })} /><NumberField label="Tax Rate %" step="0.01" value={value.taxRatePercent} set={(v) => set({ ...value, taxRatePercent: v })} />
-  <div className="sm:col-span-2 xl:col-span-3"><OptionGrid title="Add-Ons" options={RESIDENTIAL_ADD_ONS.map((item) => item.name)} selected={value.addOns} set={(addOns) => set({ ...value, addOns })} /></div>
+  <div className="sm:col-span-2 xl:col-span-3"><OptionGrid title="Add-Ons" options={addons} selected={value.addOns} set={(addOns) => set({ ...value, addOns })} /></div>
 </div>; }
 
-function CommercialFields({ value, set }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void }) { return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-  <SelectField label="Commercial Type" value={value.commercialType} options={COMMERCIAL_TYPES} set={(v) => set({ ...value, commercialType: v })} /><SelectField label="Frequency" value={value.frequency} options={frequencies} set={(v) => set({ ...value, frequency: v as Frequency })} /><SelectField label="Condition" value={value.condition} options={conditions} set={(v) => set({ ...value, condition: v as Condition })} />
+function CommercialFields({ value, set,catalog }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void;catalog:ServiceCatalogBundle }) { const services=catalog.services.filter(x=>x.division!=="Residential").map(x=>x.service_name.replace(/ Cleaning$/,""));const addons=catalog.addons.filter(x=>x.division!=="Residential").map(x=>x.addon_name);return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <SelectField label="Commercial Type" value={value.commercialType} options={services} set={(v) => set({ ...value, commercialType: v })} /><SelectField label="Frequency" value={value.frequency} options={frequencies} set={(v) => set({ ...value, frequency: v as Frequency })} /><SelectField label="Condition" value={value.condition} options={conditions} set={(v) => set({ ...value, condition: v as Condition })} />
   <NumberField label="Square Feet" value={value.squareFeet} set={(v) => set({ ...value, squareFeet: v })} /><NumberField label="Floors" value={value.floors} set={(v) => set({ ...value, floors: v })} /><NumberField label="Restrooms" value={value.restrooms} set={(v) => set({ ...value, restrooms: v })} /><NumberField label="Kitchens / Breakrooms" value={value.kitchens} set={(v) => set({ ...value, kitchens: v })} /><NumberField label="Stations / Booths" value={value.stations} set={(v) => set({ ...value, stations: v })} /><NumberField label="Number of Units" value={value.units} set={(v) => set({ ...value, units: v })} /><NumberField label="Target Completion Hours" step="0.5" value={value.targetCompletionHours} set={(v) => set({ ...value, targetCompletionHours: v })} /><NumberField label="Worker Hourly Pay" step="0.01" value={value.workerHourlyPay} set={(v) => set({ ...value, workerHourlyPay: v })} /><NumberField label="Target Profit Margin %" value={value.targetProfitMarginPercent} set={(v) => set({ ...value, targetProfitMarginPercent: v })} /><NumberField label="Additional Discount %" value={value.additionalDiscountPercent} set={(v) => set({ ...value, additionalDiscountPercent: v })} /><NumberField label="Tax Rate %" step="0.01" value={value.taxRatePercent} set={(v) => set({ ...value, taxRatePercent: v })} />
-  <div className="sm:col-span-2 xl:col-span-3"><OptionGrid title="Additional Services" options={COMMERCIAL_SERVICES.map((item) => item.name)} selected={value.additionalServices} set={(additionalServices) => set({ ...value, additionalServices })} /></div>
+  <div className="sm:col-span-2 xl:col-span-3"><OptionGrid title="Additional Services" options={addons} selected={value.additionalServices} set={(additionalServices) => set({ ...value, additionalServices })} /></div>
 </div>; }
 
 function EstimateSummary({ result, frequency, saving, save, editing }: { result: EstimateResult; frequency: Frequency; saving: boolean; save: () => Promise<void>; editing: boolean }) { const rows = [["Service", result.serviceName], ["Per Visit Price", currency(result.finalPrice)], ["Frequency", frequency], ["Monthly Contract", result.monthlyPrice == null ? "—" : currency(result.monthlyPrice)], ["Labor Hours", `${result.laborHours} hrs`], ["Crew Size", String(result.crewSize)], ["Duration", `${result.estimatedDuration} hrs`], ["Estimated Profit", currency(result.estimatedProfit)], ["One-Time Price", currency(result.oneTimePrice)], ["Discounts", `-${currency(result.totalDiscount)}`], ["Taxes", currency(result.taxes)]]; return <aside className="sticky top-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-[#143d1a] text-white shadow-[0_18px_45px_rgba(20,61,26,.2)]"><div className="border-b border-white/10 p-6"><p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#d4af37]">Live calculation</p><h2 className="mt-2 text-xl font-extrabold">Estimate Summary</h2></div><dl className="divide-y divide-white/10 px-6">{rows.map(([label, display]) => <div key={label} className="flex justify-between gap-4 py-3 text-sm"><dt className="text-white/60">{label}</dt><dd className="text-right font-bold">{display}</dd></div>)}</dl><div className="bg-[#0d2b12] p-6"><p className="text-xs font-bold uppercase tracking-[.12em] text-white/55">Final Price</p><p className="mt-1 text-4xl font-extrabold text-[#d4af37]">{currency(result.finalPrice)}</p><button type="button" disabled={saving} onClick={() => void save()} className="mt-5 w-full rounded-lg bg-[#d4af37] px-5 py-3 text-sm font-extrabold text-[#143d1a] hover:bg-[#e1c056] disabled:opacity-60">{saving ? "Saving…" : editing ? "Update Estimate" : "Save Estimate"}</button></div></aside>; }

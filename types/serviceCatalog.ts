@@ -1,0 +1,17 @@
+export const SERVICE_DIVISIONS = ["Residential", "Commercial", "Both"] as const;
+export const SERVICE_PRICING_MODELS = ["Flat Rate", "Size Tier", "Per Square Foot", "Per Bedroom", "Per Unit", "Per Hour", "Per Visit", "Custom"] as const;
+export const RECURRING_ADJUSTMENT_TYPES = ["Flat Amount", "Percentage", "Override Price"] as const;
+export type ServiceDivision = (typeof SERVICE_DIVISIONS)[number];
+export type ServicePricingModel = (typeof SERVICE_PRICING_MODELS)[number];
+export type RecurringAdjustmentType = (typeof RECURRING_ADJUSTMENT_TYPES)[number];
+export type PricingConfig = Record<string, string | number | boolean>;
+export type CatalogService = { id:string; service_code:string; service_name:string; division:ServiceDivision; category:string; description:string|null; pricing_model:ServicePricingModel; pricing_config:PricingConfig; base_price:number; unit_label:string|null; minimum_price:number; is_recurring_available:boolean; is_active:boolean; display_order:number; notes:string|null; created_at:string; updated_at:string; archived_at:string|null };
+export type ServiceInput = Omit<CatalogService,"id"|"created_at"|"updated_at"|"archived_at">;
+export type ServiceTierPricingConfig = { bedrooms?:number; bathrooms?:number };
+export type ServicePriceTier = { id:string; service_id:string; tier_name:string; min_value:number|null; max_value:number|null; price:number; unit_label:string|null; pricing_config:ServiceTierPricingConfig; display_order:number; is_active:boolean; created_at:string; updated_at:string };
+export type ServicePriceTierInput = Omit<ServicePriceTier,"id"|"created_at"|"updated_at">;
+export type ServiceAddon = { id:string; addon_code:string; addon_name:string; description:string|null; division:ServiceDivision; pricing_model:ServicePricingModel; pricing_config:PricingConfig; price:number; unit_label:string|null; is_active:boolean; display_order:number; created_at:string; updated_at:string; archived_at:string|null };
+export type ServiceAddonInput = Omit<ServiceAddon,"id"|"created_at"|"updated_at"|"archived_at">;
+export type RecurringPricingRule = { id:string; service_id:string|null; frequency:string; adjustment_type:RecurringAdjustmentType; adjustment_value:number; is_active:boolean; created_at:string; updated_at:string };
+export type RecurringPricingRuleInput = Omit<RecurringPricingRule,"id"|"created_at"|"updated_at">;
+export type ServiceCatalogBundle = { services:CatalogService[]; tiers:ServicePriceTier[]; addons:ServiceAddon[]; recurringRules:RecurringPricingRule[] };

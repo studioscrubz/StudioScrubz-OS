@@ -31,6 +31,8 @@ const CONFIGS: ArchiveConfig[] = [
   { type: "Mileage", table: "mileage_entries", href: "/vehicles" },
   { type: "Time Entries", table: "time_entries", href: "/time-clock" },
   { type: "Service Agreements", table: "service_agreements", href: "/agreements" },
+  { type: "Services", table: "services", href: "/settings/services" },
+  { type: "Service Add-Ons", table: "service_addons", href: "/settings/services" },
 ];
 
 const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> = {
@@ -45,6 +47,8 @@ const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> 
   Invoices: [["payments", "invoice_id"]],
   Vehicles: [["mileage_entries", "vehicle_id"]],
   "Service Agreements": [["service_occurrences", "agreement_id"]],
+  Services: [["service_price_tiers", "service_id"], ["service_addon_links", "service_id"], ["recurring_pricing_rules", "service_id"]],
+  "Service Add-Ons": [["service_addon_links", "addon_id"]],
 };
 
 export async function getArchivedRecords(): Promise<ArchivedRecord[]> {
@@ -97,7 +101,7 @@ function text(row: Record<string, unknown>, key: string) { const value = row[key
 function first(row: Record<string, unknown>, keys: string[]) { return keys.map((key) => text(row, key)).find(Boolean) ?? "Archived record"; }
 function toArchivedRecord(config: ArchiveConfig, row: Record<string, unknown>): ArchivedRecord {
   const person = [text(row, "first_name"), text(row, "last_name")].filter(Boolean).join(" ");
-  const label = person || first(row, ["client_name", "company_name", "property_name", "address", "estimate_number", "contact_name", "proposal_number", "job_number", "employee_number", "crew_name", "invoice_number", "expense_number", "vehicle_number", "mileage_number", "time_entry_number", "agreement_number", "description"]);
+  const label = person || first(row, ["client_name", "company_name", "property_name", "address", "estimate_number", "contact_name", "proposal_number", "job_number", "employee_number", "crew_name", "invoice_number", "expense_number", "vehicle_number", "mileage_number", "time_entry_number", "agreement_number", "service_name", "addon_name", "description"]);
   const storedStatus = first(row, ["status", "employment_status"]);
   return { id: text(row, "id"), type: config.type, label, relatedName: first(row, ["property_name", "service_name", "vendor"]) === "Archived record" ? null : first(row, ["property_name", "service_name", "vendor"]), archivedAt: text(row, "archived_at"), status: storedStatus === "Archived record" ? "Archived" : storedStatus, href: `${config.href}?id=${text(row, "id")}` };
 }
@@ -114,5 +118,6 @@ function restoreValues(type: ArchiveRecordType): Record<string, unknown> {
   if (type === "Expenses" || type === "Mileage") return { ...base, status: "Active" };
   if (type === "Time Entries") return { ...base, status: "Completed" };
   if (type === "Service Agreements") return { ...base, status: "Draft" };
+  if (type === "Services" || type === "Service Add-Ons") return { ...base, is_active: true };
   return base;
 }

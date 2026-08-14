@@ -15,6 +15,8 @@ import type {TimeEntry,TimeEntryInput,TimeEntryUpdate} from "@/types/timeEntry";
 import type {ServiceAgreement,AgreementInput,AgreementUpdate} from "@/types/agreement";
 import type {ServiceOccurrence} from "@/types/serviceOccurrence";
 import type {UserProfile} from "@/types/auth";
+import type {CatalogService,RecurringPricingRule,RecurringPricingRuleInput,ServiceAddon,ServiceAddonInput,ServiceInput,ServicePriceTier,ServicePriceTierInput} from "@/types/serviceCatalog";
+import type {BusinessIdentitySettings,BusinessSettings,BusinessSettingsUpdate} from "@/types/businessSettings";
 
 export interface Database {
   public: {
@@ -77,6 +79,11 @@ export interface Database {
       time_entries:{Row:TimeEntry;Insert:TimeEntryInput&{id?:string;time_entry_number:string;status?:"Open"|"Completed";regular_hours?:number;overtime_hours?:number;total_hours?:number;hourly_rate_snapshot?:number;overtime_rate_snapshot?:number;regular_pay?:number;overtime_pay?:number;gross_pay?:number;approved_at?:string|null;approved_by?:string|null;created_at?:string;updated_at?:string;archived_at?:string|null};Update:TimeEntryUpdate;Relationships:[{foreignKeyName:"time_entries_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]},{foreignKeyName:"time_entries_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"time_entries_crew_id_fkey";columns:["crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]}]};
       service_agreements:{Row:ServiceAgreement;Insert:AgreementInput&{agreement_number:string};Update:AgreementUpdate;Relationships:[{foreignKeyName:"service_agreements_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"service_agreements_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"service_agreements_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"service_agreements_assigned_crew_id_fkey";columns:["assigned_crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]}]};
       service_occurrences:{Row:ServiceOccurrence;Insert:Omit<ServiceOccurrence,"id"|"job_id"|"created_at"|"updated_at"|"notes">&{job_id?:string|null;notes?:string|null};Update:Partial<ServiceOccurrence>;Relationships:[{foreignKeyName:"service_occurrences_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"service_occurrences_assigned_crew_id_fkey";columns:["assigned_crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]},{foreignKeyName:"service_occurrences_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
+      services:{Row:CatalogService;Insert:ServiceInput;Update:Partial<ServiceInput>&{archived_at?:string|null};Relationships:[]};
+      service_price_tiers:{Row:ServicePriceTier;Insert:ServicePriceTierInput;Update:Partial<ServicePriceTierInput>;Relationships:[{foreignKeyName:"service_price_tiers_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
+      service_addons:{Row:ServiceAddon;Insert:ServiceAddonInput;Update:Partial<ServiceAddonInput>&{archived_at?:string|null};Relationships:[]};
+      recurring_pricing_rules:{Row:RecurringPricingRule;Insert:RecurringPricingRuleInput;Update:Partial<RecurringPricingRuleInput>;Relationships:[{foreignKeyName:"recurring_pricing_rules_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
+      business_settings:{Row:BusinessSettings;Insert:BusinessSettingsUpdate&{id?:string};Update:Partial<BusinessSettingsUpdate>;Relationships:[]};
     };
     Views: {
       jobs_operational_safe:{Row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">;Relationships:[]};
@@ -84,6 +91,8 @@ export interface Database {
       time_entries_operational_safe:{Row:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null};Relationships:[]};
       crew_directory_safe:{Row:Crew;Relationships:[]};
       crew_members_directory_safe:{Row:{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null};Relationships:[]};
+      business_settings_public:{Row:BusinessIdentitySettings;Relationships:[]};
+      business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
       admin_create_user_profile:{Args:{p_auth_user_id:string;p_email:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
