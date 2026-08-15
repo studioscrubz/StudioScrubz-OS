@@ -26,6 +26,16 @@ export function WalkthroughsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => { let mounted = true; void getWalkthroughs().then((rows) => { if (mounted) setWalkthroughs(rows); }).catch((caught: unknown) => { console.error("Walkthrough load failed", caught); if (mounted) setError(message(caught, "Walkthroughs could not be loaded.")); }).finally(() => { if (mounted) setLoading(false); }); return () => { mounted = false; }; }, []);
+  useEffect(() => {
+    const walkthroughId = new URLSearchParams(window.location.search).get("walkthroughId");
+    if (!walkthroughId) return;
+    const selected = walkthroughs.find((item) => item.id === walkthroughId);
+    if (selected) {
+      // Open the existing Walkthrough editor requested by another workflow.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActive(selected);
+    }
+  }, [walkthroughs]);
   const summary = useMemo(() => ({ total: walkthroughs.filter((item) => !item.archived_at).length, scheduled: walkthroughs.filter((item) => !item.archived_at && item.status === "Scheduled").length, completed: walkthroughs.filter((item) => !item.archived_at && item.status === "Completed").length, proposalReady: walkthroughs.filter((item) => !item.archived_at && item.status === "Proposal Ready").length }), [walkthroughs]);
   const filtered = useMemo(() => { const term = search.trim().toLocaleLowerCase(); const today = localDate(); return walkthroughs.filter((item) => { const haystack = [displayClient(item.client), item.property?.address||"Deleted Property", item.estimate?.estimate_number, item.phone, item.email, item.assigned_to].filter(Boolean).join(" ").toLocaleLowerCase(); const dateMatch = dateFilter === "All" || (dateFilter === "Today" && item.walkthrough_date === today) || (dateFilter === "Upcoming" && Boolean(item.walkthrough_date && item.walkthrough_date > today)) || (dateFilter === "Past" && Boolean(item.walkthrough_date && item.walkthrough_date < today)); return !item.archived_at && item.status !== "Archived" && (!term || haystack.includes(term)) && (division === "All" || item.division === division) && (status === "All" || item.status === status) && dateMatch; }); }, [dateFilter, division, search, status, walkthroughs]);
 
