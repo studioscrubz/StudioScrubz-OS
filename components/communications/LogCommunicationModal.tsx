@@ -30,6 +30,8 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
   useEffect(() => {
     if (context || type !== "Service Reminder" || !links.clientId) return;
     let active = true;
+    // Reset request state before beginning the client-side lookup.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingUpcoming(true); setUpcomingError(null);
     void getUpcomingServicesForClient(links.clientId)
       .then((services) => {

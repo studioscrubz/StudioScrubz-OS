@@ -50,7 +50,11 @@ export function ServiceCatalogPage() {
     setServices(nextServices); setTiers(nextTiers); setAddons(nextAddons); setRules(nextRules);
   }, []);
 
-  useEffect(() => { void load().catch((cause) => setError(message(cause))).finally(() => setLoading(false)); }, [load]);
+  useEffect(() => {
+    // Initial client-side hydration from the catalog service.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load().catch((cause) => setError(message(cause))).finally(() => setLoading(false));
+  }, [load]);
 
   async function run(action: () => Promise<unknown>, success: string) {
     try { await action(); await load(); setNotice(success); setError(null); }

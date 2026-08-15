@@ -45,7 +45,12 @@ export function ClientsPage() {
     const clientId = params.get("clientId");
     if (!clientId) return;
     const selected = clients.find((client) => client.id === clientId);
-    if (selected) { setDetailClient(selected); if (params.get("logCommunication") === "service-reminder") setReminderServiceId(params.get("serviceId") ?? undefined); }
+    if (selected) {
+      // Synchronize the query-string selection after the client list loads.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDetailClient(selected);
+      if (params.get("logCommunication") === "service-reminder") setReminderServiceId(params.get("serviceId") ?? undefined);
+    }
   }, [clients]);
 
   const activeClients = useMemo(() => clients.filter((client) => !client.archived_at), [clients]);

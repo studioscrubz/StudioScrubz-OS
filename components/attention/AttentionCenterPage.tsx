@@ -12,7 +12,11 @@ export function AttentionCenterPage() {
   const [view, setView] = useState<AttentionView>("Active"); const [changing, setChanging] = useState<string | null>(null);
   const [composerItem, setComposerItem] = useState<AttentionItem | null>(null);
   async function load() { setLoading(true); setError(null); try { setItems(await getAttentionItems("All")); } catch (caught) { console.error("Attention Center load failed", caught); setError("Attention Center could not be loaded."); } finally { setLoading(false); } }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    // Initial client-side hydration from role-scoped services.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, []);
   const activeItems = items.filter((item) => !item.attention_state); const summary = summarizeAttention(activeItems);
   const shown = useMemo(() => items.filter((item) => (view === "All" || (view === "Active" ? !item.attention_state : item.attention_state?.state === view)) && (severity === "All" || item.severity === severity) && (category === "All" || item.category === category)), [category, items, severity, view]);
   async function change(key: string, action: () => Promise<void>) { setChanging(key); setError(null); try { await action(); await load(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Attention state could not be updated."); } finally { setChanging(null); } }

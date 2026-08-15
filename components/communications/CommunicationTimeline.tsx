@@ -45,8 +45,16 @@ export function CommunicationTimeline(props: CommunicationTimelineProps) {
     finally { setLoading(false); }
   }, [canView, props.agreementId, props.clientId, props.estimateId, props.invoiceId, props.proposalId, showArchived]);
 
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { if (canCreate && props.initialLogType) setLogging(true); }, [canCreate, props.initialLogType]);
+  useEffect(() => {
+    // Initial and filter-driven client-side hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+  useEffect(() => {
+    // Open the composer when the parent explicitly requests a prepared workflow.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (canCreate && props.initialLogType) setLogging(true);
+  }, [canCreate, props.initialLogType]);
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();

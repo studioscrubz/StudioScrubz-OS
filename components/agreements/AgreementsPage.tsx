@@ -44,6 +44,8 @@ export function AgreementsPage() {
     setAgreements(nextAgreements); setOccurrences(nextOccurrences);
   }
   useEffect(() => {
+    // Initial client-side hydration from Supabase.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void Promise.all([load(), getBusinessSettings().then(setSettings)])
       .catch((cause) => setError(message(cause))).finally(() => setLoading(false));
   }, []);
@@ -106,11 +108,13 @@ function SendAgreementModal({ agreement, settings, sender, close, sent }: { agre
   const [email, setEmail] = useState(agreement.sent_to || agreement.client?.email || "");
   const [subject, setSubject] = useState(`StudioScrubz Service Agreement ${agreement.agreement_number}`);
   const [body, setBody] = useState(`Hello ${clientName(agreement)},\n\nYour StudioScrubz Service Agreement is ready for review.\n\nPlease use the secure link below to review and sign your agreement.\n\nIf you have questions, please contact StudioScrubz.\n\nThank you,\nStudioScrubz`);
-  const hasValidToken = Boolean(agreement.client_access_token && (!agreement.client_access_token_expires_at || new Date(agreement.client_access_token_expires_at).getTime() > Date.now()));
-  const [token, setToken] = useState(hasValidToken ? agreement.client_access_token || "" : "");
-  const [reviewUrl, setReviewUrl] = useState("");
+  const [token] = useState(() => {
+    const validExistingToken = Boolean(agreement.client_access_token && (!agreement.client_access_token_expires_at || new Date(agreement.client_access_token_expires_at).getTime() > Date.now()));
+    return validExistingToken ? agreement.client_access_token || "" : generateSecureToken();
+  });
+  const hasValidToken = token === agreement.client_access_token;
+  const reviewUrl = `${getPublicSiteUrl()}/agreement/${token}`;
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  useEffect(() => { const nextToken = token || generateSecureToken(); if (!token) setToken(nextToken); setReviewUrl(`${getPublicSiteUrl()}/agreement/${nextToken}`); }, [token]);
   async function submit() {
     if (!email.trim()) { setError("Client email is required."); return; } if (!token || !reviewUrl) { setError("The secure review link is still being prepared."); return; }
     setBusy(true); setError(null);
