@@ -16,6 +16,7 @@ import { getActiveCrews } from "@/lib/services/crews";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
+import { AgreementPricingBreakdown } from "@/components/agreements/AgreementPricingBreakdown";
 import { recordAgreementSent } from "@/lib/services/clientCommunications";
 import { AGREEMENT_BILLING_TYPES, AGREEMENT_FREQUENCIES, AGREEMENT_STATUSES, type AgreementInput, type AgreementWithRelations } from "@/types/agreement";
 import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
@@ -142,6 +143,7 @@ function AgreementDocument({ agreement, settings }: { agreement: AgreementWithRe
     <h2 className="mt-6 text-2xl font-bold">Service Agreement</h2><p className="font-semibold">{agreement.agreement_number} · {agreement.status}</p>
     <div className="mt-5 grid grid-cols-2 gap-4"><Detail label="Client" value={clientName(agreement)}/><Detail label="Property / Service Location" value={agreement.property?.address || "Deleted Property"}/><Detail label="Service" value={agreement.service_name}/><Detail label="Frequency" value={agreement.frequency}/><Detail label="Per-visit / Billing Price" value={`${money(agreement.billing_amount)} · ${agreement.billing_type}`}/><Detail label="Estimated Monthly Amount" value={estimatedMonthlyAmount(agreement) ? `${money(estimatedMonthlyAmount(agreement))} (estimate)` : "Not applicable"}/><Detail label="Start Date" value={agreement.start_date}/><Detail label="Service Schedule" value={`${schedule}${agreement.default_start_time ? ` at ${agreement.default_start_time}` : ""}`}/></div>
     <Section title="Scope / Service Details" value={agreement.scope.map((item) => item.text).join("\n") || "—"}/><Section title="Special Instructions" value={agreement.special_instructions || "—"}/><Section title="Payment Terms" value={agreement.payment_terms || "—"}/><Section title="Agreement Terms" value={agreement.agreement_terms || agreement.notes || "—"}/><Section title="Cancellation Terms" value={agreement.cancellation_terms || "—"}/>
+    <AgreementPricingBreakdown pricing={agreement.pricing_snapshot}/>
     <p className="mt-5 text-xs text-neutral-500">This operational agreement record reflects the supplied business terms and is not a substitute for independent legal advice.</p>
     <div className="mt-12 grid grid-cols-2 gap-12"><Signature label="Client Signature"/><Signature label="StudioScrubz Signature"/></div>
   </article>;

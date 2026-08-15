@@ -1,4 +1,4 @@
-import type { AgreementBillingType, AgreementFrequency, AgreementStatus, Weekday } from "@/types/agreement";
+import type { AgreementBillingType, AgreementFrequency, AgreementPricingSnapshot, AgreementStatus, Weekday } from "@/types/agreement";
 
 export type PublicAgreement = {
   agreement_number: string;
@@ -14,6 +14,7 @@ export type PublicAgreement = {
   end_date: string | null;
   billing_type: AgreementBillingType;
   billing_amount: number;
+  pricing_snapshot: AgreementPricingSnapshot | null;
   payment_terms: string | null;
   agreement_terms: string | null;
   cancellation_terms: string | null;

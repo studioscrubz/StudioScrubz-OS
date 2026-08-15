@@ -1,5 +1,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getProposalById } from "@/lib/services/proposals";
+import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
+import { getServiceCatalog } from "@/lib/services/serviceCatalog";
 import type {
   AgreementFinancialSummary,
   AgreementInput,
@@ -46,10 +48,18 @@ export async function createAgreement(input: AgreementInput) {
     const old = await getAgreementForProposal(input.proposal_id);
     if (old) return old;
   }
+  let prepared = input;
+  if (!input.proposal_id && !input.pricing_snapshot) {
+    const catalog = await getServiceCatalog();
+    const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
+    if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
+    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules });
+    prepared = { ...input, billing_amount:pricing.final_per_visit_price, pricing_snapshot:pricing };
+  }
   for (let i = 0; i < 5; i++) {
     const { data, error } = await getSupabaseClient()
       .from("service_agreements")
-      .insert({ ...input, agreement_number: num() })
+      .insert({ ...prepared, agreement_number: num() })
       .select(select)
       .single();
     if (!error) return data as AgreementWithRelations;
@@ -65,6 +75,7 @@ export async function createAgreementFromProposal(proposalId: string) {
   const p = await getProposalById(proposalId);
   if (p.status !== "Accepted" || p.frequency === "One-Time")
     throw new Error("Only accepted recurring proposals can create agreements.");
+  const pricing = proposalAgreementPricing(p);
   return createAgreement({
     client_id: p.client_id,
     property_id: p.property_id,
@@ -81,7 +92,8 @@ export async function createAgreementFromProposal(proposalId: string) {
     end_date: null,
     auto_renew: false,
     billing_type: "Per Visit",
-    billing_amount: p.result.perVisitTotal,
+    billing_amount: pricing.final_per_visit_price,
+    pricing_snapshot: pricing,
     payment_terms: p.result.terms.paymentTerms,
     agreement_terms: null,
     cancellation_terms: null,
