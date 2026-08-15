@@ -94,6 +94,7 @@ type SentDocumentInput = {
   recipientEmail: string | null; subject: string; messageBody: string; sentAt: string;
   recipientPhone?: string | null;
   channel?: "Email" | "SMS";
+  provider?: "mailto" | "device";
 };
 
 export const recordEstimateSent = (input: SentDocumentInput) => recordDocumentSent("Estimate", "estimate_id", "estimate_number", input);
@@ -126,7 +127,7 @@ export async function recordAgreementSigned(input: Omit<ClientCommunicationInput
 async function recordDocumentSent(type: "Estimate" | "Proposal" | "Service Agreement" | "Invoice" | "Payment Reminder", linkColumn: "estimate_id" | "proposal_id" | "agreement_id" | "invoice_id", numberKey: string, input: SentDocumentInput) {
   return createCommunicationOnce({
     client_id: input.clientId, property_id: input.propertyId, [linkColumn]: input.id,
-    communication_type: type, channel: input.channel ?? "Email", direction: "Outbound", status: "Sent", provider: input.channel === "SMS" ? "sms" : "mailto",
+    communication_type: type, channel: input.channel ?? "Email", direction: "Outbound", status: "Sent", provider: input.provider ?? (input.channel === "SMS" ? "device" : "mailto"),
     recipient_email: input.recipientEmail, recipient_phone: input.recipientPhone ?? null, subject: input.subject, message_body: input.messageBody, sent_at: input.sentAt,
     metadata: { [numberKey]: input.number }, event_key: `${type.toLowerCase().replaceAll(" ", "-")}:${input.id}:sent:${input.sentAt}`,
   });

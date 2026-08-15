@@ -4,8 +4,13 @@ import { isMasterAdmin } from "@/lib/auth/permissions";
 import type { Employee, EmployeeDepartment, EmployeeInput, EmployeeUpdate } from "@/types/employee";
 
 export async function getEmployees(): Promise<Employee[]> {
-  if (isMasterAdmin(await getCurrentProfile())) {
+  const profile = await getCurrentProfile();
+  if (isMasterAdmin(profile)) {
     const { data,error }=await getSupabaseClient().from("employees").select("*").order("last_name"); if(error)throw error; return data;
+  }
+  if (profile?.role === "Sales") {
+    const { data,error }=await getSupabaseClient().from("employee_directory_sales_safe").select("*").order("last_name"); if(error)throw error;
+    return data.map((row) => safeEmployee({ ...row, hire_date: null, notes: null }));
   }
   const { data,error }=await getSupabaseClient().from("employee_directory_safe").select("*").order("last_name"); if(error)throw error;
   return data.map(safeEmployee);

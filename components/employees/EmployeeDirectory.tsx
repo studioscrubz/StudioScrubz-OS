@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import {
   archiveEmployee,
   createEmployee,
@@ -32,6 +34,11 @@ export function EmployeeDirectory({
   description?: string;
   directory?: boolean;
 }) {
+  const { profile } = useAuth();
+  const canManage = hasPermission(profile, "employees.manage");
+  const canManageCrews = hasPermission(profile, "crews.manage");
+  const canViewCrews = hasPermission(profile, "crews.view");
+  const canViewTime = hasPermission(profile, "timeClock.manageAll");
   const [rows, setRows] = useState<Employee[]>([]);
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,13 +52,13 @@ export function EmployeeDirectory({
   const [detail, setDetail] = useState<Employee | null>(null);
   const [manageCrews, setManageCrews] = useState(false);
   async function load() {
-    const [e, c] = await Promise.all([getEmployees(), getCrews()]);
+    const [e, c] = await Promise.all([getEmployees(), canViewCrews ? getCrews() : Promise.resolve([])]);
     setRows(e);
     setCrews(c);
   }
   useEffect(() => {
     let active = true;
-    void Promise.all([getEmployees(), getCrews()])
+    void Promise.all([getEmployees(), canViewCrews ? getCrews() : Promise.resolve([])])
       .then(([e, c]) => {
         if (active) {
           setRows(e);
@@ -68,7 +75,7 @@ export function EmployeeDirectory({
     return () => {
       active = false;
     };
-  }, []);
+  }, [canViewCrews]);
   const visible = useMemo(
     () =>
       rows.filter(
@@ -120,17 +127,17 @@ export function EmployeeDirectory({
         title={title}
         description={description}
         actions={
-          directory ? (
+          directory && (canManage || canManageCrews) ? (
             <>
-              <button className={primary} onClick={() => setEditing("new")}>
+              {canManage && <button className={primary} onClick={() => setEditing("new")}>
                 Add Employee
-              </button>
-              <button
+              </button>}
+              {canManageCrews && <button
                 className={secondary}
                 onClick={() => setManageCrews(true)}
               >
                 Manage Crews
-              </button>
+              </button>}
             </>
           ) : null
         }
@@ -228,6 +235,8 @@ export function EmployeeDirectory({
             await load();
             setNotice("Employee archived.");
           }}
+          canManage={canManage}
+          canViewTime={canViewTime}
         />
       )}
       {manageCrews && (
@@ -387,12 +396,16 @@ function EmployeeDetail({
   close,
   edit,
   archived,
+  canManage,
+  canViewTime,
 }: {
   employee: Employee;
   crews: CrewWithRelations[];
   close: () => void;
   edit: () => void;
   archived: () => Promise<void>;
+  canManage: boolean;
+  canViewTime: boolean;
 }) {
   const current =
     crews
@@ -418,10 +431,10 @@ function EmployeeDetail({
           ["Notes", employee.notes || "—"],
           ["Created", new Date(employee.created_at).toLocaleDateString()],
           ["Updated", new Date(employee.updated_at).toLocaleDateString()],
-        ]}
+        ].filter(([label]) => canManage || !["Hourly Rate", "Overtime Rate", "Commission", "Hire Date", "Notes"].includes(label))}
       />
-      <EmployeeTimeSummary employeeId={employee.id} />
-      <div className="mt-5 flex gap-2">
+      {canViewTime && <EmployeeTimeSummary employeeId={employee.id} />}
+      {canManage && <div className="mt-5 flex gap-2">
         <button className={primary} onClick={edit}>
           Edit
         </button>
@@ -430,7 +443,7 @@ function EmployeeDetail({
             Archive
           </button>
         )}
-      </div>
+      </div>}
     </Modal>
   );
 }

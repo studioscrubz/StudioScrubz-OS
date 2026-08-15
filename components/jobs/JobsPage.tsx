@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import {
   archiveJob,
   assignJobCrew,
@@ -37,6 +39,7 @@ const columns: JobStatus[] = [
   "Cancelled",
 ];
 export function JobsPage() {
+  const { profile } = useAuth();
   const [rows, setRows] = useState<JobWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +232,7 @@ export function JobsPage() {
           busy={busy === selected.id}
           close={() => setSelected(null)}
           mutate={(fn, text) => void mutate(selected, fn, text)}
+          canArchive={hasPermission(profile, "jobs.archive")}
         />
       )}
     </>
@@ -271,11 +275,13 @@ function JobModal({
   busy,
   close,
   mutate,
+  canArchive,
 }: {
   job: JobWithRelations;
   busy: boolean;
   close: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
+  canArchive: boolean;
 }) {
   const [date, setDate] = useState(job.scheduled_date ?? "");
   const [time, setTime] = useState(job.start_time?.slice(0, 5) ?? "");
@@ -445,7 +451,7 @@ function JobModal({
             Cancel
           </button>
         )}
-        {job.status !== "Archived" && (
+        {canArchive && job.status !== "Archived" && (
           <button
             disabled={busy}
             onClick={() => mutate(() => archiveJob(job.id), "Job archived.")}

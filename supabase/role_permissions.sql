@@ -165,12 +165,33 @@ create policy "Proposal role history append" on public.proposal_history for inse
 
 -- RLS cannot protect individual columns, so block non-Master approval-field escalation.
 create or replace function public.protect_proposal_approval_fields() returns trigger
-language plpgsql security invoker set search_path = '' as $$ begin
-  if public.is_master_admin() then return new; end if;
+  language plpgsql security invoker set search_path = '' as $$
+  declare
+    v_controlled_acceptance boolean := coalesce(current_setting('studioscrubz.controlled_proposal_acceptance', true), '') = 'on';
+    v_consent constant text := 'I have reviewed and accept this Proposal.';
+  begin
+    if public.is_master_admin() then return new; end if;
+    if v_controlled_acceptance then
+      if TG_OP <> 'UPDATE'
+        or old.status not in ('Sent','Viewed') or new.status <> 'Accepted'
+        or old.accepted is distinct from false or new.accepted is distinct from true
+        or old.accepted_at is not null or new.accepted_at is null
+        or length(btrim(coalesce(new.accepted_by_name, ''))) < 2
+        or new.acceptance_method is distinct from 'Signed Proposal'
+        or new.client_acceptance_consent is distinct from v_consent
+        or new.client_acceptance_consent_at is null
+        or new.accepted_at is distinct from new.client_acceptance_consent_at
+        or (to_jsonb(new) - array['status','accepted','accepted_at','accepted_by_name','acceptance_method','client_acceptance_consent','client_acceptance_consent_at','updated_at']::text[])
+          is distinct from
+          (to_jsonb(old) - array['status','accepted','accepted_at','accepted_by_name','acceptance_method','client_acceptance_consent','client_acceptance_consent_at','updated_at']::text[])
+      then raise exception 'Controlled Proposal acceptance may change only the permitted client acceptance fields'; end if;
+      return new;
+    end if;
   if TG_OP = 'INSERT' then
     if new.approval_status = 'Approved' or new.approved_at is not null or new.approved_by is not null
       or new.approval_notes is not null or new.status in ('Approved','Accepted') or new.accepted = true
-      or new.accepted_at is not null or new.accepted_by_name is not null or new.acceptance_method is not null
+        or new.accepted_at is not null or new.accepted_by_name is not null or new.acceptance_method is not null
+        or new.client_acceptance_consent is not null or new.client_acceptance_consent_at is not null
     then raise exception 'Only Master Admin may set proposal approval or acceptance fields'; end if;
   elsif ((new.approval_status = 'Approved' or old.approval_status = 'Approved') and new.approval_status is distinct from old.approval_status)
     or new.approved_at is distinct from old.approved_at or new.approved_by is distinct from old.approved_by
@@ -178,7 +199,9 @@ language plpgsql security invoker set search_path = '' as $$ begin
     or (new.status in ('Approved','Accepted') and new.status is distinct from old.status)
     or (old.status in ('Approved','Accepted') and new.status is distinct from old.status)
     or new.accepted is distinct from old.accepted or new.accepted_at is distinct from old.accepted_at
-    or new.accepted_by_name is distinct from old.accepted_by_name or new.acceptance_method is distinct from old.acceptance_method
+      or new.accepted_by_name is distinct from old.accepted_by_name or new.acceptance_method is distinct from old.acceptance_method
+      or new.client_acceptance_consent is distinct from old.client_acceptance_consent
+      or new.client_acceptance_consent_at is distinct from old.client_acceptance_consent_at
   then raise exception 'Only Master Admin may change proposal approval or acceptance fields'; end if;
   return new;
 end $$;

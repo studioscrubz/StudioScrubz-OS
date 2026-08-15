@@ -1,8 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import {
   archiveVehicle,
   createVehicle,
+  getAuthorizedVehicles,
   getVehicles,
   updateVehicle,
 } from "@/lib/services/vehicles";
@@ -26,6 +29,7 @@ import {
   VEHICLE_TYPES,
   vehicleLabel,
   type VehicleInput,
+  type AuthorizedVehicle,
   type VehicleWithRelations,
 } from "@/types/vehicle";
 import {
@@ -40,6 +44,43 @@ import type { Client } from "@/types/client";
 import type { PropertyWithClient } from "@/types/property";
 
 export function VehiclesPage() {
+  const { profile } = useAuth();
+  return hasPermission(profile, "vehicles.manage") ? <VehicleAdministrationPage /> : <AuthorizedVehiclesPage />;
+}
+
+function AuthorizedVehiclesPage() {
+  const [vehicles, setVehicles] = useState<AuthorizedVehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void getAuthorizedVehicles()
+      .then((rows) => { if (active) setVehicles(rows); })
+      .catch((cause: unknown) => { console.error("Authorized vehicle load failed", cause); if (active) setError(msg(cause)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  return <>
+    <header className="border-b pb-7">
+      <h1 className="text-3xl font-extrabold text-[#143d1a]">Authorized Vehicles</h1>
+      <p className="mt-3 text-neutral-600">Vehicles assigned to you or your crew. This directory is read only.</p>
+    </header>
+    {error && <Alert text={error} />}
+    {loading ? <div className="mt-7 h-48 animate-pulse rounded-2xl bg-neutral-200" /> :
+      <section className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {vehicles.map((vehicle) => <article key={vehicle.id} className="rounded-2xl border bg-white p-5 shadow-sm">
+          <b className="text-[#143d1a]">{vehicle.vehicle_number} · {vehicleLabel(vehicle)}</b>
+          <p className="mt-2 text-sm">{vehicle.vehicle_type || "Type not set"} · {vehicle.status}</p>
+          <p className="text-sm text-neutral-600">License Plate: {vehicle.license_plate || "—"}</p>
+          <p className="mt-2 text-xs text-neutral-500">Employee: {vehicle.assigned_employee_name || "Unassigned"} · Crew: {vehicle.assigned_crew_name || "Unassigned"}</p>
+          {vehicle.notes && <p className="mt-3 border-t pt-3 text-sm text-neutral-600">{vehicle.notes}</p>}
+        </article>)}
+        {!vehicles.length && <p className="col-span-full rounded-2xl border border-dashed p-10 text-center text-neutral-500">No vehicles are currently assigned to you or your crew.</p>}
+      </section>}
+  </>;
+}
+
+function VehicleAdministrationPage() {
   const [vehicles, setVehicles] = useState<VehicleWithRelations[]>([]),
     [mileage, setMileage] = useState<MileageWithRelations[]>([]),
     [loading, setLoading] = useState(true),

@@ -12,4 +12,8 @@ export type Vehicle = { id:string; vehicle_number:string; nickname:string|null; 
 export type VehicleInput = Omit<Vehicle,"id"|"vehicle_number"|"created_at"|"updated_at"|"archived_at">;
 export type VehicleUpdate = Partial<VehicleInput>&{archived_at?:string|null};
 export type VehicleWithRelations = Vehicle&{assigned_employee:Employee|null;assigned_crew:Crew|null};
+export type AuthorizedVehicle = Pick<Vehicle,"id"|"vehicle_number"|"nickname"|"year"|"make"|"model"|"color"|"license_plate"|"vehicle_type"|"status"|"assigned_employee_id"|"assigned_crew_id"|"notes"> & {
+  assigned_employee_name:string|null;
+  assigned_crew_name:string|null;
+};
 export function vehicleLabel(vehicle:Pick<Vehicle,"vehicle_number"|"nickname"|"year"|"make"|"model">|null){return vehicle?vehicle.nickname?.trim()||`${vehicle.year??""} ${vehicle.make} ${vehicle.model}`.trim()||vehicle.vehicle_number:"Deleted Vehicle"}

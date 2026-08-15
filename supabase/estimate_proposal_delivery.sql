@@ -129,6 +129,8 @@ declare
   v_consent constant text := 'I have reviewed and accept this Proposal.';
   v_id uuid;
   v_previous_status text;
+  v_accepted_at timestamptz := now();
+  v_updated_count integer;
 begin
   if p_token is null or length(p_token) < 32 then raise exception 'This proposal link is invalid, expired, or no longer available.'; end if;
   if p_consent is distinct from true then raise exception 'Explicit consent is required to accept this Proposal.'; end if;
@@ -140,11 +142,16 @@ begin
     and (p.client_access_token_expires_at is null or p.client_access_token_expires_at > now())
   limit 1 for update;
   if v_id is null then raise exception 'This Proposal cannot be accepted because it is invalid, expired, archived, or already accepted.'; end if;
-  update public.proposals set status='Accepted', accepted=true, accepted_at=now(), accepted_by_name=v_name,
-    acceptance_method='Signed Proposal', client_acceptance_consent=v_consent, client_acceptance_consent_at=now()
-  where id=v_id and status in ('Sent','Viewed') and accepted=false;
+  perform set_config('studioscrubz.controlled_proposal_acceptance','on',true);
+  update public.proposals set status='Accepted', accepted=true, accepted_at=v_accepted_at, accepted_by_name=v_name,
+    acceptance_method='Signed Proposal', client_acceptance_consent=v_consent, client_acceptance_consent_at=v_accepted_at
+  where id=v_id and client_access_token=p_token and archived_at is null and status in ('Sent','Viewed')
+    and approval_status='Approved' and accepted=false and expiration_date>=current_date
+    and (client_access_token_expires_at is null or client_access_token_expires_at>now());
+  get diagnostics v_updated_count = row_count;
+  if v_updated_count <> 1 then raise exception 'This Proposal changed before acceptance could be completed. Refresh and try again.'; end if;
   insert into public.proposal_history(proposal_id,event_type,previous_status,new_status,description,metadata,performed_by)
-    values(v_id,'Accepted',v_previous_status,'Accepted','Proposal accepted through the secure client review page.',jsonb_build_object('accepted_by_name',v_name,'accepted_at',now()),'Client');
+    values(v_id,'Accepted',v_previous_status,'Accepted','Proposal accepted through the secure client review page.',jsonb_build_object('accepted_by_name',v_name,'accepted_at',v_accepted_at),'Client');
   return public.get_proposal_by_token(p_token);
 end; $$;
 

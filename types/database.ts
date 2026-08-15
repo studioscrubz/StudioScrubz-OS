@@ -9,7 +9,7 @@ import type { Crew, CrewInput, CrewMember, CrewUpdate } from "@/types/crew";
 import type { Invoice, InvoiceUpdate } from "@/types/invoice";
 import type { Payment, PaymentInsert } from "@/types/payment";
 import type {Expense,ExpenseInput,ExpenseUpdate} from "@/types/expense";
-import type {Vehicle,VehicleInput,VehicleUpdate} from "@/types/vehicle";
+import type {AuthorizedVehicle,Vehicle,VehicleInput,VehicleUpdate} from "@/types/vehicle";
 import type {MileageEntry,MileageInput,MileageUpdate} from "@/types/mileage";
 import type {TimeEntry,TimeEntryInput,TimeEntryUpdate} from "@/types/timeEntry";
 import type {ServiceAgreement,AgreementInput,AgreementUpdate} from "@/types/agreement";
@@ -94,6 +94,8 @@ export interface Database {
     Views: {
       jobs_operational_safe:{Row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">;Relationships:[]};
       employee_directory_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">;Relationships:[]};
+      employee_directory_sales_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate"|"hire_date"|"notes">;Relationships:[]};
+      authorized_vehicles_safe:{Row:AuthorizedVehicle;Relationships:[]};
       time_entries_operational_safe:{Row:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null};Relationships:[]};
       crew_directory_safe:{Row:Crew;Relationships:[]};
       crew_members_directory_safe:{Row:{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null};Relationships:[]};

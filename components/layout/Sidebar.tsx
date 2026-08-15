@@ -46,7 +46,7 @@ const navItems: Array<NavLink | NavGroup> = [
     label: "Employees",
     marker: "E",
     children: [
-      { label: "Employee Directory", href: "/employees", marker: "", permission: "employees.view" },
+      { label: "Employee Directory", href: "/employees", marker: "", permission: "employees.directory_view" },
       { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "", permission: "employees.view" },
       { label: "Sales", href: "/employees/sales", marker: "", permission: "employees.view" },
       { label: "Administration / Management", href: "/employees/administration", marker: "", permission: "employees.view" },

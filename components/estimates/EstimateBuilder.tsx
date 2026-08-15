@@ -43,6 +43,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [catalogLoading,setCatalogLoading]=useState(true);
   const restoredDraft = useRef(false);
   const suppressDraftSave = useRef(false);
+  const pendingCatalogSelection = useRef<{ division: EstimateDivision; selection: string } | null>(null);
   const calculatorInput: CalculatorInput = division === "Residential" ? residential : commercial;
   useEffect(() => {
     if (estimate) return;
@@ -71,7 +72,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       setDraftReady(true);
     }
   }, [estimate]);
-  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);if(!restoredDraft.current&&!serviceDescription.trim()){const selected=selectedCatalogService(loaded,division,division==="Residential"?residential.serviceType:commercial.commercialType);setServiceDescription(selected?.description?.trim()??"")}if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
+  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);const pending=pendingCatalogSelection.current;if(pending){const selected=selectedCatalogService(loaded,pending.division,pending.selection);setServiceDescription(selected?.description?.trim()??"");pendingCatalogSelection.current=null}else if(!restoredDraft.current&&!estimate&&!serviceDescription.trim()){const selected=selectedCatalogService(loaded,division,division==="Residential"?residential.serviceType:commercial.commercialType);setServiceDescription(selected?.description?.trim()??"")}if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
   useEffect(() => {
     if (estimate || !draftReady) return;
     if (suppressDraftSave.current) {
@@ -93,7 +94,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:division === "Residential" ? calculateResidentialEstimate(residential,catalog) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, division, residential]);
   const result=calculation.result?{...calculation.result,serviceDescription:serviceDescription.trim()||null}:null;
 
-  function selectCatalogService(nextDivision:EstimateDivision, selection:string) { if (!catalog) return; const service=selectedCatalogService(catalog,nextDivision,selection); setServiceDescription(service?.description?.trim()??""); }
+  function selectCatalogService(nextDivision:EstimateDivision, selection:string) { if (!catalog) { pendingCatalogSelection.current={division:nextDivision,selection}; return; } const service=selectedCatalogService(catalog,nextDivision,selection); setServiceDescription(service?.description?.trim()??""); }
 
   async function save() {
     if(!result){setError(calculation.error??"Pricing is not ready.");return}
@@ -205,7 +206,7 @@ function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDiv
 function estimatePayload(clientId: string, propertyId: string, customer: CustomerInformation, division: EstimateDivision, result: EstimateResult, notes: string, status: "Open" | "Archived") { return { client_id: clientId, property_id: propertyId, division, customer_first_name: clean(customer.firstName), customer_last_name: clean(customer.lastName), customer_phone: clean(customer.phone), customer_email: clean(customer.email), customer_address: customer.address.trim(), frequency: result.calculatorInput.frequency, service_name: result.serviceName, status, result, notes: clean(notes) }; }
 function customerFromEstimate(estimate: EstimateWithRelations): CustomerInformation { return { firstName: estimate.customer_first_name ?? "", lastName: estimate.customer_last_name ?? "", companyName: estimate.client?.company_name ?? "", phone: estimate.customer_phone ?? "", email: estimate.customer_email ?? "", address: estimate.property?.address ?? estimate.customer_address ?? "", addressLine2: estimate.property?.address_line_2 ?? "", city: estimate.property?.city ?? "", state: estimate.property?.state ?? "", zip: estimate.property?.zip ?? "" }; }
 function clean(value: string): string | null { return value.trim() || null; }
-function selectedCatalogService(catalog:ServiceCatalogBundle,division:EstimateDivision,selection:string){const normalized=selection.trim().toLowerCase();return catalog.services.find(service=>service.division!==oppositeDivision(division)&&service.service_name.replace(/ Cleaning$/i,"").trim().toLowerCase()===normalized)}
-function oppositeDivision(division:EstimateDivision):EstimateDivision{return division==="Residential"?"Commercial":"Residential"}
+function selectedCatalogService(catalog:ServiceCatalogBundle,division:EstimateDivision,selection:string){const normalized=normalizeServiceSelection(selection);return catalog.services.find(service=>(service.division===division||service.division==="Both")&&normalizeServiceSelection(service.service_name)===normalized)}
+function normalizeServiceSelection(value:string){return value.replace(/ Cleaning$/i,"").trim().toLowerCase()}
 function currency(value: number): string { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
 const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
