@@ -20,8 +20,6 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Attention Center", href: "/attention", marker: "", permission: "attention.view" },
     ],
   },
-  { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
-  { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {
     label: "Estimates",
     marker: "E",
@@ -37,11 +35,13 @@ const navItems: Array<NavLink | NavGroup> = [
     children: [
       { label: "Proposal Calculator", href: "/proposals", marker: "", permission: "proposals.create" },
       { label: "Open Proposals", href: "/open-proposals", marker: "", permission: "proposals.view" },
+      { label: "Service Agreements", href: "/agreements", marker: "", permission: "agreements.view" },
     ],
   },
   { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
-  { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
   { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
+  { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
+  { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {
     label: "Employees",
     marker: "E",
@@ -53,16 +53,15 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Time Clock", href: "/time-clock", marker: "", permission: "timeClock.view" },
     ],
   },
-  { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
   {
     label: "Finances",
     marker: "F",
-    permission: "finances.view",
     children: [
       { label: "Revenue", href: "/revenue", marker: "", permission: "finances.view" },
       { label: "Expenses", href: "/expenses", marker: "", permission: "expenses.view" },
       { label: "Vehicles", href: "/vehicles", marker: "", permission: "vehicles.view" },
       { label: "Payroll Preparation", href: "/payroll-prep", marker: "", permission: "payrollPrep.view" },
+      { label: "Invoices", href: "/invoices", marker: "", permission: "invoices.view" },
     ],
   },
   {
