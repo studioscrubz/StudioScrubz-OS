@@ -21,6 +21,7 @@ type EstimateDraft = {
   division: EstimateDivision;
   residential: ResidentialCalculatorInput;
   commercial: CommercialCalculatorInput;
+  serviceDescription: string;
   notes: string;
 };
 
@@ -31,6 +32,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [division, setDivision] = useState<EstimateDivision>(estimate?.division ?? "Residential");
   const [residential, setResidential] = useState<ResidentialCalculatorInput>(initialInput?.division === "Residential" ? initialInput : defaultResidential);
   const [commercial, setCommercial] = useState<CommercialCalculatorInput>(initialInput?.division === "Commercial" ? initialInput : defaultCommercial);
+  const [serviceDescription, setServiceDescription] = useState(estimate?.result.serviceDescription ?? "");
   const [notes, setNotes] = useState(estimate?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           setDivision(parsed.division);
           setResidential(parsed.residential);
           setCommercial(parsed.commercial);
+          setServiceDescription(parsed.serviceDescription ?? "");
           setNotes(parsed.notes);
           setDraftNotice("Your unfinished estimate was restored.");
         } else {
@@ -68,7 +71,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       setDraftReady(true);
     }
   }, [estimate]);
-  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
+  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);if(!restoredDraft.current&&!serviceDescription.trim()){const selected=selectedCatalogService(loaded,division,division==="Residential"?residential.serviceType:commercial.commercialType);setServiceDescription(selected?.description?.trim()??"")}if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
   useEffect(() => {
     if (estimate || !draftReady) return;
     if (suppressDraftSave.current) {
@@ -76,19 +79,21 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    if (!hasMeaningfulDraft(customer, division, residential, commercial, notes)) {
+    if (!hasMeaningfulDraft(customer, division, residential, commercial, serviceDescription, notes)) {
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, notes };
+    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, serviceDescription, notes };
     try {
       window.sessionStorage.setItem(estimateDraftKey, JSON.stringify(draft));
     } catch (caught) {
       console.warn("Estimate draft could not be saved", caught);
     }
-  }, [commercial, customer, division, draftReady, estimate, notes, residential]);
+  }, [commercial, customer, division, draftReady, estimate, notes, residential, serviceDescription]);
   const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:division === "Residential" ? calculateResidentialEstimate(residential,catalog) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, division, residential]);
-  const result=calculation.result;
+  const result=calculation.result?{...calculation.result,serviceDescription:serviceDescription.trim()||null}:null;
+
+  function selectCatalogService(nextDivision:EstimateDivision, selection:string) { if (!catalog) return; const service=selectedCatalogService(catalog,nextDivision,selection); setServiceDescription(service?.description?.trim()??""); }
 
   async function save() {
     if(!result){setError(calculation.error??"Pricing is not ready.");return}
@@ -123,12 +128,13 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     setDivision("Residential");
     setResidential({ ...defaultResidential, addOns: [] });
     setCommercial({ ...defaultCommercial, additionalServices: [] });
+    setServiceDescription("");
     setNotes("");
     setDraftNotice(null);
   }
 
   function requestClearDraft() {
-    if (hasMeaningfulDraft(customer, division, residential, commercial, notes) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
+    if (hasMeaningfulDraft(customer, division, residential, commercial, serviceDescription, notes) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
     clearNewEstimateDraft();
     setSuccess("Estimate draft cleared.");
     setError(null);
@@ -153,9 +159,10 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,.75fr)]">
       <div className="space-y-6">
         <Section title="Estimate Calculator" subtitle="Choose a division and configure the service.">
-          <DivisionToggle value={division} set={(value) => setDivision(value)} />
-          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:calculation.error?<Alert kind="error" text={calculation.error}/>:catalog&&<div className="mt-6">{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} catalog={catalog} /> : <CommercialFields value={commercial} set={setCommercial} catalog={catalog} />}</div>}
+          <DivisionToggle value={division} set={(value) => {setDivision(value);selectCatalogService(value,value==="Residential"?residential.serviceType:commercial.commercialType)}} />
+          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:calculation.error?<Alert kind="error" text={calculation.error}/>:catalog&&<div className="mt-6">{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} />}</div>}
         </Section>
+        <Section title="Service Description" subtitle="Copied from the selected Service Catalog entry and saved with this Estimate."><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{serviceDescription||"No service description available."}</div></Section>
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
       </div>
       {result?<EstimateSummary result={result} frequency={calculatorInput.frequency} saving={saving} save={save} editing={Boolean(estimate)} />:<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
@@ -163,8 +170,8 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   </div>;
 }
 
-function ResidentialFields({ value, set,catalog }: { value: ResidentialCalculatorInput; set: (value: ResidentialCalculatorInput) => void;catalog:ServiceCatalogBundle }) { const services=catalog.services.filter(x=>x.division!=="Commercial").map(x=>x.service_name.replace(/ Cleaning$/,""));const addons=catalog.addons.filter(x=>x.division!=="Commercial").map(x=>x.addon_name);return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-  <SelectField label="Service Type" value={value.serviceType} options={services} set={(v) => set({ ...value, serviceType: v as ResidentialCalculatorInput["serviceType"] })} />
+function ResidentialFields({ value, set,catalog,serviceChanged }: { value: ResidentialCalculatorInput; set: (value: ResidentialCalculatorInput) => void;catalog:ServiceCatalogBundle;serviceChanged:(selection:string)=>void }) { const services=catalog.services.filter(x=>x.division!=="Commercial").map(x=>x.service_name.replace(/ Cleaning$/,""));const addons=catalog.addons.filter(x=>x.division!=="Commercial").map(x=>x.addon_name);return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <SelectField label="Service Type" value={value.serviceType} options={services} set={(v) => {set({ ...value, serviceType: v as ResidentialCalculatorInput["serviceType"] });serviceChanged(v)}} />
   <SelectField label="Frequency" value={value.frequency} options={frequencies} set={(v) => set({ ...value, frequency: v as Frequency })} />
   <SelectField label="Condition" value={value.condition} options={conditions} set={(v) => set({ ...value, condition: v as Condition })} />
   <NumberField label="Square Feet" value={value.squareFeet} set={(v) => set({ ...value, squareFeet: v })} />
@@ -175,8 +182,8 @@ function ResidentialFields({ value, set,catalog }: { value: ResidentialCalculato
   <div className="sm:col-span-2 xl:col-span-3"><OptionGrid title="Add-Ons" options={addons} selected={value.addOns} set={(addOns) => set({ ...value, addOns })} /></div>
 </div>; }
 
-function CommercialFields({ value, set,catalog }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void;catalog:ServiceCatalogBundle }) { const services=catalog.services.filter(x=>x.division!=="Residential").map(x=>x.service_name.replace(/ Cleaning$/,""));const addons=catalog.addons.filter(x=>x.division!=="Residential").map(x=>x.addon_name);return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-  <SelectField label="Commercial Type" value={value.commercialType} options={services} set={(v) => set({ ...value, commercialType: v })} /><SelectField label="Frequency" value={value.frequency} options={frequencies} set={(v) => set({ ...value, frequency: v as Frequency })} /><SelectField label="Condition" value={value.condition} options={conditions} set={(v) => set({ ...value, condition: v as Condition })} />
+function CommercialFields({ value, set,catalog,serviceChanged }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void;catalog:ServiceCatalogBundle;serviceChanged:(selection:string)=>void }) { const services=catalog.services.filter(x=>x.division!=="Residential").map(x=>x.service_name.replace(/ Cleaning$/,""));const addons=catalog.addons.filter(x=>x.division!=="Residential").map(x=>x.addon_name);return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <SelectField label="Commercial Type" value={value.commercialType} options={services} set={(v) => {set({ ...value, commercialType: v });serviceChanged(v)}} /><SelectField label="Frequency" value={value.frequency} options={frequencies} set={(v) => set({ ...value, frequency: v as Frequency })} /><SelectField label="Condition" value={value.condition} options={conditions} set={(v) => set({ ...value, condition: v as Condition })} />
   <NumberField label="Square Feet" value={value.squareFeet} set={(v) => set({ ...value, squareFeet: v })} /><NumberField label="Floors" value={value.floors} set={(v) => set({ ...value, floors: v })} /><NumberField label="Restrooms" value={value.restrooms} set={(v) => set({ ...value, restrooms: v })} /><NumberField label="Kitchens / Breakrooms" value={value.kitchens} set={(v) => set({ ...value, kitchens: v })} /><NumberField label="Stations / Booths" value={value.stations} set={(v) => set({ ...value, stations: v })} /><NumberField label="Number of Units" value={value.units} set={(v) => set({ ...value, units: v })} /><NumberField label="Target Completion Hours" step="0.5" value={value.targetCompletionHours} set={(v) => set({ ...value, targetCompletionHours: v })} /><NumberField label="Worker Hourly Pay" step="0.01" value={value.workerHourlyPay} set={(v) => set({ ...value, workerHourlyPay: v })} /><NumberField label="Target Profit Margin %" value={value.targetProfitMarginPercent} set={(v) => set({ ...value, targetProfitMarginPercent: v })} /><NumberField label="Additional Discount %" value={value.additionalDiscountPercent} set={(v) => set({ ...value, additionalDiscountPercent: v })} /><NumberField label="Tax Rate %" step="0.01" value={value.taxRatePercent} set={(v) => set({ ...value, taxRatePercent: v })} />
   <div className="sm:col-span-2 xl:col-span-3"><OptionGrid title="Additional Services" options={addons} selected={value.additionalServices} set={(additionalServices) => set({ ...value, additionalServices })} /></div>
 </div>; }
@@ -194,9 +201,11 @@ function Label({ text, required }: { text: string; required?: boolean }) { retur
 function Alert({ kind, text }: { kind: "success" | "error"; text: string }) { return <div role={kind === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${kind === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-[#143d1a]/15 bg-[#edf4ec] text-[#143d1a]"}`}>{text}</div>; }
 function validateCustomer(customer: CustomerInformation): string | null { if (!customer.firstName.trim() && !customer.lastName.trim() && !customer.companyName.trim() && !customer.email.trim() && !customer.phone.trim()) return "Enter a name, company, email, or phone number to identify the client."; if (!customer.address.trim()) return "Enter the property address before saving."; return null; }
 function isEstimateDraft(value: unknown): value is EstimateDraft { if (!value || typeof value !== "object") return false; const draft=value as Partial<EstimateDraft>; return draft.version===1&&(draft.division==="Residential"||draft.division==="Commercial")&&typeof draft.notes==="string"&&Boolean(draft.customer&&typeof draft.customer==="object")&&draft.residential?.division==="Residential"&&Array.isArray(draft.residential.addOns)&&draft.commercial?.division==="Commercial"&&Array.isArray(draft.commercial.additionalServices); }
-function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDivision, residential: ResidentialCalculatorInput, commercial: CommercialCalculatorInput, notes: string): boolean { return Object.values(customer).some((value)=>value.trim())||division!=="Residential"||notes.trim()!==""||JSON.stringify(residential)!==JSON.stringify(defaultResidential)||JSON.stringify(commercial)!==JSON.stringify(defaultCommercial); }
+function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDivision, residential: ResidentialCalculatorInput, commercial: CommercialCalculatorInput, serviceDescription:string, notes: string): boolean { return Object.values(customer).some((value)=>value.trim())||division!=="Residential"||serviceDescription.trim()!==""||notes.trim()!==""||JSON.stringify(residential)!==JSON.stringify(defaultResidential)||JSON.stringify(commercial)!==JSON.stringify(defaultCommercial); }
 function estimatePayload(clientId: string, propertyId: string, customer: CustomerInformation, division: EstimateDivision, result: EstimateResult, notes: string, status: "Open" | "Archived") { return { client_id: clientId, property_id: propertyId, division, customer_first_name: clean(customer.firstName), customer_last_name: clean(customer.lastName), customer_phone: clean(customer.phone), customer_email: clean(customer.email), customer_address: customer.address.trim(), frequency: result.calculatorInput.frequency, service_name: result.serviceName, status, result, notes: clean(notes) }; }
 function customerFromEstimate(estimate: EstimateWithRelations): CustomerInformation { return { firstName: estimate.customer_first_name ?? "", lastName: estimate.customer_last_name ?? "", companyName: estimate.client?.company_name ?? "", phone: estimate.customer_phone ?? "", email: estimate.customer_email ?? "", address: estimate.property?.address ?? estimate.customer_address ?? "", addressLine2: estimate.property?.address_line_2 ?? "", city: estimate.property?.city ?? "", state: estimate.property?.state ?? "", zip: estimate.property?.zip ?? "" }; }
 function clean(value: string): string | null { return value.trim() || null; }
+function selectedCatalogService(catalog:ServiceCatalogBundle,division:EstimateDivision,selection:string){const normalized=selection.trim().toLowerCase();return catalog.services.find(service=>service.division!==oppositeDivision(division)&&service.service_name.replace(/ Cleaning$/i,"").trim().toLowerCase()===normalized)}
+function oppositeDivision(division:EstimateDivision):EstimateDivision{return division==="Residential"?"Commercial":"Residential"}
 function currency(value: number): string { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
 const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";

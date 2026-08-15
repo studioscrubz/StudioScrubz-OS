@@ -6,6 +6,8 @@ import type { Client } from "@/types/client";
 import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughWithRelations } from "@/types/walkthrough";
 import { EMPTY_MEASUREMENTS, WALKTHROUGH_STATUSES } from "@/types/walkthrough";
 import type { Property } from "@/types/property";
+import { getActiveServices } from "@/lib/services/serviceCatalog";
+import type { CatalogService } from "@/types/serviceCatalog";
 
 const scopeOptions = ["Floors", "Bathrooms", "Kitchen", "Windows", "Baseboards", "Appliances", "Common Areas", "Workstations", "Trash", "Sanitizing", "Pressure Washing", "Other"];
 const recommendationOptions = ["Deep cleaning recommended", "Recurring service recommended", "Additional crew recommended", "Special equipment required", "Pressure washing recommended", "Carpet service recommended"];
@@ -17,6 +19,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [estimates, setEstimates] = useState<AvailableEstimate[]>(initialEstimate ? [initialEstimate] : []);
   const [clients, setClients] = useState<Client[]>(walkthrough?.client ? [walkthrough.client] : []);
   const [properties, setProperties] = useState<Property[]>(walkthrough?.property ? [walkthrough.property] : []);
+  const [services, setServices] = useState<CatalogService[]>([]);
   const [estimateId, setEstimateId] = useState(walkthrough?.estimate_id ?? initialEstimate?.id ?? "");
   const [clientId, setClientId] = useState(walkthrough?.client_id ?? initialEstimate?.client_id ?? "");
   const [propertyId, setPropertyId] = useState(walkthrough?.property_id ?? initialEstimate?.property_id ?? "");
@@ -26,7 +29,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [assignedTo, setAssignedTo] = useState(walkthrough?.assigned_to ?? "");
   const [notes, setNotes] = useState(walkthrough?.notes ?? "");
   const [status, setStatus] = useState<WalkthroughStatus>(walkthrough?.status ?? "New");
-  const [measurements, setMeasurements] = useState<WalkthroughMeasurements>({ ...EMPTY_MEASUREMENTS, ...walkthrough?.measurements });
+  const [measurements, setMeasurements] = useState<WalkthroughMeasurements>({ ...EMPTY_MEASUREMENTS, ...walkthrough?.measurements, serviceType: walkthrough?.measurements.serviceType||initialEstimate?.service_name||initialEstimate?.result.serviceName||walkthrough?.estimate?.service_name||walkthrough?.estimate?.result.serviceName||"", serviceDescription: walkthrough?.measurements.serviceDescription||initialEstimate?.result.serviceDescription||walkthrough?.estimate?.result.serviceDescription||"" });
   const [scope, setScope] = useState<WalkthroughScopeItem[]>(walkthrough?.scope ?? []);
   const [recommendations, setRecommendations] = useState<WalkthroughRecommendation[]>(walkthrough?.recommendations ?? []);
   const [customScope, setCustomScope] = useState("");
@@ -38,8 +41,8 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
 
   useEffect(() => {
     let active = true;
-    void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties()])
-      .then(([estimateRows, clientRows, propertyRows]) => { if (active) { setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); } })
+    void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties(), getActiveServices()])
+      .then(([estimateRows, clientRows, propertyRows, serviceRows]) => { if (active) { setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(serviceRows); } })
       .catch((caught: unknown) => { console.error("Walkthrough relationship data failed to load", caught); if (active) setError(message(caught, "Estimate, client, or property information could not be loaded.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -52,7 +55,8 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const filteredEstimates = useMemo(() => { const term = estimateSearch.trim().toLocaleLowerCase(); return estimates.filter((item) => !term || [item.estimate_number, displayClient(item.client), item.property?.address||"Deleted Property", item.service_name].filter(Boolean).join(" ").toLocaleLowerCase().includes(term)); }, [estimateSearch, estimates]);
   const clientProperties = properties.filter((item) => item.client_id === clientId);
 
-  function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); } }
+  function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>({...current,serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription??""})); } }
+  function chooseService(serviceId:string){const service=services.find(item=>item.id===serviceId);if(service)setMeasurements(current=>({...current,serviceType:service.service_name,serviceDescription:service.description?.trim()??""}))}
   function chooseClient(id: string) { setClientId(id); setPropertyId(""); }
   function addScope(label: string) { if (label.trim() && !scope.some((item) => item.label.toLocaleLowerCase() === label.trim().toLocaleLowerCase())) setScope([...scope, { id: crypto.randomUUID(), label: label.trim() }]); setCustomScope(""); }
   function addRecommendation(text: string) { if (text.trim() && !recommendations.some((item) => item.text.toLocaleLowerCase() === text.trim().toLocaleLowerCase())) setRecommendations([...recommendations, { id: crypto.randomUUID(), text: text.trim() }]); setCustomRecommendation(""); }
@@ -73,6 +77,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
       {!walkthrough && <Panel title="Link an Estimate"><div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-[#edf1eb] p-1.5"><ModeButton active={mode === "estimate"} text="Link an Estimate" click={() => setMode("estimate")} /><ModeButton active={mode === "manual"} text="Create Without Estimate" click={() => { setMode("manual"); setEstimateId(""); setClientId(""); setPropertyId(""); }} /></div>{mode === "estimate" ? <div className="space-y-2"><input type="search" value={estimateSearch} onChange={(e) => setEstimateSearch(e.target.value)} placeholder="Search estimate, customer, property, or service" className={inputClass} /><select value={estimateId} onChange={(e) => chooseEstimate(e.target.value)} className={inputClass} disabled={loading}><option value="">Select an active estimate</option>{filteredEstimates.map((item) => <option key={item.id} value={item.id}>{item.estimate_number} — {customerName(item)} — {item.property?.address||"Deleted Property"} — {item.division} — {item.service_name ?? "Service"} — {currency(item.result.finalPrice)}</option>)}</select></div> : <div className="grid gap-4 sm:grid-cols-2"><Select label="Client" value={clientId} set={chooseClient} options={clients.map((item) => ({ value: item.id, label: displayClient(item) }))} placeholder="Select client" /><Select label="Property" value={propertyId} set={setPropertyId} options={clientProperties.map((item) => ({ value: item.id, label: item.address }))} placeholder={clientId ? "Select property" : "Select a client first"} disabled={!clientId} /></div>}</Panel>}
       {(selectedClient || selectedProperty) && <Panel title="Linked Information"><div className="grid gap-4 text-sm sm:grid-cols-3"><Info label="Client" value={selectedClient ? displayClient(selectedClient) : "—"} /><Info label="Property" value={selectedProperty?.address ?? "—"} /><Info label="Division" value={division} />{selectedEstimate && <><Info label="Estimate" value={selectedEstimate.estimate_number} /><Info label="Service" value={selectedEstimate.service_name ?? "—"} /><Info label="Price" value={currency(selectedEstimate.result.finalPrice)} /></>}</div></Panel>}
       <Panel title="Walkthrough Schedule"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Text label="Date" type="date" value={date} set={setDate} required /><Text label="Time" type="time" value={time} set={setTime} required /><Text label="Assigned To" value={assignedTo} set={setAssignedTo} /><Select label="Status" value={status} set={(value) => setStatus(value as WalkthroughStatus)} options={WALKTHROUGH_STATUSES.map((item) => ({ value: item, label: item }))} placeholder="Status" /></div><label className="mt-4 block"><Label text="Notes" /><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputClass} /></label></Panel>
+      <Panel title="Service"><div className="grid gap-4 sm:grid-cols-2"><Select label="Service Type" value={services.find(item=>item.service_name===measurements.serviceType)?.id??""} set={chooseService} options={services.filter(item=>item.division===division||item.division==="Both").map(item=>({value:item.id,label:item.service_name}))} placeholder={measurements.serviceType||"Select service"}/><div><Label text="Service Description"/><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{measurements.serviceDescription||"No service description available."}</div></div></div></Panel>
       <Assessment division={division} value={measurements} set={setMeasurements} />
       <ListEditor title="Scope" presets={scopeOptions} items={scope.map((item) => ({ id: item.id, text: item.label }))} custom={customScope} setCustom={setCustomScope} add={addScope} remove={(id) => setScope(scope.filter((item) => item.id !== id))} />
       <ListEditor title="Recommendations" presets={recommendationOptions} items={recommendations} custom={customRecommendation} setCustom={setCustomRecommendation} add={addRecommendation} remove={(id) => setRecommendations(recommendations.filter((item) => item.id !== id))} />

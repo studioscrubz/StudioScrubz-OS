@@ -60,6 +60,7 @@ export type CalculatorInput = ResidentialCalculatorInput | CommercialCalculatorI
 
 export type EstimateResult = {
   serviceName: string;
+  serviceDescription: string | null;
   basePrice: number;
   adjustments: PriceAdjustment[];
   oneTimePrice: number;

@@ -8,6 +8,8 @@ export type WalkthroughScopeItem = { id: string; label: string };
 export type WalkthroughRecommendation = { id: string; text: string };
 export type WalkthroughPhoto = { id: string; fileName: string; storagePath: string | null; caption: string | null };
 export type WalkthroughMeasurements = {
+  serviceType: string;
+  serviceDescription: string;
   overallCondition: "" | "Light" | "Average" | "Heavy" | "Extreme";
   squareFeet: number | null;
   bedrooms: number | null;
@@ -54,4 +56,4 @@ export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | 
 export type WalkthroughWithRelations = Walkthrough & { client: Client | null; property: Property | null; estimate: Estimate | null };
 export type AvailableEstimate = EstimateWithRelations;
 
-export const EMPTY_MEASUREMENTS: WalkthroughMeasurements = { overallCondition: "", squareFeet: null, bedrooms: null, bathrooms: null, floors: null, restrooms: null, kitchenAreas: null, specialtyAreas: "", accessRestrictions: "", parkingLoading: "", waterAccess: "", powerAccess: "", securityAlarm: "", pets: "", heavySoilBuildup: false, damageObserved: "", hazardsObserved: "" };
+export const EMPTY_MEASUREMENTS: WalkthroughMeasurements = { serviceType: "", serviceDescription: "", overallCondition: "", squareFeet: null, bedrooms: null, bathrooms: null, floors: null, restrooms: null, kitchenAreas: null, specialtyAreas: "", accessRestrictions: "", parkingLoading: "", waterAccess: "", powerAccess: "", securityAlarm: "", pets: "", heavySoilBuildup: false, damageObserved: "", hazardsObserved: "" };
