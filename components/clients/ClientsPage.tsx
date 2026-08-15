@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ClientFormModal } from "./ClientFormModal";
+import { ClientDetailModal } from "./ClientDetailModal";
 import { archiveClient, createClient, findPotentialDuplicateClients, getClients, updateClient } from "@/lib/services/clients";
 import { CLIENT_STATUSES, CLIENT_TYPES, type Client, type ClientInput, type ClientStatus, type ClientType } from "@/types/client";
 
@@ -23,6 +24,8 @@ export function ClientsPage() {
   const [duplicateInput, setDuplicateInput] = useState<ClientInput | null>(null);
   const [duplicateMatches, setDuplicateMatches] = useState<Client[]>([]);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [detailClient, setDetailClient] = useState<Client | null>(null);
+  const [reminderServiceId, setReminderServiceId] = useState<string | undefined>();
 
   useEffect(() => {
     let active = true;
@@ -35,6 +38,15 @@ export function ClientsPage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!clients.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get("clientId");
+    if (!clientId) return;
+    const selected = clients.find((client) => client.id === clientId);
+    if (selected) { setDetailClient(selected); if (params.get("logCommunication") === "service-reminder") setReminderServiceId(params.get("serviceId") ?? undefined); }
+  }, [clients]);
 
   const activeClients = useMemo(() => clients.filter((client) => !client.archived_at), [clients]);
   const summary = {
@@ -146,10 +158,11 @@ export function ClientsPage() {
           <Filter label="Archived records" value={archiveFilter} onChange={(value) => setArchiveFilter(value as ArchiveFilter)} options={["Active Records", "Archived Records", "All Records"]} />
         </div>
 
-        {loading ? <LoadingState /> : filteredClients.length === 0 ? <EmptyState hasClients={clients.length > 0} onAdd={() => setFormClient(null)} /> : <ClientList clients={filteredClients} archivingId={archivingId} onEdit={setFormClient} onArchive={handleArchive} />}
+        {loading ? <LoadingState /> : filteredClients.length === 0 ? <EmptyState hasClients={clients.length > 0} onAdd={() => setFormClient(null)} /> : <ClientList clients={filteredClients} archivingId={archivingId} onView={setDetailClient} onEdit={setFormClient} onArchive={handleArchive} />}
       </section>
 
       {formClient !== undefined && <ClientFormModal key={formClient?.id ?? "new"} client={formClient} saving={saving} onClose={() => { if (!saving) setFormClient(undefined); }} onSubmit={handleSubmit} />}
+      {detailClient && <ClientDetailModal client={detailClient} initialServiceId={reminderServiceId} onClose={() => { setDetailClient(null); setReminderServiceId(undefined); }} onEdit={() => { setFormClient(detailClient); setDetailClient(null); }} />}
       {duplicateInput && <DuplicateWarning matches={duplicateMatches} saving={saving} onCancel={() => { setDuplicateInput(null); setDuplicateMatches([]); }} onContinue={continueDuplicate} />}
     </>
   );
@@ -167,7 +180,7 @@ function Filter({ label, value, onChange, options }: { label: string; value: str
   return <label><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={filterClass}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
 }
 
-function ClientList({ clients, archivingId, onEdit, onArchive }: { clients: Client[]; archivingId: string | null; onEdit: (client: Client) => void; onArchive: (client: Client) => Promise<void> }) {
+function ClientList({ clients, archivingId, onView, onEdit, onArchive }: { clients: Client[]; archivingId: string | null; onView: (client: Client) => void; onEdit: (client: Client) => void; onArchive: (client: Client) => Promise<void> }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[850px] border-collapse text-left">
@@ -178,7 +191,7 @@ function ClientList({ clients, archivingId, onEdit, onArchive }: { clients: Clie
             <td className="px-5 py-4 text-sm text-neutral-600">{client.client_type}</td>
             <td className="px-5 py-4"><p className="text-sm text-neutral-700">{client.email || "—"}</p><p className="mt-1 text-xs text-neutral-500">{client.phone || "—"}</p></td>
             <td className="px-5 py-4"><StatusBadge status={client.status} /></td>
-            <td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => onEdit(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">Edit</button>{!client.archived_at && <button type="button" disabled={archivingId === client.id} onClick={() => void onArchive(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">{archivingId === client.id ? "Archiving…" : "Archive"}</button>}</div></td>
+            <td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => onView(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">View</button><button type="button" onClick={() => onEdit(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">Edit</button>{!client.archived_at && <button type="button" disabled={archivingId === client.id} onClick={() => void onArchive(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">{archivingId === client.id ? "Archiving…" : "Archive"}</button>}</div></td>
           </tr>
         ))}</tbody>
       </table>

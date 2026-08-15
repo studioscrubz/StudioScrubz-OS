@@ -15,6 +15,7 @@ import { getProperties } from "@/lib/services/properties";
 import { getActiveCrews } from "@/lib/services/crews";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
+import { recordAgreementSent } from "@/lib/services/clientCommunications";
 import { AGREEMENT_BILLING_TYPES, AGREEMENT_FREQUENCIES, AGREEMENT_STATUSES, type AgreementInput, type AgreementWithRelations } from "@/types/agreement";
 import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 import type { Client } from "@/types/client";
@@ -115,9 +116,10 @@ function SendAgreementModal({ agreement, settings, sender, close, sent }: { agre
     setBusy(true); setError(null);
     try {
       const expiry = hasValidToken && agreement.client_access_token_expires_at ? agreement.client_access_token_expires_at : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      await markAgreementSent(agreement.id, email, sender, token, expiry);
+      const updated = await markAgreementSent(agreement.id, email, sender, token, expiry);
       const emailBody = `${body}\n\nReview & Sign Agreement:\n${reviewUrl}\n\nAgreement: ${agreement.agreement_number}\nService: ${agreement.service_name}\nFrequency: ${agreement.frequency}`;
       window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+      await recordAgreementSent({ id: agreement.id, number: agreement.agreement_number, clientId: agreement.client_id, propertyId: agreement.property_id, recipientEmail: email, subject, messageBody: body, sentAt: updated.sent_at! });
       await sent();
     } catch (cause) { setError(message(cause)); } finally { setBusy(false); }
   }

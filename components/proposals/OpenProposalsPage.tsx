@@ -34,6 +34,7 @@ import {
   requestProposalChanges,
   submitProposalForApproval,
 } from "@/lib/services/proposals";
+import { recordProposalSent } from "@/lib/services/clientCommunications";
 type Sort =
   | "Newest"
   | "Oldest"
@@ -360,11 +361,14 @@ function Card({
   }
   function send(v: "Text" | "Email") {
     if (p.approval_status !== "Approved" || p.expiration_date < today()) return;
-    if (v === "Text" && p.customer_phone)
-      window.location.href = `sms:${p.customer_phone}?body=${encodeURIComponent(`StudioScrubz proposal ${p.proposal_number}: ${money(p.result.perVisitTotal)}`)}`;
-    if (v === "Email" && p.customer_email)
-      window.location.href = `mailto:${p.customer_email}?subject=${encodeURIComponent(`StudioScrubz Proposal ${p.proposal_number}`)}`;
-    mutate(() => markProposalSent(p.id, v), `Proposal marked sent by ${v}.`);
+    const subject = `StudioScrubz Proposal ${p.proposal_number}`;
+    const body = `StudioScrubz proposal ${p.proposal_number}: ${money(p.result.perVisitTotal)}`;
+    mutate(async () => {
+      if (v === "Text" && p.customer_phone) window.location.href = `sms:${p.customer_phone}?body=${encodeURIComponent(body)}`;
+      if (v === "Email" && p.customer_email) window.location.href = `mailto:${encodeURIComponent(p.customer_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const updated = await markProposalSent(p.id, v);
+      await recordProposalSent({ id: p.id, number: p.proposal_number, clientId: p.client_id, propertyId: p.property_id, recipientEmail: v === "Email" ? p.customer_email : null, recipientPhone: v === "Text" ? p.customer_phone : null, subject, messageBody: body, sentAt: updated.sent_at!, channel: v === "Text" ? "SMS" : "Email" });
+    }, `Proposal marked sent by ${v}.`);
   }
   return (
     <article className="mb-3 rounded-xl bg-white p-4 shadow-sm">

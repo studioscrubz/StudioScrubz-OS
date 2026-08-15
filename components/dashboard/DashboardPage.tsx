@@ -8,6 +8,7 @@ import type { JobWithRelations } from "@/types/job";
 import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
+import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -61,6 +62,7 @@ export function DashboardPage() {
   return (
     <>
       <Header />
+      {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
       {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
       {error && (
         <div className="mt-5 flex items-center justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">

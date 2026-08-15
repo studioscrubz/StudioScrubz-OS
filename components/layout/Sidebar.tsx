@@ -13,6 +13,7 @@ type NavGroup = { label: string; marker: string; permission?: Permission; childr
 
 const navItems: Array<NavLink | NavGroup> = [
   { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
+  { label: "Attention Center", href: "/attention", marker: "!", permission: "attention.view" },
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {

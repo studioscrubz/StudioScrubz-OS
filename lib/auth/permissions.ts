@@ -13,6 +13,8 @@ export const PERMISSIONS = [
   "invoices.view", "invoices.create", "invoices.edit", "invoices.recordPayment",
   "finances.view", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage",
+  "communications.view", "communications.create", "communications.archive",
+  "attention.view",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -26,7 +28,8 @@ const operationalAdmin: Permission[] = [
   "jobs.complete", "schedule.view", "schedule.edit", "employees.view", "employees.manage",
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll",
   "agreements.view", "agreements.manage", "invoices.view", "invoices.create",
-  "invoices.edit", "archives.view", "archives.restore",
+  "invoices.edit", "archives.view", "archives.restore", "communications.view",
+  "communications.create", "communications.archive", "attention.view",
 ];
 
 export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
@@ -39,22 +42,22 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete",
     "schedule.view", "schedule.edit", "employees.view", "crews.view", "crews.manage",
     "timeClock.view", "timeClock.manageAll", "agreements.view", "agreements.manage",
-    "invoices.view",
+    "invoices.view", "communications.view", "communications.create", "communications.archive", "attention.view",
   ]),
   Sales: new Set([
     "dashboard.view", "clients.view", "clients.create", "clients.edit", "properties.view",
     "properties.create", "properties.edit", "estimates.view", "estimates.create",
     "estimates.edit", "walkthroughs.view", "walkthroughs.create", "walkthroughs.edit",
     "proposals.view", "proposals.create", "proposals.send", "agreements.view",
-    "agreements.manage", "timeClock.view",
+    "agreements.manage", "timeClock.view", "communications.view", "communications.create", "attention.view",
   ]),
   "Crew Lead": new Set([
     "dashboard.view", "jobs.view", "jobs.edit", "jobs.complete", "schedule.view",
-    "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view",
+    "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view",
   ]),
   "Scrub Technician": new Set([
     "dashboard.view", "jobs.view", "schedule.view", "timeClock.view", "clients.view",
-    "properties.view", "vehicles.view",
+    "properties.view", "vehicles.view", "attention.view",
   ]),
 };
 
@@ -73,6 +76,7 @@ export const canPermanentlyDelete = (profile: UserProfile | null) => hasPermissi
 export const canManageSystem = (profile: UserProfile | null) => hasPermission(profile, "dashboard.view");
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/attention", "attention.view"],
   ["/users", "users.manage"], ["/revenue", "finances.view"], ["/expenses", "expenses.view"],
   ["/vehicles", "vehicles.view"], ["/payroll-prep", "payrollPrep.view"],
   ["/archives", "archives.view"], ["/clients", "clients.view"],
