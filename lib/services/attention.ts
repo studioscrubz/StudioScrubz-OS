@@ -7,6 +7,7 @@ import { getInvoices } from "@/lib/services/invoices";
 import { getAllClientCommunications } from "@/lib/services/clientCommunications";
 import { getOpenTimeEntries } from "@/lib/services/timeEntries";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
+import { getWalkthroughs } from "@/lib/services/walkthroughs";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { AttentionItem, AttentionStateRecord, AttentionSummary, AttentionView } from "@/types/attention";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
@@ -16,8 +17,9 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
   const canManageCommunications = hasPermission(profile, "communications.view") && hasPermission(profile, "communications.create");
-  const [jobs, proposals, agreements, invoices, communications, timeEntries, states, settings] = await Promise.all([
+  const [jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings] = await Promise.all([
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
+    hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
     hasPermission(profile, "proposals.view") ? getProposals() : Promise.resolve([]),
     hasPermission(profile, "agreements.view") ? getAgreements() : Promise.resolve([]),
     hasPermission(profile, "invoices.view") ? getInvoices() : Promise.resolve([]),
@@ -28,6 +30,16 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   const clock = businessClock(settings?.timezone ?? null);
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
+
+  for (const walkthrough of walkthroughs.filter((row) => row.status === "New" && !row.walkthrough_date && !row.archived_at && row.measurements.requestSource === "Public Estimate")) {
+    const requestedAt = walkthrough.measurements.requestedAt ?? walkthrough.created_at;
+    const client = walkthrough.client?.company_name || [walkthrough.client?.first_name, walkthrough.client?.last_name].filter(Boolean).join(" ") || walkthrough.contact_name || "Deleted Client";
+    const property = walkthrough.property ? [walkthrough.property.address, walkthrough.property.city].filter(Boolean).join(", ") : "Deleted Property";
+    const service = walkthrough.measurements.serviceType || walkthrough.estimate?.service_name || "Service";
+    const estimateNumber = walkthrough.measurements.estimateNumber || walkthrough.estimate?.estimate_number || "Estimate";
+    const contact = walkthrough.measurements.preferredContactMethod || "Not specified";
+    items.push(item(`walkthrough:${walkthrough.id}:requested`, "Walkthrough Requested", "Attention", "Walkthroughs", "Walkthrough requested", `${client} · ${property} · ${service} · ${estimateNumber} · Prefers ${contact} · Requested ${friendlyDate(requestedAt.slice(0, 10))}`, "Walkthrough", walkthrough.id, walkthrough.client_id, estimateNumber, null, null, requestedAt, `/walkthroughs?walkthroughId=${walkthrough.id}`, "Open Walkthrough"));
+  }
 
   for (const job of jobs) {
     const label = job.job_number;

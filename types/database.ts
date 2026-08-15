@@ -119,6 +119,7 @@ export interface Database {
       get_service_agreement_by_token:{Args:{p_token:string};Returns:import("@/types/publicAgreement").PublicAgreement};
       accept_service_agreement_by_token:{Args:{p_token:string;p_signed_name:string;p_signature:string;p_consent:boolean};Returns:import("@/types/publicAgreement").PublicAgreement};
       get_estimate_by_token:{Args:{p_token:string};Returns:PublicEstimate};
+      request_estimate_walkthrough_by_token:{Args:{p_token:string;p_client_name:string;p_email:string|null;p_phone:string|null;p_preferred_contact_method:string};Returns:import("@/types/publicEstimate").PublicEstimateWalkthroughRequestResult};
       get_proposal_by_token:{Args:{p_token:string};Returns:PublicProposal};
       accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};
       mark_estimate_sent_for_delivery:{Args:{p_estimate_id:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
