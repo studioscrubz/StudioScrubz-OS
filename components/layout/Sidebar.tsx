@@ -12,8 +12,14 @@ type NavLink = { label: string; href: string; marker: string; permission: Permis
 type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
 
 const navItems: Array<NavLink | NavGroup> = [
-  { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
-  { label: "Attention Center", href: "/attention", marker: "!", permission: "attention.view" },
+  {
+    label: "Dashboard",
+    marker: "D",
+    children: [
+      { label: "Dashboard", href: "/", marker: "", permission: "dashboard.view" },
+      { label: "Attention Center", href: "/attention", marker: "", permission: "attention.view" },
+    ],
+  },
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {
@@ -59,8 +65,14 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Payroll Preparation", href: "/payroll-prep", marker: "", permission: "payrollPrep.view" },
     ],
   },
-  { label: "Archives", href: "/archives", marker: "A", permission: "archives.view" },
-  { label: "User Management", href: "/users", marker: "U", permission: "users.manage" },
+  {
+    label: "User Management",
+    marker: "U",
+    children: [
+      { label: "Users", href: "/users", marker: "", permission: "users.manage" },
+      { label: "Archives", href: "/archives", marker: "", permission: "archives.view" },
+    ],
+  },
   {
     label: "Settings",
     marker: "S",
@@ -111,7 +123,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
           {visibleItems.map((item) => {
             if (isGroup(item)) {
               const active = item.children.some((child) => child.href === pathname);
-              const open = openGroups[item.label] ?? false;
+              const open = active || (openGroups[item.label] ?? false);
               return (
                 <li key={item.label}>
                   <button
