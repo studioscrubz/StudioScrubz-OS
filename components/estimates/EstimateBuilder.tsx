@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
@@ -13,6 +13,16 @@ const conditions: Condition[] = ["Light", "Average", "Heavy", "Extreme"];
 const blankCustomer: CustomerInformation = { firstName: "", lastName: "", companyName: "", phone: "", email: "", address: "", addressLine2: "", city: "", state: "", zip: "" };
 const defaultResidential: ResidentialCalculatorInput = { division: "Residential", serviceType: "Standard", frequency: "One-Time", condition: "Average", squareFeet: 1000, bedrooms: 2, bathrooms: 1, occupied: true, pets: false, additionalDiscountPercent: 0, taxRatePercent: 0, addOns: [] };
 const defaultCommercial: CommercialCalculatorInput = { division: "Commercial", commercialType: "Office", frequency: "One-Time", squareFeet: 2500, floors: 1, restrooms: 2, kitchens: 1, stations: 0, units: 0, condition: "Average", targetCompletionHours: 4, workerHourlyPay: 22, targetProfitMarginPercent: 35, additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [] };
+const estimateDraftKey = "studioscrubz:estimate-draft";
+
+type EstimateDraft = {
+  version: 1;
+  customer: CustomerInformation;
+  division: EstimateDivision;
+  residential: ResidentialCalculatorInput;
+  commercial: CommercialCalculatorInput;
+  notes: string;
+};
 
 export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWithRelations; onSaved?: () => void }) {
   const initialCustomer = estimate ? customerFromEstimate(estimate) : blankCustomer;
@@ -25,10 +35,58 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(Boolean(estimate));
   const [catalog,setCatalog]=useState<ServiceCatalogBundle|null>(null);
   const [catalogLoading,setCatalogLoading]=useState(true);
+  const restoredDraft = useRef(false);
+  const suppressDraftSave = useRef(false);
   const calculatorInput: CalculatorInput = division === "Residential" ? residential : commercial;
-  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);if(!estimate){setResidential(x=>({...x,taxRatePercent:settings.default_tax_rate}));setCommercial(x=>({...x,taxRatePercent:settings.default_tax_rate}));setNotes(settings.default_estimate_notes??"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
+  useEffect(() => {
+    if (estimate) return;
+    try {
+      const saved = window.sessionStorage.getItem(estimateDraftKey);
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved);
+        if (isEstimateDraft(parsed)) {
+          restoredDraft.current = true;
+          // Restore the external session snapshot once after client hydration.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setCustomer(parsed.customer);
+          setDivision(parsed.division);
+          setResidential(parsed.residential);
+          setCommercial(parsed.commercial);
+          setNotes(parsed.notes);
+          setDraftNotice("Your unfinished estimate was restored.");
+        } else {
+          window.sessionStorage.removeItem(estimateDraftKey);
+        }
+      }
+    } catch (caught) {
+      console.warn("Estimate draft could not be restored", caught);
+    } finally {
+      setDraftReady(true);
+    }
+  }, [estimate]);
+  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
+  useEffect(() => {
+    if (estimate || !draftReady) return;
+    if (suppressDraftSave.current) {
+      suppressDraftSave.current = false;
+      window.sessionStorage.removeItem(estimateDraftKey);
+      return;
+    }
+    if (!hasMeaningfulDraft(customer, division, residential, commercial, notes)) {
+      window.sessionStorage.removeItem(estimateDraftKey);
+      return;
+    }
+    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, notes };
+    try {
+      window.sessionStorage.setItem(estimateDraftKey, JSON.stringify(draft));
+    } catch (caught) {
+      console.warn("Estimate draft could not be saved", caught);
+    }
+  }, [commercial, customer, division, draftReady, estimate, notes, residential]);
   const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:division === "Residential" ? calculateResidentialEstimate(residential,catalog) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, division, residential]);
   const result=calculation.result;
 
@@ -50,19 +108,35 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         await createEstimate(estimatePayload(client.id, property.id, customer, division, result, notes, "Open"));
         await getEstimates();
         setSuccess("Estimate saved successfully and is available in Open Estimates.");
-        setCustomer({ ...blankCustomer });
-        setDivision("Residential");
-        setResidential({ ...defaultResidential, addOns: [] });
-        setCommercial({ ...defaultCommercial, additionalServices: [] });
-        setNotes("");
+        clearNewEstimateDraft();
       }
       onSaved?.();
     } catch (caught) { console.error("Estimate save workflow failed", caught); setError(caught instanceof Error ? caught.message : "The estimate could not be saved. Please try again."); }
     finally { setSaving(false); }
   }
 
+  function clearNewEstimateDraft() {
+    suppressDraftSave.current = true;
+    restoredDraft.current = false;
+    window.sessionStorage.removeItem(estimateDraftKey);
+    setCustomer({ ...blankCustomer });
+    setDivision("Residential");
+    setResidential({ ...defaultResidential, addOns: [] });
+    setCommercial({ ...defaultCommercial, additionalServices: [] });
+    setNotes("");
+    setDraftNotice(null);
+  }
+
+  function requestClearDraft() {
+    if (hasMeaningfulDraft(customer, division, residential, commercial, notes) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
+    clearNewEstimateDraft();
+    setSuccess("Estimate draft cleared.");
+    setError(null);
+  }
+
   return <div className="space-y-6">
-    {success && <Alert kind="success" text={success} />}{error && <Alert kind="error" text={error} />}
+    {draftNotice && <Alert kind="success" text={draftNotice} />}{success && <Alert kind="success" text={success} />}{error && <Alert kind="error" text={error} />}
+    {!estimate && <div className="flex justify-end"><button type="button" onClick={requestClearDraft} className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] hover:border-[#d4af37]">Clear Draft</button></div>}
     <Section title="Customer Information" subtitle="Customer and service-location details are matched automatically when you save.">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <TextField label="First Name" value={customer.firstName} set={(value) => setCustomer({ ...customer, firstName: value })} />
@@ -119,6 +193,8 @@ function OptionGrid({ title, options, selected, set }: { title: string; options:
 function Label({ text, required }: { text: string; required?: boolean }) { return <span className="mb-2 block text-xs font-bold text-neutral-700">{text}{required && <span className="ml-1 text-[#9a7a17]">*</span>}</span>; }
 function Alert({ kind, text }: { kind: "success" | "error"; text: string }) { return <div role={kind === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${kind === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-[#143d1a]/15 bg-[#edf4ec] text-[#143d1a]"}`}>{text}</div>; }
 function validateCustomer(customer: CustomerInformation): string | null { if (!customer.firstName.trim() && !customer.lastName.trim() && !customer.companyName.trim() && !customer.email.trim() && !customer.phone.trim()) return "Enter a name, company, email, or phone number to identify the client."; if (!customer.address.trim()) return "Enter the property address before saving."; return null; }
+function isEstimateDraft(value: unknown): value is EstimateDraft { if (!value || typeof value !== "object") return false; const draft=value as Partial<EstimateDraft>; return draft.version===1&&(draft.division==="Residential"||draft.division==="Commercial")&&typeof draft.notes==="string"&&Boolean(draft.customer&&typeof draft.customer==="object")&&draft.residential?.division==="Residential"&&Array.isArray(draft.residential.addOns)&&draft.commercial?.division==="Commercial"&&Array.isArray(draft.commercial.additionalServices); }
+function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDivision, residential: ResidentialCalculatorInput, commercial: CommercialCalculatorInput, notes: string): boolean { return Object.values(customer).some((value)=>value.trim())||division!=="Residential"||notes.trim()!==""||JSON.stringify(residential)!==JSON.stringify(defaultResidential)||JSON.stringify(commercial)!==JSON.stringify(defaultCommercial); }
 function estimatePayload(clientId: string, propertyId: string, customer: CustomerInformation, division: EstimateDivision, result: EstimateResult, notes: string, status: "Open" | "Archived") { return { client_id: clientId, property_id: propertyId, division, customer_first_name: clean(customer.firstName), customer_last_name: clean(customer.lastName), customer_phone: clean(customer.phone), customer_email: clean(customer.email), customer_address: customer.address.trim(), frequency: result.calculatorInput.frequency, service_name: result.serviceName, status, result, notes: clean(notes) }; }
 function customerFromEstimate(estimate: EstimateWithRelations): CustomerInformation { return { firstName: estimate.customer_first_name ?? "", lastName: estimate.customer_last_name ?? "", companyName: estimate.client?.company_name ?? "", phone: estimate.customer_phone ?? "", email: estimate.customer_email ?? "", address: estimate.property?.address ?? estimate.customer_address ?? "", addressLine2: estimate.property?.address_line_2 ?? "", city: estimate.property?.city ?? "", state: estimate.property?.state ?? "", zip: estimate.property?.zip ?? "" }; }
 function clean(value: string): string | null { return value.trim() || null; }
