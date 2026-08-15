@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
+import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -17,7 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#143d1a]/10 bg-white/95 px-5 backdrop-blur lg:hidden">
         <div className="flex items-center gap-3">
-          <BrandMark compact />
+          <StudioScrubzLogo size={40} priority />
           <span className="text-sm font-extrabold tracking-tight text-[#143d1a]">StudioScrubz OS</span>
         </div>
         <button
@@ -52,18 +53,5 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto max-w-[1320px]">{children}</div>
       </main>
     </div>
-  );
-}
-
-export function BrandMark({ compact = false }: { compact?: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={`grid place-items-center rounded-xl bg-[#d4af37] font-black text-[#143d1a] shadow-[inset_0_0_0_1px_rgba(255,255,255,.35)] ${
-        compact ? "size-8 text-xs" : "size-11 text-sm"
-      }`}
-    >
-      SS
-    </span>
   );
 }

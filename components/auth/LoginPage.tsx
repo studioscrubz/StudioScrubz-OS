@@ -1,15 +1,71 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { signIn } from "@/lib/services/auth";
 
 export function LoginPage() {
-  const router = useRouter(); const auth = useAuth();
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [show, setShow] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!auth.loading && auth.user && auth.profile?.is_active) router.replace("/"); }, [auth.loading, auth.user, auth.profile, router]);
-  async function submit(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(null); try { await signIn(email, password); router.replace("/"); router.refresh(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Sign in failed."); } finally { setBusy(false); } }
-  if (auth.loading || (auth.user && auth.profile?.is_active)) return <div className="grid min-h-screen place-items-center bg-[#f5f6f4] text-sm font-bold text-[#143d1a]">Checking session…</div>;
-  return <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#edf4ec,#f5f6f4_55%)] p-5"><section className="w-full max-w-md rounded-3xl border border-[#143d1a]/10 bg-white p-8 shadow-[0_24px_70px_rgba(20,61,26,.16)]"><div className="flex items-center gap-4"><span className="grid size-12 place-items-center rounded-xl bg-[#d4af37] font-black text-[#143d1a]">SS</span><div><h1 className="text-2xl font-extrabold text-[#143d1a]">StudioScrubz OS</h1><p className="text-sm text-neutral-500">Internal operations access</p></div></div><form className="mt-8 space-y-5" onSubmit={submit}><label className="block text-sm font-bold text-neutral-700">Email<input required type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} className={input}/></label><label className="block text-sm font-bold text-neutral-700">Password<span className="relative mt-2 block"><input required type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 w-full rounded-lg border px-3 pr-20 outline-none focus:border-[#d4af37]"/><button type="button" onClick={() => setShow((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#143d1a]">{show ? "Hide" : "Show"}</button></span></label>{error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<button disabled={busy} className="w-full rounded-lg bg-[#143d1a] px-5 py-3 font-extrabold text-white disabled:opacity-60">{busy ? "Signing In…" : "Sign In"}</button></form><p className="mt-6 text-center text-xs text-neutral-400">Authorized StudioScrubz personnel only.</p></section></main>;
+  const router = useRouter();
+  const auth = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!auth.loading && auth.user && auth.profile?.is_active) router.replace("/");
+  }, [auth.loading, auth.user, auth.profile, router]);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn(email, password);
+      router.replace("/");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Sign in failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (auth.loading || (auth.user && auth.profile?.is_active)) {
+    return <div className="grid min-h-screen place-items-center bg-[#f5f6f4] text-sm font-bold text-[#143d1a]">Checking session…</div>;
+  }
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#edf4ec,#f5f6f4_55%)] p-5">
+      <section className="w-full max-w-md rounded-3xl border border-[#143d1a]/10 bg-white p-8 shadow-[0_24px_70px_rgba(20,61,26,.16)]">
+        <div className="text-center">
+          <StudioScrubzLogo size={156} priority className="mx-auto" />
+          <h1 className="mt-2 text-2xl font-extrabold text-[#143d1a]">StudioScrubz OS</h1>
+          <p className="mt-1 text-sm font-semibold text-[#9a7a16]">No mess. No stress.</p>
+          <p className="mt-1 text-sm text-neutral-500">Internal operations access</p>
+        </div>
+        <form className="mt-8 space-y-5" onSubmit={submit}>
+          <label className="block text-sm font-bold text-neutral-700">
+            Email
+            <input required type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className={input} />
+          </label>
+          <label className="block text-sm font-bold text-neutral-700">
+            Password
+            <span className="relative mt-2 block">
+              <input required type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-lg border px-3 pr-20 outline-none focus:border-[#d4af37]" />
+              <button type="button" onClick={() => setShow((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#143d1a]">{show ? "Hide" : "Show"}</button>
+            </span>
+          </label>
+          {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+          <button disabled={busy} className="w-full rounded-lg bg-[#143d1a] px-5 py-3 font-extrabold text-white disabled:opacity-60">{busy ? "Signing In…" : "Sign In"}</button>
+        </form>
+        <p className="mt-6 text-center text-xs text-neutral-400">Authorized StudioScrubz personnel only.</p>
+      </section>
+    </main>
+  );
 }
+
 const input = "mt-2 h-12 w-full rounded-lg border px-3 outline-none focus:border-[#d4af37]";

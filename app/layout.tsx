@@ -7,6 +7,10 @@ export const metadata: Metadata = {
     template: "%s | StudioScrubz OS",
   },
   description: "StudioScrubz business operations workspace.",
+  icons: {
+    icon: "/branding/studioscrubz-logo.png",
+    apple: "/branding/studioscrubz-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BrandMark } from "./AppShell";
+import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
 
@@ -94,15 +94,10 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#143d1a] text-white shadow-2xl shadow-[#07190a]/25 lg:shadow-none">
-      <div className="flex items-start justify-between border-b border-white/10 px-6 py-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <BrandMark />
-            <div>
-              <p className="text-lg font-extrabold leading-tight tracking-[-0.03em]">StudioScrubz</p>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d4af37]">OS</p>
-            </div>
-          </div>
+      <div className="relative flex items-start justify-between border-b border-white/10 px-6 py-5">
+        <div className="flex-1 text-center">
+          <StudioScrubzLogo size={112} priority className="mx-auto drop-shadow-[0_8px_18px_rgba(0,0,0,.24)]" />
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.28em] text-[#d4af37]">Operations System</p>
           <div className="mt-5 border-l-2 border-[#d4af37] pl-3 text-xs leading-relaxed text-white/65">
             <p className="font-bold text-white/90">{auth.profile?.role ?? "StudioScrubz User"}</p>
             <p>Operations</p>

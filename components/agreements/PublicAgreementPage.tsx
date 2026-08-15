@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { acceptPublicAgreement, getPublicAgreement } from "@/lib/services/publicAgreements";
 import type { PublicAgreement } from "@/types/publicAgreement";
 
@@ -17,7 +18,7 @@ export function PublicAgreementPage({ token }: { token: string }) {
   const signed = Boolean(agreement.client_signed_at);
   const canSign = agreement.status === "Sent" && !signed;
   return <PublicShell><article id="public-agreement" className="rounded-2xl border bg-white p-6 shadow-sm print:border-0 print:p-0 print:shadow-none">
-    <header className="border-b-2 border-[#143d1a] pb-5"><h1 className="text-3xl font-extrabold text-[#143d1a]">{agreement.business_name}</h1>{agreement.tagline && <p>{agreement.tagline}</p>}<p className="mt-1 text-sm text-neutral-600">{[agreement.business_email, agreement.business_phone, agreement.website].filter(Boolean).join(" · ")}</p><p className="text-sm text-neutral-600">{[agreement.address, agreement.city, agreement.state, agreement.zip].filter(Boolean).join(", ")}</p></header>
+    <header className="flex flex-col items-center gap-4 border-b-2 border-[#143d1a] pb-5 text-center sm:flex-row sm:text-left"><StudioScrubzLogo size={112} priority/><div><h1 className="text-3xl font-extrabold text-[#143d1a]">{agreement.business_name}</h1>{agreement.tagline && <p>{agreement.tagline}</p>}<p className="mt-1 text-sm text-neutral-600">{[agreement.business_email, agreement.business_phone, agreement.website].filter(Boolean).join(" · ")}</p><p className="text-sm text-neutral-600">{[agreement.address, agreement.city, agreement.state, agreement.zip].filter(Boolean).join(", ")}</p></div></header>
     <h2 className="mt-6 text-2xl font-bold">Service Agreement</h2><p className="font-semibold">{agreement.agreement_number}</p>
     <div className="mt-6 grid gap-4 sm:grid-cols-2"><Detail label="Client" value={agreement.client_name}/><Detail label="Property / Service Location" value={agreement.property_location}/><Detail label="Service" value={agreement.service_name}/><Detail label="Frequency" value={agreement.frequency}/><Detail label="Schedule" value={`${schedule}${agreement.default_start_time ? ` at ${agreement.default_start_time}` : ""}`}/><Detail label="Dates" value={`${agreement.start_date}${agreement.end_date ? ` through ${agreement.end_date}` : ""}`}/><Detail label="Billing" value={`${money(agreement.billing_amount)} · ${agreement.billing_type}`}/></div>
     <Section label="Scope / Service Details" value={agreement.scope}/><Section label="Payment Terms" value={agreement.payment_terms}/><Section label="Agreement Terms" value={agreement.agreement_terms}/><Section label="Cancellation Terms" value={agreement.cancellation_terms}/><Section label="Special Instructions" value={agreement.special_instructions}/>
