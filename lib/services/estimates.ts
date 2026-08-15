@@ -41,6 +41,12 @@ export async function archiveEstimate(id: string): Promise<Estimate> {
   return data;
 }
 
+export async function markEstimateSent(id: string, input: { email: string; sender: string; token: string; expiresAt: string; snapshot: Record<string, unknown> }): Promise<{ sent_at: string }> {
+  const { data, error } = await getSupabaseClient().rpc("mark_estimate_sent_for_delivery", { p_estimate_id:id, p_recipient:input.email.trim(), p_sender:input.sender, p_token:input.token, p_token_expires_at:input.expiresAt, p_snapshot:input.snapshot });
+  if (error) throw error;
+  return data;
+}
+
 export async function findOrCreateEstimateClient(customer: CustomerInformation, division: EstimateDivision): Promise<Client> {
   const { data, error } = await getSupabaseClient().from("clients").select("*");
   if (error) throw new Error(`Client lookup failed: ${error.message}`);

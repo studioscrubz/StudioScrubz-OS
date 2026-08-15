@@ -41,3 +41,9 @@ a:focus-visible {
 ::selection {
   background: #d4af3740;
 }
+
+@media print {
+  body * { visibility: hidden; }
+  .document-print-root, .document-print-root * { visibility: visible; }
+  .document-print-root { position: absolute; inset: 0; width: 100%; }
+}

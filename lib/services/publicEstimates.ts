@@ -1,0 +1,2 @@
+import{getSupabaseClient}from"@/lib/supabase/client";import type{PublicEstimate}from"@/types/publicEstimate";
+export async function getPublicEstimate(token:string):Promise<PublicEstimate>{if(!token)throw new Error("This estimate link is invalid.");const{data,error}=await getSupabaseClient().rpc("get_estimate_by_token",{p_token:token});if(error)throw new Error(error.message||"This estimate could not be loaded.");if(!data)throw new Error("This estimate link is invalid, expired, or no longer available.");return data as PublicEstimate}

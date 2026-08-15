@@ -22,9 +22,9 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const isLogin = request.nextUrl.pathname === "/login";
-  const isPublicAgreement = request.nextUrl.pathname.startsWith("/agreement/");
+  const isPublicDocument = ["/agreement/", "/estimate/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
 
-  if ((error || !data?.claims) && !isLogin && !isPublicAgreement) {
+  if ((error || !data?.claims) && !isLogin && !isPublicDocument) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("returnTo", `${request.nextUrl.pathname}${request.nextUrl.search}`);

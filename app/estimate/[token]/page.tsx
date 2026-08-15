@@ -1,0 +1,1 @@
+import{PublicEstimatePage}from"@/components/estimates/PublicEstimatePage";export default async function Page({params}:PageProps<"/estimate/[token]">){const{token}=await params;return <PublicEstimatePage token={token}/>}

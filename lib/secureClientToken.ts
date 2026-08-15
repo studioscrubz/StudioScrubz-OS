@@ -1,0 +1,3 @@
+export function generateSecureClientToken():string{if(typeof window==="undefined"||!window.crypto?.getRandomValues)throw new Error("Secure token generation is unavailable in this browser.");const bytes=new Uint8Array(32);window.crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("")}
+export function validClientToken(token:string|null,expiresAt:string|null):token is string{return Boolean(token&&token.length>=32&&(!expiresAt||Date.parse(expiresAt)>Date.now()))}
+export function clientTokenExpiration(days=30):string{const date=new Date();date.setDate(date.getDate()+days);return date.toISOString()}

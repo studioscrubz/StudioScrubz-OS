@@ -18,6 +18,7 @@ const navItems: Array<NavLink | NavGroup> = [
     children: [
       { label: "Dashboard", href: "/", marker: "", permission: "dashboard.view" },
       { label: "Attention Center", href: "/attention", marker: "", permission: "attention.view" },
+      { label: "Schedule", href: "/schedule", marker: "", permission: "schedule.view" },
     ],
   },
   {
@@ -39,7 +40,6 @@ const navItems: Array<NavLink | NavGroup> = [
     ],
   },
   { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
-  { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {

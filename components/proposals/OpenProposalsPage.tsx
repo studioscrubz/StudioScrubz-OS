@@ -35,6 +35,12 @@ import {
   submitProposalForApproval,
 } from "@/lib/services/proposals";
 import { recordProposalSent } from "@/lib/services/clientCommunications";
+import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
+import { openDeviceEmailApp } from "@/lib/deviceEmail";
+import { openDeviceSmsApp } from "@/lib/deviceSms";
+import { clientTokenExpiration, generateSecureClientToken, validClientToken } from "@/lib/secureClientToken";
+import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
+import { ProposalDocument, proposalDeliverySnapshot, proposalDocumentFromRecord } from "./ProposalDocument";
 type Sort =
   | "Newest"
   | "Oldest"
@@ -54,6 +60,7 @@ const columns: ProposalStatus[] = [
   "Archived",
 ];
 export function OpenProposalsPage() {
+  const { profile } = useAuth();
   const [rows, setRows] = useState<ProposalWithRelations[]>([]);
   const [jobProposalIds, setJobProposalIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -76,6 +83,7 @@ export function OpenProposalsPage() {
     rows: ProposalHistory[];
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [sending, setSending] = useState<ProposalWithRelations | null>(null);
   useEffect(() => {
     let active = true;
     void loadPageData()
@@ -239,10 +247,11 @@ export function OpenProposalsPage() {
           edit={setEdit}
           accept={setAccepting}
           history={(p) => void showHistory(p)}
+          send={setSending}
           mutate={mutate}
         />
       )}{" "}
-      {view && <ViewModal p={view} close={() => setView(null)} />}{" "}
+      {view && <SharedProposalPreview p={view} close={() => setView(null)} />}{" "}
       {edit && (
         <EditModal
           p={edit}
@@ -266,6 +275,7 @@ export function OpenProposalsPage() {
       {history && (
         <HistoryModal data={history} close={() => setHistory(null)} />
       )}
+      {sending && <SendProposalModal proposal={sending} sender={profile?.display_name||profile?.email||"StudioScrubz User"} close={()=>setSending(null)} sent={()=>{setSending(null);void refresh("Proposal delivery handoff recorded.")}} />}
     </>
   );
 }
@@ -276,6 +286,7 @@ function Pipeline({
   edit,
   accept,
   history,
+  send,
   mutate,
 }: {
   rows: ProposalWithRelations[];
@@ -284,6 +295,7 @@ function Pipeline({
   edit: (p: ProposalWithRelations) => void;
   accept: (p: ProposalWithRelations) => void;
   history: (p: ProposalWithRelations) => void;
+  send: (p: ProposalWithRelations) => void;
   mutate: (
     p: ProposalWithRelations,
     fn: () => Promise<unknown>,
@@ -312,6 +324,7 @@ function Pipeline({
                   edit={() => edit(p)}
                   accept={() => accept(p)}
                   history={() => history(p)}
+                  openSend={() => send(p)}
                   mutate={(fn, t) => void mutate(p, fn, t)}
                 />
               ))}
@@ -328,6 +341,7 @@ function Card({
   edit,
   accept,
   history,
+  openSend,
   mutate,
 }: {
   p: ProposalWithRelations;
@@ -336,6 +350,7 @@ function Card({
   edit: () => void;
   accept: () => void;
   history: () => void;
+  openSend: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
 }) {
   const { profile } = useAuth();
@@ -362,12 +377,17 @@ function Card({
   function send(v: "Text" | "Email") {
     if (p.approval_status !== "Approved" || p.expiration_date < today()) return;
     const subject = `StudioScrubz Proposal ${p.proposal_number}`;
-    const body = `StudioScrubz proposal ${p.proposal_number}: ${money(p.result.perVisitTotal)}`;
+    const sanitizedBody = `Hello ${p.client?.first_name || p.client_name || "Client"},\n\nYour StudioScrubz Proposal is ready for review.\n\nPlease use the secure Review Proposal link included in this message.\n\nThank you,\nStudioScrubz`;
     mutate(async () => {
-      if (v === "Text" && p.customer_phone) window.location.href = `sms:${p.customer_phone}?body=${encodeURIComponent(body)}`;
-      if (v === "Email" && p.customer_email) window.location.href = `mailto:${encodeURIComponent(p.customer_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      const updated = await markProposalSent(p.id, v);
-      await recordProposalSent({ id: p.id, number: p.proposal_number, clientId: p.client_id, propertyId: p.property_id, recipientEmail: v === "Email" ? p.customer_email : null, recipientPhone: v === "Text" ? p.customer_phone : null, subject, messageBody: body, sentAt: updated.sent_at!, channel: v === "Text" ? "SMS" : "Email" });
+      const token=validClientToken(p.client_access_token,p.client_access_token_expires_at)?p.client_access_token:generateSecureClientToken();
+      const expiresAt=validClientToken(p.client_access_token,p.client_access_token_expires_at)?p.client_access_token_expires_at!:clientTokenExpiration();
+      const reviewUrl=`${getPublicSiteUrl()}/proposal/${token}`;
+      const outgoingBody=`${sanitizedBody}\n\nReview Proposal:\n${reviewUrl}`;
+      const recipient=v==="Email"?p.customer_email:p.customer_phone;
+      if(!recipient)throw new Error(`A client ${v==="Email"?"email address":"phone number"} is required.`);
+      if(v==="Email")openDeviceEmailApp(recipient,subject,outgoingBody);else openDeviceSmsApp(recipient,outgoingBody);
+      const updated = await markProposalSent(p.id, v,{recipient,sender:profile?.display_name||profile?.email||"StudioScrubz User",token,expiresAt,snapshot:proposalSnapshot(p)});
+      await recordProposalSent({ id: p.id, number: p.proposal_number, clientId: p.client_id, propertyId: p.property_id, recipientEmail: v === "Email" ? p.customer_email : null, recipientPhone: v === "Text" ? p.customer_phone : null, subject, messageBody: sanitizedBody, sentAt: updated.sent_at!, channel: v === "Text" ? "SMS" : "Email" });
     }, `Proposal marked sent by ${v}.`);
   }
   return (
@@ -396,7 +416,7 @@ function Card({
         )}
       </button>
       <div className="mt-3 flex flex-wrap gap-1 border-t pt-3">
-        <Action t="View" f={view} />
+        <Action t="Preview" f={view} />
         {p.status === "Draft" && (
           <>
             <Action t="Edit" f={edit} />
@@ -436,13 +456,13 @@ function Card({
           )}
         {canSend && p.status === "Approved" && p.approval_status === "Approved" && (
           <>
-            <Action t="Text Client Proposal" f={() => send("Text")} />
-            <Action t="Email Client Proposal" f={() => send("Email")} />
+            <Action t="Send to Client" f={openSend} />
             <Action t="Print / Save PDF" f={() => printProposal(p)} />
           </>
         )}
         {(p.status === "Sent" || p.status === "Viewed") && (
           <>
+            {canSend && <Action t="Resend Proposal" f={openSend} />}
             <Action
               t="Viewed"
               f={() => mutate(() => markProposalViewed(p.id), "Marked viewed.")}
@@ -473,6 +493,11 @@ function Card({
     </article>
   );
 }
+function SharedProposalPreview({p,close}:{p:ProposalWithRelations;close:()=>void}){return <Modal title={p.proposal_number} close={close}><ProposalDocument document={proposalDocumentFromRecord(p)}/><button type="button" onClick={()=>window.print()} className="mt-5 rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white print:hidden">Print / Save PDF</button></Modal>}
+
+function SendProposalModal({proposal,sender,close,sent}:{proposal:ProposalWithRelations;sender:string;close:()=>void;sent:()=>void}){const[method,setMethod]=useState<"Email"|"Text">("Email");const[recipient,setRecipient]=useState(proposal.customer_email||"");const[subject,setSubject]=useState(`StudioScrubz Proposal ${proposal.proposal_number}`);const[body,setBody]=useState(`Hello ${proposal.client?.first_name||proposal.client_name||"Client"},\n\nYour StudioScrubz Proposal is ready for review.\n\nThank you,\nStudioScrubz`);const[busy,setBusy]=useState(false);const[error,setError]=useState<string|null>(null);const token=useMemo(()=>validClientToken(proposal.client_access_token,proposal.client_access_token_expires_at)?proposal.client_access_token!:generateSecureClientToken(),[proposal]);const expiresAt=useMemo(()=>validClientToken(proposal.client_access_token,proposal.client_access_token_expires_at)?proposal.client_access_token_expires_at!:clientTokenExpiration(),[proposal]);const reviewUrl=`${getPublicSiteUrl()}/proposal/${token}`;function changeMethod(next:"Email"|"Text"){setMethod(next);setRecipient(next==="Email"?proposal.customer_email||"":proposal.customer_phone||"")}async function submit(){if(!recipient.trim())return setError(`A client ${method==="Email"?"email address":"phone number"} is required.`);if(method==="Email"&&!/^\S+@\S+\.\S+$/.test(recipient.trim()))return setError("A valid client email address is required.");setBusy(true);setError(null);try{const updated=await markProposalSent(proposal.id,method,{recipient:recipient.trim(),sender,token,expiresAt,snapshot:proposalDeliverySnapshot(proposal)});const outgoing=`${body.trim()}\n\nReview Proposal:\n${reviewUrl}`;if(method==="Email")openDeviceEmailApp(recipient.trim(),subject.trim(),outgoing);else openDeviceSmsApp(recipient.trim(),outgoing);await recordProposalSent({id:proposal.id,number:proposal.proposal_number,clientId:proposal.client_id,propertyId:proposal.property_id,recipientEmail:method==="Email"?recipient.trim():null,recipientPhone:method==="Text"?recipient.trim():null,subject:subject.trim(),messageBody:body.trim(),sentAt:updated.sent_at!,channel:method==="Text"?"SMS":"Email"});sent()}catch(caught){console.error("Proposal delivery handoff failed",caught);setError(msg(caught,"Proposal delivery could not be prepared."));setBusy(false)}}return <Modal title={`Send Proposal ${proposal.proposal_number}`} close={close}><div className="space-y-5"><ProposalDocument document={proposalDocumentFromRecord(proposal)}/><fieldset><legend className="text-sm font-bold">Delivery Method</legend><div className="mt-2 flex gap-4">{(["Email","Text"] as const).map(value=><label key={value} className="flex items-center gap-2"><input type="radio" checked={method===value} onChange={()=>changeMethod(value)}/>{value}</label>)}</div></fieldset><label className="block text-sm font-bold">Recipient<input className={`${input} mt-2`} value={recipient} onChange={e=>setRecipient(e.target.value)}/></label><label className="block text-sm font-bold">Subject<input className={`${input} mt-2`} value={subject} onChange={e=>setSubject(e.target.value)}/></label><label className="block text-sm font-bold">Editable Message<textarea className="mt-2 min-h-36 w-full rounded-lg border border-neutral-200 p-3 font-normal" value={body} onChange={e=>setBody(e.target.value)}/></label><div><p className="text-sm font-bold">Review Proposal</p><p className="mt-1 break-all rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">{reviewUrl}</p></div>{error&&<p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="flex flex-wrap gap-3 print:hidden"><button type="button" disabled={busy} onClick={()=>void submit()} className="rounded-lg bg-[#143d1a] px-5 py-2.5 font-bold text-white disabled:opacity-50">{busy?"Preparing…":"Send"}</button><button type="button" onClick={()=>window.print()} className="rounded-lg border px-4 py-2 font-bold text-[#143d1a]">Print / Save PDF</button><button type="button" onClick={close} className="rounded-lg border px-4 py-2 font-bold text-[#143d1a]">Cancel</button></div></div></Modal>}
+
+function proposalSnapshot(p:ProposalWithRelations){return proposalDeliverySnapshot(p)}
 function ViewModal({
   p,
   close,
@@ -483,7 +508,7 @@ function ViewModal({
   return (
     <Modal title={p.proposal_number} close={close}>
       <div className="print-proposal">
-        <h1 className="hidden print:block">StudioScrubz</h1>
+        <div className="mb-6 flex items-center gap-4 border-b-2 border-[#143d1a] pb-4"><StudioScrubzLogo size={88}/><div><h1 className="text-2xl font-extrabold text-[#143d1a]">StudioScrubz Proposal</h1><p>{p.proposal_number}</p></div></div>
         <div className="grid gap-5 sm:grid-cols-2">
           <Details
             title="Customer"

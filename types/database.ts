@@ -19,6 +19,8 @@ import type {CatalogService,RecurringPricingRule,RecurringPricingRuleInput,Servi
 import type {BusinessIdentitySettings,BusinessSettings,BusinessSettingsUpdate} from "@/types/businessSettings";
 import type {ClientCommunication,ClientCommunicationInput} from "@/types/clientCommunication";
 import type {AttentionStateRecord} from "@/types/attention";
+import type {PublicEstimate} from "@/types/publicEstimate";
+import type {PublicProposal} from "@/types/publicProposal";
 
 export interface Database {
   public: {
@@ -116,6 +118,11 @@ export interface Database {
       master_admin_permanently_delete_archived_record:{Args:{p_record_type:string;p_record_id:string};Returns:string};
       get_service_agreement_by_token:{Args:{p_token:string};Returns:import("@/types/publicAgreement").PublicAgreement};
       accept_service_agreement_by_token:{Args:{p_token:string;p_signed_name:string;p_signature:string;p_consent:boolean};Returns:import("@/types/publicAgreement").PublicAgreement};
+      get_estimate_by_token:{Args:{p_token:string};Returns:PublicEstimate};
+      get_proposal_by_token:{Args:{p_token:string};Returns:PublicProposal};
+      accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};
+      mark_estimate_sent_for_delivery:{Args:{p_estimate_id:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
+      mark_proposal_sent_for_delivery:{Args:{p_proposal_id:string;p_via:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

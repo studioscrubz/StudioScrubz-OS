@@ -97,11 +97,17 @@ export type Estimate = {
   status: EstimateStatus;
   result: EstimateResult;
   notes: string | null;
+  sent_at: string | null;
+  sent_to: string | null;
+  sent_by: string | null;
+  client_access_token: string | null;
+  client_access_token_expires_at: string | null;
+  client_delivery_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
 };
 
-export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at"> & { archived_at?: string | null };
+export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at" | "sent_at" | "sent_to" | "sent_by" | "client_access_token" | "client_access_token_expires_at" | "client_delivery_snapshot"> & { archived_at?: string | null; sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; client_delivery_snapshot?: Record<string, unknown> | null };
 export type EstimateUpdate = Partial<Omit<Estimate, "id" | "created_at" | "updated_at">>;
 export type EstimateWithRelations = Estimate & { client: Client | null; property: Property | null };

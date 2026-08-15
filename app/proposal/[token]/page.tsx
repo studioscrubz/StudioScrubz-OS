@@ -1,0 +1,1 @@
+import{PublicProposalPage}from"@/components/proposals/PublicProposalPage";export default async function Page({params}:PageProps<"/proposal/[token]">){const{token}=await params;return <PublicProposalPage token={token}/>}
