@@ -1,7 +1,7 @@
 import type { CommercialCalculatorInput, Condition, EstimateResult, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { applyRecurringRule, calculateAddons, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
-import { addonsForService } from "@/lib/services/serviceCatalog";
+import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling/frequency";
 
 const conditionMultiplier: Record<Condition, number> = { Light: 0.92, Average: 1, Heavy: 1.22, Extreme: 1.48 };
@@ -9,7 +9,7 @@ const conditionMultiplier: Record<Condition, number> = { Light: 0.92, Average: 1
 export function calculateResidentialEstimate(input: ResidentialCalculatorInput, catalog: ServiceCatalogBundle): EstimateResult {
   const service=catalog.services.find(x=>x.division!=="Commercial"&&x.service_name===`${input.serviceType} Cleaning`);
   if(!service)throw new Error(`No active catalog service is configured for ${input.serviceType} Cleaning.`);
-  const availableAddons=addonsForService(catalog,service.id);
+  const availableAddons=getAvailableServiceAddons(catalog,service.id,input.division);
   const configured= residentialCatalogPrice(input,service,catalog.tiers,availableAddons);
   const basePrice = configured.basePrice;
   const adjustments = [];
@@ -42,7 +42,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
 export function calculateCommercialEstimate(input: CommercialCalculatorInput, catalog: ServiceCatalogBundle): EstimateResult {
   const service=catalog.services.find(x=>x.division!=="Residential"&&x.service_name===`${input.commercialType} Cleaning`);
   if(!service)throw new Error(`No active catalog service is configured for ${input.commercialType} Cleaning.`);
-  const availableAddons=addonsForService(catalog,service.id);
+  const availableAddons=getAvailableServiceAddons(catalog,service.id,input.division);
   const configured=commercialCatalogContext(input,service,availableAddons);
   const baseProductionRate = configured.productionRate;
   if(baseProductionRate<=0)throw new Error(`Custom Pricing Required for ${service.service_name}.`);

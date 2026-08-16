@@ -7,7 +7,7 @@ import type { Client } from "@/types/client";
 import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughWithRelations } from "@/types/walkthrough";
 import { EMPTY_MEASUREMENTS, WALKTHROUGH_STATUSES } from "@/types/walkthrough";
 import type { Property } from "@/types/property";
-import { addonsForService, findCatalogService, getServiceCatalog } from "@/lib/services/serviceCatalog";
+import { findCatalogService, getAvailableServiceAddons, getServiceCatalog } from "@/lib/services/serviceCatalog";
 import type { CatalogService, ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
@@ -65,7 +65,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const filteredEstimates = useMemo(() => { const term = estimateSearch.trim().toLocaleLowerCase(); return estimates.filter((item) => !term || [item.estimate_number, displayClient(item.client), item.property?.address||"Deleted Property", item.service_name].filter(Boolean).join(" ").toLocaleLowerCase().includes(term)); }, [estimateSearch, estimates]);
   const clientProperties = properties.filter((item) => item.client_id === clientId);
   const catalogService=catalog?findCatalogService(catalog.services,division,measurements.serviceType):undefined;
-  const availableAddons=catalog&&catalogService?addonsForService(catalog,catalogService.id):[];
+  const availableAddons=catalog&&catalogService?getAvailableServiceAddons(catalog,catalogService.id,division):[];
 
   function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>({...current,serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription??"",catalogAddons:found.result.catalogAddons??[]})); } }
   function chooseService(serviceId:string){const service=services.find(item=>item.id===serviceId);if(service)setMeasurements(current=>({...current,serviceType:service.service_name,serviceDescription:service.description?.trim()??"",catalogAddons:[]}))}
