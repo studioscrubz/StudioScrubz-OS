@@ -1,13 +1,14 @@
 import type { Client } from "@/types/client";
 import type { Estimate, EstimateDivision, EstimateWithRelations } from "@/types/estimate";
 import type { Property } from "@/types/property";
+import type { OperationalPhoto } from "@/types/photo";
 
 export const WALKTHROUGH_STATUSES = ["New", "Scheduled", "Completed", "Proposal Ready", "Archived"] as const;
 export type WalkthroughStatus = (typeof WALKTHROUGH_STATUSES)[number];
 export type WalkthroughContactMethod = "Phone" | "Text" | "Email";
 export type WalkthroughScopeItem = { id: string; label: string };
 export type WalkthroughRecommendation = { id: string; text: string };
-export type WalkthroughPhoto = { id: string; fileName: string; storagePath: string | null; caption: string | null };
+export type WalkthroughPhoto = OperationalPhoto;
 export type WalkthroughMeasurements = {
   serviceType: string;
   serviceDescription: string;

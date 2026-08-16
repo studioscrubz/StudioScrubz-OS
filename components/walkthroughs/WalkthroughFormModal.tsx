@@ -8,9 +8,14 @@ import { EMPTY_MEASUREMENTS, WALKTHROUGH_STATUSES } from "@/types/walkthrough";
 import type { Property } from "@/types/property";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
 import type { CatalogService } from "@/types/serviceCatalog";
+import { PhotoUploader } from "@/components/photos/PhotoUploader";
+import { PhotoCaptureQueue } from "@/components/photos/PhotoCaptureQueue";
+import type { OperationalPhoto, PendingOperationalPhoto, WalkthroughPhotoCategory } from "@/types/photo";
+import { uploadOperationalPhoto, validateOperationalPhoto } from "@/lib/services/photoStorage";
 
 const scopeOptions = ["Floors", "Bathrooms", "Kitchen", "Windows", "Baseboards", "Appliances", "Common Areas", "Workstations", "Trash", "Sanitizing", "Pressure Washing", "Other"];
 const recommendationOptions = ["Deep cleaning recommended", "Recurring service recommended", "Additional crew recommended", "Special equipment required", "Pressure washing recommended", "Carpet service recommended"];
+const photoCategories: readonly WalkthroughPhotoCategory[] = ["General", "Exterior", "Interior", "Kitchen", "Bathroom", "Flooring", "Damage / Concern", "Other"];
 
 type Props = { walkthrough?: WalkthroughWithRelations; initialEstimate?: AvailableEstimate; onClose: () => void; onSaved: () => void; onViewDuplicate?: (walkthrough: WalkthroughWithRelations) => void };
 
@@ -38,6 +43,8 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<WalkthroughWithRelations | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [pendingPhotos, setPendingPhotos] = useState<PendingOperationalPhoto[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -65,9 +72,17 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
     if (!clientId || !propertyId) return setError("Select a valid client and property relationship.");
     if (!date || !time) return setError("Walkthrough date and time are required.");
     if (mode === "estimate" && !estimateId) return setError("Select an estimate or choose Create Without Estimate.");
+    try { pendingPhotos.forEach((photo) => validateOperationalPhoto(photo.file)); } catch (caught) { return setError(message(caught, "Photo upload failed.")); }
     setSaving(true); setError(null); setDuplicate(null);
     const input: WalkthroughInput = { estimate_id: mode === "estimate" ? estimateId : null, client_id: clientId, property_id: propertyId, division, walkthrough_date: date, walkthrough_time: time, status, contact_name: selectedEstimate ? customerName(selectedEstimate) : selectedClient ? displayClient(selectedClient) : null, phone: selectedEstimate?.customer_phone ?? selectedClient?.phone ?? null, email: selectedEstimate?.customer_email ?? selectedClient?.email ?? null, assigned_to: clean(assignedTo), notes: clean(notes), scope, measurements, recommendations, photos: walkthrough?.photos ?? [] };
-    try { if (walkthrough) await updateWalkthrough(walkthrough.id, input); else await createWalkthrough(input); onSaved(); }
+    try {
+      const record = walkthrough || createdId ? await updateWalkthrough(walkthrough?.id ?? createdId!, input) : await createWalkthrough(input);
+      if (!walkthrough && !createdId) setCreatedId(record.id);
+      let uploaded: OperationalPhoto[] = walkthrough?.photos ?? [];
+      for (const pending of pendingPhotos) uploaded = await uploadOperationalPhoto({ recordType: "walkthroughs", recordId: record.id, category: pending.category, caption: pending.caption, source: pending.source, file: pending.file, currentPhotos: uploaded });
+      setPendingPhotos([]);
+      onSaved();
+    }
     catch (caught) { console.error("Walkthrough save failed", caught); if (caught instanceof WalkthroughDuplicateError) setDuplicate(caught.walkthrough); else setError(message(caught, "The walkthrough could not be saved.")); }
     finally { setSaving(false); }
   }
@@ -81,7 +96,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
       <Assessment division={division} value={measurements} set={setMeasurements} />
       <ListEditor title="Scope" presets={scopeOptions} items={scope.map((item) => ({ id: item.id, text: item.label }))} custom={customScope} setCustom={setCustomScope} add={addScope} remove={(id) => setScope(scope.filter((item) => item.id !== id))} />
       <ListEditor title="Recommendations" presets={recommendationOptions} items={recommendations} custom={customRecommendation} setCustom={setCustomRecommendation} add={addRecommendation} remove={(id) => setRecommendations(recommendations.filter((item) => item.id !== id))} />
-      <Panel title="Photos"><div className="rounded-xl border border-dashed border-[#143d1a]/20 bg-[#f8faf7] px-6 py-8 text-center"><p className="text-sm font-bold text-[#143d1a]">Photos</p><p className="mt-1 text-sm text-neutral-500">Storage integration coming in a later phase.</p></div></Panel>
+      {walkthrough || (createdId && pendingPhotos.length === 0) ? <PhotoUploader recordType="walkthroughs" recordId={walkthrough?.id ?? createdId!} categories={photoCategories} title="Walkthrough Photos" /> : <Panel title="Walkthrough Photos"><PhotoCaptureQueue photos={pendingPhotos} setPhotos={setPendingPhotos} categories={photoCategories} />{pendingPhotos.length > 0 && <p className="mt-3 text-xs text-neutral-500">These reviewed photos will upload securely after the Walkthrough record is created. A failed upload keeps this form open for retry.</p>}</Panel>}
       <footer className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={saving} className={secondaryClass}>Cancel</button><button type="button" onClick={() => void save()} disabled={saving || loading} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "Saving…" : walkthrough ? "Save Walkthrough" : "Create Walkthrough"}</button></footer>
     </div></section></div>;
 }

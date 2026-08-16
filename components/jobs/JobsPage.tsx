@@ -16,6 +16,8 @@ import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
 import { JobLaborSummary } from "@/components/time/JobLaborSummary";
 import type { CrewWithRelations } from "@/types/crew";
+import { PhotoUploader } from "@/components/photos/PhotoUploader";
+import type { JobPhotoCategory } from "@/types/photo";
 import {
   type JobStatus,
   type JobWithRelations,
@@ -38,6 +40,7 @@ const columns: JobStatus[] = [
   "Completed",
   "Cancelled",
 ];
+const jobPhotoCategories: readonly JobPhotoCategory[] = ["Before", "After", "Damage / Issue", "Other"];
 export function JobsPage() {
   const { profile } = useAuth();
   const [rows, setRows] = useState<JobWithRelations[]>([]);
@@ -426,6 +429,7 @@ function JobModal({
           ],
         ]}
       />
+      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} title="Before / After & Issue Photos" />
       <JobMileageSummary jobId={job.id} />
       <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />
       <div className="mt-6 flex flex-wrap gap-2">

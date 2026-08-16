@@ -126,6 +126,8 @@ export interface Database {
       accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};
       mark_estimate_sent_for_delivery:{Args:{p_estimate_id:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
       mark_proposal_sent_for_delivery:{Args:{p_proposal_id:string;p_via:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
+      get_operational_photos:{Args:{p_record_type:string;p_record_id:string};Returns:import("@/types/photo").OperationalPhoto[]};
+      set_operational_photos:{Args:{p_record_type:string;p_record_id:string;p_photos:import("@/types/photo").OperationalPhoto[]};Returns:import("@/types/photo").OperationalPhoto[]};
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

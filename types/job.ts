@@ -3,6 +3,7 @@ import type { EstimateDivision, Frequency } from "@/types/estimate";
 import type { Property } from "@/types/property";
 import type { Proposal, ProposalScopeItem } from "@/types/proposal";
 import type { AgreementFrequency } from "@/types/agreement";
+import type { OperationalPhoto } from "@/types/photo";
 
 export const JOB_STATUSES = [
   "Ready to Schedule",
@@ -20,11 +21,7 @@ export type JobChecklistItem = {
   label: string;
   completed: boolean;
 };
-export type JobPhoto = {
-  id: string;
-  fileName: string;
-  storagePath: string | null;
-};
+export type JobPhoto = OperationalPhoto;
 
 export type Job = {
   id: string;
