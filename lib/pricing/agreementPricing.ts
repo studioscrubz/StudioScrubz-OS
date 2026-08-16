@@ -1,10 +1,7 @@
-import { applyRecurringRule } from "@/lib/pricing/pricingEngine";
+import { calculateRecurringTotals } from "@/lib/pricing/pricingEngine";
 import type { AgreementFrequency, AgreementPricingSnapshot } from "@/types/agreement";
 import type { ProposalWithRelations } from "@/types/proposal";
 import type { RecurringPricingRule } from "@/types/serviceCatalog";
-import { estimatedMonthlyTotal } from "@/lib/scheduling/frequency";
-
-const supported = new Set<AgreementFrequency>(["One-Time", "Daily", "Weekly", "Biweekly", "Monthly"]);
 
 export function proposalAgreementPricing(proposal: ProposalWithRelations): AgreementPricingSnapshot {
   const estimate = proposal.estimate?.result;
@@ -23,12 +20,8 @@ export function proposalAgreementPricing(proposal: ProposalWithRelations): Agree
 }
 
 export function catalogAgreementPricing(input: { standardPrice:number; frequency:AgreementFrequency; serviceId:string; rules:RecurringPricingRule[]; customDiscount?:number; taxes?:number }): AgreementPricingSnapshot {
-  const recurring = supported.has(input.frequency)
-    ? applyRecurringRule(input.standardPrice, input.frequency, input.rules, input.serviceId)
-    : { amount: input.standardPrice, discount: 0, percent: 0 };
-  const customDiscount=Math.max(0,input.customDiscount??0),taxes=Math.max(0,input.taxes??0);
-  const final = round(Math.max(0,recurring.amount-customDiscount)+taxes);
-  return make({ source:"Service Catalog", standard:input.standardPrice, frequency:input.frequency, frequencyDiscount:recurring.discount, frequencyPercent:recurring.percent, customDiscount, taxes, final, monthly:estimatedMonthlyTotal(final,input.frequency) });
+  const pricing=calculateRecurringTotals({subtotal:input.standardPrice,frequency:input.frequency,rules:input.rules,serviceId:input.serviceId,manualDiscountAmount:Math.max(0,input.customDiscount??0),fixedTaxes:Math.max(0,input.taxes??0)});
+  return make({ source:"Service Catalog", standard:input.standardPrice, frequency:input.frequency, frequencyDiscount:pricing.recurringDiscountAmount, frequencyPercent:pricing.recurringDiscountPercent, customDiscount:pricing.manualDiscount, taxes:pricing.taxes, final:pricing.finalPrice, monthly:pricing.monthlyPrice });
 }
 
 function make(values:{source:AgreementPricingSnapshot["source"];standard:number;frequency:AgreementFrequency;frequencyDiscount:number;frequencyPercent:number;customDiscount:number;taxes:number;final:number;monthly:number|null;catalogAddons?:AgreementPricingSnapshot["catalog_addons"]}):AgreementPricingSnapshot {
