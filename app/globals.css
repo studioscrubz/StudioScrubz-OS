@@ -27,6 +27,20 @@ body {
   font-family: "Avenir Next", "Segoe UI", Arial, Helvetica, sans-serif;
 }
 
+@media (display-mode: standalone) and (max-width: 1023px) {
+  .pwa-mobile-header {
+    height: calc(4rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+  .pwa-sidebar {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pwa-main {
+    padding-bottom: calc(1.75rem + env(safe-area-inset-bottom));
+  }
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;

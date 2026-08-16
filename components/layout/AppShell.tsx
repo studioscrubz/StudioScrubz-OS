@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
 
-      <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#143d1a]/10 bg-white/95 px-5 backdrop-blur lg:hidden">
+      <div className="pwa-mobile-header sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#143d1a]/10 bg-white/95 px-5 backdrop-blur lg:hidden">
         <div className="flex items-center gap-3">
           <StudioScrubzLogo size={40} priority />
           <span className="text-sm font-extrabold tracking-tight text-[#143d1a]">StudioScrubz OS</span>
@@ -42,14 +42,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,304px)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:w-auto lg:translate-x-0 ${
+        className={`pwa-sidebar fixed inset-y-0 left-0 z-50 w-[min(86vw,304px)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:w-auto lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <Sidebar onClose={() => setMobileOpen(false)} />
       </aside>
 
-      <main id="main-content" className="min-w-0 px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10 xl:px-14">
+      <main id="main-content" className="pwa-main min-w-0 px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10 xl:px-14">
         <div className="mx-auto max-w-[1320px]">{children}</div>
       </main>
     </div>
