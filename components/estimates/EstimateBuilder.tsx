@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
@@ -26,6 +27,7 @@ type EstimateDraft = {
 };
 
 export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWithRelations; onSaved?: () => void }) {
+  const router = useRouter();
   const initialCustomer = estimate ? customerFromEstimate(estimate) : blankCustomer;
   const initialInput = estimate?.result.calculatorInput;
   const [customer, setCustomer] = useState(initialCustomer);
@@ -117,6 +119,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         clearNewEstimateDraft();
       }
       onSaved?.();
+      if (!estimate) router.push("/open-estimates");
     } catch (caught) { console.error("Estimate save workflow failed", caught); setError(caught instanceof Error ? caught.message : "The estimate could not be saved. Please try again."); }
     finally { setSaving(false); }
   }

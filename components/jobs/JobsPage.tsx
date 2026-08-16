@@ -236,6 +236,7 @@ export function JobsPage() {
           close={() => setSelected(null)}
           mutate={(fn, text) => void mutate(selected, fn, text)}
           canArchive={hasPermission(profile, "jobs.archive")}
+          canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
     </>
@@ -279,12 +280,14 @@ function JobModal({
   close,
   mutate,
   canArchive,
+  canDeletePhotos,
 }: {
   job: JobWithRelations;
   busy: boolean;
   close: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
   canArchive: boolean;
+  canDeletePhotos: boolean;
 }) {
   const [date, setDate] = useState(job.scheduled_date ?? "");
   const [time, setTime] = useState(job.start_time?.slice(0, 5) ?? "");
@@ -429,7 +432,7 @@ function JobModal({
           ],
         ]}
       />
-      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} title="Before / After & Issue Photos" />
+      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Before / After & Issue Photos" />
       <JobMileageSummary jobId={job.id} />
       <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />
       <div className="mt-6 flex flex-wrap gap-2">

@@ -12,20 +12,22 @@ import {
 const SIGNED_URL_SECONDS = 15 * 60;
 
 export async function getOperationalPhotos(recordType: OperationalPhotoRecordType, recordId: string): Promise<OperationalPhoto[]> {
+  assertSavedRecordId(recordId);
   const { data, error } = await getSupabaseClient().rpc("get_operational_photos", { p_record_type: recordType, p_record_id: recordId });
-  if (error) throw error;
+  if (error) { console.error("Operational photo metadata load failed", { recordType, recordId, message: error.message, code: error.code }); throw new Error(error.message || "Photos could not be loaded."); }
   return normalizePhotos(data);
 }
 
 export async function createPhotoSignedUrls(photos: OperationalPhoto[]): Promise<OperationalPhotoWithUrl[]> {
   if (!photos.length) return [];
   const { data, error } = await getSupabaseClient().storage.from(OPERATIONAL_PHOTO_BUCKET).createSignedUrls(photos.map((photo) => photo.storagePath), SIGNED_URL_SECONDS);
-  if (error) throw error;
+  if (error) { console.error("Operational photo signed URL generation failed", { bucket: OPERATIONAL_PHOTO_BUCKET, photoCount: photos.length, message: error.message }); throw new Error(error.message || "Photo previews could not be loaded."); }
   return photos.map((photo, index) => ({ ...photo, signedUrl: data[index]?.signedUrl ?? null }));
 }
 
 export async function uploadOperationalPhoto(input: { recordType: OperationalPhotoRecordType; recordId: string; category: OperationalPhotoCategory; caption: string | null; source: "camera" | "library"; file: File; currentPhotos: OperationalPhoto[] }): Promise<OperationalPhoto[]> {
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("An internet connection is required to upload photos.");
+  assertSavedRecordId(input.recordId);
   validateOperationalPhoto(input.file);
   const file = await compressPhoto(input.file);
   const user = await authenticatedUserId();
@@ -36,10 +38,10 @@ export async function uploadOperationalPhoto(input: { recordType: OperationalPho
   const photo: OperationalPhoto = { id, storagePath, category: input.category, originalFilename: input.file.name, mimeType: file.type, sizeBytes: file.size, uploadedAt: new Date().toISOString(), uploadedBy: user, caption: input.caption?.trim() || null, source: input.source };
   const storage = getSupabaseClient().storage.from(OPERATIONAL_PHOTO_BUCKET);
   const { error: uploadError } = await storage.upload(storagePath, file, { contentType: file.type, upsert: false, cacheControl: "3600" });
-  if (uploadError) throw uploadError;
+  if (uploadError) { console.error("Operational photo Storage upload failed", { bucket: OPERATIONAL_PHOTO_BUCKET, recordType: input.recordType, recordId: input.recordId, category: input.category, storagePath, message: uploadError.message }); throw new Error(uploadError.message || "Photo upload failed."); }
   const next = [...input.currentPhotos, photo];
   try { await saveMetadata(input.recordType, input.recordId, next); }
-  catch (error) { await storage.remove([storagePath]); throw error; }
+  catch (error) { const { error: cleanupError } = await storage.remove([storagePath]); if (cleanupError) console.error("Operational photo cleanup after metadata failure failed", { bucket: OPERATIONAL_PHOTO_BUCKET, recordType: input.recordType, recordId: input.recordId, storagePath, message: cleanupError.message }); throw error; }
   return next;
 }
 
@@ -62,7 +64,7 @@ export async function deleteOperationalPhoto(recordType: OperationalPhotoRecordT
 
 async function saveMetadata(recordType: OperationalPhotoRecordType, recordId: string, photos: OperationalPhoto[]) {
   const { error } = await getSupabaseClient().rpc("set_operational_photos", { p_record_type: recordType, p_record_id: recordId, p_photos: photos });
-  if (error) throw error;
+  if (error) { console.error("Operational photo metadata RPC failed", { recordType, recordId, photoCount: photos.length, message: error.message, code: error.code }); throw new Error(error.message || "Photo metadata could not be saved."); }
 }
 
 export function validateOperationalPhoto(file: File) {
@@ -77,6 +79,7 @@ async function authenticatedUserId() {
 }
 
 function safeExtension(file: File) { return file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "image/heic" ? "heic" : "heif"; }
+function assertSavedRecordId(recordId: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recordId)) throw new Error("Save this record before uploading photos."); }
 function jobFolder(category: OperationalPhotoCategory) { return category === "Before" ? "before" : category === "After" ? "after" : category === "Damage / Issue" ? "damage" : "other"; }
 
 async function compressPhoto(file: File): Promise<File> {
