@@ -71,6 +71,7 @@ export function ServiceCatalogPage() {
     {error && <Alert text={error} />}{notice && <Alert text={notice} good />}
     <div className="mt-6 flex flex-wrap gap-2">{(["Services", "Price Tiers", "Add-Ons", "Recurring Pricing"] as Tab[]).map((item) =>
       <button key={item} className={item === tab ? primary : secondary} onClick={() => setTab(item)}>{item}</button>)}</div>
+    {tab === "Recurring Pricing" && <p className="mt-4 rounded-xl border border-[#d4af37]/40 bg-[#fffdf5] p-4 text-sm text-neutral-700"><b className="text-[#143d1a]">All Services</b> applies the configured frequency rule to every eligible Service Catalog service across Estimates, Proposals, and directly created Service Agreements. A service-specific rule for the same frequency takes precedence. Proposal-generated Agreements preserve the accepted Proposal pricing snapshot.</p>}
     {loading ? <div className="mt-6 h-60 animate-pulse rounded-xl bg-neutral-100" /> :
       <div className="mt-6 overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[900px] text-sm">
         <thead><tr>{headers(tab).map((heading) => <th key={heading} className="p-3 text-left">{heading}</th>)}</tr></thead>
