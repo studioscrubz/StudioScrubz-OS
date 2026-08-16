@@ -2,9 +2,9 @@ import { applyRecurringRule } from "@/lib/pricing/pricingEngine";
 import type { AgreementFrequency, AgreementPricingSnapshot } from "@/types/agreement";
 import type { ProposalWithRelations } from "@/types/proposal";
 import type { RecurringPricingRule } from "@/types/serviceCatalog";
+import { estimatedMonthlyTotal } from "@/lib/scheduling/frequency";
 
 const supported = new Set<AgreementFrequency>(["One-Time", "Daily", "Weekly", "Biweekly", "Monthly"]);
-const visitsPerMonth: Partial<Record<AgreementFrequency, number>> = { Daily: 365/12, Weekly: 52/12, Biweekly: 26/12, Monthly: 1 };
 
 export function proposalAgreementPricing(proposal: ProposalWithRelations): AgreementPricingSnapshot {
   const estimate = proposal.estimate?.result;
@@ -27,7 +27,7 @@ export function catalogAgreementPricing(input: { standardPrice:number; frequency
     : { amount: input.standardPrice, discount: 0, percent: 0 };
   const customDiscount=Math.max(0,input.customDiscount??0),taxes=Math.max(0,input.taxes??0);
   const final = round(Math.max(0,recurring.amount-customDiscount)+taxes);
-  return make({ source:"Service Catalog", standard:input.standardPrice, frequency:input.frequency, frequencyDiscount:recurring.discount, frequencyPercent:recurring.percent, customDiscount, taxes, final, monthly:input.frequency === "One-Time" ? null : round(final * (visitsPerMonth[input.frequency] ?? 0)) });
+  return make({ source:"Service Catalog", standard:input.standardPrice, frequency:input.frequency, frequencyDiscount:recurring.discount, frequencyPercent:recurring.percent, customDiscount, taxes, final, monthly:estimatedMonthlyTotal(final,input.frequency) });
 }
 
 function make(values:{source:AgreementPricingSnapshot["source"];standard:number;frequency:AgreementFrequency;frequencyDiscount:number;frequencyPercent:number;customDiscount:number;taxes:number;final:number;monthly:number|null}):AgreementPricingSnapshot {

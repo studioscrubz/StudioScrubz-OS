@@ -6,6 +6,7 @@ import {
   ProposalJobAction,
 } from "@/components/jobs/ProposalJobAction";
 import { ProposalAgreementAction } from "@/components/agreements/ProposalAgreementAction";
+import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 import { getJobProposalIds } from "@/lib/services/jobs";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -474,7 +475,7 @@ function Card({
         )}
         {p.status === "Accepted" && (
           <>
-            {p.frequency === "One-Time" ? <ProposalJobAction proposalId={p.id} /> : <ProposalAgreementAction proposalId={p.id} />}
+            {isRecurringFrequency(p.frequency) ? <ProposalAgreementAction proposalId={p.id} /> : <ProposalJobAction proposalId={p.id} />}
             <Action t="Print / Save PDF" f={() => printProposal(p)} />
           </>
         )}{" "}

@@ -2,6 +2,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { getProposalById } from "@/lib/services/proposals";
 import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
+import { estimatedMonthlyTotal, isRecurringFrequency } from "@/lib/scheduling/frequency";
 import type {
   AgreementFinancialSummary,
   AgreementInput,
@@ -73,7 +74,7 @@ export async function createAgreement(input: AgreementInput) {
 }
 export async function createAgreementFromProposal(proposalId: string) {
   const p = await getProposalById(proposalId);
-  if (p.status !== "Accepted" || p.frequency === "One-Time")
+  if (p.status !== "Accepted" || !isRecurringFrequency(p.frequency))
     throw new Error("Only accepted recurring proposals can create agreements.");
   const pricing = proposalAgreementPricing(p);
   return createAgreement({
@@ -193,6 +194,8 @@ export function estimatedMonthlyAmount(a: ServiceAgreement) {
   if (a.billing_type === "Weekly") return (a.billing_amount * 52) / 12;
   if (a.billing_type === "Biweekly") return (a.billing_amount * 26) / 12;
   if (a.billing_type === "Per Visit") {
+    const shared=estimatedMonthlyTotal(a.billing_amount,a.frequency);
+    if(shared!==null&&shared>0)return shared;
     const visits =
       a.frequency === "Weekly"
         ? 52 / 12

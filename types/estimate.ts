@@ -4,7 +4,7 @@ import type { Property } from "@/types/property";
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
 export type EstimateStatus = "Open" | "Archived";
-export type Frequency = "One-Time" | "Weekly" | "Biweekly" | "Monthly";
+export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Monthly";
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 
 export type CustomerInformation = {

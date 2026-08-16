@@ -42,16 +42,19 @@ export function OpenEstimatesPage() {
   const [sending, setSending] = useState<EstimateWithRelations | null>(null);
 
   useEffect(() => { let active = true; void Promise.all([getEstimates(), getWalkthroughsForEstimates()]).then(([estimateRows, walkthroughRows]) => { if (active) { setEstimates(estimateRows); setWalkthroughs(walkthroughRows); } }).catch((caught: unknown) => { console.error("Failed to load estimates or walkthrough links from Supabase", caught); if (active) setError(message(caught, "Estimates could not be loaded.")); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
-  const summary = useMemo(() => ({ total: estimates.filter((item) => !item.archived_at && item.status === "Open").length, residential: estimates.filter((item) => !item.archived_at && item.division === "Residential").length, commercial: estimates.filter((item) => !item.archived_at && item.division === "Commercial").length, archived: estimates.filter((item) => Boolean(item.archived_at)).length }), [estimates]);
+  const linkedEstimateIds=useMemo(()=>new Set(walkthroughs.map((item)=>item.estimate_id).filter((id):id is string=>Boolean(id))),[walkthroughs]);
+  const isOpenWork=(item:EstimateWithRelations)=>!item.archived_at&&item.status==="Open"&&!linkedEstimateIds.has(item.id);
+  const summary = useMemo(() => ({ total: estimates.filter(isOpenWork).length, residential: estimates.filter((item) => isOpenWork(item) && item.division === "Residential").length, commercial: estimates.filter((item) => isOpenWork(item) && item.division === "Commercial").length, archived: estimates.filter((item) => Boolean(item.archived_at)).length }), [estimates,linkedEstimateIds]);
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     const records = estimates.filter((item) => {
+      if(!item.archived_at&&item.status==="Open"&&linkedEstimateIds.has(item.id))return false;
       const haystack = [item.estimate_number, customerName(item), item.property?.address||"Deleted Property", item.customer_phone, item.customer_email, item.service_name].filter(Boolean).join(" ").toLocaleLowerCase();
       const archiveMatch = archive === "All Records" || (archive === "Archived Records" ? Boolean(item.archived_at) : !item.archived_at);
       return (!term || haystack.includes(term)) && (division === "All" || item.division === division) && (status === "All" || item.status === status) && archiveMatch;
     });
     return records.sort((a, b) => compare(a, b, sort));
-  }, [archive, division, estimates, search, sort, status]);
+  }, [archive, division, estimates, linkedEstimateIds, search, sort, status]);
 
   async function refresh(text?: string) { const [estimateRows, walkthroughRows] = await Promise.all([getEstimates(), getWalkthroughsForEstimates()]); setEstimates(estimateRows); setWalkthroughs(walkthroughRows); if (text) setNotice(text); }
   async function archiveRecord(estimate: EstimateWithRelations) { if (!window.confirm(`Archive ${estimate.estimate_number}?`)) return; setArchivingId(estimate.id); setError(null); try { await archiveEstimate(estimate.id); await refresh("Estimate archived successfully."); } catch (caught) { console.error("Failed to archive estimate", caught); setError(message(caught, "The estimate could not be archived.")); } finally { setArchivingId(null); } }

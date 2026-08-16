@@ -1,9 +1,9 @@
 import type { CommercialCalculatorInput, Condition, EstimateResult, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { applyRecurringRule, calculateAddons, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
+import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling/frequency";
 
 const conditionMultiplier: Record<Condition, number> = { Light: 0.92, Average: 1, Heavy: 1.22, Extreme: 1.48 };
-const visitsPerMonth: Record<Frequency, number> = { "One-Time": 1, Weekly: 4.33, Biweekly: 2.17, Monthly: 1 };
 
 export function calculateResidentialEstimate(input: ResidentialCalculatorInput, catalog: ServiceCatalogBundle): EstimateResult {
   const service=catalog.services.find(x=>x.division!=="Commercial"&&x.service_name===`${input.serviceType} Cleaning`);
@@ -68,7 +68,7 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
 
 function result(values: { input: ResidentialCalculatorInput | CommercialCalculatorInput; serviceName: string; basePrice: number; adjustments: { label: string; amount: number }[]; oneTimePrice: number; recurringDiscount: number; recurringDiscountPercent: number; manualDiscount: number; totalDiscount: number; taxes: number; finalPrice: number; laborHours: number; crewSize: number; laborCost: number; supplyCost: number; scope: string[] }): EstimateResult {
   const frequency = values.input.frequency;
-  return { ...values, serviceDescription: null, basePrice: money(values.basePrice), adjustments: values.adjustments.map((item) => ({ ...item, amount: money(item.amount) })), oneTimePrice: money(values.oneTimePrice), recurringDiscount: money(values.recurringDiscount), manualDiscount: money(values.manualDiscount), totalDiscount: money(values.totalDiscount), taxes: money(values.taxes), finalPrice: money(values.finalPrice), monthlyPrice: frequency === "One-Time" ? null : money(values.finalPrice * visitsPerMonth[frequency]), visitsPerMonth: visitsPerMonth[frequency], laborHours: tenth(values.laborHours), crewSize: values.crewSize, estimatedDuration: tenth(values.laborHours / values.crewSize), laborCost: money(values.laborCost), supplyCost: money(values.supplyCost), estimatedProfit: money(values.finalPrice - values.laborCost - values.supplyCost), calculatorInput: values.input };
+  return { ...values, serviceDescription: null, basePrice: money(values.basePrice), adjustments: values.adjustments.map((item) => ({ ...item, amount: money(item.amount) })), oneTimePrice: money(values.oneTimePrice), recurringDiscount: money(values.recurringDiscount), manualDiscount: money(values.manualDiscount), totalDiscount: money(values.totalDiscount), taxes: money(values.taxes), finalPrice: money(values.finalPrice), monthlyPrice: estimatedMonthlyTotal(values.finalPrice,frequency), visitsPerMonth: estimatedVisitsPerMonth(frequency), laborHours: tenth(values.laborHours), crewSize: values.crewSize, estimatedDuration: tenth(values.laborHours / values.crewSize), laborCost: money(values.laborCost), supplyCost: money(values.supplyCost), estimatedProfit: money(values.finalPrice - values.laborCost - values.supplyCost), calculatorInput: values.input };
 }
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value || 0)); }
 function money(value: number): number { return Math.round(value * 100) / 100; }
