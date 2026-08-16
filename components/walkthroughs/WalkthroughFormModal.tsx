@@ -7,8 +7,9 @@ import type { Client } from "@/types/client";
 import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughWithRelations } from "@/types/walkthrough";
 import { EMPTY_MEASUREMENTS, WALKTHROUGH_STATUSES } from "@/types/walkthrough";
 import type { Property } from "@/types/property";
-import { getActiveServices } from "@/lib/services/serviceCatalog";
-import type { CatalogService } from "@/types/serviceCatalog";
+import { addonsForService, findCatalogService, getServiceCatalog } from "@/lib/services/serviceCatalog";
+import type { CatalogService, ServiceCatalogBundle } from "@/types/serviceCatalog";
+import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
 import type { WalkthroughPhotoCategory } from "@/types/photo";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -28,6 +29,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [clients, setClients] = useState<Client[]>(walkthrough?.client ? [walkthrough.client] : []);
   const [properties, setProperties] = useState<Property[]>(walkthrough?.property ? [walkthrough.property] : []);
   const [services, setServices] = useState<CatalogService[]>([]);
+  const [catalog,setCatalog]=useState<ServiceCatalogBundle|null>(null);
   const [estimateId, setEstimateId] = useState(walkthrough?.estimate_id ?? initialEstimate?.id ?? "");
   const [clientId, setClientId] = useState(walkthrough?.client_id ?? initialEstimate?.client_id ?? "");
   const [propertyId, setPropertyId] = useState(walkthrough?.property_id ?? initialEstimate?.property_id ?? "");
@@ -37,7 +39,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [assignedTo, setAssignedTo] = useState(walkthrough?.assigned_to ?? "");
   const [notes, setNotes] = useState(walkthrough?.notes ?? "");
   const [status, setStatus] = useState<WalkthroughStatus>(walkthrough?.status ?? "New");
-  const [measurements, setMeasurements] = useState<WalkthroughMeasurements>({ ...EMPTY_MEASUREMENTS, ...walkthrough?.measurements, serviceType: walkthrough?.measurements.serviceType||initialEstimate?.service_name||initialEstimate?.result.serviceName||walkthrough?.estimate?.service_name||walkthrough?.estimate?.result.serviceName||"", serviceDescription: walkthrough?.measurements.serviceDescription||initialEstimate?.result.serviceDescription||walkthrough?.estimate?.result.serviceDescription||"" });
+  const [measurements, setMeasurements] = useState<WalkthroughMeasurements>({ ...EMPTY_MEASUREMENTS, ...walkthrough?.measurements, serviceType: walkthrough?.measurements.serviceType||initialEstimate?.service_name||initialEstimate?.result.serviceName||walkthrough?.estimate?.service_name||walkthrough?.estimate?.result.serviceName||"", serviceDescription: walkthrough?.measurements.serviceDescription||initialEstimate?.result.serviceDescription||walkthrough?.estimate?.result.serviceDescription||"",catalogAddons:walkthrough?.measurements.catalogAddons??initialEstimate?.result.catalogAddons??walkthrough?.estimate?.result.catalogAddons??[] });
   const [scope, setScope] = useState<WalkthroughScopeItem[]>(walkthrough?.scope ?? []);
   const [recommendations, setRecommendations] = useState<WalkthroughRecommendation[]>(walkthrough?.recommendations ?? []);
   const [customScope, setCustomScope] = useState("");
@@ -49,8 +51,8 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
 
   useEffect(() => {
     let active = true;
-    void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties(), getActiveServices()])
-      .then(([estimateRows, clientRows, propertyRows, serviceRows]) => { if (active) { setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(serviceRows); } })
+    void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties(), getServiceCatalog()])
+      .then(([estimateRows, clientRows, propertyRows, bundle]) => { if (active) { setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(bundle.services);setCatalog(bundle); } })
       .catch((caught: unknown) => { console.error("Walkthrough relationship data failed to load", caught); if (active) setError(message(caught, "Estimate, client, or property information could not be loaded.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -62,9 +64,11 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const division = selectedEstimate?.division ?? selectedProperty?.property_type ?? selectedClient?.client_type ?? "Residential";
   const filteredEstimates = useMemo(() => { const term = estimateSearch.trim().toLocaleLowerCase(); return estimates.filter((item) => !term || [item.estimate_number, displayClient(item.client), item.property?.address||"Deleted Property", item.service_name].filter(Boolean).join(" ").toLocaleLowerCase().includes(term)); }, [estimateSearch, estimates]);
   const clientProperties = properties.filter((item) => item.client_id === clientId);
+  const catalogService=catalog?findCatalogService(catalog.services,division,measurements.serviceType):undefined;
+  const availableAddons=catalog&&catalogService?addonsForService(catalog,catalogService.id):[];
 
-  function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>({...current,serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription??""})); } }
-  function chooseService(serviceId:string){const service=services.find(item=>item.id===serviceId);if(service)setMeasurements(current=>({...current,serviceType:service.service_name,serviceDescription:service.description?.trim()??""}))}
+  function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>({...current,serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription??"",catalogAddons:found.result.catalogAddons??[]})); } }
+  function chooseService(serviceId:string){const service=services.find(item=>item.id===serviceId);if(service)setMeasurements(current=>({...current,serviceType:service.service_name,serviceDescription:service.description?.trim()??"",catalogAddons:[]}))}
   function chooseClient(id: string) { setClientId(id); setPropertyId(""); }
   function addScope(label: string) { if (label.trim() && !scope.some((item) => item.label.toLocaleLowerCase() === label.trim().toLocaleLowerCase())) setScope([...scope, { id: crypto.randomUUID(), label: label.trim() }]); setCustomScope(""); }
   function addRecommendation(text: string) { if (text.trim() && !recommendations.some((item) => item.text.toLocaleLowerCase() === text.trim().toLocaleLowerCase())) setRecommendations([...recommendations, { id: crypto.randomUUID(), text: text.trim() }]); setCustomRecommendation(""); }
@@ -91,6 +95,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
       <Panel title="Walkthrough Schedule"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Text label="Date" type="date" value={date} set={setDate} required /><Text label="Time" type="time" value={time} set={setTime} required /><Text label="Assigned To" value={assignedTo} set={setAssignedTo} /><Select label="Status" value={status} set={(value) => setStatus(value as WalkthroughStatus)} options={WALKTHROUGH_STATUSES.map((item) => ({ value: item, label: item }))} placeholder="Status" /></div><label className="mt-4 block"><Label text="Notes" /><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputClass} /></label></Panel>
       <Panel title="Service"><div className="grid gap-4 sm:grid-cols-2"><Select label="Service Type" value={services.find(item=>item.service_name===measurements.serviceType)?.id??""} set={chooseService} options={services.filter(item=>item.division===division||item.division==="Both").map(item=>({value:item.id,label:item.service_name}))} placeholder={measurements.serviceType||"Select service"}/><div><Label text="Service Description"/><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{measurements.serviceDescription||"No service description available."}</div></div></div></Panel>
       <Assessment division={division} value={measurements} set={setMeasurements} />
+      <Panel title="Catalog Add-Ons"><CatalogAddonPicker addons={availableAddons} selected={(measurements.catalogAddons??[]).map(item=>item.name)} setSelected={names=>setMeasurements(current=>({...current,catalogAddons:names.map(name=>availableAddons.find(addon=>addon.addon_name===name)).filter((addon):addon is NonNullable<typeof addon>=>Boolean(addon)).map(addon=>({id:addon.id,catalogAddonId:addon.id,name:addon.addon_name,description:addon.description,price:addon.price,pricingModel:addon.pricing_model,unitLabel:addon.unit_label}))}))}/></Panel>
       <ListEditor title="Scope" presets={scopeOptions} items={scope.map((item) => ({ id: item.id, text: item.label }))} custom={customScope} setCustom={setCustomScope} add={addScope} remove={(id) => setScope(scope.filter((item) => item.id !== id))} />
       <ListEditor title="Recommendations" presets={recommendationOptions} items={recommendations} custom={customRecommendation} setCustom={setCustomRecommendation} add={addRecommendation} remove={(id) => setRecommendations(recommendations.filter((item) => item.id !== id))} />
       {walkthrough ? <PhotoUploader recordType="walkthroughs" recordId={walkthrough.id} categories={photoCategories} title="Walkthrough Photos" readonly={!canWritePhotos} canDelete={canWritePhotos} /> : <Panel title="Walkthrough Photos"><div className="rounded-xl border border-dashed border-[#143d1a]/20 bg-[#f8faf7] px-6 py-8 text-center"><p className="text-sm font-bold text-[#143d1a]">Save this Walkthrough before adding photos</p><p className="mt-1 text-sm text-neutral-500">A saved Walkthrough UUID is required by private Storage authorization. Reopen the saved Walkthrough to take or upload photos.</p></div></Panel>}

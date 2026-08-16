@@ -1,6 +1,6 @@
 import type { Client } from "@/types/client";
 import type { Property } from "@/types/property";
-import type { Proposal, ProposalScopeItem } from "@/types/proposal";
+import type { Proposal, ProposalAdjustment, ProposalScopeItem } from "@/types/proposal";
 import type { Crew } from "@/types/crew";
 
 export const AGREEMENT_STATUSES = ["Draft", "Sent", "Accepted", "Active", "Paused", "Completed", "Cancelled", "Expired", "Archived"] as const;
@@ -24,6 +24,7 @@ export type AgreementPricingSnapshot = {
   final_per_visit_price: number;
   estimated_monthly_total: number | null;
   captured_at: string;
+  catalog_addons?: ProposalAdjustment[];
 };
 export type ServiceAgreement = {
   id: string; agreement_number: string; client_id: string | null; property_id: string | null; proposal_id: string | null;

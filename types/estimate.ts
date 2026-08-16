@@ -1,5 +1,6 @@
 import type { Client } from "@/types/client";
 import type { Property } from "@/types/property";
+import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
@@ -20,7 +21,7 @@ export type CustomerInformation = {
   zip: string;
 };
 
-export type PriceAdjustment = { label: string; amount: number };
+export type PriceAdjustment = { label: string; amount: number; catalogAddonId?:string; description?:string|null; pricingModel?:string; unitLabel?:string|null };
 
 export type ResidentialCalculatorInput = {
   division: "Residential";
@@ -63,6 +64,7 @@ export type EstimateResult = {
   serviceDescription: string | null;
   basePrice: number;
   adjustments: PriceAdjustment[];
+  catalogAddons?: CatalogAddonSnapshot[];
   oneTimePrice: number;
   recurringDiscount: number;
   recurringDiscountPercent: number;

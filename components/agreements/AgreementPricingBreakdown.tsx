@@ -13,7 +13,7 @@ export function AgreementPricingBreakdown({ pricing }: { pricing: AgreementPrici
     ["Final Per-Visit Price", money(pricing.final_per_visit_price)],
     ["Estimated Monthly Total", pricing.estimated_monthly_total === null ? "Not applicable" : money(pricing.estimated_monthly_total)],
   ];
-  return <section className="mt-6 rounded-xl border border-[#d4af37]/50 bg-[#fffdf5] p-5"><h3 className="font-extrabold text-[#143d1a]">Pricing Breakdown</h3><dl className="mt-3 divide-y divide-[#143d1a]/10">{rows.map(([label,value])=><div key={label} className="flex justify-between gap-5 py-2 text-sm"><dt className="text-neutral-600">{label}</dt><dd className="text-right font-bold">{value}</dd></div>)}</dl></section>;
+  return <section className="mt-6 rounded-xl border border-[#d4af37]/50 bg-[#fffdf5] p-5"><h3 className="font-extrabold text-[#143d1a]">Pricing Breakdown</h3>{Boolean(pricing.catalog_addons?.length)&&<div className="mt-3 space-y-2"><p className="text-xs font-bold uppercase tracking-wide text-[#9a7a17]">Accepted Add-Ons</p>{pricing.catalog_addons?.map(item=><div key={item.catalogAddonId??item.id} className="flex justify-between gap-4 text-sm"><span>{item.label}</span><b>{money(item.amount)}</b></div>)}</div>}<dl className="mt-3 divide-y divide-[#143d1a]/10">{rows.map(([label,value])=><div key={label} className="flex justify-between gap-5 py-2 text-sm"><dt className="text-neutral-600">{label}</dt><dd className="text-right font-bold">{value}</dd></div>)}</dl></section>;
 }
 const money=(value:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value);
 const number=(value:number)=>new Intl.NumberFormat("en-US",{maximumFractionDigits:2}).format(value);

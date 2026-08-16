@@ -18,6 +18,7 @@ export function proposalAgreementPricing(proposal: ProposalWithRelations): Agree
     taxes: (estimate?.taxes ?? 0) + proposal.result.taxes,
     final: proposal.result.perVisitTotal,
     monthly: proposal.result.monthlyTotal,
+    catalogAddons:proposal.result.adjustments.filter(item=>item.catalogAddonId),
   });
 }
 
@@ -30,7 +31,7 @@ export function catalogAgreementPricing(input: { standardPrice:number; frequency
   return make({ source:"Service Catalog", standard:input.standardPrice, frequency:input.frequency, frequencyDiscount:recurring.discount, frequencyPercent:recurring.percent, customDiscount, taxes, final, monthly:estimatedMonthlyTotal(final,input.frequency) });
 }
 
-function make(values:{source:AgreementPricingSnapshot["source"];standard:number;frequency:AgreementFrequency;frequencyDiscount:number;frequencyPercent:number;customDiscount:number;taxes:number;final:number;monthly:number|null}):AgreementPricingSnapshot {
-  return { source:values.source, standard_service_price:round(values.standard), frequency:values.frequency, frequency_discount_label:`${values.frequency} Service Discount`, frequency_discount_percent:round(values.frequencyPercent), frequency_discount_amount:round(values.frequencyDiscount), price_after_frequency_discount:round(Math.max(0,values.standard-values.frequencyDiscount)), custom_discount_amount:round(values.customDiscount), taxes:round(values.taxes), final_per_visit_price:round(values.final), estimated_monthly_total:values.monthly===null?null:round(values.monthly), captured_at:new Date().toISOString() };
+function make(values:{source:AgreementPricingSnapshot["source"];standard:number;frequency:AgreementFrequency;frequencyDiscount:number;frequencyPercent:number;customDiscount:number;taxes:number;final:number;monthly:number|null;catalogAddons?:AgreementPricingSnapshot["catalog_addons"]}):AgreementPricingSnapshot {
+  return { source:values.source, standard_service_price:round(values.standard), frequency:values.frequency, frequency_discount_label:`${values.frequency} Service Discount`, frequency_discount_percent:round(values.frequencyPercent), frequency_discount_amount:round(values.frequencyDiscount), price_after_frequency_discount:round(Math.max(0,values.standard-values.frequencyDiscount)), custom_discount_amount:round(values.customDiscount), taxes:round(values.taxes), final_per_visit_price:round(values.final), estimated_monthly_total:values.monthly===null?null:round(values.monthly), captured_at:new Date().toISOString(),catalog_addons:values.catalogAddons??[] };
 }
 const round=(value:number)=>Math.round(Number(value||0)*100)/100;

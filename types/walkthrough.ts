@@ -2,6 +2,7 @@ import type { Client } from "@/types/client";
 import type { Estimate, EstimateDivision, EstimateWithRelations } from "@/types/estimate";
 import type { Property } from "@/types/property";
 import type { OperationalPhoto } from "@/types/photo";
+import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 
 export const WALKTHROUGH_STATUSES = ["New", "Scheduled", "Completed", "Proposal Ready", "Archived"] as const;
 export type WalkthroughStatus = (typeof WALKTHROUGH_STATUSES)[number];
@@ -12,6 +13,7 @@ export type WalkthroughPhoto = OperationalPhoto;
 export type WalkthroughMeasurements = {
   serviceType: string;
   serviceDescription: string;
+  catalogAddons?: CatalogAddonSnapshot[];
   requestSource: "Public Estimate" | null;
   requestedAt: string | null;
   preferredContactMethod: WalkthroughContactMethod | null;
