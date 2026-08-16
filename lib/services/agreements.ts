@@ -187,6 +187,8 @@ export function monthlyRecurringRevenue(a: ServiceAgreement) {
   return estimatedMonthlyAmount(a);
 }
 export function estimatedMonthlyAmount(a: ServiceAgreement) {
+  if (a.pricing_snapshot?.estimated_monthly_total !== null && a.pricing_snapshot?.estimated_monthly_total !== undefined)
+    return a.pricing_snapshot.estimated_monthly_total;
   if (a.billing_type === "Monthly") return a.billing_amount;
   if (a.billing_type === "Weekly") return (a.billing_amount * 52) / 12;
   if (a.billing_type === "Biweekly") return (a.billing_amount * 26) / 12;
@@ -194,6 +196,8 @@ export function estimatedMonthlyAmount(a: ServiceAgreement) {
     const visits =
       a.frequency === "Weekly"
         ? 52 / 12
+        : a.frequency === "Daily"
+          ? 365 / 12
         : a.frequency === "Biweekly"
           ? 26 / 12
           : a.frequency === "Every 4 Weeks"
