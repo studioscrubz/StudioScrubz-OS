@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/services/dashboard";
 import { completeJob, startJob } from "@/lib/services/jobs";
-import type { DashboardData } from "@/types/dashboard";
+import type { DashboardData, DashboardRecentActivity } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
 import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -25,6 +26,7 @@ export function DashboardPage() {
       );
     }
   }
+  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "service_occurrences"], load);
   useEffect(() => {
     let active = true;
     void getDashboardData()
@@ -142,7 +144,6 @@ export function DashboardPage() {
             {hasPermission(profile, "jobs.view") && <JobPipeline data={data} />}
             {hasPermission(profile, "crews.view") && <CrewStatus data={data} />}
             {hasPermission(profile, "schedule.view") && <SchedulePreview data={data} />}
-            <Recent rows={data.recent} />
           </section>
         </>
       )}
@@ -373,7 +374,7 @@ function PreviewGroup({
     </div>
   );
 }
-function Recent({ rows }: { rows: DashboardData["recent"] }) {
+function Recent({ rows }: { rows: DashboardRecentActivity[] }) {
   return (
     <Panel title="Recent Activity" className="xl:col-span-2">
       {rows.length ? (

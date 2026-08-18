@@ -18,6 +18,7 @@ import { JobLaborSummary } from "@/components/time/JobLaborSummary";
 import type { CrewWithRelations } from "@/types/crew";
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
 import type { JobPhotoCategory } from "@/types/photo";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import {
   type JobStatus,
   type JobWithRelations,
@@ -57,6 +58,7 @@ export function JobsPage() {
   async function load() {
     setRows(await getJobs());
   }
+  useOperationalRealtime(["jobs", "invoices", "service_occurrences"], load);
   useEffect(() => {
     let active = true;
     void getJobs()

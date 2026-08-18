@@ -24,9 +24,14 @@ const workflowStatuses: Exclude<JobStatus, "Archived">[] = [
 ];
 export async function getJobs(): Promise<JobWithRelations[]> {
   if (!(await master())) {
-    const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
+    const [{ data, error }, invoicesResult] = await Promise.all([
+      getSupabaseClient().rpc("get_operational_jobs", {}),
+      getSupabaseClient().from("invoices").select("job_id").is("archived_at", null).neq("status", "Cancelled"),
+    ]);
     if (error) throw error;
-    return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived");
+    if (invoicesResult.error) throw invoicesResult.error;
+    const invoiced = new Set((invoicesResult.data ?? []).map((row) => row.job_id));
+    return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived" && (job.status !== "Completed" || !invoiced.has(job.id)));
   }
   const [jobsResult, invoicesResult] = await Promise.all([
     getSupabaseClient().from("jobs").select(select).is("archived_at", null).in("status", workflowStatuses).order("created_at", { ascending: false }),

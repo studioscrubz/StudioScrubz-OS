@@ -42,6 +42,7 @@ import { openDeviceSmsApp } from "@/lib/deviceSms";
 import { clientTokenExpiration, generateSecureClientToken, validClientToken } from "@/lib/secureClientToken";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { ProposalDocument, proposalDeliverySnapshot, proposalDocumentFromRecord } from "./ProposalDocument";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 type Sort =
   | "Newest"
   | "Oldest"
@@ -111,6 +112,7 @@ export function OpenProposalsPage() {
     setJobProposalIds(new Set(proposalIds));
     if (text) setNotice(text);
   }
+  useOperationalRealtime(["proposals", "jobs", "service_agreements"], refresh);
   async function mutate(
     p: ProposalWithRelations,
     fn: () => Promise<unknown>,

@@ -12,6 +12,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import type { AttentionItem, AttentionStateRecord, AttentionSummary, AttentionView } from "@/types/attention";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import type { CommunicationComposerContext } from "@/types/clientCommunication";
+import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
   const profile = await getCurrentProfile();
@@ -30,6 +31,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   const clock = businessClock(settings?.timezone ?? null);
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
+  const routedProposalIds = new Set([...jobs.map((row) => row.proposal_id), ...agreements.map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
 
   for (const walkthrough of walkthroughs.filter((row) => row.status === "New" && !row.walkthrough_date && !row.archived_at && row.measurements.requestSource === "Public Estimate")) {
     const requestedAt = walkthrough.measurements.requestedAt ?? walkthrough.created_at;
@@ -43,6 +45,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 
   for (const job of jobs) {
     const label = job.job_number;
+    if (job.status === "Completed") items.push(item(`job:${job.id}:invoice`, "Completed Job Needs Invoice", "Urgent", "Invoices", "Completed job needs an invoice", `${label} - ${job.service_name || "Service"} - ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Create Invoice"));
     if (job.status === "Ready to Schedule" && !job.scheduled_date) items.push(item(`job:${job.id}:unscheduled`, "Unscheduled Job", "Attention", "Jobs", "Job needs scheduling", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, null, job.created_at, `/jobs?jobId=${job.id}`, "Schedule Job"));
     if (["Scheduled", "Ready to Schedule"].includes(job.status) && job.scheduled_date && !job.assigned_crew_id) items.push(item(`job:${job.id}:crew`, "Job Needs Crew", "Attention", "Jobs", "Job needs crew assignment", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Assign Crew"));
     if (job.scheduled_date && job.scheduled_date >= today && job.scheduled_date <= inSeven && !["Completed", "Cancelled", "Archived"].includes(job.status) && !job.archived_at) items.push(item(`job:${job.id}:upcoming`, "Upcoming Job", "Info", "Jobs", "Upcoming job", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
@@ -52,6 +55,10 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     }
   }
   for (const proposal of proposals.filter((row) => !row.archived_at && row.status !== "Archived")) {
+    if (proposal.status === "Accepted" && proposal.accepted && !routedProposalIds.has(proposal.id)) {
+      const recurring = isRecurringFrequency(proposal.frequency);
+      items.push(item(`proposal:${proposal.id}:route`, "Accepted Proposal Needs Routing", "Urgent", "Proposals", recurring ? "Accepted proposal needs a Service Agreement" : "Accepted proposal needs a Job", `${proposal.proposal_number} - ${proposal.client_name || "Deleted Client"}`, "Proposal", proposal.id, proposal.client_id, proposal.proposal_number, null, null, proposal.accepted_at ?? proposal.created_at, `/open-proposals?proposalId=${proposal.id}`, recurring ? "Create Agreement" : "Create Job"));
+    }
     if (proposal.approval_status === "Pending Approval") items.push(item(`proposal:${proposal.id}:approval`, "Proposal Awaiting Approval", "Attention", "Proposals", "Proposal awaiting approval", `${proposal.proposal_number} · ${proposal.client_name || "Deleted Client"}`, "Proposal", proposal.id, proposal.client_id, proposal.proposal_number, null, null, proposal.created_at, `/open-proposals?proposalId=${proposal.id}`, "Review Proposal"));
     if (proposal.approval_status === "Approved" && ["Approved", "Sent", "Viewed"].includes(proposal.status) && !proposal.accepted) items.push(item(`proposal:${proposal.id}:client`, "Proposal Awaiting Client", "Attention", "Proposals", "Proposal awaiting client acceptance", `${proposal.proposal_number} · ${proposal.client_name || "Deleted Client"}${lastFollowup(communications, "proposal_id", proposal.id)}`, "Proposal", proposal.id, proposal.client_id, proposal.proposal_number, proposal.expiration_date, null, proposal.created_at, `/open-proposals?proposalId=${proposal.id}`, "Open Proposal", composer({ clientId: proposal.client_id, propertyId: proposal.property_id, proposalId: proposal.id, communicationType: "Proposal", client: proposal.client, fallbackName: proposal.client_name, email: proposal.customer_email ?? proposal.client?.email, phone: proposal.customer_phone ?? proposal.client?.phone, subject: `Follow-Up: StudioScrubz Proposal ${proposal.proposal_number}`, message: `Hello ${greeting(proposal.client, proposal.client_name)},\n\nWe wanted to follow up regarding your StudioScrubz proposal for ${proposal.result.serviceName}.\n\nPlease let us know if you have any questions or would like to move forward.\n\nThank you,\nStudioScrubz`, sourceType: "Proposal", sourceId: proposal.id, metadata: { proposal_number: proposal.proposal_number } })));
   }

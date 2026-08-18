@@ -4,9 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useEffect } from "react";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
+import { getAttentionSummary } from "@/lib/services/attention";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 type NavLink = { label: string; href: string; marker: string; permission: Permission };
 type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
@@ -92,6 +95,18 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const auth = useAuth();
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [attentionCount, setAttentionCount] = useState(0);
+  async function loadAttentionCount() {
+    if (!hasPermission(auth.profile, "attention.view")) return setAttentionCount(0);
+    setAttentionCount((await getAttentionSummary()).total);
+  }
+  useEffect(() => {
+    let active = true;
+    if (!hasPermission(auth.profile, "attention.view")) return;
+    void getAttentionSummary().then((summary) => { if (active) setAttentionCount(summary.total); }).catch((cause) => console.error("Attention badge load failed", cause));
+    return () => { active = false; };
+  }, [auth.profile]);
+  useOperationalRealtime(["walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "service_occurrences"], loadAttentionCount);
   const visibleItems = navItems.reduce<Array<NavLink | NavGroup>>((items, item) => {
     if (!isGroup(item)) return hasPermission(auth.profile, item.permission) ? [...items, item] : items;
     if (item.permission && !hasPermission(auth.profile, item.permission)) return items;
@@ -137,7 +152,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                   </button>
                   {open && (
                     <ul className="mb-2 ml-[27px] mt-1 space-y-0.5 border-l border-white/15 pl-3">
-                      {item.children.map((child) => <NavItem key={child.href} item={child} active={child.href === pathname} onNavigate={onClose} />)}
+                      {item.children.map((child) => <NavItem key={child.href} item={child} active={child.href === pathname} onNavigate={onClose} badge={child.href === "/attention" ? attentionCount : undefined} />)}
                     </ul>
                   )}
                 </li>
@@ -164,7 +179,7 @@ function NavMarker({ value }: { value: string }) {
   return <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[.06] text-[10px] font-extrabold text-[#d4af37]">{value}</span>;
 }
 
-function NavItem({ item, active, onNavigate }: { item: NavLink; active: boolean; onNavigate: () => void }) {
+function NavItem({ item, active, onNavigate, badge }: { item: NavLink; active: boolean; onNavigate: () => void; badge?: number }) {
   return (
     <li>
       <Link
@@ -175,6 +190,7 @@ function NavItem({ item, active, onNavigate }: { item: NavLink; active: boolean;
       >
         {item.marker && <NavMarker value={item.marker} />}
         <span>{item.label}</span>
+        {Boolean(badge) && <span className="ml-auto min-w-6 rounded-full bg-[#d4af37] px-1.5 py-0.5 text-center text-[10px] font-extrabold text-[#143d1a]">{badge}</span>}
       </Link>
     </li>
   );

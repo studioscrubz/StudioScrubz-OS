@@ -6,6 +6,7 @@ import { archiveWalkthrough, getWalkthroughs, updateWalkthroughStatus } from "@/
 import type { EstimateDivision } from "@/types/estimate";
 import { WALKTHROUGH_STATUSES, type WalkthroughStatus, type WalkthroughWithRelations } from "@/types/walkthrough";
 import { ProposalLinkSummary } from "@/components/proposals/ProposalLinkSummary";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 type DivisionFilter = "All" | EstimateDivision;
 type StatusFilter = "All" | WalkthroughStatus;
@@ -40,6 +41,7 @@ export function WalkthroughsPage() {
   const filtered = useMemo(() => { const term = search.trim().toLocaleLowerCase(); const today = localDate(); return walkthroughs.filter((item) => { const haystack = [displayClient(item.client), item.property?.address||"Deleted Property", item.estimate?.estimate_number, item.phone, item.email, item.assigned_to].filter(Boolean).join(" ").toLocaleLowerCase(); const dateMatch = dateFilter === "All" || (dateFilter === "Today" && item.walkthrough_date === today) || (dateFilter === "Upcoming" && Boolean(item.walkthrough_date && item.walkthrough_date > today)) || (dateFilter === "Past" && Boolean(item.walkthrough_date && item.walkthrough_date < today)); return !item.archived_at && item.status !== "Archived" && (!term || haystack.includes(term)) && (division === "All" || item.division === division) && (status === "All" || item.status === status) && dateMatch; }); }, [dateFilter, division, search, status, walkthroughs]);
 
   async function refresh(text?: string) { const rows = await getWalkthroughs(); setWalkthroughs(rows); if (text) setNotice(text); }
+  useOperationalRealtime(["walkthroughs", "proposals"], refresh);
   async function changeStatus(item: WalkthroughWithRelations, nextStatus: WalkthroughStatus) { setUpdatingId(item.id); setError(null); try { await updateWalkthroughStatus(item.id, nextStatus); await refresh(`Walkthrough moved to ${nextStatus}.`); } catch (caught) { console.error("Walkthrough status update failed", caught); setError(message(caught, "The walkthrough status could not be updated.")); } finally { setUpdatingId(null); } }
   async function archiveItem(item: WalkthroughWithRelations) { if (!window.confirm("Archive this walkthrough?")) return; setUpdatingId(item.id); try { await archiveWalkthrough(item.id); await refresh("Walkthrough archived successfully."); } catch (caught) { console.error("Walkthrough archive failed", caught); setError(message(caught, "The walkthrough could not be archived.")); } finally { setUpdatingId(null); } }
 

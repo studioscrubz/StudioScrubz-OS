@@ -13,6 +13,7 @@ import type {
 } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
+import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 export async function getFinancialOperationalMetrics() {
   const { data, error } = await getSupabaseClient()
     .from("invoices")
@@ -86,7 +87,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     estimate,
     jobs,
     crews,
-    recent,
     attention,
     invoiceAttention,
     preview,
@@ -99,7 +99,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     getEstimateMetrics(),
     getJobPipelineMetrics(),
     getCrewStatus(),
-    getRecentActivity(),
     getAttentionItems(),
     getInvoiceAttentionItems(),
     getSchedulePreview(),
@@ -112,7 +111,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     estimate,
     jobs,
     crews,
-    recent,
     attention: [...attention, ...invoiceAttention].slice(0, 12),
     preview,
   };
@@ -123,9 +121,10 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const queries = [
     db
       .from("estimates")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("status", "Open")
       .is("archived_at", null),
+    db.from("walkthroughs").select("estimate_id").not("estimate_id", "is", null),
     db
       .from("walkthroughs")
       .select("id", { count: "exact", head: true })
@@ -147,7 +146,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       .from("jobs")
       .select("id", { count: "exact", head: true })
       .eq("scheduled_date", today)
-      .not("status", "in", "(Cancelled,Archived)")
+      .not("status", "in", "(Completed,Cancelled,Archived)")
       .is("archived_at", null),
     db
       .from("time_entries")
@@ -160,11 +159,11 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const failed = results.find((r) => r.error);
   if (failed?.error) throw failed.error;
   return {
-    openEstimates: results[0].count ?? 0,
-    upcomingWalkthroughs: results[1].count ?? 0,
-    pendingProposals: results[2].count ?? 0,
-    jobsToday: results[3].count ?? 0,
-    employeesClockedIn: results[4].count ?? 0,
+    openEstimates: activeEstimateCount(results[0].data as { id: string }[] | null, results[1].data as { estimate_id: string | null }[] | null),
+    upcomingWalkthroughs: results[2].count ?? 0,
+    pendingProposals: results[3].count ?? 0,
+    jobsToday: results[4].count ?? 0,
+    employeesClockedIn: results[5].count ?? 0,
   };
 }
 export async function getTodaysJobs() {
@@ -172,7 +171,7 @@ export async function getTodaysJobs() {
     .from("jobs")
     .select(jobSelect)
     .eq("scheduled_date", localDate())
-    .not("status", "in", "(Cancelled,Archived)")
+    .not("status", "in", "(Completed,Cancelled,Archived)")
     .order("start_time");
   if (error) throw error;
   return data as JobWithRelations[];
@@ -216,9 +215,10 @@ export async function getEstimateMetrics(): Promise<DashboardEstimateMetrics> {
   const qs = [
     db
       .from("estimates")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("status", "Open")
       .is("archived_at", null),
+    db.from("walkthroughs").select("estimate_id").not("estimate_id", "is", null),
     db
       .from("estimates")
       .select("id", { count: "exact", head: true })
@@ -239,19 +239,19 @@ export async function getEstimateMetrics(): Promise<DashboardEstimateMetrics> {
   const fail = r.find((x) => x.error);
   if (fail?.error) throw fail.error;
   return {
-    open: r[0].count ?? 0,
-    residential: r[1].count ?? 0,
-    commercial: r[2].count ?? 0,
-    createdThisMonth: r[3].count ?? 0,
+    open: activeEstimateCount(r[0].data as { id: string }[] | null, r[1].data as { estimate_id: string | null }[] | null),
+    residential: r[2].count ?? 0,
+    commercial: r[3].count ?? 0,
+    createdThisMonth: r[4].count ?? 0,
   };
 }
 export async function getJobPipelineMetrics(): Promise<DashboardJobMetrics> {
-  const { data, error } = await getSupabaseClient()
-    .from("jobs")
-    .select("status")
-    .is("archived_at", null);
+  const [{ data, error }, invoicedIds] = await Promise.all([getSupabaseClient()
+    .from("jobs").select("id,status").is("archived_at", null), getInvoicedJobIds()]);
   if (error) throw error;
-  const n = (s: string) => data.filter((x) => x.status === s).length;
+  const invoiced = new Set(invoicedIds);
+  const active = data.filter((x) => !invoiced.has(x.id) && !["Cancelled", "Archived"].includes(x.status));
+  const n = (s: string) => active.filter((x) => x.status === s).length;
   return {
     ready: n("Ready to Schedule"),
     scheduled: n("Scheduled"),
@@ -278,11 +278,12 @@ export async function getAttentionItems(): Promise<DashboardAttentionItem[]> {
     { data: proposals, error: pe },
     { data: jobs, error: je },
     { data: walkthroughs, error: we },
+    { data: agreements, error: ae },
   ] = await Promise.all([
     getJobProposalIds(),
     db
       .from("proposals")
-      .select("id,proposal_number,status,client_name")
+      .select("id,proposal_number,status,client_name,frequency")
       .in("status", ["Ready for Approval", "Accepted", "Expired"])
       .is("archived_at", null),
     db
@@ -301,12 +302,15 @@ export async function getAttentionItems(): Promise<DashboardAttentionItem[]> {
       .eq("walkthrough_date", today)
       .neq("status", "Archived")
       .is("archived_at", null),
+    db.from("service_agreements").select("proposal_id").not("proposal_id", "is", null),
   ]);
   if (pe) throw pe;
   if (je) throw je;
   if (we) throw we;
+  if (ae) throw ae;
   const rows = jobs as JobWithRelations[];
   const jobProposalIds = new Set(jobIds);
+  const agreementProposalIds = new Set((agreements ?? []).map((row) => row.proposal_id));
   const items: DashboardAttentionItem[] = [];
   for (const p of proposals) {
     if (p.status === "Ready for Approval")
@@ -320,14 +324,14 @@ export async function getAttentionItems(): Promise<DashboardAttentionItem[]> {
           "/open-proposals",
         ),
       );
-    if (p.status === "Accepted" && !jobProposalIds.has(p.id))
+    if (p.status === "Accepted" && !jobProposalIds.has(p.id) && !agreementProposalIds.has(p.id))
       items.push(
         item(
           `job-${p.id}`,
           "Proposal",
           p.proposal_number,
-          "Accepted proposal does not have a Job.",
-          "Create Job",
+          isRecurringFrequency(p.frequency) ? "Accepted proposal does not have a Service Agreement." : "Accepted proposal does not have a Job.",
+          isRecurringFrequency(p.frequency) ? "Create Agreement" : "Create Job",
           "/open-proposals",
         ),
       );
@@ -505,7 +509,7 @@ export async function getSchedulePreview() {
     .from("jobs")
     .select(jobSelect)
     .in("scheduled_date", [today, tomorrow])
-    .not("status", "in", "(Cancelled,Archived)")
+    .not("status", "in", "(Completed,Cancelled,Archived)")
     .order("start_time");
   if (error) throw error;
   const rows = data as JobWithRelations[];
@@ -557,4 +561,8 @@ function addDays(date: string, n: number) {
   const d = new Date(`${date}T12:00:00`);
   d.setDate(d.getDate() + n);
   return localDate(d);
+}
+function activeEstimateCount(estimates: { id: string }[] | null, walkthroughs: { estimate_id: string | null }[] | null) {
+  const linked = new Set((walkthroughs ?? []).map((row) => row.estimate_id).filter(Boolean));
+  return (estimates ?? []).filter((row) => !linked.has(row.id)).length;
 }

@@ -2,6 +2,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { getProposalById } from "@/lib/services/proposals";
 import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
+import { getBusinessSettings } from "@/lib/services/businessSettings";
 import { estimatedMonthlyTotal, isRecurringFrequency } from "@/lib/scheduling/frequency";
 import type {
   AgreementFinancialSummary,
@@ -73,7 +74,7 @@ export async function createAgreement(input: AgreementInput) {
   throw new Error("A unique agreement number could not be generated.");
 }
 export async function createAgreementFromProposal(proposalId: string) {
-  const p = await getProposalById(proposalId);
+  const [p, settings] = await Promise.all([getProposalById(proposalId), getBusinessSettings()]);
   if (p.status !== "Accepted" || !isRecurringFrequency(p.frequency))
     throw new Error("Only accepted recurring proposals can create agreements.");
   const pricing = proposalAgreementPricing(p);
@@ -96,7 +97,7 @@ export async function createAgreementFromProposal(proposalId: string) {
     billing_amount: pricing.final_per_visit_price,
     pricing_snapshot: pricing,
     payment_terms: p.result.terms.paymentTerms,
-    agreement_terms: null,
+    agreement_terms: settings.default_service_agreement_terms,
     cancellation_terms: null,
     scope: p.result.scope,
     special_instructions: p.result.terms.accessRequirements,

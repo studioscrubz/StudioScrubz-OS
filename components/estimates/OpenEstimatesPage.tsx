@@ -16,6 +16,7 @@ import { openDeviceSmsApp } from "@/lib/deviceSms";
 import { clientTokenExpiration, generateSecureClientToken, validClientToken } from "@/lib/secureClientToken";
 import { EstimateDocument, estimateDeliverySnapshot, estimateDocumentFromRecord } from "./EstimateDocument";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 type DivisionFilter = "All" | EstimateDivision;
 type StatusFilter = "All" | EstimateStatus;
@@ -57,6 +58,7 @@ export function OpenEstimatesPage() {
   }, [archive, division, estimates, linkedEstimateIds, search, sort, status]);
 
   async function refresh(text?: string) { const [estimateRows, walkthroughRows] = await Promise.all([getEstimates(), getWalkthroughsForEstimates()]); setEstimates(estimateRows); setWalkthroughs(walkthroughRows); if (text) setNotice(text); }
+  useOperationalRealtime(["estimates", "walkthroughs"], refresh);
   async function archiveRecord(estimate: EstimateWithRelations) { if (!window.confirm(`Archive ${estimate.estimate_number}?`)) return; setArchivingId(estimate.id); setError(null); try { await archiveEstimate(estimate.id); await refresh("Estimate archived successfully."); } catch (caught) { console.error("Failed to archive estimate", caught); setError(message(caught, "The estimate could not be archived.")); } finally { setArchivingId(null); } }
   return <>
     <header className="border-b border-[#143d1a]/10 pb-7 sm:pb-8"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">Open Estimates</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">Review and manage saved StudioScrubz estimates.</p></header>
