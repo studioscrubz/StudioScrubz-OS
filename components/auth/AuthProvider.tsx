@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentProfile, signOut as signOutService } from "@/lib/services/auth";
@@ -17,28 +17,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  async function resolve(nextSession: Session | null) {
-    setSession(nextSession); setProfile(null); setError(null);
-    if (!nextSession?.user) { setLoading(false); return; }
+  const userIdRef = useRef<string | null>(null);
+  const profileRef = useRef<UserProfile | null>(null);
+  const resolutionRef = useRef(0);
+  const commitProfile = useCallback((nextProfile: UserProfile | null) => {
+    profileRef.current = nextProfile;
+    setProfile(nextProfile);
+  }, []);
+  const resolveProfile = useCallback(async (nextSession: Session, showLoading: boolean) => {
+    const resolution = ++resolutionRef.current;
+    userIdRef.current = nextSession.user.id;
+    setSession(nextSession);
+    setError(null);
+    if (showLoading) { setLoading(true); commitProfile(null); }
     try {
       const nextProfile = await getCurrentProfile(nextSession.user.id);
-      if (!nextProfile) setError("Your StudioScrubz OS account is not configured. Contact the Master Admin.");
-      else if (!nextProfile.is_active) setError("Your StudioScrubz OS account is inactive.");
-      else setProfile(nextProfile);
-    } catch (cause) { console.error("Profile resolution failed", cause); setError(cause instanceof Error ? cause.message : "Your account could not be verified."); }
-    finally { setLoading(false); }
-  }
+      if (resolution !== resolutionRef.current) return;
+      if (!nextProfile) { commitProfile(null); setError("Your StudioScrubz OS account is not configured. Contact the Master Admin."); }
+      else if (!nextProfile.is_active) { commitProfile(null); setError("Your StudioScrubz OS account is inactive."); }
+      else commitProfile(nextProfile);
+    } catch (cause) {
+      if (resolution !== resolutionRef.current) return;
+      console.error("Profile resolution failed", cause);
+      if (showLoading) {
+        commitProfile(null);
+        setError(cause instanceof Error ? cause.message : "Your account could not be verified.");
+      }
+    } finally { if (resolution === resolutionRef.current && showLoading) setLoading(false); }
+  }, [commitProfile]);
   useEffect(() => {
     const client = getSupabaseClient();
     void client.auth.getSession().then(({ data, error: sessionError }) => {
       if (sessionError) { setError("Your session could not be verified."); setLoading(false); return; }
-      void resolve(data.session);
+      if (!data.session?.user) {
+        userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); return;
+      }
+      void resolveProfile(data.session, true);
     });
-    const { data } = client.auth.onAuthStateChange((_event, nextSession) => { setLoading(true); window.setTimeout(() => void resolve(nextSession), 0); });
+    const { data } = client.auth.onAuthStateChange((event, nextSession) => {
+      window.setTimeout(() => {
+        if (event === "INITIAL_SESSION") return;
+        if (event === "SIGNED_OUT" || !nextSession?.user) {
+          resolutionRef.current += 1; userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); return;
+        }
+        const sameUser = userIdRef.current === nextSession.user.id;
+        if (event === "TOKEN_REFRESHED" || event === "PASSWORD_RECOVERY") {
+          userIdRef.current = nextSession.user.id; setSession(nextSession); return;
+        }
+        if (event === "USER_UPDATED") {
+          if (sameUser && profileRef.current) { setSession(nextSession); void resolveProfile(nextSession, false); }
+          else void resolveProfile(nextSession, true);
+          return;
+        }
+        if (event === "SIGNED_IN" || event === "MFA_CHALLENGE_VERIFIED") {
+          if (sameUser && profileRef.current) { setSession(nextSession); return; }
+          void resolveProfile(nextSession, true);
+        }
+      }, 0);
+    });
     return () => data.subscription.unsubscribe();
-  }, []);
-  async function refreshProfile() { if (session?.user) setProfile(await getCurrentProfile(session.user.id)); }
-  async function logout() { await signOutService(); setSession(null); setProfile(null); }
+  }, [commitProfile, resolveProfile]);
+  async function refreshProfile() { if (session?.user) await resolveProfile(session, false); }
+  async function logout() { await signOutService(); resolutionRef.current += 1; userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); }
   const value: AuthContextValue = { session, user: session?.user ?? null, profile, loading, error, refreshProfile, signOut: logout };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -48,7 +88,8 @@ export function useAuth() { const value = useContext(AuthContext); if (!value) t
 export function ProtectedWorkspace({ children }: { children: ReactNode }) {
   const auth = useAuth(); const router = useRouter(); const pathname = usePathname();
   useEffect(() => { if (!auth.loading && !auth.user) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`); }, [auth.loading, auth.user, pathname, router]);
-  if (auth.loading || !auth.user) return <AuthLoading />;
+  if (auth.loading) return <AuthLoading />;
+  if (!auth.user) return null;
   if (auth.error || !auth.profile) return <AccessBlocked message={auth.error ?? "Your account is not authorized for this version of StudioScrubz OS."} signOut={auth.signOut} />;
   if (pathname !== "/access-denied" && !hasPermission(auth.profile, permissionForPath(pathname))) return <AccessDenied />;
   return <>{children}</>;
