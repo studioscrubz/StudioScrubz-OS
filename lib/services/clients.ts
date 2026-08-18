@@ -10,6 +10,11 @@ export async function getClients(): Promise<Client[]> {
   if (error) throw error;
   return data;
 }
+export async function getClientById(id: string): Promise<Client> {
+  const { data, error } = await getSupabaseClient().from("clients").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data;
+}
 
 export async function createClient(input: ClientInput): Promise<Client> {
   const { data, error } = await getSupabaseClient().from("clients").insert(input).select().single();

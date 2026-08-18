@@ -76,6 +76,19 @@ export type JobInsert = Omit<
 export type JobUpdate = Partial<
   Omit<Job, "id" | "job_number" | "proposal_id" | "created_at" | "updated_at">
 >;
+export type DirectJobInput = {
+  client_id: string;
+  property_id: string;
+  service_id: string;
+  addon_ids: string[];
+  scheduled_date: string | null;
+  start_time: string | null;
+  estimated_duration: number | null;
+  assigned_crew_id: string | null;
+  labor_hours: number;
+  access_instructions: string | null;
+  internal_notes: string | null;
+};
 export type JobWithRelations = Job & {
   proposal: Proposal | null;
   client: Client | null;

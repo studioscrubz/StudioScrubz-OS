@@ -12,6 +12,11 @@ export async function getProperties(): Promise<PropertyWithClient[]> {
   if (error) throw error;
   return data as PropertyWithClient[];
 }
+export async function getPropertyById(id: string): Promise<Property> {
+  const { data, error } = await getSupabaseClient().from("properties").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data;
+}
 
 export async function getPropertyClients(): Promise<Client[]> {
   const { data, error } = await getSupabaseClient()

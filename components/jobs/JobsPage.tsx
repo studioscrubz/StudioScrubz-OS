@@ -19,6 +19,7 @@ import type { CrewWithRelations } from "@/types/crew";
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
 import type { JobPhotoCategory } from "@/types/photo";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { DirectJobModal } from "@/components/jobs/DirectJobModal";
 import {
   type JobStatus,
   type JobWithRelations,
@@ -55,6 +56,7 @@ export function JobsPage() {
   const [sort, setSort] = useState<Sort>("Newest");
   const [selected, setSelected] = useState<JobWithRelations | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   async function load() {
     setRows(await getJobs());
   }
@@ -162,7 +164,7 @@ export function JobsPage() {
   ] as const;
   return (
     <>
-      <Header />
+      <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
       <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-5">
@@ -241,6 +243,7 @@ export function JobsPage() {
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
+      {creating && <DirectJobModal close={() => setCreating(false)} created={async () => { setCreating(false); await load(); setNotice("Job created successfully."); }} />}
     </>
   );
 }
@@ -473,9 +476,10 @@ function JobModal({
     </Modal>
   );
 }
-function Header() {
+function Header({ canCreate, create }: { canCreate: boolean; create: () => void }) {
   return (
-    <header className="border-b border-[#143d1a]/10 pb-7">
+    <header className="flex flex-col gap-5 border-b border-[#143d1a]/10 pb-7 sm:flex-row sm:items-end sm:justify-between">
+      <div>
       <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">
         Operations workspace
       </p>
@@ -483,6 +487,8 @@ function Header() {
       <p className="mt-3 text-neutral-600">
         Manage active StudioScrubz service jobs.
       </p>
+      </div>
+      {canCreate && <button type="button" onClick={create} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)]">Create Job</button>}
     </header>
   );
 }

@@ -4,13 +4,21 @@ import type {
   CrewConflict,
   Job,
   JobStatus,
+  JobInsert,
   JobUpdate,
   JobWithRelations,
+  DirectJobInput,
 } from "@/types/job";
 import type { CrewWithRelations } from "@/types/crew";
 import { employeeName } from "@/types/employee";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { isMasterAdmin } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/auth/permissions";
+import { getClientById } from "@/lib/services/clients";
+import { getPropertyById } from "@/lib/services/properties";
+import { getServiceCatalog, getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
+import { getCrewById } from "@/lib/services/crews";
+import { calculateAddons, calculateServicePrice } from "@/lib/pricing/pricingEngine";
 
 const select =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
@@ -173,6 +181,58 @@ export async function createJobFromProposal(
     throw error;
   }
   throw new Error("A unique job number could not be generated.");
+}
+export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
+  const profile = await getCurrentProfile();
+  if (!hasPermission(profile, "jobs.create")) throw new Error("You do not have permission to create Jobs.");
+  const [client, property, catalog, crew] = await Promise.all([
+    getClientById(input.client_id),
+    getPropertyById(input.property_id),
+    getServiceCatalog(),
+    input.assigned_crew_id ? getCrewById(input.assigned_crew_id) : Promise.resolve(null),
+  ]);
+  if (client.archived_at) throw new Error("Select an active Client.");
+  if (property.archived_at || property.client_id !== client.id) throw new Error("The selected Property does not belong to the selected Client.");
+  const service = catalog.services.find((row) => row.id === input.service_id);
+  if (!service) throw new Error("Select an active Service Catalog service.");
+  const division = property.property_type;
+  if (service.division !== "Both" && service.division !== division) throw new Error("The selected Service is not available for this Property division.");
+  const availableAddons = getAvailableServiceAddons(catalog, service.id, division);
+  const selectedAddons = input.addon_ids.map((id) => availableAddons.find((row) => row.id === id));
+  if (selectedAddons.some((row) => !row)) throw new Error("One or more selected Add-Ons are not available for this Service.");
+  const quantity = property.square_feet && property.square_feet > 0 ? property.square_feet : 1;
+  const basePrice = calculateServicePrice(service, quantity, catalog.tiers);
+  if (basePrice == null) throw new Error("This Service uses custom pricing and cannot be used for a direct Job without configured catalog pricing.");
+  const addonAdjustments = calculateAddons(selectedAddons.map((row) => row!.addon_name), availableAddons);
+  const price = Math.round((basePrice + addonAdjustments.reduce((sum, row) => sum + row.amount, 0)) * 100) / 100;
+  const scheduled = Boolean(input.scheduled_date);
+  const status: JobStatus = scheduled ? (crew ? "Crew Assigned" : "Scheduled") : "Ready to Schedule";
+  const scope = [
+    ...(service.description ? [{ id: crypto.randomUUID(), text: service.description }] : []),
+    ...selectedAddons.map((addon) => ({ id: crypto.randomUUID(), text: `Add-On: ${addon!.addon_name}${addon!.description ? ` — ${addon!.description}` : ""}` })),
+  ];
+  const payload: JobInsert = {
+    proposal_id: null, estimate_id: null, walkthrough_id: null, service_occurrence_id: null,
+    client_id: client.id, property_id: property.id, division,
+    client_name: client.company_name || [client.first_name, client.last_name].filter(Boolean).join(" ") || "Client",
+    property_name: property.property_name || property.address, service_name: service.service_name,
+    frequency: "One-Time", status, scheduled_date: input.scheduled_date,
+    start_time: input.scheduled_date ? input.start_time : null,
+    estimated_duration: input.estimated_duration, assigned_crew_id: crew?.id ?? null,
+    assigned_crew_name: crew?.crew_name ?? null,
+    crew_lead_name: crew?.crew_lead ? employeeName(crew.crew_lead) : null,
+    assigned_team: crew?.members.map((member) => employeeName(member.employee)) ?? [],
+    price, deposit: 0, balance: price, labor_hours: Math.max(0, input.labor_hours),
+    recommended_crew_size: Math.max(crew?.members.length ?? 1, 1), scope, checklist: [], photos: [],
+    access_instructions: input.access_instructions || property.access_instructions || null,
+    internal_notes: input.internal_notes, completed_at: null,
+  };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await getSupabaseClient().from("jobs").insert({ ...payload, job_number: jobNumber() }).select(select).single();
+    if (!error) return data as JobWithRelations;
+    if (error.code !== "23505") throw error;
+  }
+  throw new Error("A unique Job number could not be generated.");
 }
 export async function updateJob(id: string, input: JobUpdate): Promise<Job> {
   if (!(await master())) {
