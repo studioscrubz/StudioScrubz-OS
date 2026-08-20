@@ -9,21 +9,10 @@ import type {
   DashboardJobMetrics,
   DashboardMetrics,
   DashboardProposalMetrics,
-  DashboardRecentActivity,
 } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
-export async function getFinancialOperationalMetrics() {
-  const { data, error } = await getSupabaseClient()
-    .from("invoices")
-    .select("status")
-    .is("archived_at", null);
-  if (error) throw error;
-  return {
-    pastDueInvoices: (data ?? []).filter((x) => x.status === "Past Due").length,
-  };
-}
 export async function getInvoiceAttentionItems(): Promise<
   DashboardAttentionItem[]
 > {
@@ -80,7 +69,6 @@ const walkthroughSelect =
 export async function getDashboardData(): Promise<DashboardData> {
   const [
     metrics,
-    financial,
     todaysJobs,
     upcomingWalkthroughs,
     proposal,
@@ -92,7 +80,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     preview,
   ] = await Promise.all([
     getDashboardMetrics(),
-    getFinancialOperationalMetrics(),
     getTodaysJobs(),
     getUpcomingWalkthroughs(),
     getProposalPipelineMetrics(),
@@ -104,7 +91,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     getSchedulePreview(),
   ]);
   return {
-    metrics: { ...metrics, ...financial },
+    metrics,
     todaysJobs,
     upcomingWalkthroughs,
     proposal,
@@ -118,7 +105,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const db = getSupabaseClient();
   const today = localDate();
-  const queries = [
+  const [estimatesResult, linkedWalkthroughsResult, walkthroughsResult, proposalsResult, routedJobsResult, routedAgreementsResult, jobsResult, invoicesResult, timeEntriesResult] = await Promise.all([
     db
       .from("estimates")
       .select("id")
@@ -129,41 +116,54 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       .from("walkthroughs")
       .select("id", { count: "exact", head: true })
       .gte("walkthrough_date", today)
-      .neq("status", "Archived")
+      .eq("status", "Scheduled")
       .is("archived_at", null),
     db
       .from("proposals")
-      .select("id", { count: "exact", head: true })
-      .in("status", [
-        "Draft",
-        "Ready for Approval",
-        "Approved",
-        "Sent",
-        "Viewed",
-      ])
+      .select("id,status,accepted")
       .is("archived_at", null),
+    db.from("jobs").select("proposal_id").not("proposal_id", "is", null).is("archived_at", null),
+    db.from("service_agreements").select("proposal_id").not("proposal_id", "is", null).is("archived_at", null),
     db
       .from("jobs")
       .select("id", { count: "exact", head: true })
       .eq("scheduled_date", today)
-      .not("status", "in", "(Completed,Cancelled,Archived)")
+      .not("status", "in", "(Cancelled,Archived)")
+      .is("archived_at", null),
+    db
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .lt("due_date", today)
+      .gt("balance_due", 0)
+      .not("status", "in", "(Paid,Cancelled,Archived)")
       .is("archived_at", null),
     db
       .from("time_entries")
-      .select("id", { count: "exact", head: true })
+      .select("employee_id")
       .eq("status", "Open")
       .is("clock_out", null)
       .is("archived_at", null),
-  ];
-  const results = await Promise.all(queries);
-  const failed = results.find((r) => r.error);
+  ]);
+  const results = [estimatesResult, linkedWalkthroughsResult, walkthroughsResult, proposalsResult, routedJobsResult, routedAgreementsResult, jobsResult, invoicesResult, timeEntriesResult];
+  const failed = results.find((result) => result.error);
   if (failed?.error) throw failed.error;
+  const routedProposalIds = new Set([
+    ...(routedJobsResult.data ?? []).map((row) => row.proposal_id),
+    ...(routedAgreementsResult.data ?? []).map((row) => row.proposal_id),
+  ].filter((id): id is string => Boolean(id)));
+  const pendingStatuses = new Set(["Draft", "Ready for Approval", "Approved", "Sent", "Viewed"]);
+  const pendingProposals = (proposalsResult.data ?? []).filter((proposal) =>
+    pendingStatuses.has(proposal.status) ||
+    (proposal.status === "Accepted" && proposal.accepted && !routedProposalIds.has(proposal.id)),
+  ).length;
+  const clockedInEmployees = new Set((timeEntriesResult.data ?? []).map((entry) => entry.employee_id).filter((id): id is string => Boolean(id)));
   return {
-    openEstimates: activeEstimateCount(results[0].data as { id: string }[] | null, results[1].data as { estimate_id: string | null }[] | null),
-    upcomingWalkthroughs: results[2].count ?? 0,
-    pendingProposals: results[3].count ?? 0,
-    jobsToday: results[4].count ?? 0,
-    employeesClockedIn: results[5].count ?? 0,
+    openEstimates: activeEstimateCount(estimatesResult.data, linkedWalkthroughsResult.data),
+    upcomingWalkthroughs: walkthroughsResult.count ?? 0,
+    pendingProposals,
+    jobsToday: jobsResult.count ?? 0,
+    pastDueInvoices: invoicesResult.count ?? 0,
+    employeesClockedIn: clockedInEmployees.size,
   };
 }
 export async function getTodaysJobs() {
@@ -181,7 +181,7 @@ export async function getUpcomingWalkthroughs() {
     .from("walkthroughs")
     .select(walkthroughSelect)
     .gte("walkthrough_date", localDate())
-    .neq("status", "Archived")
+    .eq("status", "Scheduled")
     .is("archived_at", null)
     .order("walkthrough_date")
     .order("walkthrough_time")
@@ -422,84 +422,6 @@ export async function getAttentionItems(): Promise<DashboardAttentionItem[]> {
       ),
     );
   return items.slice(0, 12);
-}
-export async function getRecentActivity(): Promise<DashboardRecentActivity[]> {
-  const db = getSupabaseClient();
-  const [p, c, e, w, j] = await Promise.all([
-    db
-      .from("proposal_history")
-      .select("id,event_type,description,created_at,proposal_id")
-      .order("created_at", { ascending: false })
-      .limit(10),
-    db
-      .from("clients")
-      .select("id,first_name,last_name,company_name,created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    db
-      .from("estimates")
-      .select("id,estimate_number,created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    db
-      .from("walkthroughs")
-      .select("id,contact_name,walkthrough_date,created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    db
-      .from("jobs")
-      .select("id,job_number,status,created_at,updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(5),
-  ]);
-  for (const r of [p, c, e, w, j]) if (r.error) throw r.error;
-  const out: DashboardRecentActivity[] = [];
-  for (const x of p.data ?? [])
-    out.push({
-      id: `p-${x.id}`,
-      label: x.event_type,
-      description: x.description ?? "Proposal activity recorded.",
-      timestamp: x.created_at,
-      href: "/open-proposals",
-    });
-  for (const x of c.data ?? [])
-    out.push({
-      id: `c-${x.id}`,
-      label: "Client Added",
-      description:
-        [x.first_name, x.last_name].filter(Boolean).join(" ") ||
-        x.company_name ||
-        "Client",
-      timestamp: x.created_at,
-      href: "/clients",
-    });
-  for (const x of e.data ?? [])
-    out.push({
-      id: `e-${x.id}`,
-      label: "Estimate Created",
-      description: x.estimate_number,
-      timestamp: x.created_at,
-      href: "/open-estimates",
-    });
-  for (const x of w.data ?? [])
-    out.push({
-      id: `w-${x.id}`,
-      label: "Walkthrough Scheduled",
-      description: x.contact_name ?? x.walkthrough_date ?? "Walkthrough",
-      timestamp: x.created_at,
-      href: "/walkthroughs",
-    });
-  for (const x of j.data ?? [])
-    out.push({
-      id: `j-${x.id}`,
-      label: x.status === "Completed" ? "Job Completed" : "Job Updated",
-      description: x.job_number,
-      timestamp: x.updated_at,
-      href: `/jobs?jobId=${x.id}`,
-    });
-  return out
-    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-    .slice(0, 10);
 }
 export async function getSchedulePreview() {
   const db = getSupabaseClient();

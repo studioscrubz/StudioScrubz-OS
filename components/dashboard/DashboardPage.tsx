@@ -3,11 +3,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/services/dashboard";
 import { completeJob, startJob } from "@/lib/services/jobs";
-import type { DashboardData, DashboardRecentActivity } from "@/types/dashboard";
+import type { DashboardData } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
+import { hasPermission, permissionForPath, type Permission } from "@/lib/auth/permissions";
 import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 export function DashboardPage() {
@@ -26,7 +26,7 @@ export function DashboardPage() {
       );
     }
   }
-  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "time_entries", "clients", "properties", "crews", "employees"], load);
+  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "payments", "time_entries", "clients", "properties", "crews", "employees"], load);
   useEffect(() => {
     let active = true;
     void getDashboardData()
@@ -61,11 +61,17 @@ export function DashboardPage() {
     }
   }
   if (!data && !error) return <Skeleton />;
+  const kpis: Array<{ label: string; value: number; permission: Permission }> = data ? [
+    { label: "Jobs Today", value: data.metrics.jobsToday, permission: "jobs.view" },
+    { label: "Upcoming Walkthroughs", value: data.metrics.upcomingWalkthroughs, permission: "walkthroughs.view" },
+    { label: "Open Estimates", value: data.metrics.openEstimates, permission: "estimates.view" },
+    { label: "Pending Proposals", value: data.metrics.pendingProposals, permission: "proposals.view" },
+    { label: "Past Due Invoices", value: data.metrics.pastDueInvoices, permission: "invoices.view" },
+    { label: "Employees Clocked In", value: data.metrics.employeesClockedIn, permission: "timeClock.view" },
+  ] : [];
   return (
     <>
       <Header />
-      {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
-      {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
       {error && (
         <div className="mt-5 flex items-center justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
           <span>{error}</span>
@@ -80,47 +86,11 @@ export function DashboardPage() {
       {data && (
         <>
           <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
-            {[
-              ["Open Estimates", data.metrics.openEstimates],
-              ["Upcoming Walkthroughs", data.metrics.upcomingWalkthroughs],
-              ["Pending Proposals", data.metrics.pendingProposals],
-              ["Jobs Today", data.metrics.jobsToday],
-              ["Past Due Invoices", data.metrics.pastDueInvoices ?? 0],
-              ["Employees Clocked In", data.metrics.employeesClockedIn],
-            ].filter(([label]) => label !== "Past Due Invoices" || hasPermission(profile, "invoices.view")).map(([l, v]) => (
-              <Metric key={String(l)} label={String(l)} value={Number(v)} />
+            {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
+              <Metric key={kpi.label} label={kpi.label} value={kpi.value} />
             ))}
           </section>
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-            <Panel title="Attention Required">
-              {data.attention.length ? (
-                <div className="space-y-3">
-                  {data.attention.filter((item) => hasPermission(profile, permissionForPath(item.href))).map((a) => (
-                    <div
-                      key={a.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4"
-                    >
-                      <div>
-                        <p className="text-xs font-extrabold uppercase text-amber-800">
-                          {a.type}
-                        </p>
-                        <p className="font-bold text-[#143d1a]">{a.record}</p>
-                        <p className="text-sm text-neutral-600">
-                          {a.description}
-                        </p>
-                      </div>
-                      <Link className={secondary} href={a.href}>
-                        {a.action}
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Empty text="No items currently require attention." />
-              )}
-            </Panel>
-            <QuickActions />
-          </section>
+          {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
           {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
@@ -137,6 +107,31 @@ export function DashboardPage() {
               <Empty text="No jobs scheduled today." />
             )}
           </Panel>}
+          {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
+          <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
+            <Panel title="Attention Required">
+              {data.attention.length ? (
+                <div className="space-y-3">
+                  {data.attention.filter((item) => hasPermission(profile, permissionForPath(item.href))).map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4"
+                    >
+                      <div>
+                        <p className="text-xs font-extrabold uppercase text-amber-800">{a.type}</p>
+                        <p className="font-bold text-[#143d1a]">{a.record}</p>
+                        <p className="text-sm text-neutral-600">{a.description}</p>
+                      </div>
+                      <Link className={secondary} href={a.href}>{a.action}</Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty text="No items currently require attention." />
+              )}
+            </Panel>
+            <QuickActions />
+          </section>
           <section className="mt-6 grid gap-6 xl:grid-cols-2">
             {hasPermission(profile, "walkthroughs.view") && <Upcoming rows={data.upcomingWalkthroughs} />}
             {hasPermission(profile, "proposals.view") && <ProposalPipeline data={data} />}
@@ -372,33 +367,6 @@ function PreviewGroup({
         <p className="mt-2 text-sm text-neutral-500">No jobs scheduled.</p>
       )}
     </div>
-  );
-}
-function Recent({ rows }: { rows: DashboardRecentActivity[] }) {
-  return (
-    <Panel title="Recent Activity" className="xl:col-span-2">
-      {rows.length ? (
-        <div className="grid gap-2 md:grid-cols-2">
-          {rows.map((r) => (
-            <Link
-              key={r.id}
-              href={r.href}
-              className="rounded-xl border p-4 hover:border-[#d4af37]"
-            >
-              <div className="flex justify-between gap-3">
-                <b className="text-[#143d1a]">{r.label}</b>
-                <span className="text-xs text-neutral-400">
-                  {new Date(r.timestamp).toLocaleString()}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-neutral-600">{r.description}</p>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <Empty text="No recent activity." />
-      )}
-    </Panel>
   );
 }
 function QuickActions() {

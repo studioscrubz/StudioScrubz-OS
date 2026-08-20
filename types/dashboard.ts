@@ -7,7 +7,7 @@ export type DashboardMetrics = {
   pendingProposals: number;
   jobsToday: number;
   employeesClockedIn: number;
-  pastDueInvoices?: number;
+  pastDueInvoices: number;
 };
 export type DashboardAttentionItem = {
   id: string;
@@ -43,13 +43,6 @@ export type DashboardCrewStatus = {
   crew: CrewWithRelations;
   todayJobs: number;
   inProgress: boolean;
-};
-export type DashboardRecentActivity = {
-  id: string;
-  label: string;
-  description: string;
-  timestamp: string;
-  href: string;
 };
 export type DashboardData = {
   metrics: DashboardMetrics;
