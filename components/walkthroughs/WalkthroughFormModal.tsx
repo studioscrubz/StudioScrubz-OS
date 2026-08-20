@@ -13,6 +13,7 @@ import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPick
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
 import type { WalkthroughPhotoCategory } from "@/types/photo";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 const scopeOptions = ["Floors", "Bathrooms", "Kitchen", "Windows", "Baseboards", "Appliances", "Common Areas", "Workstations", "Trash", "Sanitizing", "Pressure Washing", "Other"];
 const recommendationOptions = ["Deep cleaning recommended", "Recurring service recommended", "Additional crew recommended", "Special equipment required", "Pressure washing recommended", "Carpet service recommended"];
@@ -48,6 +49,12 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<WalkthroughWithRelations | null>(null);
+
+  useOperationalRealtime(["services", "service_addons", "service_addon_links", "service_price_tiers", "recurring_pricing_rules"], async () => {
+    const bundle = await getServiceCatalog();
+    setServices(bundle.services);
+    setCatalog(bundle);
+  });
 
   useEffect(() => {
     let active = true;

@@ -1,6 +1,6 @@
 import type { CommercialCalculatorInput, Condition, EstimateResult, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
-import { calculateRecurringTotals, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
+import { calculateRecurringTotals, catalogConfigNumber, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling/frequency";
 
@@ -10,6 +10,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
   const service=catalog.services.find(x=>x.division!=="Commercial"&&x.service_name===`${input.serviceType} Cleaning`);
   if(!service)throw new Error(`No active catalog service is configured for ${input.serviceType} Cleaning.`);
   const availableAddons=getAvailableServiceAddons(catalog,service.id,input.division);
+  if(service.pricing_model==="Custom")return calculateResidentialProductionEstimate(input,catalog,service);
   const configured= residentialCatalogPrice(input,service,catalog.tiers,availableAddons);
   const basePrice = configured.basePrice;
   const adjustments = [];
@@ -38,10 +39,19 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
   return result({ input, serviceName: `${input.serviceType} Cleaning`, catalogAddons:snapshots(input.addOns,availableAddons), basePrice, adjustments, oneTimePrice, recurringDiscount, recurringDiscountPercent, manualDiscount, totalDiscount, taxes, finalPrice, laborHours, crewSize, laborCost, supplyCost, scope: [`${input.serviceType} residential cleaning`, ...input.addOns] });
 }
 
-export function calculateCommercialEstimate(input: CommercialCalculatorInput, catalog: ServiceCatalogBundle): EstimateResult {
-  const service=catalog.services.find(x=>x.division!=="Residential"&&x.service_name===`${input.commercialType} Cleaning`);
+function calculateResidentialProductionEstimate(input:ResidentialCalculatorInput,catalog:ServiceCatalogBundle,service:ServiceCatalogBundle["services"][number]):EstimateResult{
+  const targetCompletionHours=catalogConfigNumber(service,"default_target_completion_hours"),workerHourlyPay=catalogConfigNumber(service,"default_worker_hourly_pay"),targetProfitMarginPercent=catalogConfigNumber(service,"default_target_profit_margin_percent");
+  if(targetCompletionHours<=0||workerHourlyPay<=0||targetProfitMarginPercent<=0)throw new Error(`Custom Pricing Required for ${service.service_name}: configure residential completion hours, worker pay, and target margin.`);
+  const commercialInput:CommercialCalculatorInput={division:"Commercial",commercialType:input.serviceType,frequency:input.frequency,squareFeet:input.squareFeet,floors:1,restrooms:input.bathrooms,kitchens:1,stations:0,units:input.bedrooms,condition:input.condition,targetCompletionHours,workerHourlyPay,targetProfitMarginPercent,additionalDiscountPercent:input.additionalDiscountPercent,taxRatePercent:input.taxRatePercent,additionalServices:input.addOns,targetProjectDays:input.targetProjectDays??3,workdayHours:input.workdayHours??8};
+  const calculated=calculateCommercialEstimate(commercialInput,catalog,service,"Residential");
+  return{...calculated,serviceName:service.service_name,scope:[`${input.serviceType} residential cleaning`,...input.addOns],calculatorInput:input};
+}
+
+export function calculateCommercialEstimate(input: CommercialCalculatorInput, catalog: ServiceCatalogBundle, resolvedService?:ServiceCatalogBundle["services"][number], addonDivision:"Residential"|"Commercial"="Commercial"): EstimateResult {
+  const service=resolvedService??catalog.services.find(x=>x.division!=="Residential"&&x.service_name===`${input.commercialType} Cleaning`);
   if(!service)throw new Error(`No active catalog service is configured for ${input.commercialType} Cleaning.`);
-  const availableAddons=getAvailableServiceAddons(catalog,service.id,input.division);
+  if(service.pricing_config.requires_complete_pricing_config&&(!input.targetProjectDays||input.targetProjectDays<=0||![8,10].includes(input.workdayHours??0)))throw new Error(`Custom Pricing Required for ${service.service_name}: choose valid target days and workday hours.`);
+  const availableAddons=getAvailableServiceAddons(catalog,service.id,addonDivision);
   const configured=commercialCatalogContext(input,service,availableAddons);
   const baseProductionRate = configured.productionRate;
   if(baseProductionRate<=0)throw new Error(`Custom Pricing Required for ${service.service_name}.`);
@@ -49,7 +59,8 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
   const fixtureHours = input.restrooms * configured.restroomHours + input.kitchens * configured.kitchenHours + input.stations * configured.stationHours + input.units * configured.unitHours + Math.max(0, input.floors - 1) * configured.additionalFloorHours;
   const selectedServices=availableAddons.filter(x=>input.additionalServices.includes(x.addon_name));
   const laborHours = Math.max(input.targetCompletionHours || 0, (productionHours + fixtureHours + selectedServices.reduce((sum, item) => sum + Number(item.pricing_config.labor_hours??0), 0)) * conditionMultiplier[input.condition]);
-  const crewSize = Math.max(1, Math.ceil(laborHours / Math.max(1, input.targetCompletionHours || 4)));
+  const availableHoursPerWorker=input.targetProjectDays&&input.workdayHours?input.targetProjectDays*input.workdayHours:input.targetCompletionHours||4;
+  const crewSize = Math.max(1, Math.ceil(laborHours / Math.max(1, availableHoursPerWorker)));
   const laborCost = laborHours * Math.max(0, input.workerHourlyPay);
   const supplyCost = Math.max(configured.minimumSupplyCost, input.squareFeet * configured.supplyCostPerSquareFoot) + selectedServices.reduce((sum, item) => sum + Number(item.pricing_config.supply_cost??item.price), 0);
   const directCost = laborCost + supplyCost;

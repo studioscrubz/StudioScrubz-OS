@@ -31,6 +31,7 @@ import {
 type Tab = "Services" | "Price Tiers" | "Add-Ons" | "Recurring Pricing";
 type RecordRow = CatalogService | ServicePriceTier | ServiceAddon | RecurringPricingRule;
 type FormField = { key: string; label: string; type?: "text" | "number" | "checkbox" | "textarea"; options?: readonly { label: string; value: string }[] };
+type PricingConfig = Record<string, string | number | boolean>;
 
 export function ServiceCatalogPage() {
   const [tab, setTab] = useState<Tab>("Services");
@@ -112,7 +113,7 @@ function CatalogForm({ kind, value, services, close, saved }: { kind: Tab; value
     setBusy(true); setError(null);
     try {
       if (kind === "Services") {
-        const input = { ...data, pricing_config: (data.pricing_config as Record<string, string | number | boolean> | undefined) ?? {} } as ServiceInput;
+        const input = { ...data, pricing_config: pricingConfig(data.pricing_config) } as ServiceInput;
         if (value) await updateService(value.id, input); else await createService(input);
       } else if (kind === "Price Tiers") {
         const input = { service_id: String(data.service_id), tier_name: String(data.tier_name), min_value: numberOrNull(data.min_value), max_value: numberOrNull(data.max_value), price: Number(data.price), unit_label: textOrNull(data.unit_label), pricing_config: (data.pricing_config as ServicePriceTier["pricing_config"] | undefined) ?? {}, display_order: Number(data.display_order), is_active: Boolean(data.is_active) };
@@ -130,6 +131,7 @@ function CatalogForm({ kind, value, services, close, saved }: { kind: Tab; value
   return <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4"><section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6">
     <button className="float-right" onClick={close}>×</button><h2 className="text-xl font-extrabold text-[#143d1a]">{value ? "Edit" : "Add"} {kind}</h2>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{formFields(kind, services).map((field) => <Field key={field.key} field={field} value={data[field.key]} set={set} />)}</div>
+    {kind === "Services" && data.pricing_model === "Custom" && <ProductionPricingFields config={pricingConfig(data.pricing_config)} set={(key, next) => setData((current) => ({ ...current, pricing_config: { ...pricingConfig(current.pricing_config), [key]: next } }))} />}
     {error && <Alert text={error} />}<button disabled={busy} className={`${primary} mt-5`} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
   </section></div>;
 }
@@ -140,6 +142,29 @@ function Field({ field, value, set }: { field: FormField; value: unknown; set: (
   return <label className="text-sm font-bold">{field.label}{field.options ?
     <select className={inputClass} value={String(value ?? "")} onChange={(event) => set(field.key, event.target.value)}>{field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> :
     <div className="relative">{field.type === "number" && <span className="absolute left-3 top-1/2 -translate-y-1/2">$</span>}<input className={`${inputClass} ${field.type === "number" ? "pl-7" : ""}`} type={field.type ?? "text"} value={String(value ?? "")} onChange={(event) => set(field.key, field.type === "number" ? Number(event.target.value) : event.target.value)} /></div>}</label>;
+}
+
+const productionPricingFields = [
+  ["production_rate", "Production Rate", "Square feet per labor hour"],
+  ["restroom_hours", "Restroom Labor Hours", "Hours per restroom"],
+  ["kitchen_hours", "Kitchen Labor Hours", "Hours per kitchen"],
+  ["station_hours", "Station Labor Hours", "Hours per workstation"],
+  ["unit_hours", "Unit / Bedroom Labor Hours", "Hours per unit or bedroom"],
+  ["additional_floor_hours", "Additional Floor Labor Hours", "Hours per additional floor"],
+  ["minimum_supply_cost", "Minimum Supply / Material Cost", "Dollars"],
+  ["supply_cost_per_square_foot", "Supply / Material Cost Per Square Foot", "Dollars per square foot"],
+  ["maximum_margin_percent", "Maximum Margin Percent", "Percent"],
+  ["minimum_margin_denominator", "Minimum Margin Denominator", "Decimal, for example 0.15"],
+] as const;
+const completePricingFields = [
+  ["default_target_completion_hours", "Default Target Completion Hours", "Hours"],
+  ["default_worker_hourly_pay", "Default Worker Hourly Pay", "Dollars per hour"],
+  ["default_target_profit_margin_percent", "Default Target Profit Margin Percent", "Percent"],
+] as const;
+
+function ProductionPricingFields({ config, set }: { config: PricingConfig; set: (key: string, value: number) => void }) {
+  const fields = config.requires_complete_pricing_config ? [...productionPricingFields, ...completePricingFields] : productionPricingFields;
+  return <section className="mt-6 rounded-xl border border-[#143d1a]/10 bg-neutral-50 p-4"><h3 className="font-extrabold text-[#143d1a]">Production Pricing</h3><p className="mt-1 text-sm text-neutral-600">Configure the labor, material, and margin inputs used by the estimate calculator.</p><div className="mt-4 grid gap-4 sm:grid-cols-2">{fields.map(([key, label, hint]) => <label className="text-sm font-bold" key={key}>{label}<input className={inputClass} type="number" min="0" step="any" value={Number(config[key] ?? 0)} onChange={(event) => set(key, Number(event.target.value))}/><span className="mt-1 block text-xs font-normal text-neutral-500">{hint}</span></label>)}</div></section>;
 }
 
 function formFields(kind: Tab, services: CatalogService[]): FormField[] {
@@ -164,6 +189,7 @@ function headers(tab: Tab) { return tab === "Services" ? ["Service", "Code", "Di
 function serviceName(services: CatalogService[], id: string) { return services.find((service) => service.id === id)?.service_name ?? "Service"; }
 function textOrNull(value: unknown) { const text = String(value ?? "").trim(); return text || null; }
 function numberOrNull(value: unknown) { return value === "" || value == null ? null : Number(value); }
+function pricingConfig(value: unknown): PricingConfig { return value && !Array.isArray(value) && typeof value === "object" ? value as PricingConfig : {}; }
 function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
 function message(cause: unknown) { return cause instanceof Error ? cause.message : "Catalog operation failed."; }
 function Alert({ text, good }: { text: string; good?: boolean }) { return <p className={`mt-4 rounded-lg p-3 text-sm font-bold ${good ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{text}</p>; }

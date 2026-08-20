@@ -25,7 +25,7 @@ export type PriceAdjustment = { label: string; amount: number; catalogAddonId?:s
 
 export type ResidentialCalculatorInput = {
   division: "Residential";
-  serviceType: "Standard" | "Deep" | "Move-In / Move-Out";
+  serviceType: string;
   frequency: Frequency;
   condition: Condition;
   squareFeet: number;
@@ -36,6 +36,8 @@ export type ResidentialCalculatorInput = {
   additionalDiscountPercent: number;
   taxRatePercent: number;
   addOns: string[];
+  targetProjectDays?: number;
+  workdayHours?: 8 | 10;
 };
 
 export type CommercialCalculatorInput = {
@@ -55,6 +57,8 @@ export type CommercialCalculatorInput = {
   additionalDiscountPercent: number;
   taxRatePercent: number;
   additionalServices: string[];
+  targetProjectDays?: number;
+  workdayHours?: 8 | 10;
 };
 
 export type CalculatorInput = ResidentialCalculatorInput | CommercialCalculatorInput;
