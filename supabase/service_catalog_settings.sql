@@ -42,7 +42,8 @@ create table if not exists public.business_settings (
   address text, city text, state text, zip text, default_tax_rate numeric not null default 0,
   default_estimate_expiration_days integer not null default 30, default_proposal_expiration_days integer not null default 30,
   default_invoice_due_days integer not null default 15, default_payment_terms text, default_invoice_terms text,
-  default_proposal_terms text, default_estimate_notes text, currency text not null default 'USD', timezone text,
+  default_proposal_terms text, default_estimate_notes text, default_service_agreement_terms text,
+  currency text not null default 'USD', timezone text,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 create index if not exists services_active_order_idx on public.services(is_active,archived_at,display_order);
@@ -147,7 +148,8 @@ select
   currency,
   timezone,
   created_at,
-  updated_at
+  updated_at,
+  default_service_agreement_terms
 from public.business_settings
 where (select auth.uid()) is not null
   and public.has_any_role(array['Master Admin','Administrator','Manager','Sales']);
