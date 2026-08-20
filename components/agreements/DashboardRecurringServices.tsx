@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getUpcomingOccurrences } from "@/lib/services/serviceOccurrences";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 
 export function DashboardRecurringServices() {
@@ -10,6 +11,13 @@ export function DashboardRecurringServices() {
   const [error, setError] = useState(false);
   const today = localDate(new Date());
   const weekEnd = addDays(today, 7);
+
+  async function load() {
+    const items = await getUpcomingOccurrences(today, weekEnd);
+    setRows(items.filter((item) => !item.job_id && item.status === "Scheduled"));
+    setError(false);
+  }
+  useOperationalRealtime(["service_occurrences", "service_agreements", "jobs"], load);
 
   useEffect(() => {
     void getUpcomingOccurrences(today, weekEnd)

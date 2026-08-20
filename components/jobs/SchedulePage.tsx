@@ -10,6 +10,7 @@ import type {CrewWithRelations} from "@/types/crew";
 import type {CrewConflict,JobStatus,JobWithRelations} from "@/types/job";
 import type {WalkthroughWithRelations} from "@/types/walkthrough";
 import {ScheduleOccurrences} from "@/components/agreements/ScheduleOccurrences";
+import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
 type View="Day"|"Week"|"List";
 type EventSource="All Events"|"Jobs"|"Walkthroughs";
 type ScheduleEvent={kind:"Job";id:string;date:string|null;time:string|null;job:JobWithRelations}|{kind:"Walkthrough";id:string;date:string;time:string|null;walkthrough:WalkthroughWithRelations};
@@ -43,6 +44,8 @@ export function SchedulePage(){
     setWalkthroughs(w);
     setCrews(c);
   }
+
+  useOperationalRealtime(["jobs","walkthroughs","crews","employees"],load);
 
   useEffect(()=>{
     let active=true;

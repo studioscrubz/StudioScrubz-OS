@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { getClients } from "@/lib/services/clients";
 import { getProperties } from "@/lib/services/properties";
 import { getServiceCatalog, getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
@@ -23,6 +24,8 @@ export function DirectJobModal({ close, created }: { close: () => void; created:
   const [date, setDate] = useState(""), [time, setTime] = useState(""), [duration, setDuration] = useState(0), [laborHours, setLaborHours] = useState(0);
   const [crewId, setCrewId] = useState(""), [access, setAccess] = useState(""), [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null);
+  async function refreshOptions() { const [c, p, s, r] = await Promise.all([getClients(), getProperties(), getServiceCatalog(), getActiveCrews()]); setClients(c.filter((row) => !row.archived_at)); setProperties(p.filter((row) => !row.archived_at)); setCatalog(s); setCrews(r); }
+  useOperationalRealtime(["clients", "properties", "crews", "employees", "services", "service_addons", "service_addon_links", "service_price_tiers", "recurring_pricing_rules"], refreshOptions);
   useEffect(() => { let active = true; void Promise.all([getClients(), getProperties(), getServiceCatalog(), getActiveCrews()]).then(([c, p, s, r]) => { if (active) { setClients(c.filter((row) => !row.archived_at)); setProperties(p.filter((row) => !row.archived_at)); setCatalog(s); setCrews(r); } }).catch((cause) => { if (active) setError(message(cause, "Job form data could not be loaded.")); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
   const matchedClients = useMemo(() => { const term = clientSearch.trim().toLowerCase(); return clients.filter((row) => !term || [clientName(row), row.company_name, row.phone, row.email].filter(Boolean).join(" ").toLowerCase().includes(term)).slice(0, 100); }, [clientSearch, clients]);
   const clientProperties = useMemo(() => properties.filter((row) => row.client_id === clientId), [clientId, properties]);

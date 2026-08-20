@@ -106,7 +106,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     void getAttentionSummary().then((summary) => { if (active) setAttentionCount(summary.total); }).catch((cause) => console.error("Attention badge load failed", cause));
     return () => { active = false; };
   }, [auth.profile]);
-  useOperationalRealtime(["walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "service_occurrences"], loadAttentionCount);
+  useOperationalRealtime(["walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "time_entries"], loadAttentionCount);
   const visibleItems = navItems.reduce<Array<NavLink | NavGroup>>((items, item) => {
     if (!isGroup(item)) return hasPermission(auth.profile, item.permission) ? [...items, item] : items;
     if (item.permission && !hasPermission(auth.profile, item.permission)) return items;

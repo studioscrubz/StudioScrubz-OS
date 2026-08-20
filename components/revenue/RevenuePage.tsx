@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getRevenueReport } from "@/lib/services/revenue";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import {
   REVENUE_PERIODS,
   type RevenueGroup,
@@ -31,6 +32,7 @@ export function RevenuePage() {
       setLoading(false);
     }
   }
+  useOperationalRealtime(["invoices", "payments", "jobs", "expenses", "time_entries"], load);
   useEffect(() => {
     let active = true;
     void getRevenueReport(period, start, end, group)

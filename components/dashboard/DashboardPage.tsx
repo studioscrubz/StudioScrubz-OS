@@ -26,7 +26,7 @@ export function DashboardPage() {
       );
     }
   }
-  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "service_occurrences"], load);
+  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "time_entries", "clients", "properties", "crews", "employees"], load);
   useEffect(() => {
     let active = true;
     void getDashboardData()

@@ -13,7 +13,7 @@ export function AttentionCenterPage() {
   const [view, setView] = useState<AttentionView>("Active"); const [changing, setChanging] = useState<string | null>(null);
   const [composerItem, setComposerItem] = useState<AttentionItem | null>(null);
   async function load() { setLoading(true); setError(null); try { setItems(await getAttentionItems("All")); } catch (caught) { console.error("Attention Center load failed", caught); setError("Attention Center could not be loaded."); } finally { setLoading(false); } }
-  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "service_occurrences"], load);
+  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "time_entries"], load);
   useEffect(() => {
     // Initial client-side hydration from role-scoped services.
     // eslint-disable-next-line react-hooks/set-state-in-effect

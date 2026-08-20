@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PropertyFormModal, clientDisplayName } from "./PropertyFormModal";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { archiveProperty, createProperty, findPotentialDuplicateProperties, getProperties, getPropertyClients, updateProperty } from "@/lib/services/properties";
 import type { Client } from "@/types/client";
 import { PROPERTY_TYPES, type PropertyInput, type PropertyType, type PropertyWithClient } from "@/types/property";
@@ -22,6 +23,9 @@ export function PropertiesPage() {
   const [saving, setSaving] = useState(false);
   const [duplicateInput, setDuplicateInput] = useState<PropertyInput | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+
+  async function refreshRealtime() { const [propertyRecords, clientRecords] = await Promise.all([getProperties(), getPropertyClients()]); setProperties(propertyRecords); setClients(clientRecords); }
+  useOperationalRealtime(["properties", "clients"], refreshRealtime);
 
   useEffect(() => {
     let active = true;

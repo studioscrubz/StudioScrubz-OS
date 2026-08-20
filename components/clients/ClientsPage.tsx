@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientFormModal } from "./ClientFormModal";
 import { ClientDetailModal } from "./ClientDetailModal";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { archiveClient, createClient, findPotentialDuplicateClients, getClients, updateClient } from "@/lib/services/clients";
 import { CLIENT_STATUSES, CLIENT_TYPES, type Client, type ClientInput, type ClientStatus, type ClientType } from "@/types/client";
 
@@ -26,6 +27,9 @@ export function ClientsPage() {
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [detailClient, setDetailClient] = useState<Client | null>(null);
   const [reminderServiceId, setReminderServiceId] = useState<string | undefined>();
+
+  async function refreshRealtime() { setClients(await getClients()); }
+  useOperationalRealtime(["clients"], refreshRealtime);
 
   useEffect(() => {
     let active = true;
