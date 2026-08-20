@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 export const OPERATIONAL_TABLES = [
   "estimates", "walkthroughs", "proposals", "service_agreements", "jobs",
   "invoices", "attention_item_states", "client_communications", "service_occurrences",
+  "service_agreement_documents",
   "payments", "expenses", "time_entries", "clients", "properties", "crews", "employees",
   "services", "service_addons", "service_addon_links", "service_price_tiers",
   "recurring_pricing_rules",

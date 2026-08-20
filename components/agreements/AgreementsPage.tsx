@@ -19,6 +19,7 @@ import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import { formatTime12Hour } from "@/lib/formatTime";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { AgreementPricingBreakdown } from "@/components/agreements/AgreementPricingBreakdown";
+import { AgreementDocuments } from "@/components/agreements/AgreementDocuments";
 import { recordAgreementSent } from "@/lib/services/clientCommunications";
 import { AGREEMENT_BILLING_TYPES, AGREEMENT_FREQUENCIES, AGREEMENT_STATUSES, type AgreementInput, type AgreementWithRelations } from "@/types/agreement";
 import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
@@ -38,6 +39,7 @@ export function AgreementsPage() {
   const [form, setForm] = useState<AgreementWithRelations | null | "new">(null);
   const [preview, setPreview] = useState<AgreementWithRelations | null>(null);
   const [send, setSend] = useState<AgreementWithRelations | null>(null);
+  const [documents, setDocuments] = useState<AgreementWithRelations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -94,6 +96,7 @@ export function AgreementsPage() {
       <div className="mt-3 flex flex-wrap gap-1">
         {agreement.status === "Draft" && canManage && <button className={secondary} onClick={() => setForm(agreement)}>Edit</button>}
         <button className={secondary} onClick={() => setPreview(agreement)}>Preview</button>
+        <button className={secondary} onClick={() => setDocuments(agreement)}>Documents</button>
         {canManage && agreement.status === "Draft" && <button className={secondary} onClick={() => setSend(agreement)}>Send to Client</button>}
         {canManage && agreement.status === "Sent" && <><button className={secondary} onClick={() => setSend(agreement)}>Resend</button><button className={secondary} onClick={() => void act(() => markAgreementAccepted(agreement.id), "Agreement marked accepted.")}>Mark Accepted</button></>}
         {canManage && agreement.status === "Accepted" && <button className={secondary} onClick={() => void act(() => activateAgreement(agreement.id), "Agreement activated.")}>Activate</button>}
@@ -106,6 +109,7 @@ export function AgreementsPage() {
     <div className="mt-5 flex gap-2"><button className={secondary} onClick={() => exportAgreements(shown, occurrences)}>Export Agreements CSV</button><button className={secondary} onClick={() => exportOccurrences(occurrences.filter((row) => row.scheduled_date >= today))}>Export Upcoming Services CSV</button></div>
     {form && <AgreementForm value={form === "new" ? null : form} settings={settings} close={() => setForm(null)} saved={async () => { setForm(null); await load(); }}/>}
     {preview && <Modal close={() => setPreview(null)}><AgreementDocument agreement={preview} settings={settings}/><button className={`${primary} mt-5 print:hidden`} onClick={() => window.print()}>Print Agreement</button></Modal>}
+    {documents && <Modal close={() => setDocuments(null)}><h2 className="text-2xl font-bold text-[#143d1a]">{documents.agreement_number} Documents</h2><p className="mt-1 text-sm text-neutral-500">{documents.agreement_name}</p><AgreementDocuments agreementId={documents.id} canManage={canManage}/></Modal>}
     {send && <SendAgreementModal agreement={send} settings={settings} sender={profile?.display_name || profile?.email || "Master Admin"} close={() => setSend(null)} sent={async () => { setSend(null); await load(); setNotice("Agreement email draft opened and delivery handoff recorded."); }}/>} 
   </>;
 }
