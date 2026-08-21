@@ -11,6 +11,10 @@ import type {
   AgreementWithRelations,
   ServiceAgreement,
 } from "@/types/agreement";
+import { AGREEMENT_BILLING_TYPES } from "@/types/agreement";
+import type { Client } from "@/types/client";
+import type { Property } from "@/types/property";
+import type { CatalogService } from "@/types/serviceCatalog";
 const select =
   "*, client:clients!service_agreements_client_id_fkey(*), property:properties!service_agreements_property_id_fkey(*), proposal:proposals!service_agreements_proposal_id_fkey(*), crew:crews!service_agreements_assigned_crew_id_fkey(*)";
 export async function getAgreements(): Promise<AgreementWithRelations[]> {
@@ -78,6 +82,8 @@ export async function createAgreementFromProposal(proposalId: string) {
   if (p.status !== "Accepted" || !isRecurringFrequency(p.frequency))
     throw new Error("Only accepted recurring proposals can create agreements.");
   const pricing = proposalAgreementPricing(p);
+  const startDate = p.requested_date ?? today();
+  const startDay = new Date(`${startDate}T12:00:00`).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
   return createAgreement({
     client_id: p.client_id,
     property_id: p.property_id,
@@ -86,11 +92,11 @@ export async function createAgreementFromProposal(proposalId: string) {
     agreement_name: `${p.result.serviceName} Service Agreement`,
     service_name: p.result.serviceName,
     frequency: p.frequency,
-    days_of_week: [],
+    days_of_week: ["Weekly", "Biweekly"].includes(p.frequency) ? [startDay] : [],
     interval_weeks: p.frequency === "Biweekly" ? 2 : 1,
-    day_of_month: p.frequency === "Monthly" ? new Date().getDate() : null,
+    day_of_month: p.frequency === "Monthly" ? new Date(`${startDate}T12:00:00`).getDate() : null,
     custom_interval_days: null,
-    start_date: p.requested_date ?? today(),
+    start_date: startDate,
     end_date: null,
     auto_renew: false,
     billing_type: "Per Visit",
@@ -129,7 +135,15 @@ export async function markAgreementSent(id: string, sentTo: string, sentBy: stri
   return transition(id, ["Draft", "Sent"], "Sent", { sent_at: new Date().toISOString(), sent_to: sentTo.trim(), sent_by: sentBy.trim() || null, client_access_token: token, client_access_token_expires_at: tokenExpiresAt });
 }
 export const markAgreementAccepted = (id: string) => transition(id, ["Sent"], "Accepted", { accepted_at: new Date().toISOString() });
-export const activateAgreement = (id: string) => transition(id, ["Accepted"], "Active");
+export async function activateAgreement(id: string) {
+  const agreement = await getAgreementById(id);
+  if (agreement.status !== "Accepted") throw new Error(`A ${agreement.status} agreement cannot be changed to Active.`);
+  const catalog = await getServiceCatalog();
+  const service = catalog.services.find((row) => row.service_name === agreement.service_name && (row.division === agreement.division || row.division === "Both"));
+  const validation = validateAgreementConfiguration(agreement, agreement.client, agreement.property, service, true);
+  if (validation) throw new Error(validation);
+  return updateAgreement(id, { status: "Active" });
+}
 export const pauseAgreement = (id: string) => transition(id, ["Active"], "Paused");
 export const resumeAgreement = (id: string) => transition(id, ["Paused"], "Active");
 export const completeAgreement = (id: string) => transition(id, ["Active"], "Completed");
@@ -214,6 +228,35 @@ export function estimatedMonthlyAmount(a: ServiceAgreement) {
     return a.billing_amount * visits;
   }
   return 0;
+}
+export function validateAgreementConfiguration(
+  agreement: AgreementInput | ServiceAgreement,
+  client: Client | null | undefined,
+  property: Property | null | undefined,
+  service: CatalogService | null | undefined,
+  activation = false,
+) {
+  if (!agreement.agreement_name.trim()) return "Agreement name is required.";
+  if (!client) return "Select an active client.";
+  if (!property) return "Select an active property or service site.";
+  if (property.client_id !== client.id) return "The selected property or site does not belong to the selected client.";
+  if (client.client_type !== agreement.division) return `Select a ${agreement.division} client for this agreement.`;
+  if (property.property_type !== agreement.division) return `Select a ${agreement.division} property or site for this agreement.`;
+  if (agreement.division === "Commercial" && !client.company_name?.trim()) return "Commercial agreements require a client with a company or business name.";
+  if (!service) return `Select an active service compatible with the ${agreement.division} division.`;
+  if (!agreement.start_date) return "Start date is required.";
+  if (agreement.end_date && agreement.end_date < agreement.start_date) return "End date must be on or after the start date.";
+  if (!AGREEMENT_BILLING_TYPES.includes(agreement.billing_type)) return "Select a valid billing type.";
+  if (!Number.isFinite(agreement.billing_amount) || agreement.billing_amount < 0) return "Billing amount must be zero or greater.";
+  const weekdayFrequency = ["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(agreement.frequency);
+  if (weekdayFrequency && !agreement.days_of_week.length) return `Select at least one service day for ${agreement.frequency}.`;
+  if (agreement.frequency === "Multiple Days Per Week" && (!Number.isInteger(agreement.interval_weeks) || agreement.interval_weeks < 1)) return "Interval weeks must be at least 1.";
+  if (agreement.frequency === "Monthly" && (!agreement.day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 31)) return "Select a monthly service day from 1 through 31.";
+  if (agreement.frequency === "Custom" && (!agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be at least 1.";
+  if (activation && !agreement.default_start_time) return "A default service start time is required before activation.";
+  if (activation && agreement.division === "Commercial" && !agreement.assigned_crew_id) return "Assign a crew before activating a Commercial agreement.";
+  if (activation && agreement.division === "Commercial" && ["Monthly", "Flat Contract"].includes(agreement.billing_type)) return `${agreement.billing_type} Commercial agreements can be stored, but cannot be activated until contract billing is implemented without per-occurrence charges.`;
+  return null;
 }
 function num() {
   const d = new Date();
