@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/services/dashboard";
-import { completeJob, startJob } from "@/lib/services/jobs";
+import { completeJob, isJobCompletionResult, startJob } from "@/lib/services/jobs";
 import type { DashboardData } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
@@ -14,6 +14,7 @@ export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   async function load() {
     setError(null);
@@ -49,10 +50,24 @@ export function DashboardPage() {
   async function operate(job: JobWithRelations, action: "start" | "complete") {
     setBusy(job.id);
     setError(null);
+    setNotice(null);
     try {
+      let actionError: string | null = null;
+      let actionNotice: string | null = null;
       if (action === "start") await startJob(job.id);
-      else await completeJob(job.id);
+      else {
+        const result = await completeJob(job.id);
+        if (isJobCompletionResult(result)) {
+          if (result.invoiceError) actionError = result.invoiceError;
+          else if (result.invoice) actionNotice = result.invoiceCreated
+            ? `Job completed and Invoice ${result.invoice.invoice_number} created.`
+            : `Job completed. Invoice ${result.invoice.invoice_number} already exists.`;
+          else actionNotice = "Job completed.";
+        }
+      }
       await load();
+      setError(actionError);
+      setNotice(actionNotice);
     } catch (x) {
       console.error("Dashboard job operation failed", x);
       setError(x instanceof Error ? x.message : "Job operation failed.");
@@ -72,6 +87,7 @@ export function DashboardPage() {
   return (
     <>
       <Header />
+      {notice && <div className="mt-5 rounded-xl bg-green-50 p-4 text-sm font-bold text-green-700">{notice}</div>}
       {error && (
         <div className="mt-5 flex items-center justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
           <span>{error}</span>

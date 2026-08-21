@@ -8,6 +8,7 @@ import {
   cancelJob,
   getCrewConflicts,
   getJobs,
+  isJobCompletionResult,
   scheduleJob,
   updateJobStatus,
 } from "@/lib/services/jobs";
@@ -92,10 +93,23 @@ export function JobsPage() {
     setBusy(job.id);
     setError(null);
     try {
-      await fn();
+      const result = await fn();
       await load();
       setSelected(null);
-      setNotice(text);
+      if (isJobCompletionResult(result)) {
+        if (result.invoiceError) {
+          setNotice(null);
+          setError(result.invoiceError);
+        } else if (result.invoice) {
+          setNotice(result.invoiceCreated
+            ? `Job completed and Invoice ${result.invoice.invoice_number} created.`
+            : `Job completed. Invoice ${result.invoice.invoice_number} already exists.`);
+        } else {
+          setNotice("Job completed.");
+        }
+      } else {
+        setNotice(text);
+      }
     } catch (x) {
       console.error("Job mutation failed", x);
       setError(message(x, "Job action failed."));

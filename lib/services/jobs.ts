@@ -19,6 +19,19 @@ import { getPropertyById } from "@/lib/services/properties";
 import { getServiceCatalog, getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { getCrewById } from "@/lib/services/crews";
 import { calculateAddons, calculateServicePrice } from "@/lib/pricing/pricingEngine";
+import type { InvoiceWithRelations } from "@/types/invoice";
+
+export type JobCompletionResult = {
+  job: Job;
+  invoice: InvoiceWithRelations | null;
+  invoiceCreated: boolean;
+  invoiceSkipped: boolean;
+  invoiceError: string | null;
+};
+
+export function isJobCompletionResult(value: unknown): value is JobCompletionResult {
+  return Boolean(value && typeof value === "object" && "invoiceSkipped" in value);
+}
 
 const select =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
@@ -263,9 +276,38 @@ export async function updateJobStatus(id: string, status: JobStatus) {
         "Set a scheduled date before moving this job to Scheduled.",
       );
   }
-  if (status === "Completed")
-    return updateJob(id, { status, completed_at: new Date().toISOString() });
+  if (status === "Completed") {
+    const job = await updateJob(id, { status, completed_at: new Date().toISOString() });
+    return createCompletedJobInvoice(job);
+  }
   return updateJob(id, { status, completed_at: null });
+}
+
+async function createCompletedJobInvoice(job: Job): Promise<JobCompletionResult> {
+  try {
+    // Dynamic loading avoids a runtime jobs <-> invoices module cycle while keeping
+    // completion and its invoice handoff in the shared workflow service.
+    const { canCreateJobInvoice, createInvoiceFromJob, getInvoiceForJob } = await import("@/lib/services/invoices");
+    const existing = await getInvoiceForJob(job.id);
+    if (existing) {
+      return { job, invoice: existing, invoiceCreated: false, invoiceSkipped: false, invoiceError: null };
+    }
+    if (!(await canCreateJobInvoice(job.id))) {
+      return { job, invoice: null, invoiceCreated: false, invoiceSkipped: true, invoiceError: null };
+    }
+    const invoice = await createInvoiceFromJob(job.id);
+    return { job, invoice, invoiceCreated: true, invoiceSkipped: false, invoiceError: null };
+  } catch (cause) {
+    console.error("Completed Job invoice creation failed", cause);
+    const detail = cause instanceof Error && cause.message ? ` ${cause.message}` : "";
+    return {
+      job,
+      invoice: null,
+      invoiceCreated: false,
+      invoiceSkipped: false,
+      invoiceError: `Job was completed, but its Invoice could not be created.${detail}`,
+    };
+  }
 }
 export async function assignJobCrew(
   id: string,
