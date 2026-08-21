@@ -19,6 +19,7 @@ create table if not exists public.estimates (
   status text not null default 'Open' check (status in ('Open', 'Archived')),
   result jsonb not null default '{}'::jsonb,
   notes text,
+  terms text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   archived_at timestamptz,

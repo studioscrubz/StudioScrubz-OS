@@ -15,6 +15,7 @@ import { getProperties } from "@/lib/services/properties";
 import type { Client } from "@/types/client";
 import type { PropertyWithClient } from "@/types/property";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
+import type { BusinessSettings } from "@/types/businessSettings";
 
 const frequencies: Frequency[] = ["One-Time", "Daily", "Weekly", "Biweekly", "Monthly"];
 const conditions: Condition[] = ["Light", "Average", "Heavy", "Extreme"];
@@ -31,7 +32,9 @@ type EstimateDraft = {
   commercial: CommercialCalculatorInput;
   serviceDescription: string;
   notes: string;
+  terms?: string;
 };
+type EstimateDraftDefaults = { residential:ResidentialCalculatorInput;commercial:CommercialCalculatorInput;serviceDescription:string;notes:string;terms:string };
 
 export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWithRelations; onSaved?: () => void }) {
   const router = useRouter();
@@ -43,6 +46,8 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [commercial, setCommercial] = useState<CommercialCalculatorInput>(initialInput?.division === "Commercial" ? initialInput : defaultCommercial);
   const [serviceDescription, setServiceDescription] = useState(estimate?.result.serviceDescription ?? "");
   const [notes, setNotes] = useState(estimate?.notes ?? "");
+  const [terms, setTerms] = useState(estimate?.terms ?? "");
+  const [defaults,setDefaults]=useState<BusinessSettings|null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -58,6 +63,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const suppressDraftSave = useRef(false);
   const pendingCatalogSelection = useRef<{ division: EstimateDivision; selection: string } | null>(null);
   const calculatorInput: CalculatorInput = division === "Residential" ? residential : commercial;
+  const draftDefaults=useMemo<EstimateDraftDefaults>(()=>{const taxRatePercent=defaults?.default_tax_rate??0;return{residential:{...defaultResidential,taxRatePercent,addOns:[]},commercial:{...defaultCommercial,taxRatePercent,additionalServices:[]},serviceDescription:catalog?selectedCatalogService(catalog,"Residential",defaultResidential.serviceType)?.description?.trim()??"":"",notes:defaults?.default_estimate_notes??"",terms:defaults?.default_estimate_terms??""}},[catalog,defaults]);
   useOperationalRealtime(["services", "service_addons", "service_addon_links", "service_price_tiers", "recurring_pricing_rules"], async () => {
     setCatalog(await getServiceCatalog());
   });
@@ -80,6 +86,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           setCommercial(parsed.commercial);
           setServiceDescription(parsed.serviceDescription ?? "");
           setNotes(parsed.notes);
+          setTerms(parsed.terms??"");
           setDraftNotice("Your unfinished estimate was restored.");
         } else {
           window.sessionStorage.removeItem(estimateDraftKey);
@@ -91,7 +98,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       setDraftReady(true);
     }
   }, [estimate]);
-  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);const pending=pendingCatalogSelection.current;if(pending){const selected=selectedCatalogService(loaded,pending.division,pending.selection);setServiceDescription(selected?.description?.trim()??"");pendingCatalogSelection.current=null}else if(!restoredDraft.current&&!estimate&&!serviceDescription.trim()){const selected=selectedCatalogService(loaded,division,division==="Residential"?residential.serviceType:commercial.commercialType);setServiceDescription(selected?.description?.trim()??"")}if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
+  useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);setDefaults(settings);const pending=pendingCatalogSelection.current;if(pending){const selected=selectedCatalogService(loaded,pending.division,pending.selection);setServiceDescription(selected?.description?.trim()??"");pendingCatalogSelection.current=null}else if(!restoredDraft.current&&!estimate&&!serviceDescription.trim()){const selected=selectedCatalogService(loaded,division,division==="Residential"?residential.serviceType:commercial.commercialType);setServiceDescription(selected?.description?.trim()??"")}if(!estimate&&!restoredDraft.current){setResidential(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setCommercial(x=>x.taxRatePercent===0?{...x,taxRatePercent:settings.default_tax_rate}:x);setNotes(value=>value||settings.default_estimate_notes||"");setTerms(settings.default_estimate_terms??"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
   useEffect(() => {
     if (estimate || !draftReady) return;
     if (suppressDraftSave.current) {
@@ -99,17 +106,17 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    if (!hasMeaningfulDraft(customer, division, residential, commercial, serviceDescription, notes)) {
+    if (!hasMeaningfulDraft(customer, division, residential, commercial, serviceDescription, notes, terms, draftDefaults)) {
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, serviceDescription, notes };
+    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, serviceDescription, notes, terms };
     try {
       window.sessionStorage.setItem(estimateDraftKey, JSON.stringify(draft));
     } catch (caught) {
       console.warn("Estimate draft could not be saved", caught);
     }
-  }, [commercial, customer, division, draftReady, estimate, notes, residential, serviceDescription]);
+  }, [commercial, customer, division, draftDefaults, draftReady, estimate, notes, residential, serviceDescription, terms]);
   const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:division === "Residential" ? calculateResidentialEstimate(residential,catalog) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, division, residential]);
   const result=calculation.result?{...calculation.result,serviceDescription:serviceDescription.trim()||null}:null;
 
@@ -145,7 +152,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       if (estimate) {
         await updateEstimateRelationships(estimate, customer, division);
         if (!estimate.client_id || !estimate.property_id) throw new Error("This historical Estimate is no longer linked to a Client and Property.");
-        await updateEstimate(estimate.id, estimatePayload(estimate.client_id, estimate.property_id, customer, division, result, notes, estimate.status));
+        await updateEstimate(estimate.id, estimatePayload(estimate.client_id, estimate.property_id, customer, division, result, notes, terms, estimate.status));
         await getEstimates();
         setSuccess("Estimate updated successfully.");
       } else {
@@ -160,7 +167,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         if (selectedProperty && selectedProperty.client_id!==client.id) throw new Error("The selected property does not belong to the selected client.");
         if (selectedProperty && selectedProperty.property_type!==division) throw new Error(`The selected property must be a ${division} property.`);
         const property = selectedProperty ?? await findOrCreateEstimateProperty(client.id, customer, division);
-        await createEstimate(estimatePayload(client.id, property.id, customer, division, result, notes, "Open"));
+        await createEstimate(estimatePayload(client.id, property.id, customer, division, result, notes, terms, "Open"));
         await getEstimates();
         setSuccess("Estimate saved successfully and is available in Open Estimates.");
         clearNewEstimateDraft();
@@ -177,17 +184,18 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     window.sessionStorage.removeItem(estimateDraftKey);
     setCustomer({ ...blankCustomer });
     setDivision("Residential");
-    setResidential({ ...defaultResidential, addOns: [] });
-    setCommercial({ ...defaultCommercial, additionalServices: [] });
-    setServiceDescription("");
-    setNotes("");
+    setResidential({ ...draftDefaults.residential, addOns: [] });
+    setCommercial({ ...draftDefaults.commercial, additionalServices: [] });
+    setServiceDescription(draftDefaults.serviceDescription);
+    setNotes(draftDefaults.notes);
+    setTerms(draftDefaults.terms);
     setDraftNotice(null);
     setSelectedClientId("");
     setSelectedPropertyId("");
   }
 
   function requestClearDraft() {
-    if (hasMeaningfulDraft(customer, division, residential, commercial, serviceDescription, notes) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
+    if (hasMeaningfulDraft(customer, division, residential, commercial, serviceDescription, notes, terms, draftDefaults) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
     clearNewEstimateDraft();
     setSuccess("Estimate draft cleared.");
     setError(null);
@@ -221,6 +229,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         </Section>
         <Section title="Service Description" subtitle="Copied from the selected Service Catalog entry and saved with this Estimate."><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{serviceDescription||"No service description available."}</div></Section>
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
+        <Section title="Estimate Terms & Conditions"><textarea value={terms} onChange={(event) => setTerms(event.target.value)} rows={6} className={inputClass} placeholder="Terms shown on the client Estimate" /></Section>
       </div>
       {result?<EstimateSummary result={result} frequency={calculatorInput.frequency} saving={saving} save={save} editing={Boolean(estimate)} />:<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
     </div>
@@ -260,8 +269,8 @@ function Label({ text, required }: { text: string; required?: boolean }) { retur
 function Alert({ kind, text }: { kind: "success" | "error"; text: string }) { return <div role={kind === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${kind === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-[#143d1a]/15 bg-[#edf4ec] text-[#143d1a]"}`}>{text}</div>; }
 function validateCustomer(customer: CustomerInformation): string | null { if (!customer.firstName.trim() && !customer.lastName.trim() && !customer.companyName.trim() && !customer.email.trim() && !customer.phone.trim()) return "Enter a name, company, email, or phone number to identify the client."; if (!customer.address.trim()) return "Enter the property address before saving."; return null; }
 function isEstimateDraft(value: unknown): value is EstimateDraft { if (!value || typeof value !== "object") return false; const draft=value as Partial<EstimateDraft>; return draft.version===1&&(draft.division==="Residential"||draft.division==="Commercial")&&typeof draft.notes==="string"&&Boolean(draft.customer&&typeof draft.customer==="object")&&draft.residential?.division==="Residential"&&Array.isArray(draft.residential.addOns)&&draft.commercial?.division==="Commercial"&&Array.isArray(draft.commercial.additionalServices); }
-function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDivision, residential: ResidentialCalculatorInput, commercial: CommercialCalculatorInput, serviceDescription:string, notes: string): boolean { return Object.values(customer).some((value)=>value.trim())||division!=="Residential"||serviceDescription.trim()!==""||notes.trim()!==""||JSON.stringify(residential)!==JSON.stringify(defaultResidential)||JSON.stringify(commercial)!==JSON.stringify(defaultCommercial); }
-function estimatePayload(clientId: string, propertyId: string, customer: CustomerInformation, division: EstimateDivision, result: EstimateResult, notes: string, status: "Open" | "Archived") { return { client_id: clientId, property_id: propertyId, division, customer_first_name: clean(customer.firstName), customer_last_name: clean(customer.lastName), customer_phone: clean(customer.phone), customer_email: clean(customer.email), customer_address: customer.address.trim(), frequency: result.calculatorInput.frequency, service_name: result.serviceName, status, result, notes: clean(notes) }; }
+function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDivision, residential: ResidentialCalculatorInput, commercial: CommercialCalculatorInput, serviceDescription:string, notes: string, terms:string, defaults:EstimateDraftDefaults): boolean { return Object.values(customer).some((value)=>value.trim())||division!=="Residential"||serviceDescription.trim()!==defaults.serviceDescription.trim()||notes.trim()!==defaults.notes.trim()||terms.trim()!==defaults.terms.trim()||JSON.stringify(residential)!==JSON.stringify(defaults.residential)||JSON.stringify(commercial)!==JSON.stringify(defaults.commercial); }
+function estimatePayload(clientId: string, propertyId: string, customer: CustomerInformation, division: EstimateDivision, result: EstimateResult, notes: string, terms:string, status: "Open" | "Archived") { return { client_id: clientId, property_id: propertyId, division, customer_first_name: clean(customer.firstName), customer_last_name: clean(customer.lastName), customer_phone: clean(customer.phone), customer_email: clean(customer.email), customer_address: customer.address.trim(), frequency: result.calculatorInput.frequency, service_name: result.serviceName, status, result, notes: clean(notes), terms:clean(terms) }; }
 function customerFromEstimate(estimate: EstimateWithRelations): CustomerInformation { return { firstName: estimate.customer_first_name ?? "", lastName: estimate.customer_last_name ?? "", companyName: estimate.client?.company_name ?? "", phone: estimate.customer_phone ?? "", email: estimate.customer_email ?? "", address: estimate.property?.address ?? estimate.customer_address ?? "", addressLine2: estimate.property?.address_line_2 ?? "", city: estimate.property?.city ?? "", state: estimate.property?.state ?? "", zip: estimate.property?.zip ?? "" }; }
 function clientOptionLabel(client:Client){const contact=[client.first_name,client.last_name].filter(Boolean).join(" ");return client.company_name&&contact?`${client.company_name} - ${contact}`:client.company_name||contact||client.email||"Unnamed client"}
 function propertyOptionLabel(property:PropertyWithClient){return [property.property_name,property.address,property.city,property.state].filter(Boolean).join(" - ")||"Unnamed property"}

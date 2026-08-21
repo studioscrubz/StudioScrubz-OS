@@ -104,6 +104,7 @@ export type Estimate = {
   status: EstimateStatus;
   result: EstimateResult;
   notes: string | null;
+  terms: string | null;
   sent_at: string | null;
   sent_to: string | null;
   sent_by: string | null;

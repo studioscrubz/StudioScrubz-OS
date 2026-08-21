@@ -43,6 +43,7 @@ create table if not exists public.business_settings (
   default_estimate_expiration_days integer not null default 30, default_proposal_expiration_days integer not null default 30,
   default_invoice_due_days integer not null default 15, default_payment_terms text, default_invoice_terms text,
   default_proposal_terms text, default_estimate_notes text, default_service_agreement_terms text,
+  default_estimate_terms text, default_cancellation_terms text,
   currency text not null default 'USD', timezone text,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
@@ -149,7 +150,9 @@ select
   timezone,
   created_at,
   updated_at,
-  default_service_agreement_terms
+  default_service_agreement_terms,
+  default_estimate_terms,
+  default_cancellation_terms
 from public.business_settings
 where (select auth.uid()) is not null
   and public.has_any_role(array['Master Admin','Administrator','Manager','Sales']);

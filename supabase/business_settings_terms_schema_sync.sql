@@ -3,7 +3,12 @@
 -- Existing Service Agreements are intentionally not modified by this migration.
 
 alter table public.business_settings
-  add column if not exists default_service_agreement_terms text;
+  add column if not exists default_service_agreement_terms text,
+  add column if not exists default_estimate_terms text,
+  add column if not exists default_cancellation_terms text;
+
+alter table public.estimates
+  add column if not exists terms text;
 
 -- Business Settings are read through this explicit workflow projection.
 -- Append the new column so existing view column ordering remains stable.
@@ -32,7 +37,9 @@ select
   timezone,
   created_at,
   updated_at,
-  default_service_agreement_terms
+  default_service_agreement_terms,
+  default_estimate_terms,
+  default_cancellation_terms
 from public.business_settings
 where (select auth.uid()) is not null
   and public.has_any_role(array['Master Admin','Administrator','Manager','Sales']);

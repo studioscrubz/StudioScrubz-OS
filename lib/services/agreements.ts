@@ -104,7 +104,7 @@ export async function createAgreementFromProposal(proposalId: string) {
     pricing_snapshot: pricing,
     payment_terms: p.result.terms.paymentTerms,
     agreement_terms: settings.default_service_agreement_terms,
-    cancellation_terms: null,
+    cancellation_terms: settings.default_cancellation_terms,
     scope: p.result.scope,
     special_instructions: p.result.terms.accessRequirements,
     assigned_crew_id: null,
