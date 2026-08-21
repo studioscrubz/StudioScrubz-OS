@@ -3,6 +3,8 @@ import { getProposalById } from "@/lib/services/proposals";
 import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
+import { getCurrentProfile } from "@/lib/services/auth";
+import { hasPermission } from "@/lib/auth/permissions";
 import { estimatedMonthlyTotal, isRecurringFrequency } from "@/lib/scheduling/frequency";
 import type {
   AgreementFinancialSummary,
@@ -123,6 +125,34 @@ export async function updateAgreement(id: string, input: AgreementUpdate) {
     .single();
   if (error) throw error;
   return data as AgreementWithRelations;
+}
+export async function saveAgreementEdits(id: string, input: AgreementUpdate) {
+  const [current, profile] = await Promise.all([getAgreementById(id), getCurrentProfile()]);
+  if (!hasPermission(profile, "agreements.manage")) throw new Error("Agreement management permission is required.");
+  if (current.status === "Draft") return updateAgreement(id, input);
+  if (!["Sent", "Accepted", "Active", "Paused"].includes(current.status)) throw new Error(`A ${current.status} agreement cannot be edited.`);
+  // Non-Draft edits are operational only. Preserve the contractual source,
+  // accepted pricing, billing configuration, and lifecycle state.
+  const operationalUpdate: AgreementUpdate = {
+    ...input,
+    client_id: current.client_id,
+    property_id: current.property_id,
+    proposal_id: current.proposal_id,
+    division: current.division,
+    billing_type: current.billing_type,
+    billing_amount: current.billing_amount,
+    pricing_snapshot: current.pricing_snapshot,
+    payment_terms: current.payment_terms,
+    agreement_terms: current.agreement_terms,
+    cancellation_terms: current.cancellation_terms,
+    status: current.status,
+  };
+  const candidate = { ...current, ...operationalUpdate } as ServiceAgreement;
+  const catalog = await getServiceCatalog();
+  const service = catalog.services.find((row) => row.service_name === candidate.service_name && (row.division === candidate.division || row.division === "Both"));
+  const validation = validateAgreementConfiguration(candidate, current.client, current.property, service, ["Active", "Paused"].includes(current.status));
+  if (validation) throw new Error(validation);
+  return updateAgreement(id, operationalUpdate);
 }
 async function transition(id: string, allowed: ServiceAgreement["status"][], status: ServiceAgreement["status"], extra: AgreementUpdate = {}) {
   const current = await getAgreementById(id);
