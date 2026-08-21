@@ -5,6 +5,10 @@ import { getCrewById } from "@/lib/services/crews";
 import { employeeName } from "@/types/employee";
 import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 import type { JobWithRelations } from "@/types/job";
+const deletedOccurrenceMarker = "[Deleted upcoming service — retained to prevent schedule regeneration]";
+export function isDeletedOccurrence(occurrence: Pick<import("@/types/serviceOccurrence").ServiceOccurrence, "notes">) {
+  return occurrence.notes?.includes(deletedOccurrenceMarker) ?? false;
+}
 const select =
   "*, agreement:service_agreements!service_occurrences_agreement_id_fkey(*), crew:crews!service_occurrences_assigned_crew_id_fkey(*), job:jobs!service_occurrences_job_id_fkey(*)";
 export async function getOccurrences() {
@@ -169,6 +173,32 @@ export async function createJobFromOccurrence(
 export const skipOccurrence = (id: string) => update(id, { status: "Skipped" });
 export const cancelOccurrence = (id: string) =>
   update(id, { status: "Cancelled" });
+export async function deleteOccurrence(id: string) {
+  const db = getSupabaseClient();
+  const { data, error } = await db
+    .from("service_occurrences")
+    .select("id,scheduled_date,status,job_id,notes")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  if (data.job_id) throw new Error("This service already has a Job. Cancel the Job or occurrence instead.");
+  if (data.status !== "Scheduled") throw new Error("Only an upcoming Scheduled service with no operational history can be deleted.");
+  if (data.scheduled_date < today()) throw new Error("Past or completed service occurrences cannot be deleted.");
+  const linkedJob = await db.from("jobs").select("id").eq("service_occurrence_id", id).limit(1).maybeSingle();
+  if (linkedJob.error) throw linkedJob.error;
+  if (linkedJob.data) throw new Error("This service generated a Job and must remain in operational history.");
+  const tombstone = await db.from("service_occurrences")
+    .update({ status: "Cancelled", notes: data.notes ? `${data.notes}\n${deletedOccurrenceMarker}` : deletedOccurrenceMarker })
+    .eq("id", id)
+    .is("job_id", null)
+    .eq("status", "Scheduled")
+    .gte("scheduled_date", today())
+    .select()
+    .maybeSingle();
+  if (tombstone.error) throw tombstone.error;
+  if (!tombstone.data) throw new Error("This service changed and is no longer eligible for deletion.");
+  return tombstone.data;
+}
 export const rescheduleOccurrence = (
   id: string,
   date: string,
