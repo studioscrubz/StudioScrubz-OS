@@ -10,6 +10,11 @@ import type { CalculatorInput, CommercialCalculatorInput, Condition, CustomerInf
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { getClients } from "@/lib/services/clients";
+import { getProperties } from "@/lib/services/properties";
+import type { Client } from "@/types/client";
+import type { PropertyWithClient } from "@/types/property";
+import { UsStateSelect } from "@/components/forms/UsStateSelect";
 
 const frequencies: Frequency[] = ["One-Time", "Daily", "Weekly", "Biweekly", "Monthly"];
 const conditions: Condition[] = ["Light", "Average", "Heavy", "Extreme"];
@@ -45,6 +50,10 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [draftReady, setDraftReady] = useState(Boolean(estimate));
   const [catalog,setCatalog]=useState<ServiceCatalogBundle|null>(null);
   const [catalogLoading,setCatalogLoading]=useState(true);
+  const [clients,setClients]=useState<Client[]>([]);
+  const [properties,setProperties]=useState<PropertyWithClient[]>([]);
+  const [selectedClientId,setSelectedClientId]=useState("");
+  const [selectedPropertyId,setSelectedPropertyId]=useState("");
   const restoredDraft = useRef(false);
   const suppressDraftSave = useRef(false);
   const pendingCatalogSelection = useRef<{ division: EstimateDivision; selection: string } | null>(null);
@@ -52,6 +61,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   useOperationalRealtime(["services", "service_addons", "service_addon_links", "service_price_tiers", "recurring_pricing_rules"], async () => {
     setCatalog(await getServiceCatalog());
   });
+  function loadCustomerOptions() { return Promise.all([getClients(),getProperties()]).then(([nextClients,nextProperties])=>{setClients(nextClients);setProperties(nextProperties)}); }
+  useOperationalRealtime(["clients", "properties"], loadCustomerOptions);
+  useEffect(()=>{if(!estimate)void loadCustomerOptions().catch(x=>setError(x instanceof Error?x.message:"Clients and properties could not be loaded."))},[estimate]);
   useEffect(() => {
     if (estimate) return;
     try {
@@ -103,6 +115,27 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
 
   function selectCatalogService(nextDivision:EstimateDivision, selection:string) { if (!catalog) { pendingCatalogSelection.current={division:nextDivision,selection}; return; } const service=selectedCatalogService(catalog,nextDivision,selection); setServiceDescription(service?.description?.trim()??""); }
 
+  function selectExistingClient(clientId:string) {
+    setSelectedClientId(clientId);setSelectedPropertyId("");
+    const client=clients.find(entry=>entry.id===clientId);
+    if(!client){setCustomer({...blankCustomer});return}
+    setCustomer({firstName:client.first_name??"",lastName:client.last_name??"",companyName:client.company_name??"",phone:client.phone??"",email:client.email??"",address:"",addressLine2:"",city:"",state:"",zip:""});
+  }
+
+  function selectExistingProperty(propertyId:string) {
+    setSelectedPropertyId(propertyId);
+    const property=properties.find(entry=>entry.id===propertyId&&entry.client_id===selectedClientId);
+    setCustomer(current=>({...current,address:property?.address??"",addressLine2:property?.address_line_2??"",city:property?.city??"",state:property?.state??"",zip:property?.zip??""}));
+  }
+
+  function updateLocation(field:"address"|"addressLine2"|"city"|"state"|"zip",value:string) { setSelectedPropertyId("");setCustomer(current=>({...current,[field]:value})); }
+
+  function changeDivision(value:EstimateDivision) {
+    if(value!==division){setSelectedClientId("");setSelectedPropertyId("")}
+    setDivision(value);
+    selectCatalogService(value,value==="Residential"?residential.serviceType:commercial.commercialType);
+  }
+
   async function save() {
     if(!result){setError(calculation.error??"Pricing is not ready.");return}
     const validation = validateCustomer(customer);
@@ -116,8 +149,17 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         await getEstimates();
         setSuccess("Estimate updated successfully.");
       } else {
-        const client = await findOrCreateEstimateClient(customer, division);
-        const property = await findOrCreateEstimateProperty(client.id, customer, division);
+        const selectedClient = selectedClientId ? clients.find((entry)=>entry.id===selectedClientId) : null;
+        if (selectedClientId && !selectedClient) throw new Error("The selected client no longer exists. Choose another client.");
+        if (selectedClient?.archived_at) throw new Error("The selected client is archived. Choose an active client.");
+        if (selectedClient && selectedClient.client_type!==division) throw new Error(`The selected client must be a ${division} client.`);
+        const client = selectedClient ?? await findOrCreateEstimateClient(customer, division);
+        const selectedProperty = selectedPropertyId ? properties.find((entry)=>entry.id===selectedPropertyId) : null;
+        if (selectedPropertyId && !selectedProperty) throw new Error("The selected property no longer exists. Choose another property.");
+        if (selectedProperty?.archived_at) throw new Error("The selected property is archived. Choose an active property.");
+        if (selectedProperty && selectedProperty.client_id!==client.id) throw new Error("The selected property does not belong to the selected client.");
+        if (selectedProperty && selectedProperty.property_type!==division) throw new Error(`The selected property must be a ${division} property.`);
+        const property = selectedProperty ?? await findOrCreateEstimateProperty(client.id, customer, division);
         await createEstimate(estimatePayload(client.id, property.id, customer, division, result, notes, "Open"));
         await getEstimates();
         setSuccess("Estimate saved successfully and is available in Open Estimates.");
@@ -140,6 +182,8 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     setServiceDescription("");
     setNotes("");
     setDraftNotice(null);
+    setSelectedClientId("");
+    setSelectedPropertyId("");
   }
 
   function requestClearDraft() {
@@ -153,22 +197,26 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     {draftNotice && <Alert kind="success" text={draftNotice} />}{success && <Alert kind="success" text={success} />}{error && <Alert kind="error" text={error} />}
     {!estimate && <div className="flex justify-end"><button type="button" onClick={requestClearDraft} className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] hover:border-[#d4af37]">Clear Draft</button></div>}
     <Section title="Customer Information" subtitle="Customer and service-location details are matched automatically when you save.">
+      {!estimate && <div className="mb-5 grid gap-4 rounded-xl border border-[#143d1a]/10 bg-[#f7f9f6] p-4 sm:grid-cols-2">
+        <SelectField label="Existing Client" value={selectedClientId} options={["",...clients.filter(entry=>!entry.archived_at&&entry.client_type===division).map(entry=>entry.id)]} labels={new Map(clients.map(entry=>[entry.id,clientOptionLabel(entry)]))} placeholder="New client / enter details below" set={selectExistingClient} />
+        {selectedClientId && <SelectField label="Existing Property" value={selectedPropertyId} options={["",...properties.filter(entry=>entry.client_id===selectedClientId&&!entry.archived_at&&entry.property_type===division).map(entry=>entry.id)]} labels={new Map(properties.map(entry=>[entry.id,propertyOptionLabel(entry)]))} placeholder="New property / enter location below" set={selectExistingProperty} />}
+      </div>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <TextField label="First Name" value={customer.firstName} set={(value) => setCustomer({ ...customer, firstName: value })} />
         <TextField label="Last Name" value={customer.lastName} set={(value) => setCustomer({ ...customer, lastName: value })} />
         {division === "Commercial" && <TextField label="Company Name" value={customer.companyName} set={(value) => setCustomer({ ...customer, companyName: value })} />}
         <TextField label="Phone Number" type="tel" value={customer.phone} set={(value) => setCustomer({ ...customer, phone: value })} />
         <TextField label="Email Address" type="email" value={customer.email} set={(value) => setCustomer({ ...customer, email: value })} />
-        <div className="sm:col-span-2 xl:col-span-3"><TextField label="Property Address" required value={customer.address} set={(value) => setCustomer({ ...customer, address: value })} /></div>
-        <TextField label="Address Line 2" value={customer.addressLine2} set={(value) => setCustomer({ ...customer, addressLine2: value })} />
-        <TextField label="City" value={customer.city} set={(value) => setCustomer({ ...customer, city: value })} />
-        <div className="grid grid-cols-2 gap-4"><TextField label="State" value={customer.state} set={(value) => setCustomer({ ...customer, state: value })} /><TextField label="ZIP Code" value={customer.zip} set={(value) => setCustomer({ ...customer, zip: value })} /></div>
+        <div className="sm:col-span-2 xl:col-span-3"><TextField label="Property Address" required value={customer.address} set={(value) => updateLocation("address",value)} /></div>
+        <TextField label="Address Line 2" value={customer.addressLine2} set={(value) => updateLocation("addressLine2",value)} />
+        <TextField label="City" value={customer.city} set={(value) => updateLocation("city",value)} />
+        <div className="grid grid-cols-2 gap-4"><label className="block"><Label text="State" /><UsStateSelect value={customer.state} onChange={(value)=>updateLocation("state",value)} className={inputClass}/></label><TextField label="ZIP Code" value={customer.zip} set={(value) => updateLocation("zip",value)} /></div>
       </div>
     </Section>
     <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,.75fr)]">
       <div className="space-y-6">
         <Section title="Estimate Calculator" subtitle="Choose a division and configure the service.">
-          <DivisionToggle value={division} set={(value) => {setDivision(value);selectCatalogService(value,value==="Residential"?residential.serviceType:commercial.commercialType)}} />
+          <DivisionToggle value={division} set={changeDivision} />
           {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:calculation.error?<Alert kind="error" text={calculation.error}/>:catalog&&<div className="mt-6">{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} />}</div>}
         </Section>
         <Section title="Service Description" subtitle="Copied from the selected Service Catalog entry and saved with this Estimate."><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{serviceDescription||"No service description available."}</div></Section>
@@ -206,7 +254,7 @@ function DivisionToggle({ value, set }: { value: EstimateDivision; set: (value: 
 function TextField({ label, value, set, type = "text", required }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean }) { return <label className="block"><Label text={label} required={required} /><input type={type} value={value} onChange={(e) => set(e.target.value)} className={inputClass} /></label>; }
 function ProjectDurationFields({ days, workdayHours, setDays, setWorkdayHours }: { days:number; workdayHours:8|10; setDays:(value:number)=>void; setWorkdayHours:(value:8|10)=>void }) { const preset=[1,2,3].includes(days)?String(days):"Custom";return <><label className="block"><Label text="Target Completion Days"/><select className={inputClass} value={preset} onChange={(event)=>setDays(event.target.value==="Custom"?Math.max(4,days):Number(event.target.value))}><option value="1">1 Day</option><option value="2">2 Days</option><option value="3">3 Days</option><option value="Custom">Custom</option></select></label>{preset==="Custom"&&<NumberField label="Custom Target Days" value={days} set={setDays}/>}<SelectField label="Workday Length" value={String(workdayHours)} options={["8","10"]} set={(value)=>setWorkdayHours(Number(value) as 8|10)}/></>; }
 function NumberField({ label, value, set, step = "1" }: { label: string; value: number; set: (value: number) => void; step?: string }) { return <label className="block"><Label text={label} /><input type="number" min="0" step={step} value={value} onChange={(e) => set(Number(e.target.value))} className={inputClass} /></label>; }
-function SelectField({ label, value, set, options }: { label: string; value: string; set: (value: string) => void; options: readonly string[] }) { return <label className="block"><Label text={label} /><select value={value} onChange={(e) => set(e.target.value)} className={inputClass}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>; }
+function SelectField({ label, value, set, options, labels, placeholder }: { label: string; value: string; set: (value: string) => void; options: readonly string[]; labels?: ReadonlyMap<string,string>; placeholder?: string }) { return <label className="block"><Label text={label} /><select value={value} onChange={(e) => set(e.target.value)} className={inputClass}>{options.map((option) => <option key={option} value={option}>{option===""&&placeholder?placeholder:labels?.get(option)??option}</option>)}</select></label>; }
 function Check({ label, checked, set }: { label: string; checked: boolean; set: (value: boolean) => void }) { return <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-neutral-200 px-3.5 text-sm font-semibold text-neutral-700"><input type="checkbox" checked={checked} onChange={(e) => set(e.target.checked)} className="size-4 accent-[#143d1a]" />{label}</label>; }
 function Label({ text, required }: { text: string; required?: boolean }) { return <span className="mb-2 block text-xs font-bold text-neutral-700">{text}{required && <span className="ml-1 text-[#9a7a17]">*</span>}</span>; }
 function Alert({ kind, text }: { kind: "success" | "error"; text: string }) { return <div role={kind === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${kind === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-[#143d1a]/15 bg-[#edf4ec] text-[#143d1a]"}`}>{text}</div>; }
@@ -215,6 +263,8 @@ function isEstimateDraft(value: unknown): value is EstimateDraft { if (!value ||
 function hasMeaningfulDraft(customer: CustomerInformation, division: EstimateDivision, residential: ResidentialCalculatorInput, commercial: CommercialCalculatorInput, serviceDescription:string, notes: string): boolean { return Object.values(customer).some((value)=>value.trim())||division!=="Residential"||serviceDescription.trim()!==""||notes.trim()!==""||JSON.stringify(residential)!==JSON.stringify(defaultResidential)||JSON.stringify(commercial)!==JSON.stringify(defaultCommercial); }
 function estimatePayload(clientId: string, propertyId: string, customer: CustomerInformation, division: EstimateDivision, result: EstimateResult, notes: string, status: "Open" | "Archived") { return { client_id: clientId, property_id: propertyId, division, customer_first_name: clean(customer.firstName), customer_last_name: clean(customer.lastName), customer_phone: clean(customer.phone), customer_email: clean(customer.email), customer_address: customer.address.trim(), frequency: result.calculatorInput.frequency, service_name: result.serviceName, status, result, notes: clean(notes) }; }
 function customerFromEstimate(estimate: EstimateWithRelations): CustomerInformation { return { firstName: estimate.customer_first_name ?? "", lastName: estimate.customer_last_name ?? "", companyName: estimate.client?.company_name ?? "", phone: estimate.customer_phone ?? "", email: estimate.customer_email ?? "", address: estimate.property?.address ?? estimate.customer_address ?? "", addressLine2: estimate.property?.address_line_2 ?? "", city: estimate.property?.city ?? "", state: estimate.property?.state ?? "", zip: estimate.property?.zip ?? "" }; }
+function clientOptionLabel(client:Client){const contact=[client.first_name,client.last_name].filter(Boolean).join(" ");return client.company_name&&contact?`${client.company_name} - ${contact}`:client.company_name||contact||client.email||"Unnamed client"}
+function propertyOptionLabel(property:PropertyWithClient){return [property.property_name,property.address,property.city,property.state].filter(Boolean).join(" - ")||"Unnamed property"}
 function clean(value: string): string | null { return value.trim() || null; }
 function selectedCatalogService(catalog:ServiceCatalogBundle,division:EstimateDivision,selection:string){const normalized=normalizeServiceSelection(selection);return catalog.services.find(service=>(service.division===division||service.division==="Both")&&normalizeServiceSelection(service.service_name)===normalized)}
 function normalizeServiceSelection(value:string){return value.replace(/ Cleaning$/i,"").trim().toLowerCase()}

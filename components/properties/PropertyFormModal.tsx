@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { Client } from "@/types/client";
 import { PROPERTY_TYPES, type PropertyInput, type PropertyType, type PropertyWithClient } from "@/types/property";
+import { UsStateSelect } from "@/components/forms/UsStateSelect";
 
 type Props = { property: PropertyWithClient | null; clients: Client[]; saving: boolean; onClose: () => void; onSubmit: (input: PropertyInput) => Promise<void> };
 
@@ -60,7 +61,7 @@ export function PropertyFormModal({ property, clients, saving, onClose, onSubmit
             <div className="sm:col-span-2"><Field label="Street Address" required><input value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} autoComplete="street-address" required /></Field></div>
             <div className="sm:col-span-2"><Field label="Address Line 2"><input value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} className={inputClass} /></Field></div>
             <Field label="City"><input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} autoComplete="address-level2" /></Field>
-            <div className="grid grid-cols-2 gap-3"><Field label="State"><input value={state} onChange={(e) => setState(e.target.value)} className={inputClass} autoComplete="address-level1" /></Field><Field label="ZIP Code"><input value={zip} onChange={(e) => setZip(e.target.value)} className={inputClass} autoComplete="postal-code" /></Field></div>
+            <div className="grid grid-cols-2 gap-3"><Field label="State"><UsStateSelect value={state} onChange={setState} className={inputClass} /></Field><Field label="ZIP Code"><input value={zip} onChange={(e) => setZip(e.target.value)} className={inputClass} autoComplete="postal-code" /></Field></div>
             <Field label="Square Feet"><NumberField value={squareFeet} setValue={setSquareFeet} /></Field>
             <Field label="Floors"><NumberField value={floors} setValue={setFloors} /></Field>
             <Field label="Bedrooms"><NumberField value={bedrooms} setValue={setBedrooms} /></Field>

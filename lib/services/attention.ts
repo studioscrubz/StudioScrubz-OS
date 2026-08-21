@@ -3,7 +3,7 @@ import { getCurrentProfile } from "@/lib/services/auth";
 import { getJobs } from "@/lib/services/jobs";
 import { getProposals } from "@/lib/services/proposals";
 import { getAgreements } from "@/lib/services/agreements";
-import { getInvoices } from "@/lib/services/invoices";
+import { getInvoicedJobIds, getInvoices } from "@/lib/services/invoices";
 import { getAllClientCommunications } from "@/lib/services/clientCommunications";
 import { getOpenTimeEntries } from "@/lib/services/timeEntries";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
@@ -18,12 +18,13 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
   const canManageCommunications = hasPermission(profile, "communications.view") && hasPermission(profile, "communications.create");
-  const [jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings] = await Promise.all([
+  const [jobs, walkthroughs, proposals, agreements, invoices, invoicedJobIds, communications, timeEntries, states, settings] = await Promise.all([
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
     hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
     hasPermission(profile, "proposals.view") ? getProposals() : Promise.resolve([]),
     hasPermission(profile, "agreements.view") ? getAgreements() : Promise.resolve([]),
     hasPermission(profile, "invoices.view") ? getInvoices() : Promise.resolve([]),
+    hasPermission(profile, "jobs.view") && hasPermission(profile, "invoices.view") ? getInvoicedJobIds() : Promise.resolve([]),
     hasPermission(profile, "communications.view") ? getAllClientCommunications() : Promise.resolve([]),
     hasPermission(profile, "timeClock.view") ? getOpenTimeEntries() : Promise.resolve([]),
     getAttentionItemStates(),
@@ -32,6 +33,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const clock = businessClock(settings?.timezone ?? null);
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...jobs.map((row) => row.proposal_id), ...agreements.map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
+  const invoicedJobs = new Set(invoicedJobIds);
 
   for (const walkthrough of walkthroughs.filter((row) => row.status === "New" && !row.walkthrough_date && !row.archived_at && row.measurements.requestSource === "Public Estimate")) {
     const requestedAt = walkthrough.measurements.requestedAt ?? walkthrough.created_at;
@@ -45,7 +47,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 
   for (const job of jobs) {
     const label = job.job_number;
-    if (job.status === "Completed") items.push(item(`job:${job.id}:invoice`, "Completed Job Needs Invoice", "Urgent", "Invoices", "Completed job needs an invoice", `${label} - ${job.service_name || "Service"} - ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Create Invoice"));
+    if (job.status === "Completed" && !invoicedJobs.has(job.id)) items.push(item(`job:${job.id}:invoice`, "Completed Job Needs Invoice", "Urgent", "Invoices", "Completed job needs an invoice", `${label} - ${job.service_name || "Service"} - ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Create Invoice"));
     if (job.status === "Ready to Schedule" && !job.scheduled_date) items.push(item(`job:${job.id}:unscheduled`, "Unscheduled Job", "Attention", "Jobs", "Job needs scheduling", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, null, job.created_at, `/jobs?jobId=${job.id}`, "Schedule Job"));
     if (["Scheduled", "Ready to Schedule"].includes(job.status) && job.scheduled_date && !job.assigned_crew_id) items.push(item(`job:${job.id}:crew`, "Job Needs Crew", "Attention", "Jobs", "Job needs crew assignment", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Assign Crew"));
     if (job.scheduled_date && job.scheduled_date >= today && job.scheduled_date <= inSeven && !["Completed", "Cancelled", "Archived"].includes(job.status) && !job.archived_at) items.push(item(`job:${job.id}:upcoming`, "Upcoming Job", "Info", "Jobs", "Upcoming job", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));

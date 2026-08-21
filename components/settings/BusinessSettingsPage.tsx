@@ -2,11 +2,12 @@
 import { useEffect, useState } from "react";
 import { getBusinessSettings, updateBusinessSettings } from "@/lib/services/businessSettings";
 import type { BusinessSettings, BusinessSettingsUpdate } from "@/types/businessSettings";
+import { UsStateSelect } from "@/components/forms/UsStateSelect";
 
 const textFields: Array<[keyof BusinessSettings, string]> = [
   ["business_name","Business Name"],["tagline","Tagline"],["business_email","Business Email"],
   ["business_phone","Business Phone"],["website","Website"],["address","Address"],["city","City"],
-  ["state","State"],["zip","ZIP"],["timezone","Timezone"],["currency","Currency"],
+  ["zip","ZIP"],["timezone","Timezone"],["currency","Currency"],
 ];
 export function BusinessSettingsPage(){
   const [value,setValue]=useState<BusinessSettings|null>(null),[error,setError]=useState<string|null>(null),[notice,setNotice]=useState<string|null>(null),[saving,setSaving]=useState(false);
@@ -15,7 +16,7 @@ export function BusinessSettingsPage(){
   function set<K extends keyof BusinessSettings>(key:K,next:BusinessSettings[K]){setValue(current=>current?{...current,[key]:next}:current)}
   async function save(){if(!value)return;setSaving(true);setError(null);try{const{id:_,created_at:__,updated_at:___,...input}=value;setValue(await updateBusinessSettings(input as BusinessSettingsUpdate));setNotice("Business settings saved.")}catch(x){setError(msg(x))}finally{setSaving(false)}}
   return <><header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Business Settings</h1><p className="mt-3 text-neutral-600">Manage StudioScrubz business information and default document settings.</p></header>{error&&<Alert text={error}/>} {notice&&<Alert text={notice} good/>}
-    <Section title="Company Information"><Grid>{textFields.map(([key,label])=><Field key={key} label={label} value={String(value[key]??"")} set={next=>setValue(current=>current?{...current,[key]:next||null}:current)}/>)}</Grid></Section>
+    <Section title="Company Information"><Grid>{textFields.map(([key,label])=><Field key={key} label={label} value={String(value[key]??"")} set={next=>setValue(current=>current?{...current,[key]:next||null}:current)}/>)}<label className="text-sm font-bold">State<UsStateSelect className={input} value={value.state??""} onChange={next=>set("state",next||null)}/></label></Grid></Section>
     <Section title="Estimate Defaults"><Grid><NumberField label="Default estimate expiration days" value={value.default_estimate_expiration_days} set={x=>set("default_estimate_expiration_days",x)}/><NumberField label="Default tax rate %" value={value.default_tax_rate} set={x=>set("default_tax_rate",x)}/><Area label="Default estimate notes" value={value.default_estimate_notes??""} set={x=>set("default_estimate_notes",x||null)}/></Grid></Section>
     <Section title="Proposal Defaults"><Grid><NumberField label="Default proposal expiration days" value={value.default_proposal_expiration_days} set={x=>set("default_proposal_expiration_days",x)}/><Area label="Default proposal terms" value={value.default_proposal_terms??""} set={x=>set("default_proposal_terms",x||null)}/></Grid></Section>
     <Section title="Service Agreement Defaults"><Area label="Default Service Agreement Terms" value={value.default_service_agreement_terms??""} set={x=>set("default_service_agreement_terms",x||null)} large/></Section>
