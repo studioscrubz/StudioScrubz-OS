@@ -86,6 +86,7 @@ export async function createJobFromOccurrence(
   if (["Skipped", "Cancelled"].includes(occurrence.status))
     throw new Error("Skipped or cancelled occurrences cannot create Jobs.");
   const a = await getAgreementById(occurrence.agreement_id);
+  const jobAmount = ["Monthly", "Flat Contract"].includes(a.billing_type) ? 0 : a.billing_amount;
   if (!a.client_id || !a.property_id || !a.client || !a.property)
     throw new Error("This Agreement has a deleted Client or Property relationship and cannot create a Job.");
   const assignedCrew = a.assigned_crew_id ? await getCrewById(a.assigned_crew_id) : null;
@@ -127,9 +128,9 @@ export async function createJobFromOccurrence(
       assigned_crew_name: assignedCrew?.crew_name ?? null,
       crew_lead_name: assignedCrew?.crew_lead ? employeeName(assignedCrew.crew_lead) : null,
       assigned_team: assignedCrew?.members.map((member) => employeeName(member.employee)) ?? [],
-      price: a.billing_amount,
+      price: jobAmount,
       deposit: 0,
-      balance: a.billing_amount,
+      balance: jobAmount,
       labor_hours: 0,
       recommended_crew_size: 1,
       scope: a.scope,

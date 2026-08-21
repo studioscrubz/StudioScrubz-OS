@@ -73,7 +73,7 @@ export async function getJobsForDateRange(
 export async function getJobById(id: string): Promise<JobWithRelations> {
   if (!(await master())) {
     const jobs = await getJobs(); const job = jobs.find((row) => row.id === id);
-    if (!job) throw new Error("Job not found or access denied."); return job;
+    if (!job) throw new Error("Job not found or access denied."); return attachOccurrenceBilling(job);
   }
   const { data, error } = await getSupabaseClient()
     .from("jobs")
@@ -81,8 +81,9 @@ export async function getJobById(id: string): Promise<JobWithRelations> {
     .eq("id", id)
     .single();
   if (error) throw error;
-  return data as JobWithRelations;
+  return attachOccurrenceBilling(data as JobWithRelations);
 }
+async function attachOccurrenceBilling(job:JobWithRelations){if(!job.service_occurrence_id)return job;const{data,error}=await getSupabaseClient().from("service_occurrences").select("agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").eq("id",job.service_occurrence_id).maybeSingle();if(error)throw error;return{...job,service_occurrence:data as JobWithRelations["service_occurrence"]}}
 export async function getJobForProposal(
   proposalId: string,
 ): Promise<JobWithRelations | null> {

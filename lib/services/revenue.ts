@@ -23,9 +23,9 @@ import {
 } from "@/lib/services/expenses";
 
 const invoiceSelect =
-  "*, job:jobs!invoices_job_id_fkey(*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)), proposal:proposals!invoices_proposal_id_fkey(*), client:clients!invoices_client_id_fkey(*), property:properties!invoices_property_id_fkey(*)";
+  "*, job:jobs!invoices_job_id_fkey(*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)), agreement:service_agreements!invoices_service_agreement_id_fkey(*), proposal:proposals!invoices_proposal_id_fkey(*), client:clients!invoices_client_id_fkey(*), property:properties!invoices_property_id_fkey(*)";
 const paymentSelect =
-  "id,amount,payment_date,payment_method,client_id,job_id,invoice:invoices!payments_invoice_id_fkey(id,invoice_number,client_id,client_name,service_name,job:jobs!invoices_job_id_fkey(division))";
+  "id,amount,payment_date,payment_method,client_id,job_id,invoice:invoices!payments_invoice_id_fkey(id,invoice_number,client_id,client_name,service_name,job:jobs!invoices_job_id_fkey(division),agreement:service_agreements!invoices_service_agreement_id_fkey(division))";
 type RawPayment = {
   id: string;
   amount: number;
@@ -40,6 +40,7 @@ type RawPayment = {
     client_name: string | null;
     service_name: string | null;
     job: { division: "Residential" | "Commercial" } | null;
+    agreement: { division: "Residential" | "Commercial" } | null;
   } | null;
 };
 
@@ -252,7 +253,7 @@ export function getRevenueByDivision(
       division,
       collected,
       percentage: total ? (collected / total) * 100 : 0,
-      invoiceCount: invoices.filter((x) => x.job?.division === division).length,
+      invoiceCount: invoices.filter((x) => invoiceDivision(x) === division).length,
     };
   });
 }
@@ -443,7 +444,7 @@ function mapPayment(x: RawPayment): RevenuePaymentRecord {
     clientId: x.invoice?.client_id ?? x.client_id ?? `deleted-client:${x.id}`,
     clientName: x.invoice?.client_name || "Deleted Client",
     service: x.invoice?.service_name || "Unlinked payment",
-    division: x.invoice?.job?.division ?? null,
+    division: x.invoice?.job?.division ?? x.invoice?.agreement?.division ?? null,
   };
 }
 function groupKey(date: string, group: RevenueGroup) {
@@ -453,6 +454,7 @@ function groupKey(date: string, group: RevenueGroup) {
   d.setDate(d.getDate() - d.getDay());
   return localDate(d);
 }
+function invoiceDivision(invoice:InvoiceWithRelations){if(invoice.job)return invoice.job.division;const agreement=Array.isArray(invoice.agreement)?invoice.agreement[0]:invoice.agreement;return agreement?.division??null}
 function defaultGroup(period: RevenuePeriod): RevenueGroup {
   return ["This Year", "Last Year", "All Time"].includes(period)
     ? "Month"

@@ -2,7 +2,7 @@ import type { Client } from "@/types/client";
 import type { EstimateDivision, Frequency } from "@/types/estimate";
 import type { Property } from "@/types/property";
 import type { Proposal, ProposalScopeItem } from "@/types/proposal";
-import type { AgreementFrequency } from "@/types/agreement";
+import type { AgreementBillingType, AgreementFrequency } from "@/types/agreement";
 import type { OperationalPhoto } from "@/types/photo";
 
 export const JOB_STATUSES = [
@@ -93,6 +93,7 @@ export type JobWithRelations = Job & {
   proposal: Proposal | null;
   client: Client | null;
   property: Property | null;
+  service_occurrence?: { agreement: { billing_type: AgreementBillingType } } | null;
 };
 export type CrewConflict = Pick<
   JobWithRelations,

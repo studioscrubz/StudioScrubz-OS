@@ -60,7 +60,7 @@ export async function createAgreement(input: AgreementInput) {
     const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
     if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
     const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules });
-    prepared = { ...input, billing_amount:pricing.final_per_visit_price, pricing_snapshot:pricing };
+    prepared = { ...input, billing_amount:["Monthly","Flat Contract"].includes(input.billing_type) ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
   }
   for (let i = 0; i < 5; i++) {
     const { data, error } = await getSupabaseClient()
@@ -156,7 +156,7 @@ export const archiveAgreement = (id: string) =>
 export async function getAgreementFinancialSummary(
   id: string,
 ): Promise<AgreementFinancialSummary> {
-  const db = getSupabaseClient(),
+  const db = getSupabaseClient(), agreement=await getAgreementById(id),
     { data: occ, error } = await db
       .from("service_occurrences")
       .select("job_id")
@@ -165,36 +165,20 @@ export async function getAgreementFinancialSummary(
   const occurrenceRows=(occ??[]) as {job_id:string|null}[];const jobIds = occurrenceRows
     .map((x) => x.job_id)
     .filter((x): x is string => !!x);
-  if (!jobIds.length)
-    return {
-      jobsGenerated: 0,
-      completedJobs: 0,
-      invoiced: 0,
-      collected: 0,
-      outstanding: 0,
-    };
-  const { data: inv, error: ie } = await db
-    .from("invoices")
-    .select("id,total,balance_due")
-    .in("job_id", jobIds)
-    .not("status", "in", "(Cancelled,Archived)");
+  let invoiceQuery=db.from("invoices").select("id,total,amount_paid,balance_due").not("status","in","(Cancelled,Archived)").is("archived_at",null);
+  invoiceQuery=["Monthly","Flat Contract"].includes(agreement.billing_type)?invoiceQuery.eq("service_agreement_id",id):jobIds.length?invoiceQuery.in("job_id",jobIds):invoiceQuery.eq("service_agreement_id",id);
+  const { data: inv, error: ie } = await invoiceQuery;
   if (ie) throw ie;
-  const invoiceIds = (inv ?? []).map((x) => x.id);
-  let collected = 0;
-  if (invoiceIds.length) {
-    const { data, error: pe } = await db
-      .from("payments")
-      .select("amount")
-      .in("invoice_id", invoiceIds);
-    if (pe) throw pe;
-    collected = (data ?? []).reduce((n, x) => n + Number(x.amount), 0);
-  }
+  const invoiced=roundMoney((inv??[]).reduce((n,x)=>n+Number(x.total),0));
   return {
+    billingType:agreement.billing_type,
+    contractAmount:Number(agreement.billing_amount),
     jobsGenerated: jobIds.length,
-    completedJobs: await completedJobs(jobIds),
-    invoiced: (inv ?? []).reduce((n, x) => n + Number(x.total), 0),
-    collected,
-    outstanding: (inv ?? []).reduce((n, x) => n + Number(x.balance_due), 0),
+    completedJobs: jobIds.length?await completedJobs(jobIds):0,
+    invoiced,
+    paid:roundMoney((inv??[]).reduce((n,x)=>n+Number(x.amount_paid),0)),
+    outstanding:roundMoney((inv??[]).reduce((n,x)=>n+Number(x.balance_due),0)),
+    remaining:agreement.billing_type==="Flat Contract"?Math.max(0,roundMoney(Number(agreement.billing_amount)-invoiced)):null,
   };
 }
 async function completedJobs(ids:string[]){const{count,error}=await getSupabaseClient().from("jobs").select("id",{count:"exact",head:true}).in("id",ids).eq("status","Completed");if(error)throw error;return count??0}
@@ -203,9 +187,9 @@ export function monthlyRecurringRevenue(a: ServiceAgreement) {
   return estimatedMonthlyAmount(a);
 }
 export function estimatedMonthlyAmount(a: ServiceAgreement) {
+  if (a.billing_type === "Monthly") return a.billing_amount;
   if (a.pricing_snapshot?.estimated_monthly_total !== null && a.pricing_snapshot?.estimated_monthly_total !== undefined)
     return a.pricing_snapshot.estimated_monthly_total;
-  if (a.billing_type === "Monthly") return a.billing_amount;
   if (a.billing_type === "Weekly") return (a.billing_amount * 52) / 12;
   if (a.billing_type === "Biweekly") return (a.billing_amount * 26) / 12;
   if (a.billing_type === "Per Visit") {
@@ -255,9 +239,10 @@ export function validateAgreementConfiguration(
   if (agreement.frequency === "Custom" && (!agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be at least 1.";
   if (activation && !agreement.default_start_time) return "A default service start time is required before activation.";
   if (activation && agreement.division === "Commercial" && !agreement.assigned_crew_id) return "Assign a crew before activating a Commercial agreement.";
-  if (activation && agreement.division === "Commercial" && ["Monthly", "Flat Contract"].includes(agreement.billing_type)) return `${agreement.billing_type} Commercial agreements can be stored, but cannot be activated until contract billing is implemented without per-occurrence charges.`;
+  if (activation && agreement.division === "Commercial" && ["Monthly", "Flat Contract"].includes(agreement.billing_type) && agreement.billing_amount <= 0) return `${agreement.billing_type} Commercial agreements require a contract amount greater than zero.`;
   return null;
 }
+const roundMoney=(value:number)=>Math.round(value*100)/100;
 function num() {
   const d = new Date();
   return `AGR-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;

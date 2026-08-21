@@ -32,6 +32,9 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   const clock = businessClock(settings?.timezone ?? null);
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
+  const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
+  if(contractOccurrenceError)throw contractOccurrenceError;
+  const contractJobIds=new Set((contractOccurrences??[]).filter(row=>["Monthly","Flat Contract"].includes((row.agreement as {billing_type:string}|null)?.billing_type??"")).map(row=>row.job_id).filter(Boolean));
   const routedProposalIds = new Set([...jobs.map((row) => row.proposal_id), ...agreements.map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
   const invoicedJobs = new Set(invoicedJobIds);
 
@@ -47,7 +50,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 
   for (const job of jobs) {
     const label = job.job_number;
-    if (job.status === "Completed" && !invoicedJobs.has(job.id)) items.push(item(`job:${job.id}:invoice`, "Completed Job Needs Invoice", "Urgent", "Invoices", "Completed job needs an invoice", `${label} - ${job.service_name || "Service"} - ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Create Invoice"));
+    if (job.status === "Completed" && !invoicedJobs.has(job.id) && !contractJobIds.has(job.id)) items.push(item(`job:${job.id}:invoice`, "Completed Job Needs Invoice", "Urgent", "Invoices", "Completed job needs an invoice", `${label} - ${job.service_name || "Service"} - ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Create Invoice"));
     if (job.status === "Ready to Schedule" && !job.scheduled_date) items.push(item(`job:${job.id}:unscheduled`, "Unscheduled Job", "Attention", "Jobs", "Job needs scheduling", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, null, job.created_at, `/jobs?jobId=${job.id}`, "Schedule Job"));
     if (["Scheduled", "Ready to Schedule"].includes(job.status) && job.scheduled_date && !job.assigned_crew_id) items.push(item(`job:${job.id}:crew`, "Job Needs Crew", "Attention", "Jobs", "Job needs crew assignment", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Assign Crew"));
     if (job.scheduled_date && job.scheduled_date >= today && job.scheduled_date <= inSeven && !["Completed", "Cancelled", "Archived"].includes(job.status) && !job.archived_at) items.push(item(`job:${job.id}:upcoming`, "Upcoming Job", "Info", "Jobs", "Upcoming job", `${label} · ${job.service_name || "Service"} — ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
