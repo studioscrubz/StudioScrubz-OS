@@ -9,7 +9,7 @@ export function AgreementPricingBreakdown({ pricing }: { pricing: AgreementPrici
     ["Frequency Discount", `-${money(pricing.frequency_discount_amount)}`],
     ["Price After Frequency Discount", money(pricing.price_after_frequency_discount)],
     ["Custom Discount", `-${money(pricing.custom_discount_amount)}`],
-    ["Taxes", money(pricing.taxes)],
+    ...(pricing.taxes > 0 ? [["Taxes", money(pricing.taxes)] as [string, string]] : []),
     ["Final Per-Visit Price", money(pricing.final_per_visit_price)],
     ["Estimated Monthly Total", pricing.estimated_monthly_total === null ? "Not applicable" : money(pricing.estimated_monthly_total)],
   ];

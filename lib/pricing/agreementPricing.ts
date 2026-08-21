@@ -12,15 +12,15 @@ export function proposalAgreementPricing(proposal: ProposalWithRelations): Agree
     frequencyDiscount: proposal.result.frequencyDiscount ?? estimate?.recurringDiscount ?? 0,
     frequencyPercent: proposal.result.frequencyDiscountPercent ?? estimate?.recurringDiscountPercent ?? 0,
     customDiscount: (proposal.result.inheritedManualDiscount ?? estimate?.manualDiscount ?? 0) + proposal.result.manualDiscount,
-    taxes: (estimate?.taxes ?? 0) + proposal.result.taxes,
+    taxes: proposal.result.taxFreePricing ? proposal.result.taxes : (estimate?.taxes ?? 0) + proposal.result.taxes,
     final: proposal.result.perVisitTotal,
     monthly: proposal.result.monthlyTotal,
     catalogAddons:proposal.result.adjustments.filter(item=>item.catalogAddonId),
   });
 }
 
-export function catalogAgreementPricing(input: { standardPrice:number; frequency:AgreementFrequency; serviceId:string; rules:RecurringPricingRule[]; customDiscount?:number; taxes?:number }): AgreementPricingSnapshot {
-  const pricing=calculateRecurringTotals({subtotal:input.standardPrice,frequency:input.frequency,rules:input.rules,serviceId:input.serviceId,manualDiscountAmount:Math.max(0,input.customDiscount??0),fixedTaxes:Math.max(0,input.taxes??0)});
+export function catalogAgreementPricing(input: { standardPrice:number; frequency:AgreementFrequency; serviceId:string; rules:RecurringPricingRule[]; customDiscount?:number }): AgreementPricingSnapshot {
+  const pricing=calculateRecurringTotals({subtotal:input.standardPrice,frequency:input.frequency,rules:input.rules,serviceId:input.serviceId,manualDiscountAmount:Math.max(0,input.customDiscount??0)});
   return make({ source:"Service Catalog", standard:input.standardPrice, frequency:input.frequency, frequencyDiscount:pricing.recurringDiscountAmount, frequencyPercent:pricing.recurringDiscountPercent, customDiscount:pricing.manualDiscount, taxes:pricing.taxes, final:pricing.finalPrice, monthly:pricing.monthlyPrice });
 }
 

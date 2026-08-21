@@ -1,4 +1,4 @@
-import type { CommercialCalculatorInput, Condition, EstimateResult, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
+import type { CommercialCalculatorInput, Condition, EstimateResult, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { calculateRecurringTotals, catalogConfigNumber, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
@@ -25,7 +25,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
   if (input.pets) adjustments.push({ label: "Pets / heavy pet hair", amount: 35 });
   adjustments.push(...configured.addonAdjustments);
   const oneTimePrice = basePrice + adjustments.reduce((sum, item) => sum + item.amount, 0);
-  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,manualDiscountPercent:input.additionalDiscountPercent,taxRatePercent:input.taxRatePercent});
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,manualDiscountPercent:input.additionalDiscountPercent});
   const recurringDiscountPercent = pricing.recurringDiscountPercent;
   const recurringDiscount = pricing.recurringDiscountAmount;
   const manualDiscount = pricing.manualDiscount;
@@ -42,7 +42,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
 function calculateResidentialProductionEstimate(input:ResidentialCalculatorInput,catalog:ServiceCatalogBundle,service:ServiceCatalogBundle["services"][number]):EstimateResult{
   const targetCompletionHours=catalogConfigNumber(service,"default_target_completion_hours"),workerHourlyPay=catalogConfigNumber(service,"default_worker_hourly_pay"),targetProfitMarginPercent=catalogConfigNumber(service,"default_target_profit_margin_percent");
   if(targetCompletionHours<=0||workerHourlyPay<=0||targetProfitMarginPercent<=0)throw new Error(`Custom Pricing Required for ${service.service_name}: configure residential completion hours, worker pay, and target margin.`);
-  const commercialInput:CommercialCalculatorInput={division:"Commercial",commercialType:input.serviceType,frequency:input.frequency,squareFeet:input.squareFeet,floors:1,restrooms:input.bathrooms,kitchens:1,stations:0,units:input.bedrooms,condition:input.condition,targetCompletionHours,workerHourlyPay,targetProfitMarginPercent,additionalDiscountPercent:input.additionalDiscountPercent,taxRatePercent:input.taxRatePercent,additionalServices:input.addOns,targetProjectDays:input.targetProjectDays??3,workdayHours:input.workdayHours??8};
+  const commercialInput:CommercialCalculatorInput={division:"Commercial",commercialType:input.serviceType,frequency:input.frequency,squareFeet:input.squareFeet,floors:1,restrooms:input.bathrooms,kitchens:1,stations:0,units:input.bedrooms,condition:input.condition,targetCompletionHours,workerHourlyPay,targetProfitMarginPercent,additionalDiscountPercent:input.additionalDiscountPercent,taxRatePercent:0,additionalServices:input.addOns,targetProjectDays:input.targetProjectDays??3,workdayHours:input.workdayHours??8};
   const calculated=calculateCommercialEstimate(commercialInput,catalog,service,"Residential");
   return{...calculated,serviceName:service.service_name,scope:[`${input.serviceType} residential cleaning`,...input.addOns],calculatorInput:input};
 }
@@ -68,7 +68,7 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
   const basePrice = directCost / Math.max(configured.minimumMarginDenominator, 1 - margin);
   const adjustments = configured.addonAdjustments;
   const oneTimePrice = basePrice;
-  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,manualDiscountPercent:input.additionalDiscountPercent,taxRatePercent:input.taxRatePercent});
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,manualDiscountPercent:input.additionalDiscountPercent});
   const recurringDiscountPercent = pricing.recurringDiscountPercent;
   const recurringDiscount = pricing.recurringDiscountAmount;
   const manualDiscount = pricing.manualDiscount;
