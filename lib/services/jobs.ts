@@ -96,7 +96,7 @@ export async function getJobById(id: string): Promise<JobWithRelations> {
   if (error) throw error;
   return attachOccurrenceBilling(data as JobWithRelations);
 }
-async function attachOccurrenceBilling(job:JobWithRelations){if(!job.service_occurrence_id)return job;const{data,error}=await getSupabaseClient().from("service_occurrences").select("agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").eq("id",job.service_occurrence_id).maybeSingle();if(error)throw error;return{...job,service_occurrence:data as JobWithRelations["service_occurrence"]}}
+async function attachOccurrenceBilling(job:JobWithRelations){if(!job.service_occurrence_id)return job;const{data,error}=await getSupabaseClient().from("service_occurrences").select("agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type,agreement_number)").eq("id",job.service_occurrence_id).maybeSingle();if(error)throw error;return{...job,service_occurrence:data as JobWithRelations["service_occurrence"]}}
 export async function getJobForProposal(
   proposalId: string,
 ): Promise<JobWithRelations | null> {
@@ -299,13 +299,13 @@ async function createCompletedJobInvoice(job: Job): Promise<JobCompletionResult>
     return { job, invoice, invoiceCreated: true, invoiceSkipped: false, invoiceError: null };
   } catch (cause) {
     console.error("Completed Job invoice creation failed", cause);
-    const detail = cause instanceof Error && cause.message ? ` ${cause.message}` : "";
+    const detail = errorMessage(cause);
     return {
       job,
       invoice: null,
       invoiceCreated: false,
       invoiceSkipped: false,
-      invoiceError: `Job was completed, but its Invoice could not be created.${detail}`,
+      invoiceError: `Job was completed, but its Invoice could not be created${detail ? `: ${detail}` : "."}`,
     };
   }
 }
@@ -449,6 +449,7 @@ export const archiveJob = (id: string) =>
 
 async function master(){ return isMasterAdmin(await getCurrentProfile()); }
 function operationalJob(row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">):JobWithRelations{return{...row,price:0,deposit:0,balance:0,labor_hours:0,recommended_crew_size:0,photos:[],proposal:null,client:null,property:null}}
+function errorMessage(cause:unknown){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return""}
 function jobNumber() {
   const d = new Date();
   return `JOB-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;

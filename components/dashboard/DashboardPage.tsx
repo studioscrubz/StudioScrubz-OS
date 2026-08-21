@@ -70,7 +70,7 @@ export function DashboardPage() {
       setNotice(actionNotice);
     } catch (x) {
       console.error("Dashboard job operation failed", x);
-      setError(x instanceof Error ? x.message : "Job operation failed.");
+      setError(errorMessage(x, "Job operation failed."));
     } finally {
       setBusy(null);
     }
@@ -161,6 +161,8 @@ export function DashboardPage() {
     </>
   );
 }
+
+function errorMessage(cause:unknown,fallback:string){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return fallback}
 function Header() {
   return (
     <header className="border-b border-[#143d1a]/10 pb-7">

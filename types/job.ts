@@ -93,7 +93,7 @@ export type JobWithRelations = Job & {
   proposal: Proposal | null;
   client: Client | null;
   property: Property | null;
-  service_occurrence?: { agreement: { billing_type: AgreementBillingType } } | null;
+  service_occurrence?: { agreement: { billing_type: AgreementBillingType; agreement_number: string } } | null;
 };
 export type CrewConflict = Pick<
   JobWithRelations,

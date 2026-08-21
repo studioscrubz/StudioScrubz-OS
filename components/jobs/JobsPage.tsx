@@ -21,6 +21,7 @@ import { PhotoUploader } from "@/components/photos/PhotoUploader";
 import type { JobPhotoCategory } from "@/types/photo";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
+import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import {
   type JobStatus,
   type JobWithRelations,
@@ -455,6 +456,7 @@ function JobModal({
       <JobMileageSummary jobId={job.id} />
       <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />
       <div className="mt-6 flex flex-wrap gap-2">
+        <ContractServiceRecordAction jobId={job.id} />
         {nextStatuses(job.status).map((x) => (
           <button
             key={x}
@@ -629,7 +631,9 @@ function money(v: number) {
   }).format(v);
 }
 function message(x: unknown, f: string) {
-  return x instanceof Error ? x.message : f;
+  if (x instanceof Error) return x.message;
+  if (x && typeof x === "object" && "message" in x && typeof x.message === "string") return x.message;
+  return f;
 }
 const input =
   "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-[#d4af37]";
