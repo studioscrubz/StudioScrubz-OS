@@ -74,6 +74,12 @@ begin
       if not exists (select 1 from public.invoices where id = p_record_id and archived_at is not null) then
         raise exception 'The record must be archived before it can be permanently deleted.';
       end if;
+      if exists (select 1 from public.payments where invoice_id = p_record_id) then
+        raise exception 'This Invoice has payment history and must be retained for financial records. Archive it instead.';
+      end if;
+      if exists (select 1 from public.square_checkout_attempts where invoice_id = p_record_id) then
+        raise exception 'This Invoice has Square checkout history and must be retained for financial records. Archive it instead.';
+      end if;
       delete from public.invoices where id = p_record_id and archived_at is not null;
 
     when 'Expenses' then

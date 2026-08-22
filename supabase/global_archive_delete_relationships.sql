@@ -98,7 +98,7 @@ alter table public.time_entries add constraint time_entries_employee_id_fkey for
 -- Invoice and Vehicle links retain financial/mileage history.
 alter table public.payments drop constraint if exists payments_invoice_id_fkey;
 alter table public.payments alter column invoice_id drop not null;
-alter table public.payments add constraint payments_invoice_id_fkey foreign key (invoice_id) references public.invoices(id) on delete set null;
+alter table public.payments add constraint payments_invoice_id_fkey foreign key (invoice_id) references public.invoices(id) on delete restrict;
 alter table public.mileage_entries drop constraint if exists mileage_entries_vehicle_id_fkey;
 alter table public.mileage_entries alter column vehicle_id drop not null;
 alter table public.mileage_entries add constraint mileage_entries_vehicle_id_fkey foreign key (vehicle_id) references public.vehicles(id) on delete set null;

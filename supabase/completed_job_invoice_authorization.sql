@@ -82,14 +82,7 @@ begin
   select * into proposal_row from public.proposals where id = job_row.proposal_id;
   select * into settings_row from public.business_settings limit 1;
 
-  amount := greatest(
-    case
-      when jsonb_typeof(proposal_row.result -> 'perVisitTotal') = 'number'
-        then (proposal_row.result ->> 'perVisitTotal')::numeric
-      else job_row.price
-    end,
-    0
-  );
+  amount := greatest(job_row.price, 0);
 
   for attempt in 1..5 loop
     invoice_number := 'INV-' || to_char(issue_date, 'YYYYMMDD') || '-' || lpad(floor(random() * 10000)::text, 4, '0');
