@@ -8,3 +8,12 @@ export async function getPublicInvoice(token: string): Promise<PublicInvoice> {
   if (!data) throw new Error("This Invoice link is invalid, expired, or no longer available.");
   return data as PublicInvoice;
 }
+
+export type PublicPaymentConfirmationStatus = "Created" | "Pending" | "Completed" | "Failed" | "Cancelled" | "Conflict";
+
+export async function getPublicInvoicePaymentConfirmation(token: string): Promise<PublicPaymentConfirmationStatus | null> {
+  if (!token) return null;
+  const { data, error } = await getSupabaseClient().rpc("get_invoice_payment_confirmation_by_token", { p_token: token });
+  if (error) throw new Error(error.message || "Payment confirmation could not be checked.");
+  return typeof data === "string" ? data as PublicPaymentConfirmationStatus : null;
+}

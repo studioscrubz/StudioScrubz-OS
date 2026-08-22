@@ -120,6 +120,30 @@ create unique index if not exists square_checkout_attempts_one_active_invoice_id
   on public.square_checkout_attempts (invoice_id, square_environment)
   where status in ('Created','Pending');
 
+create or replace function public.get_invoice_payment_confirmation_by_token(p_token text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select attempt.status
+  from public.invoices invoice
+  join public.square_checkout_attempts attempt on attempt.invoice_id = invoice.id
+  where p_token is not null
+    and length(p_token) >= 40
+    and invoice.client_access_token = p_token
+    and invoice.archived_at is null
+    and (invoice.client_access_token_expires_at is null or invoice.client_access_token_expires_at > now())
+  order by attempt.created_at desc
+  limit 1;
+$$;
+
+revoke all on function public.get_invoice_payment_confirmation_by_token(text)
+from public, anon, authenticated;
+grant execute on function public.get_invoice_payment_confirmation_by_token(text)
+to anon, authenticated;
+
 create or replace function public.record_square_invoice_payment(
   p_attempt_id uuid,
   p_square_payment_id text,

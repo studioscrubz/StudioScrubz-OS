@@ -11,6 +11,7 @@ declare
   caller_id uuid;
   caller_role text;
   job_row public.jobs;
+  client_row public.clients;
   proposal_row public.proposals;
   settings_row public.business_settings;
   amount numeric;
@@ -79,6 +80,7 @@ begin
     );
   end if;
 
+  select * into client_row from public.clients where id = job_row.client_id;
   select * into proposal_row from public.proposals where id = job_row.proposal_id;
   select * into settings_row from public.business_settings limit 1;
 
@@ -97,8 +99,10 @@ begin
       ) values (
         invoice_number, job_row.id, null, null,
         null, job_row.proposal_id, job_row.client_id, job_row.property_id,
-        job_row.client_name, job_row.property_name, proposal_row.customer_phone,
-        proposal_row.customer_email, job_row.service_name, 'Open', issue_date,
+        job_row.client_name, job_row.property_name,
+        coalesce(nullif(btrim(client_row.phone), ''), nullif(btrim(proposal_row.customer_phone), '')),
+        coalesce(nullif(btrim(client_row.email), ''), nullif(btrim(proposal_row.customer_email), '')),
+        job_row.service_name, 'Open', issue_date,
         issue_date + coalesce(settings_row.default_invoice_due_days, 15),
         jsonb_build_array(jsonb_build_object(
           'id', line_item_id,

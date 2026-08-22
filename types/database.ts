@@ -135,6 +135,7 @@ export interface Database {
       request_estimate_walkthrough_by_token:{Args:{p_token:string;p_client_name:string;p_email:string|null;p_phone:string|null;p_preferred_contact_method:string};Returns:import("@/types/publicEstimate").PublicEstimateWalkthroughRequestResult};
       get_proposal_by_token:{Args:{p_token:string};Returns:PublicProposal};
       get_invoice_by_token:{Args:{p_token:string};Returns:import("@/types/publicInvoice").PublicInvoice};
+      get_invoice_payment_confirmation_by_token:{Args:{p_token:string};Returns:string|null};
       accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};
       mark_estimate_sent_for_delivery:{Args:{p_estimate_id:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
       mark_proposal_sent_for_delivery:{Args:{p_proposal_id:string;p_via:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
