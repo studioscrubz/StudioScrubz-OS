@@ -1,0 +1,45 @@
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import { getPublicInvoice } from "@/lib/services/publicInvoices";
+import type { PublicInvoice } from "@/types/publicInvoice";
+
+export function PublicInvoicePage({ token, paymentPending = false }: { token: string; paymentPending?: boolean }) {
+  const [invoice, setInvoice] = useState<PublicInvoice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  async function load() {
+    setLoading(true); setError(null);
+    try { setInvoice(await getPublicInvoice(token)); }
+    catch (cause) { setError(message(cause)); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { let active=true;void getPublicInvoice(token).then(value=>{if(active)setInvoice(value)}).catch(cause=>{if(active)setError(message(cause))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}; }, [token]);
+  useEffect(() => { if(!paymentPending)return;let active=true,attempts=0,timer:ReturnType<typeof setTimeout>;const poll=()=>{void getPublicInvoice(token).then(value=>{if(!active)return;setInvoice(value);attempts++;if(value.status!=="Paid"&&value.balance_due>0&&attempts<15)timer=setTimeout(poll,2000)}).catch(()=>{attempts++;if(active&&attempts<15)timer=setTimeout(poll,2000)})};timer=setTimeout(poll,1500);return()=>{active=false;clearTimeout(timer)}; }, [paymentPending,token]);
+  if (loading) return <Shell><p className="p-8">Loading your Invoice...</p></Shell>;
+  if (error || !invoice) return <Shell><div className="p-8"><h1 className="text-2xl font-bold text-[#143d1a]">Invoice unavailable</h1><p className="mt-3 text-neutral-600">{error}</p></div></Shell>;
+  const payable = invoice.balance_due > 0 && !["Paid", "Cancelled", "Archived"].includes(invoice.status);
+  return <Shell>
+    <article className="p-6 sm:p-10">
+      <header className="border-b-4 border-[#d6b923] pb-6"><p className="text-sm font-extrabold uppercase tracking-[.22em] text-[#9a7a17]">{invoice.business_name}</p><h1 className="mt-2 text-4xl font-extrabold text-[#143d1a]">INVOICE</h1><p className="mt-2 text-lg font-bold">{invoice.invoice_number}</p>{invoice.tagline&&<p className="mt-2 text-neutral-600">{invoice.tagline}</p>}</header>
+      <div className="mt-7 grid gap-6 sm:grid-cols-2"><Block title="Bill To" rows={[["Client / Company",invoice.client_name||"-"],["Property / Site",invoice.property_name||"-"]]}/><Block title="Invoice Details" rows={[["Status",invoice.status],["Issue Date",date(invoice.issue_date)],["Due Date",invoice.due_date?date(invoice.due_date):"Due on receipt"],["Source",source(invoice)],["Service",invoice.service_name||"-"]]}/></div>
+      <h2 className="mt-8 text-lg font-extrabold text-[#143d1a]">Services</h2><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[560px] text-sm"><thead className="bg-[#edf1eb]"><tr><th className="p-3 text-left">Description</th><th className="p-3 text-right">Quantity</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr></thead><tbody>{invoice.line_items.map(item=><tr key={item.id} className="border-b"><td className="p-3">{item.description}</td><td className="p-3 text-right">{item.quantity}</td><td className="p-3 text-right">{money(item.rate)}</td><td className="p-3 text-right font-bold">{money(item.amount)}</td></tr>)}</tbody></table></div>
+      <div className="ml-auto mt-6 max-w-sm"><Block title="Totals" rows={[["Subtotal",money(invoice.subtotal)],...(invoice.discount>0?[["Discount",`-${money(invoice.discount)}`]]:[]),...(invoice.tax>0?[["Tax",money(invoice.tax)]]:[]),["Total",money(invoice.total)],["Payments Received",money(invoice.amount_paid)],["Remaining Balance",money(invoice.balance_due)]]}/></div>
+      {invoice.payments.length>0&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Payments Received</h2>{invoice.payments.map((payment,index)=><div key={`${payment.payment_date}-${index}`} className="mt-2 flex justify-between rounded-lg border p-3 text-sm"><span>{date(payment.payment_date)} - {payment.payment_method}</span><b>{money(payment.amount)}</b></div>)}</section>}
+      {invoice.customer_notes&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Invoice Notes</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{invoice.customer_notes}</p></section>}{invoice.terms&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Payment Terms</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{invoice.terms}</p></section>}
+      <footer className="mt-10 border-t pt-5 text-sm text-neutral-600">{[invoice.business_email,invoice.business_phone,invoice.website].filter(Boolean).join(" | ")}<br/>{[invoice.address,invoice.city,invoice.state,invoice.zip].filter(Boolean).join(", ")}</footer>
+    </article>
+    <section className="border-t bg-neutral-50 p-6 print:hidden"><div className="flex flex-wrap gap-3">{payable&&<button disabled={checkoutBusy} className="rounded-lg bg-[#143d1a] px-5 py-2.5 font-bold text-white disabled:opacity-50" onClick={()=>void startCheckout()}>{checkoutBusy?"Preparing secure checkout...":invoice.status==="Partially Paid"?"Pay Remaining Balance":"Pay Invoice"}</button>}<button className="rounded-lg border px-5 py-2.5 font-bold text-[#143d1a]" onClick={()=>window.print()}>Print / Save as PDF</button><button className="rounded-lg border px-5 py-2.5 font-bold text-[#143d1a]" onClick={()=>void load()}>Refresh</button></div>{checkoutError&&<p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{checkoutError}</p>}{invoice.status==="Paid"?<p className="mt-4 rounded-lg bg-green-50 p-4 font-bold text-green-800">PAID - Thank you for your payment.</p>:invoice.status==="Cancelled"||invoice.status==="Archived"?<p className="mt-4 rounded-lg bg-neutral-200 p-4 font-bold">This Invoice is {invoice.status.toLowerCase()} and cannot be paid.</p>:paymentPending&&payable?<p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">Square is confirming your payment. This Invoice will update only after secure payment confirmation is received.</p>:null}</section>
+  </Shell>;
+
+  async function startCheckout(){setCheckoutBusy(true);setCheckoutError(null);try{const response=await fetch(`/api/public/invoices/${encodeURIComponent(token)}/square-checkout`,{method:"POST"});const body=await response.json() as {checkoutUrl?:string;error?:string};if(!response.ok||!body.checkoutUrl)throw new Error(body.error||"Secure checkout could not be prepared.");window.location.assign(body.checkoutUrl)}catch(cause){setCheckoutError(message(cause));setCheckoutBusy(false)}}
+}
+
+function source(invoice: PublicInvoice) { if(invoice.contract_billing_type){const period=invoice.billing_period_start?` - ${new Date(`${invoice.billing_period_start}T12:00:00`).toLocaleDateString("en-US",{month:"long",year:"numeric"})}`:"";return `${invoice.agreement_number||"Agreement"} - ${invoice.contract_billing_type}${period}`;}return invoice.job_number?`Job ${invoice.job_number}`:"Service Invoice"; }
+function Block({title,rows}:{title:string;rows:string[][]}){return <section><h2 className="font-extrabold text-[#143d1a]">{title}</h2>{rows.map(([label,value])=><div key={label} className="mt-2 flex justify-between gap-4 text-sm"><span className="text-neutral-500">{label}</span><b className="text-right">{value}</b></div>)}</section>}
+function Shell({children}:{children:ReactNode}){return <main className="min-h-screen bg-[#f5f6f4] px-4 py-10 print:bg-white print:p-0"><div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border bg-white shadow-sm print:border-0 print:shadow-none">{children}</div></main>}
+function money(value:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value??0)}
+function date(value:string){return new Date(`${value.slice(0,10)}T12:00:00`).toLocaleDateString("en-US")}
+function message(cause:unknown){console.error(cause);if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return"This Invoice could not be loaded."}

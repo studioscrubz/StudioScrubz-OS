@@ -95,7 +95,8 @@ grant select, insert, update on public.clients, public.properties, public.estima
   public.walkthroughs, public.proposals, public.jobs, public.employees, public.crews,
   public.invoices, public.expenses, public.vehicles, public.mileage_entries,
   public.time_entries, public.service_agreements, public.service_occurrences to authenticated;
-grant select, insert on public.proposal_history, public.payments to authenticated;
+grant select, insert on public.proposal_history to authenticated;
+grant select on public.payments to authenticated;
 grant select, insert, delete on public.crew_members to authenticated;
 
 -- Master Admin CRUD policies, excluding DELETE (handled separately and only for archives).
@@ -125,7 +126,6 @@ drop policy if exists "Master Admin crew members delete" on public.crew_members;
 create policy "Master Admin history read" on public.proposal_history for select to authenticated using ((select public.is_master_admin()));
 create policy "Master Admin history insert" on public.proposal_history for insert to authenticated with check ((select public.is_master_admin()));
 create policy "Master Admin payments read" on public.payments for select to authenticated using ((select public.is_master_admin()));
-create policy "Master Admin payments insert" on public.payments for insert to authenticated with check ((select public.is_master_admin()));
 create policy "Master Admin crew members read" on public.crew_members for select to authenticated using ((select public.is_master_admin()));
 create policy "Master Admin crew members insert" on public.crew_members for insert to authenticated with check ((select public.is_master_admin()));
 create policy "Master Admin crew members delete" on public.crew_members for delete to authenticated using ((select public.is_master_admin()));

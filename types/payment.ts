@@ -1,4 +1,4 @@
 export const PAYMENT_METHODS = ["Cash", "Check", "Credit Card", "Debit Card", "ACH", "Zelle", "Venmo", "Cash App", "Apple Pay", "Other"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-export type Payment = { id:string; invoice_id:string|null; client_id:string|null; job_id:string|null; amount:number; payment_date:string; payment_method:PaymentMethod; reference_number:string|null; notes:string|null; created_at:string };
-export type PaymentInsert = Omit<Payment,"id"|"created_at"|"invoice_id"> & { invoice_id:string };
+export type Payment = { id:string; invoice_id:string|null; client_id:string|null; job_id:string|null; amount:number; payment_date:string; payment_method:PaymentMethod; reference_number:string|null; notes:string|null; payment_provider:string|null; provider_payment_id:string|null; provider_order_id:string|null; created_at:string };
+export type PaymentInsert = Omit<Payment,"id"|"created_at"|"invoice_id"|"payment_provider"|"provider_payment_id"|"provider_order_id"> & { invoice_id:string; payment_provider?:string|null; provider_payment_id?:string|null; provider_order_id?:string|null };
