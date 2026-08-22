@@ -88,6 +88,7 @@ export type DirectJobInput = {
   labor_hours: number;
   access_instructions: string | null;
   internal_notes: string | null;
+  price_override?: number | null;
 };
 export type JobWithRelations = Job & {
   proposal: Proposal | null;

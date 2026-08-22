@@ -12,8 +12,7 @@ import type {
 import type { CrewWithRelations } from "@/types/crew";
 import { employeeName } from "@/types/employee";
 import { getCurrentProfile } from "@/lib/services/auth";
-import { isMasterAdmin } from "@/lib/auth/permissions";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasPermission, isMasterAdmin } from "@/lib/auth/permissions";
 import { getClientById } from "@/lib/services/clients";
 import { getPropertyById } from "@/lib/services/properties";
 import { getServiceCatalog, getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
@@ -216,9 +215,14 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
   if (selectedAddons.some((row) => !row)) throw new Error("One or more selected Add-Ons are not available for this Service.");
   const quantity = property.square_feet && property.square_feet > 0 ? property.square_feet : 1;
   const basePrice = calculateServicePrice(service, quantity, catalog.tiers);
-  if (basePrice == null) throw new Error("This Service uses custom pricing and cannot be used for a direct Job without configured catalog pricing.");
   const addonAdjustments = calculateAddons(selectedAddons.map((row) => row!.addon_name), availableAddons);
-  const price = Math.round((basePrice + addonAdjustments.reduce((sum, row) => sum + row.amount, 0)) * 100) / 100;
+  const overridePrice = input.price_override ?? null;
+  const hasOverride = overridePrice !== null;
+  if (hasOverride && !isMasterAdmin(profile)) throw new Error("Only Master Admin can override a Direct Job price.");
+  if (hasOverride && (!Number.isFinite(overridePrice) || overridePrice < 0)) throw new Error("Override Job Price must be a number greater than or equal to zero.");
+  if (basePrice == null && !hasOverride) throw new Error("This Service uses custom pricing and requires a Master Admin Job price override.");
+  const catalogPrice = basePrice == null ? null : basePrice + addonAdjustments.reduce((sum, row) => sum + row.amount, 0);
+  const price = Math.round((overridePrice ?? catalogPrice!) * 100) / 100;
   const scheduled = Boolean(input.scheduled_date);
   const status: JobStatus = scheduled ? (crew ? "Crew Assigned" : "Scheduled") : "Ready to Schedule";
   const scope = [
