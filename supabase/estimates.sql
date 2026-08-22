@@ -47,13 +47,8 @@ alter table public.estimates enable row level security;
 revoke all on table public.estimates from anon;
 grant select, insert, update on table public.estimates to authenticated;
 
+-- Access is intentionally fail-closed here. Role-scoped policies are installed
+-- by role_permissions.sql and auth_security_hardening.sql.
 drop policy if exists "Authenticated users can read estimates" on public.estimates;
-create policy "Authenticated users can read estimates" on public.estimates for select to authenticated
-using ((select auth.uid()) is not null and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false);
 drop policy if exists "Authenticated users can create estimates" on public.estimates;
-create policy "Authenticated users can create estimates" on public.estimates for insert to authenticated
-with check ((select auth.uid()) is not null and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false);
 drop policy if exists "Authenticated users can update estimates" on public.estimates;
-create policy "Authenticated users can update estimates" on public.estimates for update to authenticated
-using ((select auth.uid()) is not null and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false)
-with check ((select auth.uid()) is not null and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false);

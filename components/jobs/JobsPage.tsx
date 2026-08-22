@@ -36,13 +36,11 @@ type Sort =
   | "Price High to Low"
   | "Price Low to High";
 type ScheduleFilter = "All" | "Scheduled" | "Unscheduled" | "Upcoming" | "Past";
-const columns: JobStatus[] = [
+const activeStatuses: JobStatus[] = [
   "Ready to Schedule",
   "Scheduled",
   "Crew Assigned",
   "In Progress",
-  "Completed",
-  "Cancelled",
 ];
 const jobPhotoCategories: readonly JobPhotoCategory[] = ["Before", "After", "Damage / Issue", "Other"];
 export function JobsPage() {
@@ -72,7 +70,7 @@ export function JobsPage() {
           const jobId = new URLSearchParams(window.location.search).get(
             "jobId",
           );
-          if (jobId) setSelected(x.find((job) => job.id === jobId) ?? null);
+          if (jobId) setSelected(x.find((job) => job.id === jobId && activeStatuses.includes(job.status)) ?? null);
         }
       })
       .catch((x: unknown) => {
@@ -123,7 +121,7 @@ export function JobsPage() {
       rows.filter(
         (job) =>
           job.archived_at === null &&
-          columns.includes(job.status),
+          activeStatuses.includes(job.status),
       ),
     [rows],
   );
@@ -175,14 +173,13 @@ export function JobsPage() {
       ).length,
     ],
     ["In Progress", active.filter((j) => j.status === "In Progress").length],
-    ["Completed", active.filter((j) => j.status === "Completed").length],
   ] as const;
   return (
     <>
       <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
-      <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-5">
+      <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4">
         {metrics.map(([label, value]) => (
           <Metric key={label} label={label} value={loading ? "—" : value} />
         ))}
@@ -198,7 +195,7 @@ export function JobsPage() {
           <Select
             value={status}
             set={(v) => setStatus(v as typeof status)}
-            options={["All", ...columns]}
+            options={["All", ...activeStatuses]}
           />
           <Select
             value={division}
@@ -229,8 +226,8 @@ export function JobsPage() {
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
         <div className="mt-6 overflow-x-auto pb-5">
-          <div className="grid min-w-[1580px] grid-cols-6 gap-4">
-            {columns.map((column) => (
+          <div className="grid min-w-[1040px] grid-cols-4 gap-4">
+            {activeStatuses.map((column) => (
               <section key={column} className="rounded-2xl bg-[#eef1ed] p-3">
                 <h2 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#143d1a]">
                   {column}

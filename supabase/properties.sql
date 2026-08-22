@@ -55,30 +55,8 @@ alter table public.properties enable row level security;
 revoke all on table public.properties from anon;
 grant select, insert, update on table public.properties to authenticated;
 
+-- Access is intentionally fail-closed here. Role- and assignment-scoped
+-- policies are installed by role_permissions.sql and auth_security_hardening.sql.
 drop policy if exists "Authenticated users can read properties" on public.properties;
-create policy "Authenticated users can read properties"
-on public.properties for select to authenticated
-using (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-);
-
 drop policy if exists "Authenticated users can create properties" on public.properties;
-create policy "Authenticated users can create properties"
-on public.properties for insert to authenticated
-with check (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-);
-
 drop policy if exists "Authenticated users can update properties" on public.properties;
-create policy "Authenticated users can update properties"
-on public.properties for update to authenticated
-using (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-)
-with check (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-);

@@ -19,11 +19,11 @@ import { getPropertyById } from "@/lib/services/properties";
 import { getServiceCatalog, getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { getCrewById } from "@/lib/services/crews";
 import { calculateAddons, calculateServicePrice } from "@/lib/pricing/pricingEngine";
-import type { InvoiceWithRelations } from "@/types/invoice";
+import type { Invoice } from "@/types/invoice";
 
 export type JobCompletionResult = {
   job: Job;
-  invoice: InvoiceWithRelations | null;
+  invoice: Pick<Invoice, "id" | "invoice_number"> | null;
   invoiceCreated: boolean;
   invoiceSkipped: boolean;
   invoiceError: string | null;
@@ -287,16 +287,19 @@ async function createCompletedJobInvoice(job: Job): Promise<JobCompletionResult>
   try {
     // Dynamic loading avoids a runtime jobs <-> invoices module cycle while keeping
     // completion and its invoice handoff in the shared workflow service.
-    const { canCreateJobInvoice, createInvoiceFromJob, getInvoiceForJob } = await import("@/lib/services/invoices");
-    const existing = await getInvoiceForJob(job.id);
-    if (existing) {
-      return { job, invoice: existing, invoiceCreated: false, invoiceSkipped: false, invoiceError: null };
-    }
-    if (!(await canCreateJobInvoice(job.id))) {
+    const { createCompletedJobInvoice: createAuthorizedInvoice } = await import("@/lib/services/invoices");
+    const result = await createAuthorizedInvoice(job.id);
+    if (result.skipped) {
       return { job, invoice: null, invoiceCreated: false, invoiceSkipped: true, invoiceError: null };
     }
-    const invoice = await createInvoiceFromJob(job.id);
-    return { job, invoice, invoiceCreated: true, invoiceSkipped: false, invoiceError: null };
+    if (!result.invoice_id || !result.invoice_number) throw new Error("The completed Job invoice was not returned.");
+    return {
+      job,
+      invoice: { id: result.invoice_id, invoice_number: result.invoice_number },
+      invoiceCreated: result.created,
+      invoiceSkipped: false,
+      invoiceError: null,
+    };
   } catch (cause) {
     console.error("Completed Job invoice creation failed", cause);
     const detail = errorMessage(cause);

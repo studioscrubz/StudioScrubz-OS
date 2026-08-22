@@ -54,33 +54,8 @@ alter table public.clients enable row level security;
 revoke all on table public.clients from anon;
 grant select, insert, update on table public.clients to authenticated;
 
+-- Access is intentionally fail-closed here. Role- and assignment-scoped
+-- policies are installed by role_permissions.sql and auth_security_hardening.sql.
 drop policy if exists "Authenticated users can read clients" on public.clients;
-create policy "Authenticated users can read clients"
-on public.clients for select
-to authenticated
-using (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-);
-
 drop policy if exists "Authenticated users can create clients" on public.clients;
-create policy "Authenticated users can create clients"
-on public.clients for insert
-to authenticated
-with check (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-);
-
 drop policy if exists "Authenticated users can update clients" on public.clients;
-create policy "Authenticated users can update clients"
-on public.clients for update
-to authenticated
-using (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-)
-with check (
-  (select auth.uid()) is not null
-  and coalesce((select (auth.jwt() ->> 'is_anonymous')::boolean), false) = false
-);
