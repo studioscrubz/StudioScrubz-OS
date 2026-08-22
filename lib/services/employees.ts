@@ -12,7 +12,7 @@ export async function getEmployees(): Promise<Employee[]> {
     const { data,error }=await getSupabaseClient().from("employee_directory_sales_safe").select("*").order("last_name"); if(error)throw error;
     return data.map((row) => safeEmployee({ ...row, hire_date: null, notes: null }));
   }
-  const { data,error }=await getSupabaseClient().from("employee_directory_safe").select("*").order("last_name"); if(error)throw error;
+  const { data,error }=await getSupabaseClient().rpc("get_employee_directory"); if(error)throw error;
   return data.map(safeEmployee);
 }
 export async function getEmployeeById(id:string):Promise<Employee>{const rows=await getEmployees();const row=rows.find((employee)=>employee.id===id);if(!row)throw new Error("Employee not found or access denied.");return row}

@@ -106,6 +106,12 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
+      get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};
+      get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
+      get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
+      get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};
+      get_operational_time_entries:{Args:Record<string,never>;Returns:Array<Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}>};
       admin_create_user_profile:{Args:{p_auth_user_id:string;p_email:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
       admin_update_user_profile:{Args:{p_profile_id:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
       admin_set_user_active:{Args:{p_profile_id:string;p_is_active:boolean};Returns:UserProfile};

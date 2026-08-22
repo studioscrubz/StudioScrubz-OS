@@ -14,8 +14,8 @@ export async function getCrews(): Promise<CrewWithRelations[]> {
   }
   const client = getSupabaseClient();
   const [{ data: crews, error: crewError }, { data: members, error: memberError }, employees] = await Promise.all([
-    client.from("crew_directory_safe").select("*").order("crew_name"),
-    client.from("crew_members_directory_safe").select("id,crew_id,employee_id,created_at"),
+    client.rpc("get_crew_directory"),
+    client.rpc("get_crew_members_directory"),
     getEmployees(),
   ]);
   if (crewError) throw crewError;
