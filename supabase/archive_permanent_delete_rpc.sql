@@ -77,9 +77,21 @@ begin
       if exists (select 1 from public.payments where invoice_id = p_record_id) then
         raise exception 'This Invoice has payment history and must be retained for financial records. Archive it instead.';
       end if;
-      if exists (select 1 from public.square_checkout_attempts where invoice_id = p_record_id) then
+      if exists (
+        select 1
+        from public.square_checkout_attempts
+        where invoice_id = p_record_id
+          and (
+            square_environment is distinct from 'sandbox'
+            or status in ('Completed', 'Conflict')
+          )
+      ) then
         raise exception 'This Invoice has Square checkout history and must be retained for financial records. Archive it instead.';
       end if;
+      delete from public.square_checkout_attempts
+      where invoice_id = p_record_id
+        and square_environment = 'sandbox'
+        and status not in ('Completed', 'Conflict');
       delete from public.invoices where id = p_record_id and archived_at is not null;
 
     when 'Expenses' then

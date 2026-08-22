@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createSquarePaymentLink } from "@/lib/square";
+import { createSquarePaymentLink, getSquareEnvironment } from "@/lib/square";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(_request: Request, context: RouteContext<"/api/public/invoices/[token]/square-checkout">) {
@@ -13,13 +13,14 @@ export async function POST(_request: Request, context: RouteContext<"/api/public
     if (["Paid", "Cancelled", "Archived", "Draft"].includes(invoice.status) || Number(invoice.balance_due) <= 0) return Response.json({ error: "This Invoice is not payable." }, { status: 409 });
     const amountCents = Math.round(Number(invoice.balance_due) * 100);
     if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return Response.json({ error: "Invoice balance is invalid." }, { status: 409 });
-    const { data: reusable } = await admin.from("square_checkout_attempts").select("checkout_url").eq("invoice_id", invoice.id).eq("amount_cents", amountCents).in("status", ["Created", "Pending"]).not("checkout_url", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const squareEnvironment = getSquareEnvironment();
+    const { data: reusable } = await admin.from("square_checkout_attempts").select("checkout_url").eq("invoice_id", invoice.id).eq("square_environment", squareEnvironment).eq("amount_cents", amountCents).in("status", ["Created", "Pending"]).not("checkout_url", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (reusable?.checkout_url) return Response.json({ checkoutUrl: reusable.checkout_url });
     const attemptId = randomUUID(), idempotencyKey = randomUUID();
-    const { error: attemptError } = await admin.from("square_checkout_attempts").insert({ id: attemptId, invoice_id: invoice.id, idempotency_key: idempotencyKey, amount_cents: amountCents, currency: "USD", status: "Created" });
+    const { error: attemptError } = await admin.from("square_checkout_attempts").insert({ id: attemptId, invoice_id: invoice.id, idempotency_key: idempotencyKey, square_environment: squareEnvironment, amount_cents: amountCents, currency: "USD", status: "Created" });
     if (attemptError) {
       if (attemptError.code === "23505") {
-        const { data: active } = await admin.from("square_checkout_attempts").select("checkout_url").eq("invoice_id", invoice.id).in("status", ["Created", "Pending"]).not("checkout_url", "is", null).limit(1).maybeSingle();
+        const { data: active } = await admin.from("square_checkout_attempts").select("checkout_url").eq("invoice_id", invoice.id).eq("square_environment", squareEnvironment).in("status", ["Created", "Pending"]).not("checkout_url", "is", null).limit(1).maybeSingle();
         if (active?.checkout_url) return Response.json({ checkoutUrl: active.checkout_url });
       }
       throw attemptError;

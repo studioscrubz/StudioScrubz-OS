@@ -96,6 +96,7 @@ create table if not exists public.square_checkout_attempts (
   id uuid primary key default gen_random_uuid(),
   invoice_id uuid not null references public.invoices(id) on delete restrict,
   idempotency_key text not null unique,
+  square_environment text not null check (square_environment in ('sandbox','production')),
   square_payment_link_id text unique,
   square_order_id text unique,
   square_payment_id text unique,
@@ -116,7 +117,7 @@ create index if not exists square_checkout_attempts_invoice_id_idx
   on public.square_checkout_attempts (invoice_id, created_at desc);
 
 create unique index if not exists square_checkout_attempts_one_active_invoice_idx
-  on public.square_checkout_attempts (invoice_id)
+  on public.square_checkout_attempts (invoice_id, square_environment)
   where status in ('Created','Pending');
 
 create or replace function public.record_square_invoice_payment(

@@ -11,7 +11,11 @@ function config() {
   const environment = process.env.SQUARE_ENVIRONMENT || "sandbox";
   if (!accessToken || !locationId || !apiVersion) throw new Error("Square server credentials are not configured.");
   if (!['sandbox','production'].includes(environment)) throw new Error("SQUARE_ENVIRONMENT must be sandbox or production.");
-  return { accessToken, locationId, apiVersion, baseUrl: environment === "production" ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com" };
+  return { accessToken, locationId, apiVersion, environment, baseUrl: environment === "production" ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com" };
+}
+
+export function getSquareEnvironment(): "sandbox" | "production" {
+  return config().environment as "sandbox" | "production";
 }
 
 async function squareRequest(path: string, init: RequestInit) {
