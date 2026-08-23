@@ -22,7 +22,9 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const isLogin = request.nextUrl.pathname === "/login";
-  const isPublicDocument = ["/agreement/", "/estimate/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
+  const isPublicDocument = request.nextUrl.pathname === "/request-estimate"
+    || request.nextUrl.pathname.startsWith("/api/public/request-estimate")
+    || ["/agreement/", "/estimate/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
 
   if ((error || !data?.claims) && !isLogin && !isPublicDocument) {
     const loginUrl = request.nextUrl.clone();
