@@ -1,5 +1,5 @@
 import type { Client } from "@/types/client";
-import type { Estimate, EstimateDivision, EstimateWithRelations } from "@/types/estimate";
+import type { CalculatorInput, Estimate, EstimateDivision, EstimateResult, EstimateWithRelations, Frequency } from "@/types/estimate";
 import type { Property } from "@/types/property";
 import type { OperationalPhoto } from "@/types/photo";
 import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
@@ -18,13 +18,22 @@ export type WalkthroughMeasurements = {
   requestedAt: string | null;
   preferredContactMethod: WalkthroughContactMethod | null;
   estimateNumber: string | null;
+  frequency?: Frequency | null;
   overallCondition: "" | "Light" | "Average" | "Heavy" | "Extreme";
   squareFeet: number | null;
   bedrooms: number | null;
   bathrooms: number | null;
+  occupied?: boolean | null;
   floors: number | null;
   restrooms: number | null;
   kitchenAreas: number | null;
+  stations?: number | null;
+  units?: number | null;
+  targetCompletionHours?: number | null;
+  workerHourlyPay?: number | null;
+  targetProfitMarginPercent?: number | null;
+  targetProjectDays?: number | null;
+  workdayHours?: 8 | 10 | null;
   specialtyAreas: string;
   accessRestrictions: string;
   parkingLoading: string;
@@ -35,6 +44,21 @@ export type WalkthroughMeasurements = {
   heavySoilBuildup: boolean;
   damageObserved: string;
   hazardsObserved: string;
+};
+
+export type WalkthroughPricingReview = {
+  version: 1;
+  calculatorInput: CalculatorInput;
+  estimateResult: EstimateResult;
+  serviceId: string;
+  serviceName: string;
+  serviceDescription: string | null;
+  frequency: Frequency;
+  catalogAddons: CatalogAddonSnapshot[];
+  scope: string[];
+  finalReviewedPrice: number;
+  reviewedAt: string;
+  reviewedBy: { id: string; displayName: string };
 };
 
 export type Walkthrough = {
@@ -55,12 +79,15 @@ export type Walkthrough = {
   measurements: WalkthroughMeasurements;
   recommendations: WalkthroughRecommendation[];
   photos: WalkthroughPhoto[];
+  pricing_review: WalkthroughPricingReview | null;
+  pricing_reviewed_at: string | null;
+  pricing_reviewed_by: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
 };
-export type WalkthroughInput = Omit<Walkthrough, "id" | "created_at" | "updated_at" | "archived_at"> & { archived_at?: string | null };
-export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | "updated_at">>;
+export type WalkthroughInput = Omit<Walkthrough, "id" | "created_at" | "updated_at" | "archived_at" | "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by"> & { archived_at?: string | null };
+export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | "updated_at" | "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by">>;
 export type WalkthroughWithRelations = Walkthrough & { client: Client | null; property: Property | null; estimate: Estimate | null };
 export type AvailableEstimate = EstimateWithRelations;
 

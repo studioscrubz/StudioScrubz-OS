@@ -51,7 +51,7 @@ export interface Database {
       walkthroughs: {
         Row: Walkthrough;
         Insert: WalkthroughInput & { id?: string; created_at?: string; updated_at?: string };
-        Update: WalkthroughUpdate;
+        Update: WalkthroughUpdate & Partial<Pick<Walkthrough, "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by">>;
         Relationships: [
           { foreignKeyName: "walkthroughs_estimate_id_fkey"; columns: ["estimate_id"]; isOneToOne: false; referencedRelation: "estimates"; referencedColumns: ["id"] },
           { foreignKeyName: "walkthroughs_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
