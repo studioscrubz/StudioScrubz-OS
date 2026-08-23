@@ -54,12 +54,13 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
     const bundle = await getServiceCatalog();
     setServices(bundle.services);
     setCatalog(bundle);
+    setMeasurements(current=>withCatalogServiceDescription(current,bundle,initialEstimate??walkthrough?.estimate));
   });
 
   useEffect(() => {
     let active = true;
     void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties(), getServiceCatalog()])
-      .then(([estimateRows, clientRows, propertyRows, bundle]) => { if (active) { setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(bundle.services);setCatalog(bundle); } })
+      .then(([estimateRows, clientRows, propertyRows, bundle]) => { if (active) { setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(bundle.services);setCatalog(bundle);setMeasurements(current=>withCatalogServiceDescription(current,bundle,initialEstimate??walkthrough?.estimate)); } })
       .catch((caught: unknown) => { console.error("Walkthrough relationship data failed to load", caught); if (active) setError(message(caught, "Estimate, client, or property information could not be loaded.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -74,7 +75,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const catalogService=catalog?findCatalogService(catalog.services,division,measurements.serviceType):undefined;
   const availableAddons=catalog&&catalogService?getAvailableServiceAddons(catalog,catalogService.id,division):[];
 
-  function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>({...current,serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription??"",catalogAddons:found.result.catalogAddons??[]})); } }
+  function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>withCatalogServiceDescription({...current,serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription?.trim()??"",catalogAddons:found.result.catalogAddons??[]},catalog,found)); } }
   function chooseService(serviceId:string){const service=services.find(item=>item.id===serviceId);if(service)setMeasurements(current=>({...current,serviceType:service.service_name,serviceDescription:service.description?.trim()??"",catalogAddons:[]}))}
   function chooseClient(id: string) { setClientId(id); setPropertyId(""); }
   function addScope(label: string) { if (label.trim() && !scope.some((item) => item.label.toLocaleLowerCase() === label.trim().toLocaleLowerCase())) setScope([...scope, { id: crypto.randomUUID(), label: label.trim() }]); setCustomScope(""); }
@@ -137,3 +138,4 @@ function CustomerRequestContext({estimate}:{estimate:AvailableEstimate}){const s
 function initialMeasurements(walkthrough:WalkthroughWithRelations|undefined,estimate:AvailableEstimate|undefined):WalkthroughMeasurements{const source=estimate??walkthrough?.estimate,input=source?.result.calculatorInput,submission=source?.result.submission;const inherited:WalkthroughMeasurements={...EMPTY_MEASUREMENTS,serviceType:source?.service_name||source?.result.serviceName||"",serviceDescription:source?.result.serviceDescription||"",catalogAddons:source?.result.catalogAddons??[],requestSource:submission?.source==="Customer Self-Service"?"Public Estimate":null,requestedAt:submission?.submittedAt??null,preferredContactMethod:submission?.preferredContactMethod==="Call"?"Phone":submission?.preferredContactMethod??null,estimateNumber:source?.estimate_number??null,overallCondition:input?.condition??"",squareFeet:input?.squareFeet??null,bedrooms:input?.division==="Residential"?input.bedrooms:null,bathrooms:input?.division==="Residential"?input.bathrooms:null,floors:input?.division==="Commercial"?input.floors:1,restrooms:input?.division==="Commercial"?input.restrooms:null,kitchenAreas:input?.division==="Commercial"?input.kitchens:null,specialtyAreas:input?.division==="Commercial"?[input.stations?`${input.stations} stations`:"",input.units?`${input.units} units`:""].filter(Boolean).join(" · "):"",pets:input?.division==="Residential"?(input.pets?"Yes":"No"):"",accessRestrictions:"",parkingLoading:"",waterAccess:"",powerAccess:"",securityAlarm:"",heavySoilBuildup:false,damageObserved:"",hazardsObserved:""};return{...inherited,...walkthrough?.measurements}}
 
 function fullAddress(property:Property){return[property.address,property.address_line_2,property.city,property.state,property.zip].filter(Boolean).join(", ")}
+function withCatalogServiceDescription(measurements:WalkthroughMeasurements,catalog:ServiceCatalogBundle|null,estimate:AvailableEstimate|WalkthroughWithRelations["estimate"]|undefined){if(measurements.serviceDescription.trim()||!catalog||!estimate)return measurements;const service=findCatalogService(catalog.services,estimate.division,estimate.service_name||estimate.result.serviceName);return{...measurements,serviceDescription:service?.description?.trim()??""}}

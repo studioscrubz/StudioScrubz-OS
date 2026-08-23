@@ -31,11 +31,11 @@ export function calculatePublicRequest(input:PublicRequest,catalog:ServiceCatalo
   if(input.addons.some(name=>!selected.has(name)))throw new PublicEstimateRequestError("One or more selected add-ons are unavailable.");
   if(input.division==="Residential"){
     const calculator:ResidentialCalculatorInput={division:"Residential",serviceType:trimCleaning(service.service_name),frequency:allowedFrequency(input.frequency,service),condition:input.condition,squareFeet:input.squareFeet,bedrooms:input.bedrooms??0,bathrooms:input.bathrooms??0,occupied:Boolean(input.occupied),pets:Boolean(input.pets),additionalDiscountPercent:0,taxRatePercent:0,addOns:input.addons};
-    return calculateResidentialEstimate(calculator,catalog);
+    return withServiceDescription(calculateResidentialEstimate(calculator,catalog),service);
   }
   const config=service.pricing_config;
   const calculator:CommercialCalculatorInput={division:"Commercial",commercialType:trimCleaning(service.service_name),frequency:allowedFrequency(input.frequency,service),condition:input.condition,squareFeet:input.squareFeet,floors:input.floors??1,restrooms:input.restrooms??0,kitchens:input.kitchens??0,stations:input.stations??0,units:input.units??0,targetCompletionHours:number(config.default_target_completion_hours,4),workerHourlyPay:number(config.default_worker_hourly_pay,22),targetProfitMarginPercent:number(config.default_target_profit_margin_percent,35),additionalDiscountPercent:0,taxRatePercent:0,additionalServices:input.addons,targetProjectDays:3,workdayHours:8};
-  return calculateCommercialEstimate(calculator,catalog);
+  return withServiceDescription(calculateCommercialEstimate(calculator,catalog),service);
 }
 
 export async function submitPublicRequest(input:PublicRequest,result:EstimateResult){
@@ -61,6 +61,7 @@ function commercialFields(service:CatalogService){const c=service.pricing_config
 function divisions(service:CatalogService):EstimateDivision[]{return service.division==="Both"?["Residential","Commercial"]:[service.division]}
 function trimCleaning(value:string){return value.replace(/ Cleaning$/i,"").trim()} function number(value:unknown,fallback:number){const parsed=Number(value);return Number.isFinite(parsed)&&parsed>0?parsed:fallback}
 function validNumber(value:unknown,min:number,max:number){return typeof value==="number"&&Number.isFinite(value)&&value>=min&&value<=max}
+function withServiceDescription(result:EstimateResult,service:CatalogService):EstimateResult{return{...result,serviceDescription:service.description?.trim()||null}}
 function clean(value:string){return value.trim()||null} function normalize(value:string|null){return value?.trim().toLowerCase().replace(/\s+/g," ")??""} function digits(value:string|null){return value?.replace(/\D/g,"")??""}
 function normalizedLocation(value:{address:string;addressLine2:string;city:string;state:string;zip:string}){return[value.address,value.addressLine2,value.city,value.state,value.zip].map(x=>normalize(x).replace(/[^a-z0-9]/g,"")).join("|")}
 function numberForToday(){const d=new Date(),day=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;return`EST-${day}-${String(Math.floor(Math.random()*10000)).padStart(4,"0")}`}
