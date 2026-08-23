@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { getProposalById } from "@/lib/services/proposals";
+import { addProposalHistory, getProposalById } from "@/lib/services/proposals";
 import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
@@ -7,6 +7,8 @@ import { getCurrentProfile } from "@/lib/services/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { estimatedMonthlyTotal, isRecurringFrequency } from "@/lib/scheduling/frequency";
 import type {
+  AgreementBillingType,
+  AgreementFrequency,
   AgreementFinancialSummary,
   AgreementInput,
   AgreementUpdate,
@@ -70,7 +72,18 @@ export async function createAgreement(input: AgreementInput) {
       .insert({ ...prepared, agreement_number: num() })
       .select(select)
       .single();
-    if (!error) return data as AgreementWithRelations;
+    if (!error) {
+      if (input.proposal_id) {
+        await addProposalHistory(
+          input.proposal_id,
+          "Service Agreement Created",
+          "Accepted",
+          "Accepted",
+          `Service Agreement ${data.agreement_number} created.`,
+        );
+      }
+      return data as AgreementWithRelations;
+    }
     if (error.code === "23505" && input.proposal_id) {
       const old = await getAgreementForProposal(input.proposal_id);
       if (old) return old;
@@ -79,13 +92,42 @@ export async function createAgreement(input: AgreementInput) {
   }
   throw new Error("A unique agreement number could not be generated.");
 }
-export async function createAgreementFromProposal(proposalId: string) {
+export type ProposalAgreementReview = {
+  startDate: string;
+  endDate: string | null;
+  daysOfWeek: (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
+  intervalWeeks: number;
+  dayOfMonth: number | null;
+  customIntervalDays: number | null;
+  billingType: AgreementBillingType;
+  billingAmount: number | null;
+  assignedCrewId: string | null;
+  defaultStartTime: string | null;
+};
+export async function createAgreementFromProposal(proposalId: string, review: ProposalAgreementReview) {
   const [p, settings] = await Promise.all([getProposalById(proposalId), getBusinessSettings()]);
-  if (p.status !== "Accepted" || !isRecurringFrequency(p.frequency))
+  if (p.status !== "Accepted" || !p.accepted || !isRecurringFrequency(p.frequency))
     throw new Error("Only accepted recurring proposals can create agreements.");
+  if (!p.client_id || !p.property_id)
+    throw new Error("This Proposal has a deleted Client or Property relationship and cannot create an Agreement.");
+  if (!review.startDate) throw new Error("Confirm the Agreement Start Date.");
+  if (!AGREEMENT_BILLING_TYPES.includes(review.billingType)) throw new Error("Select a Billing Type.");
   const pricing = proposalAgreementPricing(p);
-  const startDate = p.requested_date ?? today();
-  const startDay = new Date(`${startDate}T12:00:00`).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const billingAmount = review.billingType === "Per Visit" ? pricing.final_per_visit_price : Number(review.billingAmount);
+  if (!Number.isFinite(billingAmount) || billingAmount <= 0)
+    throw new Error(`Enter the ${review.billingType === "Monthly" ? "Monthly Contract Amount" : review.billingType === "Flat Contract" ? "Flat Contract Value" : "Billing Amount"}.`);
+  const frequency = p.frequency as AgreementFrequency;
+  const candidate = {
+    frequency,
+    days_of_week: review.daysOfWeek,
+    interval_weeks: review.intervalWeeks,
+    day_of_month: review.dayOfMonth,
+    custom_interval_days: review.customIntervalDays,
+    start_date: review.startDate,
+    end_date: review.endDate,
+  };
+  const scheduleError = validateSchedule(candidate);
+  if (scheduleError) throw new Error(scheduleError);
   return createAgreement({
     client_id: p.client_id,
     property_id: p.property_id,
@@ -93,28 +135,37 @@ export async function createAgreementFromProposal(proposalId: string) {
     division: p.division,
     agreement_name: `${p.result.serviceName} Service Agreement`,
     service_name: p.result.serviceName,
-    frequency: p.frequency,
-    days_of_week: ["Weekly", "Biweekly"].includes(p.frequency) ? [startDay] : [],
-    interval_weeks: p.frequency === "Biweekly" ? 2 : 1,
-    day_of_month: p.frequency === "Monthly" ? new Date(`${startDate}T12:00:00`).getDate() : null,
-    custom_interval_days: null,
-    start_date: startDate,
-    end_date: null,
+    frequency,
+    days_of_week: review.daysOfWeek,
+    interval_weeks: review.intervalWeeks,
+    day_of_month: review.dayOfMonth,
+    custom_interval_days: review.customIntervalDays,
+    start_date: review.startDate,
+    end_date: review.endDate,
     auto_renew: false,
-    billing_type: "Per Visit",
-    billing_amount: pricing.final_per_visit_price,
+    billing_type: review.billingType,
+    billing_amount: billingAmount,
     pricing_snapshot: pricing,
     payment_terms: p.result.terms.paymentTerms,
     agreement_terms: settings.default_service_agreement_terms,
     cancellation_terms: settings.default_cancellation_terms,
     scope: p.result.scope,
     special_instructions: p.result.terms.accessRequirements,
-    assigned_crew_id: null,
-    default_start_time: null,
+    assigned_crew_id: review.assignedCrewId,
+    default_start_time: review.defaultStartTime,
     estimated_duration: p.result.estimatedDuration,
     status: "Draft",
     notes: p.notes,
   });
+}
+
+function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_week" | "interval_weeks" | "day_of_month" | "custom_interval_days" | "start_date" | "end_date">) {
+  if (input.end_date && input.end_date < input.start_date) return "End date must be on or after the start date.";
+  if (["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(input.frequency) && !input.days_of_week.length)
+    return `Select at least one service day for ${input.frequency}.`;
+  if (input.frequency === "Monthly" && (!input.day_of_month || input.day_of_month < 1 || input.day_of_month > 31))
+    return "Select a monthly service day from 1 through 31.";
+  return null;
 }
 export async function updateAgreement(id: string, input: AgreementUpdate) {
   const { data, error } = await getSupabaseClient()
@@ -278,7 +329,4 @@ const roundMoney=(value:number)=>Math.round(value*100)/100;
 function num() {
   const d = new Date();
   return `AGR-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
-}
-function today() {
-  return new Date().toISOString().slice(0, 10);
 }

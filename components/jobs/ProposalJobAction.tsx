@@ -1,59 +1,22 @@
 "use client";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createJobFromProposal, getJobForProposal } from "@/lib/services/jobs";
+import { getProposalById } from "@/lib/services/proposals";
 import type { JobWithRelations } from "@/types/job";
+import type { ProposalWithRelations } from "@/types/proposal";
 
 export const PROPOSAL_JOB_CREATED_EVENT = "studioscrubz:proposal-job-created";
-
 export function ProposalJobAction({ proposalId }: { proposalId: string }) {
   const router = useRouter();
-  const [job, setJob] = useState<JobWithRelations | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void getJobForProposal(proposalId)
-      .then((value) => {
-        if (active) setJob(value);
-      })
-      .catch((cause: unknown) => {
-        console.error("Job relationship load failed", cause);
-        if (active) setError("Unable to check Job status.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [proposalId]);
-
-  async function create() {
-    setSaving(true);
-    setFailed(false);
-    setError(null);
-    try {
-      const created = await createJobFromProposal(proposalId);
-      const linked = (await getJobForProposal(proposalId)) ?? created;
-      setJob(linked);
-      window.dispatchEvent(new Event(PROPOSAL_JOB_CREATED_EVENT));
-      router.push(`/jobs?jobId=${linked.id}`);
-    } catch (cause) {
-      console.error("Job creation failed", cause);
-      setFailed(true);
-      setError("Unable to create Job.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) return <span className="rounded border px-2 py-1 text-[10px] font-bold text-neutral-400">Checking Job…</span>;
-  if (job) return <><span className="rounded bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">Job Created</span><Link href={`/jobs?jobId=${job.id}`} className="rounded border px-2 py-1 text-[10px] font-bold text-[#143d1a]">View Job</Link></>;
-  return <><button type="button" disabled={saving} onClick={() => void create()} className="rounded bg-[#143d1a] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">{saving ? "Creating Job…" : failed ? "Retry Job Creation" : "Create Job"}</button>{error && <span className="w-full text-xs font-bold text-red-700">{error}</span>}</>;
+  const [job,setJob]=useState<JobWithRelations|null>(null),[proposal,setProposal]=useState<ProposalWithRelations|null>(null);
+  const [reviewing,setReviewing]=useState(false),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[failed,setFailed]=useState(false),[error,setError]=useState<string|null>(null);
+  useEffect(()=>{let active=true;void Promise.all([getJobForProposal(proposalId),getProposalById(proposalId)]).then(([existing,source])=>{if(active){setJob(existing);setProposal(source)}}).catch(cause=>{console.error("Job relationship load failed",cause);if(active)setError("Unable to check Job status.")}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[proposalId]);
+  async function create(){setSaving(true);setFailed(false);setError(null);try{const created=await createJobFromProposal(proposalId),linked=(await getJobForProposal(proposalId))??created;setJob(linked);setReviewing(false);window.dispatchEvent(new Event(PROPOSAL_JOB_CREATED_EVENT));router.push(`/jobs?jobId=${linked.id}`)}catch(cause){console.error("Job creation failed",cause);setFailed(true);setError(cause instanceof Error?cause.message:"Unable to create Job.")}finally{setSaving(false)}}
+  if(loading)return <span className="rounded border px-2 py-1 text-[10px] font-bold text-neutral-400">Checking Job…</span>;
+  if(job)return <><span className="rounded bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">Job Created</span><Link href={`/jobs?jobId=${job.id}`} className="rounded border px-2 py-1 text-[10px] font-bold text-[#143d1a]">View Job</Link></>;
+  return <><button type="button" disabled={!proposal} onClick={()=>setReviewing(true)} className="rounded bg-[#143d1a] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">Create Job</button>{error&&<span className="w-full text-xs font-bold text-red-700">{error}</span>}{reviewing&&proposal&&<div className="fixed inset-0 z-[95] grid place-items-center bg-black/60 p-4"><section role="dialog" aria-modal="true" aria-labelledby="proposal-job-review-title" className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><button type="button" aria-label="Close Job review" className="float-right text-xl" onClick={()=>setReviewing(false)}>×</button><h2 id="proposal-job-review-title" className="text-2xl font-extrabold text-[#143d1a]">Create Job from Accepted Proposal</h2><p className="mt-2 text-sm text-neutral-600">Review the customer context. The Job remains unscheduled until staff confirms its operational date, time, and crew.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><Detail label="Proposal" value={proposal.proposal_number}/><Detail label="Service" value={proposal.result.serviceName}/><Detail label="Service Description" value={proposal.result.serviceDescription||"—"}/><Detail label="Accepted Price" value={money(proposal.result.perVisitTotal)}/><Detail label="Customer Requested Date" value={proposal.requested_date||"—"}/><Detail label="Initial Job Status" value="Ready to Schedule"/></div><div className="mt-5 rounded-xl border bg-neutral-50 p-4"><b className="text-[#143d1a]">Scope and Add-Ons</b>{proposal.result.scope.length?<ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{proposal.result.scope.map(item=><li key={item.id}>{item.text}</li>)}</ul>:<p className="mt-2 text-sm text-neutral-500">—</p>}</div>{error&&<p className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<div className="mt-6 flex justify-end gap-3"><button type="button" className="rounded-lg border px-4 py-2 font-bold" onClick={()=>setReviewing(false)}>Cancel</button><button type="button" disabled={saving} className="rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-50" onClick={()=>void create()}>{saving?"Creating…":failed?"Retry Job Creation":"Create Ready-to-Schedule Job"}</button></div></section></div>}</>;
 }
+function Detail({label,value}:{label:string;value:string}){return <div className="rounded-lg bg-neutral-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-neutral-500">{label}</p><p className="mt-1 font-semibold text-[#143d1a]">{value}</p></div>}
+function money(value:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value)}

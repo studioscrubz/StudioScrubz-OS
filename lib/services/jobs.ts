@@ -149,7 +149,7 @@ export async function createJobFromProposal(
     service_name: proposal.result.serviceName,
     frequency: proposal.frequency,
     status: "Ready to Schedule" as const,
-    scheduled_date: proposal.requested_date,
+    scheduled_date: null,
     start_time: null,
     estimated_duration: proposal.result.estimatedDuration,
     assigned_crew_id: null,
