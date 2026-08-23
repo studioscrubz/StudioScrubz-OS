@@ -7,6 +7,8 @@ export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
 export type EstimateStatus = "Open" | "Archived";
 export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Monthly";
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
+export type PreferredContactMethod = "Call" | "Text" | "Email";
+export type PreferredContactTime = "Anytime" | "Morning" | "Afternoon" | "Evening";
 
 export type CustomerInformation = {
   firstName: string;
@@ -86,6 +88,13 @@ export type EstimateResult = {
   estimatedProfit: number;
   scope: string[];
   calculatorInput: CalculatorInput;
+  submission?: {
+    source: "Customer Self-Service";
+    preferredServiceDate: string | null;
+    preferredContactMethod: PreferredContactMethod;
+    preferredContactTime: PreferredContactTime;
+    submittedAt: string;
+  };
 };
 
 export type Estimate = {
