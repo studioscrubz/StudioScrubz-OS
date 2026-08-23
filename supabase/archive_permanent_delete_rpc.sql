@@ -149,6 +149,29 @@ begin
   if v_deleted <> 1 then
     raise exception 'The archived record could not be permanently deleted.';
   end if;
+
+  -- Attention is derived from operational records, but personal snooze/dismiss
+  -- state is persisted by canonical key. Remove only keys owned by the source
+  -- record that was deleted. This runs after the guarded source delete and in
+  -- the same transaction, so a failure rolls the entire operation back.
+  delete from public.attention_item_states
+  where case p_record_type
+    when 'Walkthroughs' then
+      attention_key = 'walkthrough:' || p_record_id::text || ':requested'
+    when 'Proposals' then
+      attention_key like 'proposal:' || p_record_id::text || ':%'
+    when 'Jobs' then
+      attention_key like 'job:' || p_record_id::text || ':%'
+      or attention_key like 'service-reminder:' || p_record_id::text || ':%'
+    when 'Invoices' then
+      attention_key like 'invoice:' || p_record_id::text || ':%'
+    when 'Time Entries' then
+      attention_key = 'time:' || p_record_id::text || ':open'
+    when 'Service Agreements' then
+      attention_key like 'agreement:' || p_record_id::text || ':%'
+    else false
+  end;
+
   return p_record_type || ':' || p_record_id::text;
 end;
 $$;

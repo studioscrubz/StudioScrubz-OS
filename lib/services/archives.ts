@@ -2,6 +2,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import type { ArchiveDeleteCheck, ArchivedRecord, ArchiveRecordType } from "@/types/archive";
 import { getCurrentProfile, getCurrentUser } from "@/lib/services/auth";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
+import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 
 type DbError = { message: string; code?: string };
 type QueryResult = { data: unknown; error: DbError | null; count?: number | null };
@@ -91,6 +92,7 @@ export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): P
     p_record_id: record.id,
   });
   if (error) throw new Error(error.message || "Permanent deletion was rejected.");
+  notifyAttentionRefresh();
 }
 
 function archiveDb() { return getSupabaseClient() as unknown as ArchiveDb; }
