@@ -7,13 +7,14 @@ import type { CalculatorInput, CommercialCalculatorInput, ResidentialCalculatorI
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import type { UserProfile } from "@/types/auth";
 import type { WalkthroughPricingReview, WalkthroughWithRelations } from "@/types/walkthrough";
+import { AUTH_SYNCHRONIZATION_MESSAGE, AuthSynchronizationError, retryJwtIssuedAtFuture } from "@/lib/supabase/retry";
 
 export async function POST(request: Request) {
   try {
     const sessionClient = await createSupabaseServerClient();
     const { data: userData } = await sessionClient.auth.getUser();
     if (!userData.user) return Response.json({ error: "Authentication is required." }, { status: 401 });
-    const { data: profileData, error: profileError } = await sessionClient.from("user_profiles").select("*").eq("id", userData.user.id).single();
+    const { data: profileData, error: profileError } = await retryJwtIssuedAtFuture(() => sessionClient.from("user_profiles").select("*").eq("id", userData.user.id).single());
     if (profileError) throw profileError;
     const profile = profileData as UserProfile;
     if (!hasPermission(profile, "proposals.create")) return Response.json({ error: "Proposal pricing permission is required." }, { status: 403 });
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
     return Response.json(saved);
   } catch (error) {
     console.error("Walkthrough pricing approval failed", error);
+    if (error instanceof AuthSynchronizationError) return Response.json({ error: AUTH_SYNCHRONIZATION_MESSAGE }, { status: 503 });
     return Response.json({ error: "Walkthrough pricing could not be approved." }, { status: 400 });
   }
 }
