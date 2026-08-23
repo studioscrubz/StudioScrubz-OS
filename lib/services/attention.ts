@@ -1,6 +1,6 @@
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/services/auth";
-import { getJobs } from "@/lib/services/jobs";
+import { getJobProposalIds, getJobs } from "@/lib/services/jobs";
 import { getProposals } from "@/lib/services/proposals";
 import { getAgreements } from "@/lib/services/agreements";
 import { getInvoicedJobIds, getInvoices } from "@/lib/services/invoices";
@@ -13,6 +13,19 @@ import type { AttentionItem, AttentionStateRecord, AttentionSummary, AttentionVi
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import type { CommunicationComposerContext } from "@/types/clientCommunication";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
+
+export const ATTENTION_REALTIME_TABLES = [
+  "walkthroughs",
+  "proposals",
+  "service_agreements",
+  "jobs",
+  "invoices",
+  "service_occurrences",
+  "payments",
+  "attention_item_states",
+  "client_communications",
+  "time_entries",
+] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
   const profile = await getCurrentProfile();
@@ -32,10 +45,19 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   const clock = businessClock(settings?.timezone ?? null);
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
+  const [jobRouteIds, agreementRoutes] = await Promise.all([
+    hasPermission(profile, "jobs.view")
+      ? getJobProposalIds()
+      : Promise.resolve([]),
+    hasPermission(profile, "agreements.view")
+      ? getSupabaseClient().from("service_agreements").select("proposal_id").not("proposal_id", "is", null).is("archived_at", null).not("status", "in", "(Cancelled,Archived)")
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (agreementRoutes.error) throw agreementRoutes.error;
   const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
   const contractJobIds=new Set((contractOccurrences??[]).filter(row=>["Monthly","Flat Contract"].includes((row.agreement as {billing_type:string}|null)?.billing_type??"")).map(row=>row.job_id).filter(Boolean));
-  const routedProposalIds = new Set([...jobs.map((row) => row.proposal_id), ...agreements.map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
+  const routedProposalIds = new Set([...jobRouteIds, ...(agreementRoutes.data ?? []).map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
   const invoicedJobs = new Set(invoicedJobIds);
 
   for (const walkthrough of walkthroughs.filter((row) => row.status === "New" && !row.walkthrough_date && !row.archived_at && row.measurements.requestSource === "Public Estimate")) {
@@ -60,8 +82,9 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     }
   }
   for (const proposal of proposals.filter((row) => !row.archived_at && row.status !== "Archived")) {
-    if (proposal.status === "Accepted" && proposal.accepted && !routedProposalIds.has(proposal.id)) {
-      const recurring = isRecurringFrequency(proposal.frequency);
+    const recurring = isRecurringFrequency(proposal.frequency);
+    const canRoute = recurring ? hasPermission(profile, "agreements.manage") : hasPermission(profile, "jobs.create");
+    if (proposal.status === "Accepted" && proposal.accepted && canRoute && !routedProposalIds.has(proposal.id)) {
       items.push(item(`proposal:${proposal.id}:route`, "Accepted Proposal Needs Routing", "Urgent", "Proposals", recurring ? "Accepted proposal needs a Service Agreement" : "Accepted proposal needs a Job", `${proposal.proposal_number} - ${proposal.client_name || "Deleted Client"}`, "Proposal", proposal.id, proposal.client_id, proposal.proposal_number, null, null, proposal.accepted_at ?? proposal.created_at, `/open-proposals?proposalId=${proposal.id}`, recurring ? "Create Agreement" : "Create Job"));
     }
     if (proposal.approval_status === "Pending Approval") items.push(item(`proposal:${proposal.id}:approval`, "Proposal Awaiting Approval", "Attention", "Proposals", "Proposal awaiting approval", `${proposal.proposal_number} · ${proposal.client_name || "Deleted Client"}`, "Proposal", proposal.id, proposal.client_id, proposal.proposal_number, null, null, proposal.created_at, `/open-proposals?proposalId=${proposal.id}`, "Review Proposal"));

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { dismissAttentionItem, getAttentionItems, restoreAttentionItem, snoozeAttentionItem, summarizeAttention } from "@/lib/services/attention";
 import { ATTENTION_CATEGORIES, ATTENTION_SEVERITIES, type AttentionCategory, type AttentionItem, type AttentionSeverity, type AttentionView } from "@/types/attention";
 import { LogCommunicationModal } from "@/components/communications/LogCommunicationModal";
-import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
 
 export function AttentionCenterPage() {
   const [items, setItems] = useState<AttentionItem[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
@@ -13,7 +13,7 @@ export function AttentionCenterPage() {
   const [view, setView] = useState<AttentionView>("Active"); const [changing, setChanging] = useState<string | null>(null);
   const [composerItem, setComposerItem] = useState<AttentionItem | null>(null);
   async function load() { setLoading(true); setError(null); try { setItems(await getAttentionItems("All")); } catch (caught) { console.error("Attention Center load failed", caught); setError("Attention Center could not be loaded."); } finally { setLoading(false); } }
-  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "time_entries"], load);
+  useAttentionRefresh(load);
   useEffect(() => {
     // Initial client-side hydration from role-scoped services.
     // eslint-disable-next-line react-hooks/set-state-in-effect

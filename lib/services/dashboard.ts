@@ -13,55 +13,7 @@ import type {
 import type { JobWithRelations } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
-export async function getInvoiceAttentionItems(): Promise<
-  DashboardAttentionItem[]
-> {
-  const db = getSupabaseClient();
-  const [
-    invoiced,
-    { data: jobs, error: jobsError },
-    { data: invoices, error: invoiceError },
-  ] = await Promise.all([
-    getInvoicedJobIds(),
-    db
-      .from("jobs")
-      .select("id,job_number")
-      .eq("status", "Completed")
-      .is("archived_at", null),
-    db
-      .from("invoices")
-      .select("id,invoice_number")
-      .eq("status", "Past Due")
-      .is("archived_at", null),
-  ]);
-  if (jobsError) throw jobsError;
-  if (invoiceError) throw invoiceError;
-  const linked = new Set(invoiced);
-  return [
-    ...(jobs ?? [])
-      .filter((job) => !linked.has(job.id))
-      .map((job) =>
-        item(
-          `invoice-job-${job.id}`,
-          "Invoice",
-          job.job_number,
-          "Completed Job does not have an Invoice.",
-          "Create Invoice",
-          `/jobs?jobId=${job.id}`,
-        ),
-      ),
-    ...(invoices ?? []).map((invoice) =>
-      item(
-        `past-due-${invoice.id}`,
-        "Invoice",
-        invoice.invoice_number,
-        "Invoice is past due.",
-        "View Invoice",
-        `/invoices?invoiceId=${invoice.id}`,
-      ),
-    ),
-  ];
-}
+import { getAttentionItems as getOperationalAttentionItems } from "@/lib/services/attention";
 const jobSelect =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
 const walkthroughSelect =
@@ -76,7 +28,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     jobs,
     crews,
     attention,
-    invoiceAttention,
     preview,
   ] = await Promise.all([
     getDashboardMetrics(),
@@ -86,8 +37,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     getEstimateMetrics(),
     getJobPipelineMetrics(),
     getCrewStatus(),
-    getAttentionItems(),
-    getInvoiceAttentionItems(),
+    getOperationalAttentionItems(),
     getSchedulePreview(),
   ]);
   return {
@@ -98,7 +48,14 @@ export async function getDashboardData(): Promise<DashboardData> {
     estimate,
     jobs,
     crews,
-    attention: [...attention, ...invoiceAttention].slice(0, 12),
+    attention: attention.slice(0, 12).map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      record: entry.entity_label ?? entry.record_type,
+      description: entry.title,
+      action: entry.action_label,
+      href: entry.action_url,
+    })),
     preview,
   };
 }

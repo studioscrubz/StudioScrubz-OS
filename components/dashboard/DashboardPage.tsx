@@ -9,7 +9,7 @@ import { DashboardRecurringServices } from "@/components/agreements/DashboardRec
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, permissionForPath, type Permission } from "@/lib/auth/permissions";
 import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
-import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -27,7 +27,7 @@ export function DashboardPage() {
       );
     }
   }
-  useOperationalRealtime(["estimates", "walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "payments", "time_entries", "clients", "properties", "crews", "employees"], load);
+  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees"]);
   useEffect(() => {
     let active = true;
     void getDashboardData()

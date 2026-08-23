@@ -111,10 +111,15 @@ export async function getJobForProposal(
   return data as JobWithRelations | null;
 }
 export async function getJobProposalIds(): Promise<string[]> {
-  if (!(await master())) return [...new Set((await getJobs()).map((job)=>job.proposal_id).filter((id):id is string=>Boolean(id)))];
+  if (!(await master())) {
+    const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
+    if (error) throw error;
+    return [...new Set(data.map((job) => job.proposal_id).filter((id): id is string => Boolean(id)))];
+  }
   const { data, error } = await getSupabaseClient()
     .from("jobs")
-    .select("proposal_id");
+    .select("proposal_id")
+    .is("archived_at", null);
   if (error) throw error;
   return [
     ...new Set(

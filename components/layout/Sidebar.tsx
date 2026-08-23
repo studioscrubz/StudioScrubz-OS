@@ -9,7 +9,7 @@ import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
 import { getAttentionSummary } from "@/lib/services/attention";
-import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
 
 type NavLink = { label: string; href: string; marker: string; permission: Permission };
 type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
@@ -106,7 +106,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     void getAttentionSummary().then((summary) => { if (active) setAttentionCount(summary.total); }).catch((cause) => console.error("Attention badge load failed", cause));
     return () => { active = false; };
   }, [auth.profile]);
-  useOperationalRealtime(["walkthroughs", "proposals", "service_agreements", "jobs", "invoices", "attention_item_states", "client_communications", "time_entries"], loadAttentionCount);
+  useAttentionRefresh(loadAttentionCount);
   const visibleItems = navItems.reduce<Array<NavLink | NavGroup>>((items, item) => {
     if (!isGroup(item)) return hasPermission(auth.profile, item.permission) ? [...items, item] : items;
     if (item.permission && !hasPermission(auth.profile, item.permission)) return items;
