@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   manifest: null,
   title: { default: "StudioScrubz | Residential & Commercial Cleaning", template: "%s | StudioScrubz" },
   description: "Residential cleaning, commercial cleaning, post-construction cleaning, and pressure washing in the Los Angeles area.",
+  keywords: ["residential cleaning", "commercial cleaning", "property management cleaning", "post-construction cleaning", "San Fernando Valley cleaning", "Los Angeles cleaning"],
+  alternates: { canonical: "https://studioscrubz.com" },
+  robots: { index: true, follow: true },
   openGraph: { type: "website", siteName: "StudioScrubz", title: "StudioScrubz | Residential & Commercial Cleaning", description: "Professional residential and commercial cleaning across the Los Angeles area.", url: "https://studioscrubz.com", images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }] },
+  twitter: { card: "summary_large_image", title: "StudioScrubz | Residential & Commercial Cleaning", description: "Professional residential and commercial cleaning across the Los Angeles area.", images: ["/branding/studioscrubz-logo.png"] },
 };
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {

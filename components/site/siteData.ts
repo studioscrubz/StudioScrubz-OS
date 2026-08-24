@@ -2,10 +2,9 @@ export const ESTIMATE_URL = "https://estimate.studioscrubz.com/";
 
 export const siteNavigation = [
   ["Home", "/"],
-  ["Residential", "/residential"],
+  ["Services", "/#services"],
   ["Commercial", "/commercial"],
-  ["Post-Construction", "/post-construction"],
-  ["Pressure Washing", "/pressure-washing"],
+  ["Residential", "/residential"],
   ["About", "/about"],
   ["Contact", "/contact"],
 ] as const;
