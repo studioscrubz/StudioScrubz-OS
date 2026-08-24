@@ -95,8 +95,14 @@ function localDate(d=new Date()){return`${d.getFullYear()}-${String(d.getMonth()
 function addDays(date:string,n:number){const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+n);return localDate(d)}
 const round=(n:number)=>Math.round(n*100)/100;
 export function calculateInvoiceAmounts(items:InvoiceLineItem[],discountValue:number,taxValue:number){
-  if(!items.length)throw new Error("At least one line item is required.");
-  const line_items=items.map(item=>{const description=item.description.trim(),quantity=round(Number(item.quantity)),rate=round(Number(item.rate));if(!description)throw new Error("Every line item requires a description.");if(!Number.isFinite(quantity)||quantity<=0)throw new Error("Line item quantities must be greater than zero.");if(!Number.isFinite(rate)||rate<0)throw new Error("Line item rates cannot be negative.");return{...item,description,quantity,rate,amount:round(quantity*rate)}});
+  return calculateInvoiceAmountsInternal(items,discountValue,taxValue,true);
+}
+export function previewInvoiceAmounts(items:InvoiceLineItem[],discountValue:number,taxValue:number){
+  return calculateInvoiceAmountsInternal(items,discountValue,taxValue,false);
+}
+function calculateInvoiceAmountsInternal(items:InvoiceLineItem[],discountValue:number,taxValue:number,strict:boolean){
+  if(strict&&!items.length)throw new Error("At least one line item is required.");
+  const line_items=items.map(item=>{const description=item.description.trim(),rawQuantity=Number(item.quantity),rawRate=Number(item.rate),quantity=round(Number.isFinite(rawQuantity)?rawQuantity:0),rate=round(Number.isFinite(rawRate)?rawRate:0);if(strict&&!description)throw new Error("Every line item requires a description.");if(strict&&(!Number.isFinite(rawQuantity)||quantity<=0))throw new Error("Line item quantities must be greater than zero.");if(strict&&!Number.isFinite(rawRate))throw new Error("Every line item requires a valid rate.");if(strict&&rate<0)throw new Error("Line item rates cannot be negative.");return{...item,description,quantity:Math.max(quantity,0),rate:Math.max(rate,0),amount:round(Math.max(quantity,0)*Math.max(rate,0))}});
   const subtotal=round(line_items.reduce((sum,item)=>sum+item.amount,0));
   const discount=round(Math.min(Math.max(Number(discountValue)||0,0),subtotal));
   const tax=round(Math.max(Number(taxValue)||0,0));
