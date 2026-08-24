@@ -19,6 +19,7 @@ import { AGREEMENT_BILLING_TYPES } from "@/types/agreement";
 import type { Client } from "@/types/client";
 import type { Property } from "@/types/property";
 import type { CatalogService } from "@/types/serviceCatalog";
+import type { ProposalScopeItem, ProposalWithRelations } from "@/types/proposal";
 const select =
   "*, client:clients!service_agreements_client_id_fkey(*), property:properties!service_agreements_property_id_fkey(*), proposal:proposals!service_agreements_proposal_id_fkey(*), crew:crews!service_agreements_assigned_crew_id_fkey(*)";
 export async function getAgreements(): Promise<AgreementWithRelations[]> {
@@ -103,7 +104,30 @@ export type ProposalAgreementReview = {
   billingAmount: number | null;
   assignedCrewId: string | null;
   defaultStartTime: string | null;
+  scope: ProposalScopeItem[];
 };
+
+export function agreementScopeFromProposal(proposal: ProposalWithRelations): ProposalScopeItem[] {
+  const proposalScope = normalizeAgreementScope(proposal.result.scope);
+  if (proposalScope.length) return proposalScope;
+
+  const walkthroughScope = normalizeAgreementScope(
+    (proposal.walkthrough?.scope ?? []).map((item) => ({ id: item.id, text: item.label })),
+  );
+  if (walkthroughScope.length) return walkthroughScope;
+
+  return normalizeAgreementScope(
+    (proposal.estimate?.result.scope ?? []).map((text, index) => ({ id: `estimate-scope-${index + 1}`, text })),
+  );
+}
+
+function normalizeAgreementScope(scope: ProposalScopeItem[] | null | undefined): ProposalScopeItem[] {
+  return (scope ?? []).flatMap((item, index) => {
+    const text = typeof item?.text === "string" ? item.text.trim() : "";
+    return text ? [{ id: item.id || `scope-${index + 1}`, text }] : [];
+  });
+}
+
 export async function createAgreementFromProposal(proposalId: string, review: ProposalAgreementReview) {
   const [p, settings] = await Promise.all([getProposalById(proposalId), getBusinessSettings()]);
   if (p.status !== "Accepted" || !p.accepted || !isRecurringFrequency(p.frequency))
@@ -149,7 +173,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     payment_terms: p.result.terms.paymentTerms,
     agreement_terms: settings.default_service_agreement_terms,
     cancellation_terms: settings.default_cancellation_terms,
-    scope: p.result.scope,
+    scope: normalizeAgreementScope(review.scope),
     special_instructions: p.result.terms.accessRequirements,
     assigned_crew_id: review.assignedCrewId,
     default_start_time: review.defaultStartTime,
