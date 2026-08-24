@@ -54,7 +54,7 @@ begin
     from public.service_occurrences occurrence
     join public.service_agreements agreement on agreement.id = occurrence.agreement_id
     where occurrence.id = job_row.service_occurrence_id
-      and agreement.billing_type in ('Monthly', 'Flat Contract')
+      and agreement.billing_type in ('Weekly', 'Biweekly', 'Monthly', 'Flat Contract')
   ) then
     return jsonb_build_object(
       'invoice_id', null,

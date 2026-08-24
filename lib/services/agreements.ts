@@ -64,7 +64,7 @@ export async function createAgreement(input: AgreementInput) {
     const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
     if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
     const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules });
-    prepared = { ...input, billing_amount:["Monthly","Flat Contract"].includes(input.billing_type) ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
+    prepared = { ...input, billing_amount:input.billing_type !== "Per Visit" ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
   }
   for (let i = 0; i < 5; i++) {
     const { data, error } = await getSupabaseClient()
@@ -115,7 +115,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
   const pricing = proposalAgreementPricing(p);
   const billingAmount = review.billingType === "Per Visit" ? pricing.final_per_visit_price : Number(review.billingAmount);
   if (!Number.isFinite(billingAmount) || billingAmount <= 0)
-    throw new Error(`Enter the ${review.billingType === "Monthly" ? "Monthly Contract Amount" : review.billingType === "Flat Contract" ? "Flat Contract Value" : "Billing Amount"}.`);
+    throw new Error(`Enter the ${review.billingType === "Weekly" ? "Weekly Contract Amount" : review.billingType === "Biweekly" ? "Biweekly Contract Amount" : review.billingType === "Monthly" ? "Monthly Contract Amount" : review.billingType === "Flat Contract" ? "Contract Value" : "Billing Amount"}.`);
   const frequency = p.frequency as AgreementFrequency;
   const candidate = {
     frequency,
@@ -205,7 +205,12 @@ export async function saveAgreementEdits(id: string, input: AgreementUpdate) {
   const service = catalog.services.find((row) => row.service_name === candidate.service_name && (row.division === candidate.division || row.division === "Both"));
   const validation = validateAgreementConfiguration(candidate, current.client, current.property, service, ["Active", "Paused"].includes(current.status));
   if (validation) throw new Error(validation);
-  return updateAgreement(id, operationalUpdate);
+  const updated = await updateAgreement(id, operationalUpdate);
+  if (["Active", "Paused"].includes(updated.status)) {
+    const { reconcileFutureOccurrences } = await import("@/lib/services/serviceOccurrences");
+    await reconcileFutureOccurrences(updated.id);
+  }
+  return updated;
 }
 async function transition(id: string, allowed: ServiceAgreement["status"][], status: ServiceAgreement["status"], extra: AgreementUpdate = {}) {
   const current = await getAgreementById(id);
@@ -227,10 +232,11 @@ export async function activateAgreement(id: string) {
   if (validation) throw new Error(validation);
   return updateAgreement(id, { status: "Active" });
 }
-export const pauseAgreement = (id: string) => transition(id, ["Active"], "Paused");
-export const resumeAgreement = (id: string) => transition(id, ["Paused"], "Active");
-export const completeAgreement = (id: string) => transition(id, ["Active"], "Completed");
-export const cancelAgreement = (id: string) => transition(id, ["Active", "Paused"], "Cancelled");
+async function transitionAndReconcile(id:string,allowed:ServiceAgreement["status"][],status:ServiceAgreement["status"]){const updated=await transition(id,allowed,status);const{reconcileFutureOccurrences}=await import("@/lib/services/serviceOccurrences");await reconcileFutureOccurrences(id);return updated}
+export const pauseAgreement = (id: string) => transitionAndReconcile(id, ["Active"], "Paused");
+export const resumeAgreement = (id: string) => transitionAndReconcile(id, ["Paused"], "Active");
+export const completeAgreement = (id: string) => transitionAndReconcile(id, ["Active"], "Completed");
+export const cancelAgreement = (id: string) => transitionAndReconcile(id, ["Active", "Paused"], "Cancelled");
 export const archiveAgreement = (id: string) =>
   updateAgreement(id, {
     status: "Archived",
@@ -249,7 +255,7 @@ export async function getAgreementFinancialSummary(
     .map((x) => x.job_id)
     .filter((x): x is string => !!x);
   let invoiceQuery=db.from("invoices").select("id,total,amount_paid,balance_due").not("status","in","(Cancelled,Archived)").is("archived_at",null);
-  invoiceQuery=["Monthly","Flat Contract"].includes(agreement.billing_type)?invoiceQuery.eq("service_agreement_id",id):jobIds.length?invoiceQuery.in("job_id",jobIds):invoiceQuery.eq("service_agreement_id",id);
+  invoiceQuery=agreement.billing_type!=="Per Visit"?invoiceQuery.eq("service_agreement_id",id):jobIds.length?invoiceQuery.in("job_id",jobIds):invoiceQuery.eq("service_agreement_id",id);
   const { data: inv, error: ie } = await invoiceQuery;
   if (ie) throw ie;
   const invoiced=roundMoney((inv??[]).reduce((n,x)=>n+Number(x.total),0));
@@ -271,10 +277,11 @@ export function monthlyRecurringRevenue(a: ServiceAgreement) {
 }
 export function estimatedMonthlyAmount(a: ServiceAgreement) {
   if (a.billing_type === "Monthly") return a.billing_amount;
-  if (a.pricing_snapshot?.estimated_monthly_total !== null && a.pricing_snapshot?.estimated_monthly_total !== undefined)
-    return a.pricing_snapshot.estimated_monthly_total;
   if (a.billing_type === "Weekly") return (a.billing_amount * 52) / 12;
   if (a.billing_type === "Biweekly") return (a.billing_amount * 26) / 12;
+  if (a.billing_type === "Flat Contract") return 0;
+  if (a.pricing_snapshot?.estimated_monthly_total !== null && a.pricing_snapshot?.estimated_monthly_total !== undefined)
+    return a.pricing_snapshot.estimated_monthly_total;
   if (a.billing_type === "Per Visit") {
     const shared=estimatedMonthlyTotal(a.billing_amount,a.frequency);
     if(shared!==null&&shared>0)return shared;
@@ -322,7 +329,7 @@ export function validateAgreementConfiguration(
   if (agreement.frequency === "Custom" && (!agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be at least 1.";
   if (activation && !agreement.default_start_time) return "A default service start time is required before activation.";
   if (activation && agreement.division === "Commercial" && !agreement.assigned_crew_id) return "Assign a crew before activating a Commercial agreement.";
-  if (activation && agreement.division === "Commercial" && ["Monthly", "Flat Contract"].includes(agreement.billing_type) && agreement.billing_amount <= 0) return `${agreement.billing_type} Commercial agreements require a contract amount greater than zero.`;
+  if (activation && agreement.billing_type !== "Per Visit" && agreement.billing_amount <= 0) return `${agreement.billing_type} agreements require a contract amount greater than zero.`;
   return null;
 }
 const roundMoney=(value:number)=>Math.round(value*100)/100;

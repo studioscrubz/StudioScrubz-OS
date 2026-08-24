@@ -56,7 +56,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   if (agreementRoutes.error) throw agreementRoutes.error;
   const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
-  const contractJobIds=new Set((contractOccurrences??[]).filter(row=>["Monthly","Flat Contract"].includes((row.agreement as {billing_type:string}|null)?.billing_type??"")).map(row=>row.job_id).filter(Boolean));
+  const contractJobIds=new Set((contractOccurrences??[]).filter(row=>{const type=(row.agreement as {billing_type:string}|null)?.billing_type;return Boolean(type&&type!=="Per Visit")}).map(row=>row.job_id).filter(Boolean));
   const routedProposalIds = new Set([...jobRouteIds, ...(agreementRoutes.data ?? []).map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
   const invoicedJobs = new Set(invoicedJobIds);
 

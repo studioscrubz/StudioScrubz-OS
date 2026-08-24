@@ -17,7 +17,7 @@ export function ContractServiceRecordAction({ jobId }: { jobId: string }) {
   }, [jobId]);
 
   const billingType = job?.service_occurrence?.agreement.billing_type;
-  if (!job || job.status !== "Completed" || !billingType || !["Monthly", "Flat Contract"].includes(billingType)) return null;
+  if (!job || job.status !== "Completed" || !billingType || billingType === "Per Visit") return null;
 
   return <>
     <button type="button" className="rounded-lg border px-3 py-2 text-xs font-bold text-[#143d1a]" onClick={() => setOpen(true)}>View / Download Service Record</button>
@@ -27,7 +27,7 @@ export function ContractServiceRecordAction({ jobId }: { jobId: string }) {
 
 function ServiceRecordModal({ job, close }: { job: JobWithRelations; close: () => void }) {
   const agreement = job.service_occurrence!.agreement;
-  const coverage = agreement.billing_type === "Monthly" ? "Covered by Monthly Contract Billing." : "Covered by Flat Contract Billing.";
+  const coverage = `Covered by ${agreement.billing_type} Agreement Billing.`;
   return <div className="fixed inset-0 z-[110] grid place-items-center overflow-y-auto bg-black/60 p-4 print:static print:block print:bg-white print:p-0">
     <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 print:max-h-none print:max-w-none print:overflow-visible print:p-0">
       <button type="button" className="float-right text-xl print:hidden" onClick={close}>×</button>
