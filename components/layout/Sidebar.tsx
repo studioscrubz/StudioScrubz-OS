@@ -15,15 +15,8 @@ type NavLink = { label: string; href: string; marker: string; permission: Permis
 type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
 
 const navItems: Array<NavLink | NavGroup> = [
-  {
-    label: "Dashboard",
-    marker: "D",
-    children: [
-      { label: "Dashboard", href: "/", marker: "", permission: "dashboard.view" },
-      { label: "Attention Center", href: "/attention", marker: "", permission: "attention.view" },
-      { label: "Schedule", href: "/schedule", marker: "", permission: "schedule.view" },
-    ],
-  },
+  { label: "Attention Center", href: "/attention", marker: "A", permission: "attention.view" },
+  { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
   {
     label: "Estimates",
     marker: "E",
@@ -39,10 +32,12 @@ const navItems: Array<NavLink | NavGroup> = [
     children: [
       { label: "Proposal Calculator", href: "/proposals", marker: "", permission: "proposals.create" },
       { label: "Open Proposals", href: "/open-proposals", marker: "", permission: "proposals.view" },
-      { label: "Service Agreements", href: "/agreements", marker: "", permission: "agreements.view" },
     ],
   },
+  { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
   { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
+  { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
+  { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {
@@ -64,7 +59,6 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Expenses", href: "/expenses", marker: "", permission: "expenses.view" },
       { label: "Vehicles", href: "/vehicles", marker: "", permission: "vehicles.view" },
       { label: "Payroll Preparation", href: "/payroll-prep", marker: "", permission: "payrollPrep.view" },
-      { label: "Invoices", href: "/invoices", marker: "", permission: "invoices.view" },
     ],
   },
   {
@@ -158,7 +152,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                 </li>
               );
             }
-            return <NavItem key={item.href} item={item} active={item.href === pathname} onNavigate={onClose} />;
+            return <NavItem key={item.href} item={item} active={item.href === pathname} onNavigate={onClose} badge={item.href === "/attention" ? attentionCount : undefined} />;
           })}
         </ul>
       </nav>
