@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
     const document = await loadDocument(admin, documentType, documentId);
     assertUsableToken(document);
+    const replyTo = await loadReplyTo(admin);
     const eventKey = `resend:${documentType.toLowerCase().replaceAll(" ", "-")}:${document.id}:${requestId}`;
     const { data: existing, error: existingError } = await admin.from("client_communications").select("id,status,provider_message_id").eq("event_key", eventKey).maybeSingle();
     if (existingError) throw existingError;
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     const publicUrl = `${getPublicSiteUrl()}${document.publicPath}/${document.token}`;
-    const resend = await sendWithResend({ recipientEmail, subject, messageBody, publicUrl, documentType, idempotencyKey: eventKey });
+    const resend = await sendWithResend({ recipientEmail, subject, messageBody, publicUrl, documentType, idempotencyKey: eventKey, replyTo });
     const sentAt = new Date().toISOString();
     const { error: sentError } = await admin.from("client_communications").update({ status: "Sent", sent_at: sentAt, failure_reason: null, provider_message_id: resend.id }).eq("id", communicationId).select("id").single();
     if (sentError) throw sentError;
@@ -76,8 +77,8 @@ export async function POST(request: Request) {
     if (communicationId) {
       await admin.from("client_communications").update({ status: "Failed", failure_reason: internal.slice(0, 1000) }).eq("id", communicationId);
     }
-    const configurationError = internal.includes("RESEND_API_KEY");
-    return Response.json({ error: configurationError ? "Transactional email is not configured." : "Resend did not accept the customer email. Please try again." }, { status: configurationError ? 503 : 502 });
+    const configurationError = internal.includes("RESEND_API_KEY") || internal.includes("Reply-To") || internal.includes("Business Email");
+    return Response.json({ error: configurationError ? internal : "Resend did not accept the customer email. Please try again." }, { status: configurationError ? 503 : 502 });
   }
 }
 
@@ -106,18 +107,25 @@ function assertUsableToken(document: DocumentContext) {
   if (!document.token || document.token.length < 40) throw new Error("The secure customer link was not persisted.");
   if (document.tokenExpiresAt && Date.parse(document.tokenExpiresAt) <= Date.now()) throw new Error("The secure customer link has expired.");
 }
+async function loadReplyTo(admin: ReturnType<typeof createSupabaseAdminClient>): Promise<string> {
+  const { data, error } = await admin.from("business_settings").select("business_email").single();
+  if (error) throw new Error("The StudioScrubz Reply-To setting could not be loaded.");
+  const replyTo = data.business_email?.trim().toLowerCase() ?? "";
+  if (!EMAIL_PATTERN.test(replyTo)) throw new Error("A valid Business Email is required in Business Settings before sending customer email.");
+  return replyTo;
+}
 function permissionFor(type: DocumentType): Permission { return type === "Estimate" ? "estimates.edit" : type === "Proposal" ? "proposals.send" : type === "Service Agreement" ? "agreements.manage" : "invoices.edit"; }
 function documentTypeValue(value: unknown): DocumentType { if (["Estimate", "Proposal", "Service Agreement", "Invoice"].includes(String(value))) return value as DocumentType; throw new Error("A supported document type is required."); }
 function requiredText(value: unknown, label: string, max = 100) { if (typeof value !== "string" || !value.trim() || value.trim().length > max) throw new Error(`${label} is required.`); return value.trim(); }
 function communicationNumber() { const date = new Date().toISOString().slice(0, 10).replaceAll("-", ""); return `COMM-${date}-${String(randomInt(10000)).padStart(4, "0")}`; }
 function errorMessage(value: unknown) { return value instanceof Error ? value.message : "Unknown transactional email failure."; }
 function escapeHtml(value: string) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
-async function sendWithResend(input: { recipientEmail: string; subject: string; messageBody: string; publicUrl: string; documentType: DocumentType; idempotencyKey: string }) {
+async function sendWithResend(input: { recipientEmail: string; subject: string; messageBody: string; publicUrl: string; documentType: DocumentType; idempotencyKey: string; replyTo: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
   const label = input.documentType === "Service Agreement" ? "Review & Sign Agreement" : `View ${input.documentType}`;
-  const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": input.idempotencyKey }, body: JSON.stringify({
-    from: FROM, to: [input.recipientEmail], subject: input.subject,
+  const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": input.idempotencyKey, "User-Agent": "StudioScrubz-OS/1.0" }, body: JSON.stringify({
+    from: FROM, to: [input.recipientEmail], reply_to: input.replyTo, subject: input.subject,
     text: `${input.messageBody}\n\n${label}:\n${input.publicUrl}`,
     html: `<div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;max-width:640px;margin:auto"><div style="border-bottom:3px solid #143d1a;padding:20px 0"><strong style="font-size:24px;color:#143d1a">StudioScrubz</strong><div style="color:#9a7a17">No mess. No stress.</div></div><div style="padding:28px 0;white-space:pre-line">${escapeHtml(input.messageBody)}</div><a href="${escapeHtml(input.publicUrl)}" style="display:inline-block;background:#143d1a;color:white;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold">${escapeHtml(label)}</a><p style="margin-top:24px;font-size:12px;color:#6b7280;word-break:break-all">${escapeHtml(input.publicUrl)}</p></div>`,
   }) });
