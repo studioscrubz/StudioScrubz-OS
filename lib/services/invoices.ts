@@ -9,7 +9,35 @@ const select = "*, job:jobs!invoices_job_id_fkey(*, proposal:proposals!jobs_prop
 
 export async function getInvoices():Promise<InvoiceWithRelations[]>{const{data,error}=await getSupabaseClient().from("invoices").select(select).order("created_at",{ascending:false});if(error)throw error;return data as unknown as InvoiceWithRelations[]}
 export async function getInvoiceById(id:string):Promise<InvoiceWithRelations>{const{data,error}=await getSupabaseClient().from("invoices").select(select).eq("id",id).single();if(error)throw error;return data as unknown as InvoiceWithRelations}
-export async function ensureInvoicePublicAccess(invoice:InvoiceWithRelations):Promise<{token:string;expiresAt:string|null}>{if(validClientToken(invoice.client_access_token,invoice.client_access_token_expires_at)&&invoice.client_access_token.length>=40)return{token:invoice.client_access_token,expiresAt:invoice.client_access_token_expires_at};const token=generateSecureClientToken(),expiresAt=clientTokenExpiration();const{error}=await getSupabaseClient().from("invoices").update({client_access_token:token,client_access_token_expires_at:expiresAt}).eq("id",invoice.id);if(error)throw error;return{token,expiresAt}}
+export async function ensureInvoicePublicAccess(invoice:InvoiceWithRelations):Promise<{token:string;expiresAt:string|null}>{
+  if(validClientToken(invoice.client_access_token,invoice.client_access_token_expires_at)&&invoice.client_access_token.length>=40){
+    return{token:invoice.client_access_token,expiresAt:invoice.client_access_token_expires_at};
+  }
+  const token=generateSecureClientToken(),expiresAt=clientTokenExpiration();
+  let update=getSupabaseClient().from("invoices")
+    .update({client_access_token:token,client_access_token_expires_at:expiresAt})
+    .eq("id",invoice.id);
+  update=invoice.client_access_token===null?update.is("client_access_token",null):update.eq("client_access_token",invoice.client_access_token);
+  const{data,error}=await update
+    .select("id,client_access_token,client_access_token_expires_at")
+    .maybeSingle();
+  if(error)throw new Error(`Public Invoice link could not be saved: ${error.message}`);
+  if(!data){
+    const{data:current,error:readError}=await getSupabaseClient().from("invoices")
+      .select("id,client_access_token,client_access_token_expires_at")
+      .eq("id",invoice.id)
+      .maybeSingle();
+    if(readError)throw new Error(`Public Invoice link could not be verified: ${readError.message}`);
+    if(current&&validClientToken(current.client_access_token,current.client_access_token_expires_at)&&current.client_access_token.length>=40){
+      return{token:current.client_access_token,expiresAt:current.client_access_token_expires_at};
+    }
+    throw new Error("Public Invoice link could not be saved. Your account may not have permission to update this Invoice.");
+  }
+  if(data.id!==invoice.id||data.client_access_token!==token||!data.client_access_token_expires_at||Date.parse(data.client_access_token_expires_at)!==Date.parse(expiresAt)){
+    throw new Error("Public Invoice link could not be verified after saving.");
+  }
+  return{token:data.client_access_token,expiresAt:data.client_access_token_expires_at};
+}
 export async function getInvoiceForJob(jobId:string):Promise<InvoiceWithRelations|null>{const{data,error}=await getSupabaseClient().from("invoices").select(select).eq("job_id",jobId).is("archived_at",null).neq("status","Cancelled").maybeSingle();if(error)throw error;return data as unknown as InvoiceWithRelations|null}
 export async function canCreateJobInvoice(jobId:string){const job=await getJobById(jobId);return !(await isContractOccurrence(job.service_occurrence_id))}
 export async function getFinanciallyResolvedJobIds():Promise<string[]>{const db=getSupabaseClient();const[invoicesResult,paymentsResult]=await Promise.all([db.from("invoices").select("id,job_id,status,archived_at,amount_paid,balance_due").not("job_id","is",null),db.from("payments").select("invoice_id").not("invoice_id","is",null)]);if(invoicesResult.error)throw invoicesResult.error;if(paymentsResult.error)throw paymentsResult.error;const paidInvoiceIds=new Set((paymentsResult.data??[]).map(row=>row.invoice_id).filter((id):id is string=>Boolean(id)));return[...new Set((invoicesResult.data??[]).filter(invoice=>invoice.job_id&&((invoice.archived_at===null&&!['Cancelled','Archived'].includes(invoice.status))||paidInvoiceIds.has(invoice.id)||(Number(invoice.amount_paid)>0&&Number(invoice.balance_due)<=0))).map(invoice=>invoice.job_id).filter((id):id is string=>Boolean(id)))]}
