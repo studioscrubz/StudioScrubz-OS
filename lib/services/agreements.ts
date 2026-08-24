@@ -64,7 +64,7 @@ export async function createAgreement(input: AgreementInput) {
     const catalog = await getServiceCatalog();
     const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
     if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
-    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules });
+    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
     prepared = { ...input, billing_amount:input.billing_type !== "Per Visit" ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
   }
   for (let i = 0; i < 5; i++) {
@@ -121,6 +121,14 @@ export function agreementScopeFromProposal(proposal: ProposalWithRelations): Pro
   );
 }
 
+export function agreementServiceDescriptionFromProposal(proposal: ProposalWithRelations, services: CatalogService[] = []): string | null {
+  const description = proposal.result.serviceDescription?.trim()
+    || proposal.walkthrough?.measurements.serviceDescription?.trim()
+    || proposal.estimate?.result.serviceDescription?.trim();
+  if (description) return description;
+  return services.find((service) => service.is_active && !service.archived_at && service.service_name === proposal.result.serviceName && (service.division === proposal.division || service.division === "Both"))?.description?.trim() || null;
+}
+
 function normalizeAgreementScope(scope: ProposalScopeItem[] | null | undefined): ProposalScopeItem[] {
   return (scope ?? []).flatMap((item, index) => {
     const text = typeof item?.text === "string" ? item.text.trim() : "";
@@ -129,14 +137,14 @@ function normalizeAgreementScope(scope: ProposalScopeItem[] | null | undefined):
 }
 
 export async function createAgreementFromProposal(proposalId: string, review: ProposalAgreementReview) {
-  const [p, settings] = await Promise.all([getProposalById(proposalId), getBusinessSettings()]);
+  const [p, settings, catalog] = await Promise.all([getProposalById(proposalId), getBusinessSettings(), getServiceCatalog()]);
   if (p.status !== "Accepted" || !p.accepted || !isRecurringFrequency(p.frequency))
     throw new Error("Only accepted recurring proposals can create agreements.");
   if (!p.client_id || !p.property_id)
     throw new Error("This Proposal has a deleted Client or Property relationship and cannot create an Agreement.");
   if (!review.startDate) throw new Error("Confirm the Agreement Start Date.");
   if (!AGREEMENT_BILLING_TYPES.includes(review.billingType)) throw new Error("Select a Billing Type.");
-  const pricing = proposalAgreementPricing(p);
+  const pricing = { ...proposalAgreementPricing(p), service_description: agreementServiceDescriptionFromProposal(p, catalog.services) };
   const billingAmount = review.billingType === "Per Visit" ? pricing.final_per_visit_price : Number(review.billingAmount);
   if (!Number.isFinite(billingAmount) || billingAmount <= 0)
     throw new Error(`Enter the ${review.billingType === "Weekly" ? "Weekly Contract Amount" : review.billingType === "Biweekly" ? "Biweekly Contract Amount" : review.billingType === "Monthly" ? "Monthly Contract Amount" : review.billingType === "Flat Contract" ? "Contract Value" : "Billing Amount"}.`);

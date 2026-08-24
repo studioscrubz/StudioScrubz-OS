@@ -13,6 +13,7 @@ export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type RecurrenceRule = { daysOfWeek: Weekday[]; intervalWeeks: number; dayOfMonth: number | null; customIntervalDays: number | null };
 export type AgreementPricingSnapshot = {
   source: "Accepted Proposal" | "Service Catalog";
+  service_description?: string | null;
   standard_service_price: number;
   frequency: AgreementFrequency;
   frequency_discount_label: string;

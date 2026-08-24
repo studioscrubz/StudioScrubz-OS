@@ -6,6 +6,7 @@ export type PublicAgreement = {
   client_name: string;
   property_location: string;
   service_name: string;
+  service_description: string | null;
   scope: string;
   frequency: AgreementFrequency;
   days_of_week: Weekday[];
