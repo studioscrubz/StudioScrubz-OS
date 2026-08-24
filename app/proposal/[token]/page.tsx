@@ -1,1 +1,1 @@
-import{PublicProposalPage}from"@/components/proposals/PublicProposalPage";export default async function Page({params}:PageProps<"/proposal/[token]">){const{token}=await params;return <PublicProposalPage token={token}/>}
+import type { Metadata } from "next";import{PublicProposalPage}from"@/components/proposals/PublicProposalPage";export const metadata:Metadata={robots:{index:false,follow:false}};export default async function Page({params}:PageProps<"/proposal/[token]">){const{token}=await params;return <PublicProposalPage token={token}/>}

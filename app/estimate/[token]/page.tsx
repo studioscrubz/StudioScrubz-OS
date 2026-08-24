@@ -1,1 +1,1 @@
-import{PublicEstimatePage}from"@/components/estimates/PublicEstimatePage";export default async function Page({params}:PageProps<"/estimate/[token]">){const{token}=await params;return <PublicEstimatePage token={token}/>}
+import type { Metadata } from "next";import{PublicEstimatePage}from"@/components/estimates/PublicEstimatePage";export const metadata:Metadata={robots:{index:false,follow:false}};export default async function Page({params}:PageProps<"/estimate/[token]">){const{token}=await params;return <PublicEstimatePage token={token}/>}
