@@ -1,4 +1,4 @@
-import { getSquarePayment, verifySquareWebhookSignature } from "@/lib/square";
+import { getSquarePayment, getSquarePaymentAmounts, verifySquareWebhookSignature } from "@/lib/square";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SquareWebhook = { type?: string; data?: { object?: { payment?: { id?: string } } } };
@@ -21,8 +21,9 @@ export async function POST(request: Request) {
       if (["FAILED", "CANCELED"].includes(payment.status || "")) await admin.from("square_checkout_attempts").update({ status: payment.status === "CANCELED" ? "Cancelled" : "Failed", updated_at: new Date().toISOString() }).eq("id", attempt.id);
       return Response.json({ received: true, ignored: true, status: payment.status });
     }
-    if (!Number.isSafeInteger(payment.amount_money?.amount) || payment.amount_money!.amount! <= 0 || payment.amount_money?.currency !== "USD") return Response.json({ error: "Square Payment details are invalid." }, { status: 400 });
-    const { data, error } = await admin.rpc("record_square_invoice_payment", { p_attempt_id: attempt.id, p_square_payment_id: payment.id, p_square_order_id: payment.order_id, p_amount_cents: payment.amount_money.amount, p_currency: payment.amount_money.currency, p_paid_at: payment.updated_at || payment.created_at || new Date().toISOString() });
+    let amounts:ReturnType<typeof getSquarePaymentAmounts>;
+    try { amounts=getSquarePaymentAmounts(payment) } catch { return Response.json({ error: "Square Payment details are invalid." }, { status: 400 }) }
+    const { data, error } = await admin.rpc("record_square_invoice_payment_v2", { p_attempt_id: attempt.id, p_square_payment_id: payment.id, p_square_order_id: payment.order_id, p_service_amount_cents: amounts.serviceCents, p_tip_amount_cents: amounts.tipCents, p_gross_amount_cents: amounts.grossCents, p_currency: amounts.currency, p_paid_at: payment.updated_at || payment.created_at || new Date().toISOString() });
     if (error) throw error;
     if (data && typeof data === "object" && "conflict" in data && data.conflict) console.error("Square payment requires manual reconciliation", { paymentId: payment.id, orderId: payment.order_id, attemptId: attempt.id });
     return Response.json({ received: true, settlement: data });

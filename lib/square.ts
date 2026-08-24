@@ -2,7 +2,19 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 type SquareMoney = { amount?: number; currency?: string };
-export type SquarePayment = { id?: string; order_id?: string; status?: string; amount_money?: SquareMoney; created_at?: string; updated_at?: string };
+export type SquarePayment = { id?: string; order_id?: string; status?: string; amount_money?: SquareMoney; tip_money?: SquareMoney; total_money?: SquareMoney; created_at?: string; updated_at?: string };
+export type SquarePaymentAmounts = { serviceCents:number; tipCents:number; grossCents:number; currency:"USD" };
+
+export function getSquarePaymentAmounts(payment:SquarePayment):SquarePaymentAmounts {
+  const serviceCents=payment.amount_money?.amount;
+  const tipCents=payment.tip_money?.amount??0;
+  const grossCents=payment.total_money?.amount;
+  const currenciesAreUsd=payment.amount_money?.currency==="USD"&&payment.total_money?.currency==="USD"&&(!payment.tip_money||payment.tip_money.currency==="USD");
+  if(!Number.isSafeInteger(serviceCents)||serviceCents!<=0||!Number.isSafeInteger(tipCents)||tipCents<0||!Number.isSafeInteger(grossCents)||grossCents!<=0||!currenciesAreUsd||grossCents!==serviceCents!+tipCents){
+    throw new Error("Square Payment amounts are invalid.");
+  }
+  return {serviceCents:serviceCents!,tipCents,grossCents:grossCents!,currency:"USD"};
+}
 
 function config() {
   const accessToken = process.env.SQUARE_ACCESS_TOKEN;
@@ -28,7 +40,7 @@ async function squareRequest(path: string, init: RequestInit) {
 
 export async function createSquarePaymentLink(input: { idempotencyKey: string; invoiceNumber: string; amountCents: number; redirectUrl: string }) {
   const square = config();
-  const body = await squareRequest("/v2/online-checkout/payment-links", { method: "POST", body: JSON.stringify({ idempotency_key: input.idempotencyKey, quick_pay: { name: `StudioScrubz Invoice ${input.invoiceNumber}`, price_money: { amount: input.amountCents, currency: "USD" }, location_id: square.locationId }, checkout_options: { redirect_url: input.redirectUrl }, payment_note: `StudioScrubz Invoice ${input.invoiceNumber}` }) }) as { payment_link?: { id?: string; order_id?: string; url?: string } };
+  const body = await squareRequest("/v2/online-checkout/payment-links", { method: "POST", body: JSON.stringify({ idempotency_key: input.idempotencyKey, quick_pay: { name: `StudioScrubz Invoice ${input.invoiceNumber}`, price_money: { amount: input.amountCents, currency: "USD" }, location_id: square.locationId }, checkout_options: { redirect_url: input.redirectUrl, allow_tipping: true }, payment_note: `StudioScrubz Invoice ${input.invoiceNumber}` }) }) as { payment_link?: { id?: string; order_id?: string; url?: string } };
   if (!body.payment_link?.id || !body.payment_link.order_id || !body.payment_link.url) throw new Error("Square did not return a complete payment link.");
   return { id: body.payment_link.id, orderId: body.payment_link.order_id, url: body.payment_link.url };
 }
