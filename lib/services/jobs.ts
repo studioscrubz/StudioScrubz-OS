@@ -351,9 +351,10 @@ export async function rescheduleJob(
 }
 export async function getCurrentJobClockState(jobId: string): Promise<JobClockState> {
   const profile = await getCurrentProfile();
-  if (!profile?.employee_id) return { clockedIn: false, clockedInAt: null, timeEntryId: null, activeWorkerCount: 0 };
   const open = (await getTimeEntriesForJob(jobId)).filter((entry) => entry.status === "Open" && !entry.clock_out && !entry.archived_at);
-  const current = open.find((entry) => entry.employee_id === profile.employee_id) ?? null;
+  const current = profile?.employee_id
+    ? open.find((entry) => entry.employee_id === profile.employee_id) ?? null
+    : null;
   return { clockedIn: Boolean(current), clockedInAt: current?.clock_in ?? null, timeEntryId: current?.id ?? null, activeWorkerCount: open.length };
 }
 export async function startOrClockInToJob(id: string): Promise<JobClockInResult> {

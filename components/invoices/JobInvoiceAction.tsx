@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {useEffect,useState,type ReactNode} from "react";
 import {canCreateJobInvoice,createInvoiceFromJob,getInvoiceForJob} from "@/lib/services/invoices";
 import type {InvoiceWithRelations} from "@/types/invoice";
@@ -12,7 +13,7 @@ export function JobInvoiceAction({jobId,children}:{jobId:string;children:ReactNo
   useEffect(()=>{void load()},[jobId]);
   useOperationalRealtime(["invoices","service_occurrences","service_agreements"],load);
   async function create(){setSaving(true);setError(null);try{const created=await createInvoiceFromJob(jobId);setInvoice(await getInvoiceForJob(jobId)??created)}catch(cause){console.error("Invoice creation failed",cause);setError(errorMessage(cause,"Unable to create invoice."))}finally{setSaving(false)}}
-  if(invoice)return null;
+  if(invoice)return <article className="mb-3 rounded-xl bg-white p-4 shadow-sm">{children}<div className="mt-3 border-t pt-3"><Link href="/invoices" className="rounded border px-3 py-2 text-xs font-bold text-[#143d1a]">Open Invoices</Link></div></article>;
   if(!eligible)return <article className="mb-3 rounded-xl bg-white p-4 shadow-sm">{children}<div className="mt-3 border-t pt-3"><ContractServiceRecordAction jobId={jobId}/></div></article>;
   return <article className="mb-3 rounded-xl bg-white p-4 shadow-sm">{children}<div className="mt-3 border-t pt-3">{loading?<span className="text-xs text-neutral-400">Checking invoice...</span>:<button disabled={saving} onClick={()=>void create()} className="rounded bg-[#143d1a] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{saving?"Creating Invoice...":"Create Invoice"}</button>}{error&&<span className="ml-2 text-xs font-bold text-red-700">{error}</span>}</div></article>
 }

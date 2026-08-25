@@ -258,6 +258,8 @@ export function JobsPage() {
           busy={busy === selected.id}
           close={() => setSelected(null)}
           mutate={(fn, text) => void mutate(selected, fn, text)}
+          canEdit={hasPermission(profile, "jobs.edit")}
+          canSchedule={hasPermission(profile, "jobs.schedule")}
           canArchive={hasPermission(profile, "jobs.archive")}
           canComplete={hasPermission(profile, "jobs.complete")}
           canClock={Boolean(profile && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role))}
@@ -272,7 +274,8 @@ export function JobsPage() {
 }
 function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
   const content = (
-    <button type="button" onClick={open} className="w-full text-left">
+    <>
+    <div className="text-left">
       <p className="font-extrabold text-[#143d1a]">{job.job_number}</p>
       <p className="mt-1 text-sm font-bold text-neutral-700">
         {job.client_name || "Unnamed client"}
@@ -292,7 +295,11 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
       <span className="mt-2 inline-block rounded-full bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">
         {job.division}
       </span>
+    </div>
+    <button type="button" onClick={open} className={`${secondary} mt-3 w-full sm:w-auto`}>
+      Manage Job
     </button>
+    </>
   );
   if (job.status === "Completed")
     return <JobInvoiceAction jobId={job.id}>{content}</JobInvoiceAction>;
@@ -307,6 +314,8 @@ function JobModal({
   busy,
   close,
   mutate,
+  canEdit,
+  canSchedule,
   canArchive,
   canComplete,
   canClock,
@@ -318,6 +327,8 @@ function JobModal({
   busy: boolean;
   close: () => void;
   mutate: (fn: () => Promise<unknown>, text: string | ((result: unknown) => string)) => void;
+  canEdit: boolean;
+  canSchedule: boolean;
   canArchive: boolean;
   canComplete: boolean;
   canClock: boolean;
@@ -334,18 +345,18 @@ function JobModal({
   const [clock, setClock] = useState<Awaited<ReturnType<typeof getCurrentJobClockState>> | null>(null);
   const [clockError, setClockError] = useState<string | null>(null);
   async function refreshClock() {
-    if (!canClock || !employeeId) { setClock(null); return; }
+    if (!canClock && !canComplete) { setClock(null); return; }
     try { setClock(await getCurrentJobClockState(job.id)); setClockError(null); }
     catch (cause) { console.error("Job clock state load failed", cause); setClockError(message(cause, "Time clock state could not be loaded.")); }
   }
   useEffect(() => {
-    if (!canClock || !employeeId) return;
+    if (!canClock && !canComplete) return;
     let active = true;
     void getCurrentJobClockState(job.id)
       .then((next) => { if (active) { setClock(next); setClockError(null); } })
       .catch((cause: unknown) => { if (active) { console.error("Job clock state load failed", cause); setClockError(message(cause, "Time clock state could not be loaded.")); } });
     return () => { active = false; };
-  }, [job.id, job.status, canClock, employeeId]);
+  }, [job.id, job.status, canClock, canComplete]);
   useOperationalRealtime(["time_entries"], refreshClock);
   useEffect(() => {
     void getActiveCrews()
@@ -378,6 +389,8 @@ function JobModal({
   const assignedCrew = crews.find((crew) => crew.id === job.assigned_crew_id) ?? null;
   const canSupervisorComplete = canComplete && (role !== "Crew Lead" || assignedCrew?.crew_lead_id === employeeId);
   const canEnterJob = canClock && Boolean(employeeId && job.assigned_crew_id);
+  const showLifecycle = ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status)
+    && (canEnterJob || (job.status === "In Progress" && canSupervisorComplete));
   function clockOutMessage(result: unknown) {
     const value = result as JobClockOutResult;
     if (value.jobCompleted) return "Your time was recorded and the Job was completed.";
@@ -417,7 +430,7 @@ function JobModal({
           <li key={x.id}>{x.text}</li>
         ))}
       </ul>
-      <section className="mt-6 grid gap-3 sm:grid-cols-3">
+      {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-6 grid gap-3 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
         <Field label="Start Time" type="time" value={time} set={setTime} />
         <Field
@@ -439,8 +452,8 @@ function JobModal({
         >
           Save Schedule
         </button>
-      </section>
-      {(job.status === "Ready to Schedule" ||
+      </section>}
+      {canSchedule && (job.status === "Ready to Schedule" ||
         job.status === "Scheduled" ||
         job.status === "Crew Assigned") && (
         <section className="mt-6">
@@ -498,10 +511,10 @@ function JobModal({
       <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
       <JobMileageSummary jobId={job.id} />
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
-      {canEnterJob && ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status) && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Your Job Time</h3>{clockError ? <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p> : clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">Clocked in {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>Finish Job / Clock Out</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You are clocked in to this Job." : "Job started and you are clocked in.")}>{job.status === "In Progress" ? "Clock In" : "Start Job"}</button>}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Active workers currently visible: {clock.activeWorkerCount}</p>}</section>}
+      {showLifecycle && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>{clockError ? <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p> : <>{canEnterJob && (clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">Clocked in {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>Finish Job / Clock Out</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You are clocked in to this Job." : "Job started and you are clocked in.")}>{job.status === "In Progress" ? "Clock In" : "Start Job"}</button>)}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Active workers currently visible: {clock.activeWorkerCount}</p>}{job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={`${primary} mt-3`}>Complete Job</button>}</>}</section>}
       <div className="mt-6 flex flex-wrap gap-2">
         <ContractServiceRecordAction jobId={job.id} />
-        {nextStatuses(job.status).filter((next) => next !== "In Progress" && next !== "Completed").map((x) => (
+        {canEdit && nextStatuses(job.status).filter((next) => next !== "In Progress" && next !== "Completed").map((x) => (
           <button
             key={x}
             disabled={busy}
@@ -511,8 +524,7 @@ function JobModal({
             {x}
           </button>
         ))}
-        {job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={primary}>Complete Job</button>}
-        {!["Cancelled", "Archived"].includes(job.status) && (
+        {canEdit && !["Cancelled", "Archived"].includes(job.status) && (
           <button
             disabled={busy}
             onClick={() => {
