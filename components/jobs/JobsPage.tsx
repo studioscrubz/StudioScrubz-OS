@@ -26,11 +26,14 @@ import type { JobPhotoCategory } from "@/types/photo";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
+import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
+import { getTimeEntries } from "@/lib/services/timeEntries";
 import {
   type JobStatus,
   type JobClockOutResult,
   type JobWithRelations,
 } from "@/types/job";
+import type { TimeEntryWithRelations } from "@/types/timeEntry";
 
 type Sort =
   | "Newest"
@@ -51,6 +54,8 @@ const jobPhotoCategories: readonly JobPhotoCategory[] = ["After", "Before", "Dam
 export function JobsPage() {
   const { profile } = useAuth();
   const [rows, setRows] = useState<JobWithRelations[]>([]);
+  const [timeEntries, setTimeEntries] = useState<TimeEntryWithRelations[]>([]);
+  const [activeCrews, setActiveCrews] = useState<CrewWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,17 +68,21 @@ export function JobsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   async function load() {
-    const next = await getJobs();
+    const [next, entries, crews] = await Promise.all([getJobs(), getTimeEntries(), getActiveCrews()]);
     setRows(next);
+    setTimeEntries(entries);
+    setActiveCrews(crews);
     return next;
   }
-  useOperationalRealtime(["jobs", "invoices", "service_occurrences"], async () => { await load(); });
+  useOperationalRealtime(["jobs", "time_entries", "crews", "employees", "invoices", "service_occurrences"], async () => { await load(); });
   useEffect(() => {
     let active = true;
-    void getJobs()
-      .then((x) => {
+    void Promise.all([getJobs(), getTimeEntries(), getActiveCrews()])
+      .then(([x, entries, crews]) => {
         if (active) {
           setRows(x);
+          setTimeEntries(entries);
+          setActiveCrews(crews);
           const jobId = new URLSearchParams(window.location.search).get(
             "jobId",
           );
@@ -101,7 +110,9 @@ export function JobsPage() {
     try {
       const result = await fn();
       const next = await load();
-      setSelected(next.find((row) => row.id === job.id && activeStatuses.includes(row.status)) ?? null);
+      setSelected((current) => current?.id === job.id
+        ? next.find((row) => row.id === job.id && activeStatuses.includes(row.status)) ?? null
+        : current);
       if (isJobCompletionResult(result)) {
         if (result.invoiceError) {
           setNotice(null);
@@ -245,7 +256,18 @@ export function JobsPage() {
                 {filtered
                   .filter((j) => j.status === column)
                   .map((j) => (
-                    <JobCard key={j.id} job={j} open={() => setSelected(j)} />
+                    <JobCard
+                      key={j.id}
+                      job={j}
+                      open={() => setSelected(j)}
+                      timeEntries={timeEntries.filter((entry) => entry.job_id === j.id && !entry.archived_at && entry.entry_type === "Job")}
+                      employeeId={profile?.employee_id ?? null}
+                      assignedToJob={isEmployeeAssigned(activeCrews, profile?.employee_id ?? null, j.assigned_crew_id)}
+                      role={profile?.role ?? null}
+                      canComplete={hasPermission(profile, "jobs.complete")}
+                      busy={busy === j.id}
+                      act={(fn, text) => void mutate(j, fn, text)}
+                    />
                   ))}
               </section>
             ))}
@@ -272,7 +294,15 @@ export function JobsPage() {
     </>
   );
 }
-function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
+function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canComplete, busy, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; assignedToJob: boolean; role: string | null; canComplete: boolean; busy: boolean; act: (fn: () => Promise<unknown>, text: string | ((result: unknown) => string)) => void }) {
+  const activeEntries = timeEntries.filter((entry) => entry.status === "Open" && !entry.clock_out);
+  const currentEntry = employeeId ? activeEntries.find((entry) => entry.employee_id === employeeId) ?? null : null;
+  const canAttemptPersonalTime = Boolean(employeeId && job.assigned_crew_id && assignedToJob);
+  const canStart = canAttemptPersonalTime && ["Scheduled", "Crew Assigned"].includes(job.status) && !currentEntry;
+  const canJoin = canAttemptPersonalTime && job.status === "In Progress" && !currentEntry;
+  const canEnd = job.status === "In Progress" && Boolean(currentEntry);
+  const canCardComplete = job.status === "In Progress" && activeEntries.length === 0 && canComplete && role !== "Crew Lead";
+  const endLabel = activeEntries.length > 1 ? "END MY WORK" : "END JOB";
   const content = (
     <>
     <div className="text-left">
@@ -295,10 +325,15 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
       <span className="mt-2 inline-block rounded-full bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">
         {job.division}
       </span>
+      {job.status === "In Progress" && <JobCardActiveTime entries={timeEntries} />}
     </div>
-    <button type="button" onClick={open} className={`${secondary} mt-3 w-full sm:w-auto`}>
-      Manage Job
-    </button>
+    <div className="mt-3 grid gap-2">
+      {canStart && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "Job started. You are now active.")} className={`${primary} w-full`}>START JOB</button>}
+      {canJoin && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "You joined the Job and are now active.")} className={`${primary} w-full`}>JOIN JOB</button>}
+      {canEnd && <button type="button" disabled={busy} onClick={() => act(() => finishJobAndClockOut(job.id, 0), cardClockOutMessage)} className={`${primary} w-full`}>{endLabel}</button>}
+      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={`${primary} w-full`}>COMPLETE JOB</button>}
+      <button type="button" onClick={open} className={`${secondary} w-full`}>MANAGE JOB</button>
+    </div>
     </>
   );
   if (job.status === "Completed")
@@ -308,6 +343,17 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
       {content}
     </article>
   );
+}
+function JobCardActiveTime({ entries }: { entries: TimeEntryWithRelations[] }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const initial = window.setTimeout(() => setNow(Date.now()), 0);
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(id); };
+  }, []);
+  const active = entries.filter((entry) => entry.status === "Open" && !entry.clock_out);
+  const startedAt = entries.reduce<string | null>((earliest, entry) => !earliest || entry.clock_in < earliest ? entry.clock_in : earliest, null);
+  return <div className={`mt-3 rounded-lg p-2 text-xs font-bold ${active.length ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}><p>IN PROGRESS · {active.length ? `${active.length} ${active.length === 1 ? "Tech" : "Techs"} Active` : "No Techs Active"}</p>{startedAt && <p className="mt-1 font-medium">Elapsed {shortDuration((now ?? Date.parse(startedAt)) - Date.parse(startedAt))}</p>}</div>;
 }
 function JobModal({
   job,
@@ -510,8 +556,9 @@ function JobModal({
       />
       <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
       <JobMileageSummary jobId={job.id} />
+      <JobTimeSummary job={job} />
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
-      {showLifecycle && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>{clockError ? <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p> : <>{canEnterJob && (clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">Clocked in {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>Finish Job / Clock Out</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You are clocked in to this Job." : "Job started and you are clocked in.")}>{job.status === "In Progress" ? "Clock In" : "Start Job"}</button>)}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Active workers currently visible: {clock.activeWorkerCount}</p>}{job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={`${primary} mt-3`}>Complete Job</button>}</>}</section>}
+      {showLifecycle && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>{clockError ? <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p> : <>{canEnterJob && (clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">Active since {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>{clock.activeWorkerCount > 1 ? "END MY WORK" : "END JOB"}</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You joined the Job and are now active." : "Job started. You are now active.")}>{job.status === "In Progress" ? "JOIN JOB" : "START JOB"}</button>)}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Active workers currently visible: {clock.activeWorkerCount}</p>}{job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={`${primary} mt-3`}>COMPLETE JOB</button>}</>}</section>}
       <div className="mt-6 flex flex-wrap gap-2">
         <ContractServiceRecordAction jobId={job.id} />
         {canEdit && nextStatuses(job.status).filter((next) => next !== "In Progress" && next !== "Completed").map((x) => (
@@ -687,6 +734,9 @@ function money(v: number) {
     currency: "USD",
   }).format(v);
 }
+function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
+function isEmployeeAssigned(crews: CrewWithRelations[], employeeId: string | null, crewId: string | null) { if (!employeeId || !crewId) return false; const crew = crews.find((candidate) => candidate.id === crewId); return crew?.crew_lead_id === employeeId || crew?.members.some((member) => member.employee_id === employeeId) === true; }
+function cardClockOutMessage(result: unknown) { const value = result as JobClockOutResult; if (value.jobCompleted) return "Work time recorded. Job completed."; if (value.remainingActiveWorkers > 0) return `Work time recorded. ${value.remainingActiveWorkers} worker${value.remainingActiveWorkers === 1 ? " remains" : "s remain"} active.`; if (value.completionPending) return "Work time recorded. Supervisor completion required."; return "Work time recorded."; }
 function message(x: unknown, f: string) {
   if (x instanceof Error) return x.message;
   if (x && typeof x === "object" && "message" in x && typeof x.message === "string") return x.message;
