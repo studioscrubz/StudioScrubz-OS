@@ -74,6 +74,10 @@ export const canAccessPayrollPrep = (profile: UserProfile | null) => hasPermissi
 export const canAccessArchives = (profile: UserProfile | null) => hasPermission(profile, "archives.view");
 export const canPermanentlyDelete = (profile: UserProfile | null) => hasPermission(profile, "archives.delete");
 export const canManageSystem = (profile: UserProfile | null) => hasPermission(profile, "dashboard.view");
+export const canManageWalkthroughPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Manager"].includes(profile.role);
+export const canManageProposalPricingPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Manager"].includes(profile.role);
+export const canViewInvoiceFinishedPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Manager"].includes(profile.role);
+export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/attention", "attention.view"],

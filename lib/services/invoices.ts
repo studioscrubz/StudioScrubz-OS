@@ -4,11 +4,14 @@ import type { Invoice, InvoiceLineItem, InvoiceStatus, InvoiceUpdate, InvoiceWit
 import { getBusinessSettings } from "@/lib/services/businessSettings";
 import { getAgreementById, getAgreementFinancialSummary } from "@/lib/services/agreements";
 import { clientTokenExpiration, generateSecureClientToken, validClientToken } from "@/lib/secureClientToken";
+import { OPERATIONAL_PHOTO_BUCKET, type InvoiceJobPhoto, type InvoiceJobPhotoWithUrl } from "@/types/photo";
 
 const select = "*, job:jobs!invoices_job_id_fkey(*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)), agreement:service_agreements!invoices_service_agreement_id_fkey(*), proposal:proposals!invoices_proposal_id_fkey(*), client:clients!invoices_client_id_fkey(*), property:properties!invoices_property_id_fkey(*)";
 
 export async function getInvoices():Promise<InvoiceWithRelations[]>{const{data,error}=await getSupabaseClient().from("invoices").select(select).order("created_at",{ascending:false});if(error)throw error;return data as unknown as InvoiceWithRelations[]}
 export async function getInvoiceById(id:string):Promise<InvoiceWithRelations>{const{data,error}=await getSupabaseClient().from("invoices").select(select).eq("id",id).single();if(error)throw error;return data as unknown as InvoiceWithRelations}
+export async function getInvoiceJobPhotos(invoiceId:string):Promise<InvoiceJobPhotoWithUrl[]>{const client=getSupabaseClient();const{data,error}=await client.from("invoice_job_photos").select("*").eq("invoice_id",invoiceId).order("uploaded_at");if(error)throw error;const photos=(data??[]) as InvoiceJobPhoto[];if(!photos.length)return[];const{data:signed,error:signedError}=await client.storage.from(OPERATIONAL_PHOTO_BUCKET).createSignedUrls(photos.map(photo=>photo.storage_path),15*60);if(signedError)throw signedError;return photos.map((photo,index)=>({...photo,signedUrl:signed[index]?.signedUrl??null}))}
+export async function setInvoiceJobPhotoVisibility(invoiceId:string,photoId:string,customerVisible:boolean):Promise<InvoiceJobPhoto>{const{data,error}=await getSupabaseClient().rpc("set_invoice_job_photo_visibility",{p_invoice_id:invoiceId,p_photo_id:photoId,p_customer_visible:customerVisible}).single();if(error)throw error;return data as InvoiceJobPhoto}
 export async function ensureInvoicePublicAccess(invoice:InvoiceWithRelations):Promise<{token:string;expiresAt:string|null}>{
   if(validClientToken(invoice.client_access_token,invoice.client_access_token_expires_at)&&invoice.client_access_token.length>=40){
     return{token:invoice.client_access_token,expiresAt:invoice.client_access_token_expires_at};

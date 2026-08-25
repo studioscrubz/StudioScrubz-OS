@@ -42,7 +42,7 @@ const activeStatuses: JobStatus[] = [
   "Crew Assigned",
   "In Progress",
 ];
-const jobPhotoCategories: readonly JobPhotoCategory[] = ["Before", "After", "Damage / Issue", "Other"];
+const jobPhotoCategories: readonly JobPhotoCategory[] = ["After", "Before", "Damage / Issue", "Other"];
 export function JobsPage() {
   const { profile } = useAuth();
   const [rows, setRows] = useState<JobWithRelations[]>([]);
@@ -365,7 +365,8 @@ function JobModal({
           ]}
         />
       </div>
-      <h3 className="mt-6 font-extrabold text-[#143d1a]">Scope</h3>
+      {(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-6 font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-2 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
+      <h3 className="mt-6 font-extrabold text-[#143d1a]">Operational Scope / Instructions</h3>
       <ul className="mt-2 list-disc pl-5 text-sm">
         {job.scope.map((x) => (
           <li key={x.id}>{x.text}</li>
@@ -449,7 +450,7 @@ function JobModal({
           ],
         ]}
       />
-      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Before / After & Issue Photos" />
+      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
       <JobMileageSummary jobId={job.id} />
       <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />
       <div className="mt-6 flex flex-wrap gap-2">

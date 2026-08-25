@@ -6,6 +6,8 @@ export type PublicInvoicePayment = {
   payment_method: string;
 };
 
+export type PublicInvoicePhoto = { id: string; caption: string | null; originalFilename: string; uploadedAt: string; url: string };
+
 export type PublicInvoice = {
   invoice_number: string;
   status: InvoiceStatus;

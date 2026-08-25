@@ -29,10 +29,10 @@ export async function uploadOperationalPhoto(input: { recordType: OperationalPho
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("An internet connection is required to upload photos.");
   assertSavedRecordId(input.recordId);
   validateOperationalPhoto(input.file);
-  const file = await compressPhoto(input.file);
+  const file = await prepareOperationalPhoto(input.file);
   const user = await authenticatedUserId();
   const id = crypto.randomUUID();
-  const extension = safeExtension(file);
+  const extension = operationalPhotoExtension(file);
   const categoryFolder = input.recordType === "jobs" ? jobFolder(input.category) : null;
   const storagePath = [input.recordType, input.recordId, categoryFolder, `${id}.${extension}`].filter(Boolean).join("/");
   const photo: OperationalPhoto = { id, storagePath, category: input.category, originalFilename: input.file.name, mimeType: file.type, sizeBytes: file.size, uploadedAt: new Date().toISOString(), uploadedBy: user, caption: input.caption?.trim() || null, source: input.source };
@@ -78,11 +78,11 @@ async function authenticatedUserId() {
   return data.user.id;
 }
 
-function safeExtension(file: File) { return file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "image/heic" ? "heic" : "heif"; }
+export function operationalPhotoExtension(file: File) { return file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "image/heic" ? "heic" : "heif"; }
 function assertSavedRecordId(recordId: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recordId)) throw new Error("Save this record before uploading photos."); }
 function jobFolder(category: OperationalPhotoCategory) { return category === "Before" ? "before" : category === "After" ? "after" : category === "Damage / Issue" ? "damage" : "other"; }
 
-async function compressPhoto(file: File): Promise<File> {
+export async function prepareOperationalPhoto(file: File): Promise<File> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size < 1_500_000) return file;
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height));

@@ -22,3 +22,23 @@ export type OperationalPhoto = {
 
 export type OperationalPhotoWithUrl = OperationalPhoto & { signedUrl: string | null };
 export type PendingOperationalPhoto = { id: string; file: File; category: OperationalPhotoCategory; caption: string; source: "camera" | "library" };
+
+export type InvoiceJobPhoto = {
+  id: string;
+  invoice_id: string;
+  job_id: string;
+  job_photo_id: string;
+  storage_path: string;
+  category: "After";
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  caption: string | null;
+  uploaded_at: string;
+  uploaded_by: string;
+  source: "camera" | "library";
+  customer_visible: boolean;
+  created_at: string;
+};
+
+export type InvoiceJobPhotoWithUrl = InvoiceJobPhoto & { signedUrl: string | null };
