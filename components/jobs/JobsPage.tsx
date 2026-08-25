@@ -51,6 +51,7 @@ const activeStatuses: JobStatus[] = [
   "Crew Assigned",
   "In Progress",
 ];
+const jobBoardStatuses: JobStatus[] = [...activeStatuses, "Completed"];
 const jobPhotoCategories: readonly JobPhotoCategory[] = ["After", "Before", "Damage / Issue", "Other"];
 export function JobsPage() {
   const { profile } = useAuth();
@@ -87,7 +88,7 @@ export function JobsPage() {
           const jobId = new URLSearchParams(window.location.search).get(
             "jobId",
           );
-          if (jobId) setSelected(x.find((job) => job.id === jobId && activeStatuses.includes(job.status)) ?? null);
+          if (jobId) setSelected(x.find((job) => job.id === jobId && jobBoardStatuses.includes(job.status)) ?? null);
         }
       })
       .catch((x: unknown) => {
@@ -112,7 +113,7 @@ export function JobsPage() {
       const result = await fn();
       const next = await load();
       setSelected((current) => current?.id === job.id
-        ? next.find((row) => row.id === job.id && activeStatuses.includes(row.status)) ?? null
+        ? next.find((row) => row.id === job.id && jobBoardStatuses.includes(row.status)) ?? null
         : current);
       if (isJobCompletionResult(result)) {
         if (result.invoiceError) {
@@ -140,7 +141,7 @@ export function JobsPage() {
       rows.filter(
         (job) =>
           job.archived_at === null &&
-          activeStatuses.includes(job.status),
+          jobBoardStatuses.includes(job.status),
       ),
     [rows],
   );
@@ -178,7 +179,7 @@ export function JobsPage() {
         .sort((a, b) => compare(a, b, sort)),
     [division, schedule, search, sort, status, workflowRows],
   );
-  const active = workflowRows;
+  const active = workflowRows.filter((job) => activeStatuses.includes(job.status));
   const metrics = [
     ["Total Jobs", active.length],
     [
@@ -214,7 +215,7 @@ export function JobsPage() {
           <Select
             value={status}
             set={(v) => setStatus(v as typeof status)}
-            options={["All", ...activeStatuses]}
+            options={["All", ...jobBoardStatuses]}
           />
           <Select
             value={division}
@@ -245,8 +246,8 @@ export function JobsPage() {
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
         <div className="mt-6 overflow-x-auto pb-5">
-          <div className="grid min-w-[1040px] grid-cols-4 gap-4">
-            {activeStatuses.map((column) => (
+          <div className="grid min-w-[1300px] grid-cols-5 gap-4">
+            {jobBoardStatuses.map((column) => (
               <section key={column} className="rounded-2xl bg-[#eef1ed] p-3">
                 <h2 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#143d1a]">
                   {column}
@@ -330,6 +331,7 @@ function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canC
         {job.division}
       </span>
       {job.status === "In Progress" && <JobCardActiveTime entries={timeEntries} />}
+      {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
     <div className="mt-3 grid gap-2">
       {canManagementStart && <button type="button" disabled={busy} onClick={() => act(() => startOperationalJob(job.id), "Job started. No employee time entry was created.")} className={`${primary} w-full`}>START JOB</button>}
@@ -359,6 +361,13 @@ function JobCardActiveTime({ entries }: { entries: TimeEntryWithRelations[] }) {
   const active = entries.filter((entry) => entry.status === "Open" && !entry.clock_out);
   const startedAt = entries.reduce<string | null>((earliest, entry) => !earliest || entry.clock_in < earliest ? entry.clock_in : earliest, null);
   return <div className={`mt-3 rounded-lg p-2 text-xs font-bold ${active.length ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}><p>IN PROGRESS · {active.length ? `${active.length} ${active.length === 1 ? "Tech" : "Techs"} Active` : "No Techs Active"}</p>{startedAt && <p className="mt-1 font-medium">Elapsed {shortDuration((now ?? Date.parse(startedAt)) - Date.parse(startedAt))}</p>}</div>;
+}
+function JobCardCompletedTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
+  const completedEntries = entries.filter((entry) => ["Completed", "Approved"].includes(entry.status) && Boolean(entry.clock_out));
+  const startedAt = entries.reduce<string | null>((earliest, entry) => !earliest || entry.clock_in < earliest ? entry.clock_in : earliest, null);
+  const totalLabor = completedEntries.reduce((sum, entry) => sum + Number(entry.total_hours || 0), 0);
+  const actualDuration = startedAt && job.completed_at ? shortDuration(Date.parse(job.completed_at) - Date.parse(startedAt)) : "—";
+  return <div className="mt-3 rounded-lg bg-[#f6f8f5] p-2 text-xs text-neutral-700"><p className="font-extrabold text-[#143d1a]">COMPLETED</p><p className="mt-1">{job.completed_at ? new Date(job.completed_at).toLocaleString() : "Completion time unavailable"}</p><p className="mt-1">Actual {actualDuration} · Total labor {shortDuration(totalLabor * 3_600_000)}</p></div>;
 }
 function JobModal({
   job,

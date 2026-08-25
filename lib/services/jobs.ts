@@ -41,23 +41,13 @@ const workflowStatuses: Exclude<JobStatus, "Archived">[] = [
 ];
 export async function getJobs(): Promise<JobWithRelations[]> {
   if (!(await master())) {
-    const [{ data, error }, invoicesResult] = await Promise.all([
-      getSupabaseClient().rpc("get_operational_jobs", {}),
-      getSupabaseClient().from("invoices").select("job_id").is("archived_at", null).neq("status", "Cancelled"),
-    ]);
+    const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
     if (error) throw error;
-    if (invoicesResult.error) throw invoicesResult.error;
-    const invoiced = new Set((invoicesResult.data ?? []).map((row) => row.job_id));
-    return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived" && (job.status !== "Completed" || !invoiced.has(job.id)));
+    return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived");
   }
-  const [jobsResult, invoicesResult] = await Promise.all([
-    getSupabaseClient().from("jobs").select(select).is("archived_at", null).in("status", workflowStatuses).order("created_at", { ascending: false }),
-    getSupabaseClient().from("invoices").select("job_id").is("archived_at", null).neq("status", "Cancelled"),
-  ]);
+  const jobsResult = await getSupabaseClient().from("jobs").select(select).is("archived_at", null).in("status", workflowStatuses).order("created_at", { ascending: false });
   if (jobsResult.error) throw jobsResult.error;
-  if (invoicesResult.error) throw invoicesResult.error;
-  const invoicedJobIds = new Set((invoicesResult.data ?? []).map((invoice) => invoice.job_id));
-  return (jobsResult.data as JobWithRelations[]).filter((job) => job.status !== "Completed" || !invoicedJobIds.has(job.id));
+  return jobsResult.data as JobWithRelations[];
 }
 export async function getJobsForDateRange(
   start: string,
@@ -370,12 +360,15 @@ export async function startOperationalJob(id: string): Promise<JobWithRelations>
 export async function finishJobAndClockOut(id: string, breakMinutes = 0): Promise<JobClockOutResult> {
   const { data, error } = await getSupabaseClient().rpc("finish_job_and_clock_out", { p_job_id: id, p_break_minutes: breakMinutes });
   if (error) throw new Error(safeDatabaseMessage(error, "Job clock-out failed."));
-  return data as JobClockOutResult;
+  const result = data as JobClockOutResult;
+  if (!result.jobCompleted) return result;
+  const job = await getJobById(id);
+  return { ...result, ...await createCompletedJobInvoice(job) };
 }
-export async function completeInProgressJob(id: string): Promise<JobWithRelations> {
+export async function completeInProgressJob(id: string): Promise<JobCompletionResult> {
   const { data, error } = await getSupabaseClient().rpc("complete_in_progress_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
-  return operationalJob(data);
+  return createCompletedJobInvoice(operationalJob(data));
 }
 export const startJob = startOrClockInToJob;
 export const updateJobInternalNotes = (id: string, notes: string) =>
