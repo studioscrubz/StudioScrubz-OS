@@ -362,6 +362,11 @@ export async function startOrClockInToJob(id: string): Promise<JobClockInResult>
   if (error) throw new Error(safeDatabaseMessage(error, "Job clock-in failed."));
   return data as JobClockInResult;
 }
+export async function startOperationalJob(id: string): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("start_operational_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job could not be started."));
+  return operationalJob(data);
+}
 export async function finishJobAndClockOut(id: string, breakMinutes = 0): Promise<JobClockOutResult> {
   const { data, error } = await getSupabaseClient().rpc("finish_job_and_clock_out", { p_job_id: id, p_break_minutes: breakMinutes });
   if (error) throw new Error(safeDatabaseMessage(error, "Job clock-out failed."));
