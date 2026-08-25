@@ -1,27 +1,24 @@
-import { addProposalHistory, getProposalById } from "@/lib/services/proposals";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type {
   CrewConflict,
   Job,
   JobStatus,
-  JobInsert,
   JobUpdate,
   JobWithRelations,
   DirectJobInput,
+  JobClockInResult,
+  JobClockOutResult,
+  JobClockState,
 } from "@/types/job";
 import type { CrewWithRelations } from "@/types/crew";
-import { employeeName } from "@/types/employee";
 import { getCurrentProfile } from "@/lib/services/auth";
-import { hasPermission, isMasterAdmin } from "@/lib/auth/permissions";
-import { getClientById } from "@/lib/services/clients";
-import { getPropertyById } from "@/lib/services/properties";
-import { getServiceCatalog, getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
-import { getCrewById } from "@/lib/services/crews";
-import { calculateAddons, calculateServicePrice } from "@/lib/pricing/pricingEngine";
+import { isMasterAdmin } from "@/lib/auth/permissions";
+import { employeeName } from "@/types/employee";
+import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import type { Invoice } from "@/types/invoice";
 
 export type JobCompletionResult = {
-  job: Job;
+  job: JobWithRelations;
   invoice: Pick<Invoice, "id" | "invoice_number"> | null;
   invoiceCreated: boolean;
   invoiceSkipped: boolean;
@@ -132,132 +129,34 @@ export async function getJobProposalIds(): Promise<string[]> {
 export async function createJobFromProposal(
   proposalId: string,
 ): Promise<JobWithRelations> {
-  const proposal = await getProposalById(proposalId);
-  if (proposal.status !== "Accepted" || !proposal.accepted)
-    throw new Error("Only accepted proposals can create jobs.");
-  if (proposal.frequency !== "One-Time")
-    throw new Error("Recurring proposals must create a Service Agreement.");
-  if (!proposal.client_id || !proposal.property_id)
-    throw new Error("This Proposal has a deleted Client or Property relationship and cannot create a Job.");
-  const existing = await getJobForProposal(proposalId);
-  if (existing) return existing;
-  const input = {
-    proposal_id: proposal.id,
-    service_occurrence_id: null,
-    estimate_id: proposal.estimate_id,
-    walkthrough_id: proposal.walkthrough_id,
-    client_id: proposal.client_id,
-    property_id: proposal.property_id,
-    division: proposal.division,
-    client_name: proposal.client_name,
-    property_name: proposal.property_name,
-    service_name: proposal.result.serviceName,
-    frequency: proposal.frequency,
-    status: "Ready to Schedule" as const,
-    scheduled_date: null,
-    start_time: null,
-    estimated_duration: proposal.result.estimatedDuration,
-    assigned_crew_id: null,
-    assigned_crew_name: null,
-    crew_lead_name: null,
-    assigned_team: [],
-    price: proposal.result.perVisitTotal,
-    deposit: 0,
-    balance: proposal.result.perVisitTotal,
-    labor_hours: proposal.result.laborHours,
-    recommended_crew_size: proposal.result.crewRecommendation,
-    scope: proposal.result.scope,
-    checklist: [],
-    photos: [],
-    access_instructions:
-      proposal.result.terms.accessRequirements ||
-      proposal.property?.access_instructions || null,
-    internal_notes: proposal.notes,
-    completed_at: null,
-  };
-  for (let i = 0; i < 5; i++) {
-    const { data, error } = await getSupabaseClient()
-      .from("jobs")
-      .insert({ ...input, job_number: jobNumber() })
-      .select(select)
-      .single();
-    if (!error) {
-      await addProposalHistory(
-        proposal.id,
-        "Job Created",
-        "Accepted",
-        "Accepted",
-        `Job ${data.job_number} created.`,
-      );
-      return data as JobWithRelations;
-    }
-    if (error.code === "23505") {
-      const duplicate = await getJobForProposal(proposalId);
-      if (duplicate) return duplicate;
-      continue;
-    }
-    throw error;
-  }
-  throw new Error("A unique job number could not be generated.");
+  const { data, error } = await getSupabaseClient().rpc("create_job_from_accepted_proposal", {
+    p_proposal_id: proposalId,
+  });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job could not be created."));
+  if (!data) throw new Error("The Job creation result was empty.");
+  const visible = await getJobForProposal(proposalId).catch(() => null);
+  return visible ?? fullJob(data);
 }
 export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
-  const profile = await getCurrentProfile();
-  if (!hasPermission(profile, "jobs.create")) throw new Error("You do not have permission to create Jobs.");
-  const [client, property, catalog, crew] = await Promise.all([
-    getClientById(input.client_id),
-    getPropertyById(input.property_id),
-    getServiceCatalog(),
-    input.assigned_crew_id ? getCrewById(input.assigned_crew_id) : Promise.resolve(null),
-  ]);
-  if (client.archived_at) throw new Error("Select an active Client.");
-  if (property.archived_at || property.client_id !== client.id) throw new Error("The selected Property does not belong to the selected Client.");
-  const service = catalog.services.find((row) => row.id === input.service_id);
-  if (!service) throw new Error("Select an active Service Catalog service.");
-  const division = property.property_type;
-  if (service.division !== "Both" && service.division !== division) throw new Error("The selected Service is not available for this Property division.");
-  const availableAddons = getAvailableServiceAddons(catalog, service.id, division);
-  const selectedAddons = input.addon_ids.map((id) => availableAddons.find((row) => row.id === id));
-  if (selectedAddons.some((row) => !row)) throw new Error("One or more selected Add-Ons are not available for this Service.");
-  const quantity = property.square_feet && property.square_feet > 0 ? property.square_feet : 1;
-  const basePrice = calculateServicePrice(service, quantity, catalog.tiers);
-  const addonAdjustments = calculateAddons(selectedAddons.map((row) => row!.addon_name), availableAddons);
-  const overridePrice = input.price_override ?? null;
-  const hasOverride = overridePrice !== null;
-  if (hasOverride && !isMasterAdmin(profile)) throw new Error("Only Master Admin can override a Direct Job price.");
-  if (hasOverride && (!Number.isFinite(overridePrice) || overridePrice < 0)) throw new Error("Override Job Price must be a number greater than or equal to zero.");
-  if (basePrice == null && !hasOverride) throw new Error("This Service uses custom pricing and requires a Master Admin Job price override.");
-  const catalogPrice = basePrice == null ? null : basePrice + addonAdjustments.reduce((sum, row) => sum + row.amount, 0);
-  const price = Math.round((overridePrice ?? catalogPrice!) * 100) / 100;
-  const scheduled = Boolean(input.scheduled_date);
-  const status: JobStatus = scheduled ? (crew ? "Crew Assigned" : "Scheduled") : "Ready to Schedule";
-  const scope = [
-    ...(service.description ? [{ id: crypto.randomUUID(), text: service.description }] : []),
-    ...selectedAddons.map((addon) => ({ id: crypto.randomUUID(), text: `Add-On: ${addon!.addon_name}${addon!.description ? ` — ${addon!.description}` : ""}` })),
-  ];
-  const payload: JobInsert = {
-    proposal_id: null, estimate_id: null, walkthrough_id: null, service_occurrence_id: null,
-    client_id: client.id, property_id: property.id, division,
-    client_name: client.company_name || [client.first_name, client.last_name].filter(Boolean).join(" ") || "Client",
-    property_name: property.property_name || property.address, service_name: service.service_name,
-    frequency: "One-Time", status, scheduled_date: input.scheduled_date,
-    start_time: input.scheduled_date ? input.start_time : null,
-    estimated_duration: input.estimated_duration, assigned_crew_id: crew?.id ?? null,
-    assigned_crew_name: crew?.crew_name ?? null,
-    crew_lead_name: crew?.crew_lead ? employeeName(crew.crew_lead) : null,
-    assigned_team: crew?.members.map((member) => employeeName(member.employee)) ?? [],
-    price, deposit: 0, balance: price, labor_hours: Math.max(0, input.labor_hours),
-    recommended_crew_size: Math.max(crew?.members.length ?? 1, 1), scope, checklist: [], photos: [],
-    access_instructions: input.access_instructions || property.access_instructions || null,
-    internal_notes: input.internal_notes, completed_at: null,
-  };
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { data, error } = await getSupabaseClient().from("jobs").insert({ ...payload, job_number: jobNumber() }).select(select).single();
-    if (!error) return data as JobWithRelations;
-    if (error.code !== "23505") throw error;
-  }
-  throw new Error("A unique Job number could not be generated.");
+  const { data, error } = await getSupabaseClient().rpc("create_direct_operational_job", {
+    p_client_id: input.client_id,
+    p_property_id: input.property_id,
+    p_service_id: input.service_id,
+    p_addon_ids: input.addon_ids,
+    p_scheduled_date: input.scheduled_date,
+    p_start_time: input.start_time,
+    p_estimated_duration: input.estimated_duration,
+    p_assigned_crew_id: input.assigned_crew_id,
+    p_labor_hours: input.labor_hours,
+    p_access_instructions: input.access_instructions,
+    p_internal_notes: input.internal_notes,
+    p_master_price_override: input.price_override ?? null,
+  });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job could not be created."));
+  if (!data) throw new Error("The Job creation result was empty.");
+  return getJobById(data.id).catch(() => fullJob(data));
 }
-export async function updateJob(id: string, input: JobUpdate): Promise<Job> {
+export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRelations> {
   if (!(await master())) {
     const forbidden = ["price","deposit","balance","labor_hours","recommended_crew_size","proposal_id","client_id","property_id"] as const;
     if (forbidden.some((field) => field in input)) throw new Error("This role cannot change Job financial or relationship fields.");
@@ -275,7 +174,7 @@ export async function updateJob(id: string, input: JobUpdate): Promise<Job> {
     .select()
     .single();
   if (error) throw error;
-  return data;
+  return fullJob(data);
 }
 export async function updateJobStatus(id: string, status: JobStatus) {
   if (status === "Scheduled") {
@@ -292,7 +191,7 @@ export async function updateJobStatus(id: string, status: JobStatus) {
   return updateJob(id, { status, completed_at: null });
 }
 
-async function createCompletedJobInvoice(job: Job): Promise<JobCompletionResult> {
+async function createCompletedJobInvoice(job: JobWithRelations): Promise<JobCompletionResult> {
   try {
     // Dynamic loading avoids a runtime jobs <-> invoices module cycle while keeping
     // completion and its invoice handoff in the shared workflow service.
@@ -450,22 +349,55 @@ export async function rescheduleJob(
     status: next,
   });
 }
-export const startJob = (id: string) => updateJobStatus(id, "In Progress");
+export async function getCurrentJobClockState(jobId: string): Promise<JobClockState> {
+  const profile = await getCurrentProfile();
+  if (!profile?.employee_id) return { clockedIn: false, clockedInAt: null, timeEntryId: null, activeWorkerCount: 0 };
+  const open = (await getTimeEntriesForJob(jobId)).filter((entry) => entry.status === "Open" && !entry.clock_out && !entry.archived_at);
+  const current = open.find((entry) => entry.employee_id === profile.employee_id) ?? null;
+  return { clockedIn: Boolean(current), clockedInAt: current?.clock_in ?? null, timeEntryId: current?.id ?? null, activeWorkerCount: open.length };
+}
+export async function startOrClockInToJob(id: string): Promise<JobClockInResult> {
+  const { data, error } = await getSupabaseClient().rpc("start_or_clock_in_to_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job clock-in failed."));
+  return data as JobClockInResult;
+}
+export async function finishJobAndClockOut(id: string, breakMinutes = 0): Promise<JobClockOutResult> {
+  const { data, error } = await getSupabaseClient().rpc("finish_job_and_clock_out", { p_job_id: id, p_break_minutes: breakMinutes });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job clock-out failed."));
+  return data as JobClockOutResult;
+}
+export async function completeInProgressJob(id: string): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("complete_in_progress_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
+  return operationalJob(data);
+}
+export const startJob = startOrClockInToJob;
 export const updateJobInternalNotes = (id: string, notes: string) =>
   updateJob(id, { internal_notes: notes || null });
-export const completeJob = (id: string) => updateJobStatus(id, "Completed");
+export const completeJob = completeInProgressJob;
 export const cancelJob = (id: string, note: string) =>
   updateJob(id, { status: "Cancelled", internal_notes: note || null });
-export const archiveJob = (id: string) =>
-  updateJob(id, { status: "Archived", archived_at: new Date().toISOString() });
+export async function archiveJob(id: string): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("archive_operational_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job could not be archived."));
+  return operationalJob(data);
+}
+export async function getArchivedJobs(): Promise<JobWithRelations[]> {
+  const { data, error } = await getSupabaseClient().rpc("get_archived_operational_jobs");
+  if (error) throw new Error(safeDatabaseMessage(error, "Archived Jobs could not be loaded."));
+  return data.map(operationalJob);
+}
+export async function restoreArchivedJob(id: string): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("restore_archived_operational_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job could not be restored."));
+  return operationalJob(data);
+}
 
 async function master(){ return isMasterAdmin(await getCurrentProfile()); }
-function operationalJob(row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">):JobWithRelations{return{...row,price:0,deposit:0,balance:0,labor_hours:0,recommended_crew_size:0,photos:[],proposal:null,client:null,property:null}}
+function operationalJob(row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">):JobWithRelations{return{...row,price:null,deposit:null,balance:null,labor_hours:null,recommended_crew_size:null,photos:[],financials_available:false,proposal:null,client:null,property:null}}
+function fullJob(row:Job):JobWithRelations{return{...row,financials_available:true,proposal:null,client:null,property:null}}
 function errorMessage(cause:unknown){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return""}
-function jobNumber() {
-  const d = new Date();
-  return `JOB-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
-}
+function safeDatabaseMessage(cause:unknown,fallback:string){const detail=errorMessage(cause).trim();return detail&&!/jwt|token|secret|authorization header|service[_ -]?role/i.test(detail)?detail:fallback}
 function minutes(value: string) {
   const [h, m] = value.slice(0, 5).split(":").map(Number);
   return h * 60 + m;

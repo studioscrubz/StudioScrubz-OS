@@ -90,11 +90,45 @@ export type DirectJobInput = {
   internal_notes: string | null;
   price_override?: number | null;
 };
-export type JobWithRelations = Job & {
+type JobRelations = {
   proposal: Proposal | null;
   client: Client | null;
   property: Property | null;
   service_occurrence?: { agreement: { billing_type: AgreementBillingType; agreement_number: string } } | null;
+};
+type RestrictedOperationalJob = Omit<Job, "price" | "deposit" | "balance" | "labor_hours" | "recommended_crew_size" | "photos"> & {
+  price: null;
+  deposit: null;
+  balance: null;
+  labor_hours: null;
+  recommended_crew_size: null;
+  photos: [];
+  financials_available: false;
+};
+export type JobWithRelations = ((Job & { financials_available?: true }) | RestrictedOperationalJob) & JobRelations;
+export type JobClockState = {
+  clockedIn: boolean;
+  clockedInAt: string | null;
+  timeEntryId: string | null;
+  activeWorkerCount: number;
+};
+export type JobClockInResult = {
+  jobId: string;
+  jobStatus: "In Progress";
+  clockedIn: true;
+  clockedInAt: string;
+  timeEntryId: string;
+  jobStarted: boolean;
+};
+export type JobClockOutResult = {
+  jobId: string;
+  jobStatus: "In Progress" | "Completed";
+  clockedIn: false;
+  clockedOutAt: string;
+  timeEntryId: string;
+  remainingActiveWorkers: number;
+  jobCompleted: boolean;
+  completionPending: boolean;
 };
 export type CrewConflict = Pick<
   JobWithRelations,

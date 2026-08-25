@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
 import { getArchivedRecords, permanentlyDeleteArchivedRecord, restoreArchivedRecord } from "@/lib/services/archives";
 import { ARCHIVE_RECORD_TYPES, type ArchivedRecord, type ArchiveRecordType } from "@/types/archive";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 type Filter = "All" | ArchiveRecordType;
 export function ArchivesPage() {
@@ -19,6 +20,7 @@ export function ArchivesPage() {
   const [confirming, setConfirming] = useState<ArchivedRecord | null>(null);
   const visible = useMemo(() => records.filter((record) => filter === "All" || record.type === filter), [filter, records]);
   async function load() { setRecords(await getArchivedRecords()); }
+  useOperationalRealtime(["jobs"], load);
   useEffect(() => { let active = true; void getArchivedRecords().then((rows) => { if (active) setRecords(rows); }).catch((cause: unknown) => { console.error("Archive load failed", cause); if (active) setError(message(cause)); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
   async function restore(record: ArchivedRecord) { setBusy(record.id); setError(null); try { await restoreArchivedRecord(record); await load(); setNotice(`${record.label} restored.`); } catch (cause) { console.error("Archive restore failed", cause); setError(message(cause)); } finally { setBusy(null); } }
   async function remove(record: ArchivedRecord) { setBusy(record.id); setError(null); try { await permanentlyDeleteArchivedRecord(record); setConfirming(null); await load(); setNotice(`${record.label} permanently deleted.`); } catch (cause) { console.error("Permanent deletion failed", cause); setError(message(cause)); setConfirming(null); } finally { setBusy(null); } }

@@ -6,10 +6,14 @@ import {
   archiveJob,
   assignJobCrew,
   cancelJob,
+  completeInProgressJob,
+  finishJobAndClockOut,
   getCrewConflicts,
+  getCurrentJobClockState,
   getJobs,
   isJobCompletionResult,
   scheduleJob,
+  startOrClockInToJob,
   updateJobStatus,
 } from "@/lib/services/jobs";
 import { getActiveCrews } from "@/lib/services/crews";
@@ -24,6 +28,7 @@ import { DirectJobModal } from "@/components/jobs/DirectJobModal";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import {
   type JobStatus,
+  type JobClockOutResult,
   type JobWithRelations,
 } from "@/types/job";
 
@@ -58,9 +63,11 @@ export function JobsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   async function load() {
-    setRows(await getJobs());
+    const next = await getJobs();
+    setRows(next);
+    return next;
   }
-  useOperationalRealtime(["jobs", "invoices", "service_occurrences"], load);
+  useOperationalRealtime(["jobs", "invoices", "service_occurrences"], async () => { await load(); });
   useEffect(() => {
     let active = true;
     void getJobs()
@@ -87,14 +94,14 @@ export function JobsPage() {
   async function mutate(
     job: JobWithRelations,
     fn: () => Promise<unknown>,
-    text: string,
+    text: string | ((result: unknown) => string),
   ) {
     setBusy(job.id);
     setError(null);
     try {
       const result = await fn();
-      await load();
-      setSelected(null);
+      const next = await load();
+      setSelected(next.find((row) => row.id === job.id && activeStatuses.includes(row.status)) ?? null);
       if (isJobCompletionResult(result)) {
         if (result.invoiceError) {
           setNotice(null);
@@ -107,7 +114,7 @@ export function JobsPage() {
           setNotice("Job completed.");
         }
       } else {
-        setNotice(text);
+        setNotice(typeof text === "function" ? text(result) : text);
       }
     } catch (x) {
       console.error("Job mutation failed", x);
@@ -252,6 +259,10 @@ export function JobsPage() {
           close={() => setSelected(null)}
           mutate={(fn, text) => void mutate(selected, fn, text)}
           canArchive={hasPermission(profile, "jobs.archive")}
+          canComplete={hasPermission(profile, "jobs.complete")}
+          canClock={Boolean(profile && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role))}
+          employeeId={profile?.employee_id ?? null}
+          role={profile?.role ?? null}
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
@@ -269,7 +280,7 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
       <p className="text-xs text-neutral-500">{job.property_name}</p>
       <p className="mt-2 text-sm">{job.service_name}</p>
       <p className="mt-2 text-xl font-extrabold text-[#143d1a]">
-        {money(job.price)}
+        {job.financials_available === false ? "Price restricted" : money(job.price)}
       </p>
       <p className="mt-2 text-xs text-neutral-500">
         {job.scheduled_date || "Unscheduled"}{" "}
@@ -297,13 +308,21 @@ function JobModal({
   close,
   mutate,
   canArchive,
+  canComplete,
+  canClock,
+  employeeId,
+  role,
   canDeletePhotos,
 }: {
   job: JobWithRelations;
   busy: boolean;
   close: () => void;
-  mutate: (fn: () => Promise<unknown>, text: string) => void;
+  mutate: (fn: () => Promise<unknown>, text: string | ((result: unknown) => string)) => void;
   canArchive: boolean;
+  canComplete: boolean;
+  canClock: boolean;
+  employeeId: string | null;
+  role: string | null;
   canDeletePhotos: boolean;
 }) {
   const [date, setDate] = useState(job.scheduled_date ?? "");
@@ -312,6 +331,22 @@ function JobModal({
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
   const [crewId, setCrewId] = useState(job.assigned_crew_id ?? "");
   const [warning, setWarning] = useState<string | null>(null);
+  const [clock, setClock] = useState<Awaited<ReturnType<typeof getCurrentJobClockState>> | null>(null);
+  const [clockError, setClockError] = useState<string | null>(null);
+  async function refreshClock() {
+    if (!canClock || !employeeId) { setClock(null); return; }
+    try { setClock(await getCurrentJobClockState(job.id)); setClockError(null); }
+    catch (cause) { console.error("Job clock state load failed", cause); setClockError(message(cause, "Time clock state could not be loaded.")); }
+  }
+  useEffect(() => {
+    if (!canClock || !employeeId) return;
+    let active = true;
+    void getCurrentJobClockState(job.id)
+      .then((next) => { if (active) { setClock(next); setClockError(null); } })
+      .catch((cause: unknown) => { if (active) { console.error("Job clock state load failed", cause); setClockError(message(cause, "Time clock state could not be loaded.")); } });
+    return () => { active = false; };
+  }, [job.id, job.status, canClock, employeeId]);
+  useOperationalRealtime(["time_entries"], refreshClock);
   useEffect(() => {
     void getActiveCrews()
       .then(setCrews)
@@ -340,6 +375,16 @@ function JobModal({
     );
     await assignJobCrew(job.id, crew, Boolean(job.scheduled_date || date));
   }
+  const assignedCrew = crews.find((crew) => crew.id === job.assigned_crew_id) ?? null;
+  const canSupervisorComplete = canComplete && (role !== "Crew Lead" || assignedCrew?.crew_lead_id === employeeId);
+  const canEnterJob = canClock && Boolean(employeeId && job.assigned_crew_id);
+  function clockOutMessage(result: unknown) {
+    const value = result as JobClockOutResult;
+    if (value.jobCompleted) return "Your time was recorded and the Job was completed.";
+    if (value.remainingActiveWorkers > 0) return `Your time was recorded. ${value.remainingActiveWorkers} worker${value.remainingActiveWorkers === 1 ? " remains" : "s remain"} clocked in.`;
+    if (value.completionPending) return "Your time has been recorded. A supervisor must complete this Job.";
+    return "Your time was recorded.";
+  }
   return (
     <Modal title={job.job_number} close={close}>
       <div className="grid gap-5 sm:grid-cols-2">
@@ -359,7 +404,7 @@ function JobModal({
             ["Service", job.service_name || "—"],
             ["Frequency", job.frequency],
             ["Division", job.division],
-            ["Price", money(job.price)],
+            ["Price", job.financials_available === false ? "Restricted" : money(job.price)],
             ["Labor Hours", String(job.labor_hours)],
             ["Recommended Crew", String(job.recommended_crew_size)],
           ]}
@@ -452,10 +497,11 @@ function JobModal({
       />
       <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
       <JobMileageSummary jobId={job.id} />
-      <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />
+      {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
+      {canEnterJob && ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status) && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Your Job Time</h3>{clockError ? <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p> : clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">Clocked in {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>Finish Job / Clock Out</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You are clocked in to this Job." : "Job started and you are clocked in.")}>{job.status === "In Progress" ? "Clock In" : "Start Job"}</button>}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Active workers currently visible: {clock.activeWorkerCount}</p>}</section>}
       <div className="mt-6 flex flex-wrap gap-2">
         <ContractServiceRecordAction jobId={job.id} />
-        {nextStatuses(job.status).map((x) => (
+        {nextStatuses(job.status).filter((next) => next !== "In Progress" && next !== "Completed").map((x) => (
           <button
             key={x}
             disabled={busy}
@@ -465,6 +511,7 @@ function JobModal({
             {x}
           </button>
         ))}
+        {job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={primary}>Complete Job</button>}
         {!["Cancelled", "Archived"].includes(job.status) && (
           <button
             disabled={busy}
@@ -618,8 +665,8 @@ function compare(a: JobWithRelations, b: JobWithRelations, s: Sort) {
   if (s === "Client Name")
     return (a.client_name ?? "").localeCompare(b.client_name ?? "");
   if (s === "Job Number") return a.job_number.localeCompare(b.job_number);
-  if (s === "Price High to Low") return b.price - a.price;
-  if (s === "Price Low to High") return a.price - b.price;
+  if (s === "Price High to Low") return a.financials_available === false || b.financials_available === false ? 0 : b.price - a.price;
+  if (s === "Price Low to High") return a.financials_available === false || b.financials_available === false ? 0 : a.price - b.price;
   return Date.parse(b.created_at) - Date.parse(a.created_at);
 }
 function money(v: number) {

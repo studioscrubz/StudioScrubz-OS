@@ -71,7 +71,11 @@ function Price({ label, value, strong }: { label: string; value: number | null; 
 function clientName(row: Client) { return row.company_name || [row.first_name, row.last_name].filter(Boolean).join(" ") || "Unnamed Client"; }
 function propertyLabel(row: PropertyWithClient) { return [row.property_name, row.address, row.city].filter(Boolean).join(" · "); }
 function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
-function message(cause: unknown, fallback: string) { return cause instanceof Error ? cause.message : fallback; }
+function message(cause: unknown, fallback: string) {
+  if (cause instanceof Error && cause.message.trim()) return cause.message;
+  if (cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string" && cause.message.trim()) return cause.message;
+  return fallback;
+}
 const input = "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-[#d4af37] disabled:bg-neutral-100";
 const primary = "rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-50";
 const secondary = "rounded-lg border border-neutral-200 px-5 py-3 text-sm font-bold text-[#143d1a]";

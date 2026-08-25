@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/services/dashboard";
-import { completeJob, isJobCompletionResult, startJob } from "@/lib/services/jobs";
 import type { DashboardData } from "@/types/dashboard";
 import type { JobWithRelations } from "@/types/job";
 import { DashboardRecurringServices } from "@/components/agreements/DashboardRecurringServices";
@@ -14,8 +13,6 @@ export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
   async function load() {
     setError(null);
     try {
@@ -47,34 +44,6 @@ export function DashboardPage() {
       active = false;
     };
   }, []);
-  async function operate(job: JobWithRelations, action: "start" | "complete") {
-    setBusy(job.id);
-    setError(null);
-    setNotice(null);
-    try {
-      let actionError: string | null = null;
-      let actionNotice: string | null = null;
-      if (action === "start") await startJob(job.id);
-      else {
-        const result = await completeJob(job.id);
-        if (isJobCompletionResult(result)) {
-          if (result.invoiceError) actionError = result.invoiceError;
-          else if (result.invoice) actionNotice = result.invoiceCreated
-            ? `Job completed and Invoice ${result.invoice.invoice_number} created.`
-            : `Job completed. Invoice ${result.invoice.invoice_number} already exists.`;
-          else actionNotice = "Job completed.";
-        }
-      }
-      await load();
-      setError(actionError);
-      setNotice(actionNotice);
-    } catch (x) {
-      console.error("Dashboard job operation failed", x);
-      setError(errorMessage(x, "Job operation failed."));
-    } finally {
-      setBusy(null);
-    }
-  }
   if (!data && !error) return <Skeleton />;
   const kpis: Array<{ label: string; value: number; permission: Permission }> = data ? [
     { label: "Jobs Today", value: data.metrics.jobsToday, permission: "jobs.view" },
@@ -87,7 +56,6 @@ export function DashboardPage() {
   return (
     <>
       <Header />
-      {notice && <div className="mt-5 rounded-xl bg-green-50 p-4 text-sm font-bold text-green-700">{notice}</div>}
       {error && (
         <div className="mt-5 flex items-center justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
           <span>{error}</span>
@@ -111,12 +79,7 @@ export function DashboardPage() {
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
                 {data.todaysJobs.map((j) => (
-                  <OperationCard
-                    key={j.id}
-                    job={j}
-                    busy={busy === j.id}
-                    operate={operate}
-                  />
+                  <OperationCard key={j.id} job={j} />
                 ))}
               </div>
             ) : (
@@ -162,7 +125,6 @@ export function DashboardPage() {
   );
 }
 
-function errorMessage(cause:unknown,fallback:string){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return fallback}
 function Header() {
   return (
     <header className="border-b border-[#143d1a]/10 pb-7">
@@ -180,12 +142,8 @@ function Header() {
 }
 function OperationCard({
   job,
-  busy,
-  operate,
 }: {
   job: JobWithRelations;
-  busy: boolean;
-  operate: (j: JobWithRelations, a: "start" | "complete") => Promise<void>;
 }) {
   return (
     <article className="rounded-xl border p-4">
@@ -208,26 +166,8 @@ function OperationCard({
       </p>
       <div className="mt-3 flex gap-2">
         <Link href={`/jobs?jobId=${job.id}`} className={secondary}>
-          View Job
+          Manage Job
         </Link>
-        {["Scheduled", "Crew Assigned"].includes(job.status) && (
-          <button
-            disabled={busy}
-            className={primary}
-            onClick={() => void operate(job, "start")}
-          >
-            Start Job
-          </button>
-        )}
-        {job.status === "In Progress" && (
-          <button
-            disabled={busy}
-            className={primary}
-            onClick={() => void operate(job, "complete")}
-          >
-            Complete Job
-          </button>
-        )}
       </div>
     </article>
   );
@@ -525,7 +465,5 @@ function time(v: string | null) {
     minute: "2-digit",
   });
 }
-const primary =
-  "rounded-lg bg-[#143d1a] px-3 py-2 text-xs font-bold text-white disabled:opacity-50";
 const secondary =
   "rounded-lg border px-3 py-2 text-xs font-bold text-[#143d1a]";

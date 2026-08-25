@@ -118,6 +118,14 @@ export interface Database {
       admin_update_user_profile:{Args:{p_profile_id:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
       admin_set_user_active:{Args:{p_profile_id:string;p_is_active:boolean};Returns:UserProfile};
       get_operational_jobs:{Args:{p_start?:string|null;p_end?:string|null};Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
+      create_job_from_accepted_proposal:{Args:{p_proposal_id:string};Returns:Job};
+      create_direct_operational_job:{Args:{p_client_id:string;p_property_id:string;p_service_id:string;p_addon_ids?:string[];p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_labor_hours?:number;p_access_instructions?:string|null;p_internal_notes?:string|null;p_master_price_override?:number|null};Returns:Job};
+      archive_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
+      get_archived_operational_jobs:{Args:Record<string,never>;Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
+      restore_archived_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
+      start_or_clock_in_to_job:{Args:{p_job_id:string};Returns:import("@/types/job").JobClockInResult};
+      finish_job_and_clock_out:{Args:{p_job_id:string;p_break_minutes?:number};Returns:import("@/types/job").JobClockOutResult};
+      complete_in_progress_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       update_operational_job:{Args:{p_job_id:string;p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_internal_notes?:string|null;p_status?:string|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       create_completed_job_invoice:{Args:{p_job_id:string};Returns:{invoice_id:string|null;invoice_number:string|null;created:boolean;skipped:boolean}};
       create_contract_agreement_invoice:{Args:{p_agreement_id:string;p_billing_period_start?:string|null;p_flat_contract_amount?:number|null};Returns:Invoice};

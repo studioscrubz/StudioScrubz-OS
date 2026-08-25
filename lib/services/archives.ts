@@ -3,6 +3,7 @@ import type { ArchiveDeleteCheck, ArchivedRecord, ArchiveRecordType } from "@/ty
 import { getCurrentProfile, getCurrentUser } from "@/lib/services/auth";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
+import { getArchivedJobs, restoreArchivedJob } from "@/lib/services/jobs";
 
 type DbError = { message: string; code?: string };
 type QueryResult = { data: unknown; error: DbError | null; count?: number | null };
@@ -55,6 +56,9 @@ const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> 
 export async function getArchivedRecords(): Promise<ArchivedRecord[]> {
   const db = archiveDb();
   const groups = await Promise.all(CONFIGS.map(async (config) => {
+    if (config.type === "Jobs") {
+      return (await getArchivedJobs()).map((row) => toArchivedRecord(config, row as unknown as Record<string, unknown>));
+    }
     const { data, error } = await db.from(config.table).select("*").not("archived_at", "is", null).order("archived_at", { ascending: false });
     if (error) throw new Error(`${config.type} archives could not be loaded: ${error.message}`);
     return rows(data).map((row) => toArchivedRecord(config, row));
@@ -63,6 +67,10 @@ export async function getArchivedRecords(): Promise<ArchivedRecord[]> {
 }
 
 export async function restoreArchivedRecord(record: ArchivedRecord): Promise<void> {
+  if (record.type === "Jobs") {
+    await restoreArchivedJob(record.id);
+    return;
+  }
   const config = configFor(record.type);
   const values = restoreValues(record.type);
   const { error } = await archiveDb().from(config.table).update(values).eq("id", record.id).not("archived_at", "is", null);
