@@ -25,7 +25,7 @@ export async function createPhotoSignedUrls(photos: OperationalPhoto[]): Promise
   return photos.map((photo, index) => ({ ...photo, signedUrl: data[index]?.signedUrl ?? null }));
 }
 
-export async function uploadOperationalPhoto(input: { recordType: OperationalPhotoRecordType; recordId: string; category: OperationalPhotoCategory; caption: string | null; source: "camera" | "library"; file: File; currentPhotos: OperationalPhoto[] }): Promise<OperationalPhoto[]> {
+export async function uploadOperationalPhoto(input: { recordType: OperationalPhotoRecordType; recordId: string; category: OperationalPhotoCategory; caption: string | null; source: "camera" | "library"; file: File }): Promise<OperationalPhoto[]> {
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("An internet connection is required to upload photos.");
   assertSavedRecordId(input.recordId);
   validateOperationalPhoto(input.file);
@@ -39,10 +39,31 @@ export async function uploadOperationalPhoto(input: { recordType: OperationalPho
   const storage = getSupabaseClient().storage.from(OPERATIONAL_PHOTO_BUCKET);
   const { error: uploadError } = await storage.upload(storagePath, file, { contentType: file.type, upsert: false, cacheControl: "3600" });
   if (uploadError) { console.error("Operational photo Storage upload failed", { bucket: OPERATIONAL_PHOTO_BUCKET, recordType: input.recordType, recordId: input.recordId, category: input.category, storagePath, message: uploadError.message }); throw new Error(uploadError.message || "Photo upload failed."); }
-  const next = [...input.currentPhotos, photo];
-  try { await saveMetadata(input.recordType, input.recordId, next); }
-  catch (error) { const { error: cleanupError } = await storage.remove([storagePath]); if (cleanupError) console.error("Operational photo cleanup after metadata failure failed", { bucket: OPERATIONAL_PHOTO_BUCKET, recordType: input.recordType, recordId: input.recordId, storagePath, message: cleanupError.message }); throw error; }
-  return next;
+  let metadataPersisted = false;
+  try {
+    const current = await getOperationalPhotos(input.recordType, input.recordId);
+    const next = [...current.filter((item) => item.id !== photo.id && item.storagePath !== photo.storagePath), photo];
+    const persisted = await saveMetadata(input.recordType, input.recordId, next);
+    if (!persisted.some((item) => item.id === photo.id && item.storagePath === photo.storagePath)) {
+      throw new Error("Photo metadata registration did not persist the uploaded photo.");
+    }
+    metadataPersisted = true;
+    const confirmed = await getOperationalPhotos(input.recordType, input.recordId);
+    if (!confirmed.some((item) => item.id === photo.id && item.storagePath === photo.storagePath)) {
+      throw new Error("Photo metadata registration could not be confirmed on the saved Walkthrough.");
+    }
+    return confirmed;
+  } catch (error) {
+    if (metadataPersisted) {
+      throw new Error(`${message(error, "Photo metadata confirmation failed.")} The metadata RPC succeeded, so the uploaded object was preserved; refresh the Walkthrough before retrying.`);
+    }
+    const { error: cleanupError } = await storage.remove([storagePath]);
+    if (cleanupError) {
+      console.error("Operational photo cleanup after metadata failure failed", { bucket: OPERATIONAL_PHOTO_BUCKET, recordType: input.recordType, recordId: input.recordId, storagePath, message: cleanupError.message });
+      throw new Error(`${message(error, "Photo metadata could not be saved.")} The uploaded object also could not be cleaned up: ${cleanupError.message}`);
+    }
+    throw error;
+  }
 }
 
 export async function updateOperationalPhotoCaption(recordType: OperationalPhotoRecordType, recordId: string, currentPhotos: OperationalPhoto[], photoId: string, caption: string): Promise<OperationalPhoto[]> {
@@ -62,9 +83,10 @@ export async function deleteOperationalPhoto(recordType: OperationalPhotoRecordT
   return next;
 }
 
-async function saveMetadata(recordType: OperationalPhotoRecordType, recordId: string, photos: OperationalPhoto[]) {
-  const { error } = await getSupabaseClient().rpc("set_operational_photos", { p_record_type: recordType, p_record_id: recordId, p_photos: photos });
+async function saveMetadata(recordType: OperationalPhotoRecordType, recordId: string, photos: OperationalPhoto[]): Promise<OperationalPhoto[]> {
+  const { data, error } = await getSupabaseClient().rpc("set_operational_photos", { p_record_type: recordType, p_record_id: recordId, p_photos: photos });
   if (error) { console.error("Operational photo metadata RPC failed", { recordType, recordId, photoCount: photos.length, message: error.message, code: error.code }); throw new Error(error.message || "Photo metadata could not be saved."); }
+  return normalizePhotos(data);
 }
 
 export function validateOperationalPhoto(file: File) {
@@ -99,3 +121,5 @@ function normalizePhotos(value: unknown): OperationalPhoto[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is OperationalPhoto => Boolean(item && typeof item === "object" && typeof (item as OperationalPhoto).id === "string" && typeof (item as OperationalPhoto).storagePath === "string")).map((photo) => ({ ...photo, source: photo.source === "camera" ? "camera" : "library" }));
 }
+
+function message(error: unknown, fallback: string) { return error instanceof Error && error.message ? error.message : fallback; }

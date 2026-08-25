@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createWalkthrough, getAvailableEstimates, getWalkthroughClients, getWalkthroughProperties, updateWalkthrough, WalkthroughDuplicateError } from "@/lib/services/walkthroughs";
 import type { Client } from "@/types/client";
-import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughWithRelations } from "@/types/walkthrough";
+import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughUpdate, WalkthroughWithRelations } from "@/types/walkthrough";
 import { EMPTY_MEASUREMENTS, WALKTHROUGH_STATUSES } from "@/types/walkthrough";
 import type { Property } from "@/types/property";
 import { findCatalogService, getAvailableServiceAddons, getServiceCatalog } from "@/lib/services/serviceCatalog";
@@ -86,9 +86,9 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
     if (!date || !time) return setError("Walkthrough date and time are required.");
     if (mode === "estimate" && !estimateId) return setError("Select an estimate or choose Create Without Estimate.");
     setSaving(true); setError(null); setDuplicate(null);
-    const input: WalkthroughInput = { estimate_id: mode === "estimate" ? estimateId : null, client_id: clientId, property_id: propertyId, division, walkthrough_date: date, walkthrough_time: time, status, contact_name: selectedEstimate ? customerName(selectedEstimate) : selectedClient ? displayClient(selectedClient) : null, phone: selectedEstimate?.customer_phone ?? selectedClient?.phone ?? null, email: selectedEstimate?.customer_email ?? selectedClient?.email ?? null, assigned_to: clean(assignedTo), notes: clean(notes), scope, measurements, recommendations, photos: walkthrough?.photos ?? [] };
+    const input: WalkthroughUpdate = { estimate_id: mode === "estimate" ? estimateId : null, client_id: clientId, property_id: propertyId, division, walkthrough_date: date, walkthrough_time: time, status, contact_name: selectedEstimate ? customerName(selectedEstimate) : selectedClient ? displayClient(selectedClient) : null, phone: selectedEstimate?.customer_phone ?? selectedClient?.phone ?? null, email: selectedEstimate?.customer_email ?? selectedClient?.email ?? null, assigned_to: clean(assignedTo), notes: clean(notes), scope, measurements, recommendations };
     try {
-      if (walkthrough) await updateWalkthrough(walkthrough.id, input); else await createWalkthrough(input);
+      if (walkthrough) await updateWalkthrough(walkthrough.id, input); else await createWalkthrough({ ...input, photos: [] } as WalkthroughInput);
       onSaved();
       if (!walkthrough) router.push("/walkthroughs");
     }

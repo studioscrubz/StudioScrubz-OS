@@ -87,7 +87,7 @@ export type Walkthrough = {
   archived_at: string | null;
 };
 export type WalkthroughInput = Omit<Walkthrough, "id" | "created_at" | "updated_at" | "archived_at" | "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by"> & { archived_at?: string | null };
-export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | "updated_at" | "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by">>;
+export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | "updated_at" | "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by" | "photos">>;
 export type WalkthroughWithRelations = Walkthrough & { client: Client | null; property: Property | null; estimate: Estimate | null };
 export type AvailableEstimate = EstimateWithRelations;
 
