@@ -4,6 +4,14 @@ export type TimeEntryType=(typeof TIME_ENTRY_TYPES)[number];export type TimeEntr
 export type TimeEntry={id:string;time_entry_number:string;employee_id:string|null;job_id:string|null;crew_id:string|null;work_date:string;clock_in:string;clock_out:string|null;break_minutes:number;regular_hours:number;overtime_hours:number;total_hours:number;hourly_rate_snapshot:number;overtime_rate_snapshot:number;regular_pay:number;overtime_pay:number;gross_pay:number;entry_type:TimeEntryType;notes:string|null;status:TimeEntryStatus;approved_at:string|null;approved_by:string|null;created_at:string;updated_at:string;archived_at:string|null};
 export type TimeEntryInput={employee_id:string;job_id:string|null;crew_id:string|null;work_date:string;clock_in:string;clock_out?:string|null;break_minutes?:number;entry_type:TimeEntryType;notes:string|null};
 export type TimeEntryUpdate=Partial<TimeEntryInput&Pick<TimeEntry,"status"|"approved_at"|"approved_by"|"archived_at"|"regular_hours"|"overtime_hours"|"total_hours"|"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">>;
+export type OperationalActiveTimeEntry = {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  clock_in: string;
+  job_id: string | null;
+  job_number: string | null;
+};
 export type TimeEntryWithRelations=TimeEntry&{employee:Employee|null;job:Job|null;crew:Crew|null};
 export type EmployeeTimeSummary={currentWeekHours:number;currentMonthHours:number;regularHours:number;overtimeHours:number;estimatedGrossPay:number;recent:TimeEntryWithRelations[]};
 export type JobLaborSummary={employeesWorked:number;regularHours:number;overtimeHours:number;totalHours:number;actualLaborCost:number};

@@ -13,6 +13,7 @@ import type {
   TimeEntry,
   TimeEntryInput,
   TimeEntryWithRelations,
+  OperationalActiveTimeEntry,
 } from "@/types/timeEntry";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { isMasterAdmin } from "@/lib/auth/permissions";
@@ -38,6 +39,26 @@ export async function getOpenTimeEntries() {
     .order("clock_in");
   if (error) throw error;
   return data as TimeEntryWithRelations[];
+}
+export async function getOperationalActiveTimeEntries(): Promise<OperationalActiveTimeEntry[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("time_entries_operational_safe")
+    .select("id,employee_id,employee_name,clock_in,job_id,job_number")
+    .eq("status", "Open")
+    .is("clock_out", null)
+    .is("archived_at", null)
+    .order("clock_in");
+  if (error) throw error;
+  return data
+    .filter((entry) => Boolean(entry.employee_id))
+    .map((entry) => ({
+      id: entry.id,
+      employee_id: entry.employee_id as string,
+      employee_name: entry.employee_name,
+      clock_in: entry.clock_in,
+      job_id: entry.job_id,
+      job_number: entry.job_number,
+    }));
 }
 export async function getTimeEntriesForEmployee(employeeId: string) {
   return filtered("employee_id", employeeId);

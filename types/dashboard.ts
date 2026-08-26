@@ -1,6 +1,7 @@
 import type { CrewWithRelations } from "@/types/crew";
 import type { JobWithRelations } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
+import type { OperationalActiveTimeEntry } from "@/types/timeEntry";
 export type DashboardMetrics = {
   openEstimates: number;
   upcomingWalkthroughs: number;
@@ -46,6 +47,7 @@ export type DashboardCrewStatus = {
 };
 export type DashboardData = {
   metrics: DashboardMetrics;
+  activeEmployees: OperationalActiveTimeEntry[];
   attention: DashboardAttentionItem[];
   todaysJobs: JobWithRelations[];
   upcomingWalkthroughs: WalkthroughWithRelations[];

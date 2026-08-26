@@ -14,11 +14,13 @@ import type { JobWithRelations } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 import { getAttentionItems as getOperationalAttentionItems } from "@/lib/services/attention";
+import { getOperationalActiveTimeEntries } from "@/lib/services/timeEntries";
 const jobSelect =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
 const walkthroughSelect =
   "*, client:clients!walkthroughs_client_id_fkey(*), property:properties!walkthroughs_property_id_fkey(*), estimate:estimates!walkthroughs_estimate_id_fkey(*)";
 export async function getDashboardData(): Promise<DashboardData> {
+  const activeEmployeesPromise = getOperationalActiveTimeEntries();
   const [
     metrics,
     todaysJobs,
@@ -29,6 +31,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     crews,
     attention,
     preview,
+    activeEmployees,
   ] = await Promise.all([
     getDashboardMetrics(),
     getTodaysJobs(),
@@ -39,9 +42,14 @@ export async function getDashboardData(): Promise<DashboardData> {
     getCrewStatus(),
     getOperationalAttentionItems(),
     getSchedulePreview(),
+    activeEmployeesPromise,
   ]);
   return {
-    metrics,
+    metrics: {
+      ...metrics,
+      employeesClockedIn: new Set(activeEmployees.map((entry) => entry.employee_id)).size,
+    },
+    activeEmployees,
     todaysJobs,
     upcomingWalkthroughs,
     proposal,
@@ -59,10 +67,10 @@ export async function getDashboardData(): Promise<DashboardData> {
     preview,
   };
 }
-export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+export async function getDashboardMetrics(): Promise<Omit<DashboardMetrics, "employeesClockedIn">> {
   const db = getSupabaseClient();
   const today = localDate();
-  const [estimatesResult, linkedWalkthroughsResult, walkthroughsResult, proposalsResult, routedJobsResult, routedAgreementsResult, jobsResult, invoicesResult, timeEntriesResult] = await Promise.all([
+  const [estimatesResult, linkedWalkthroughsResult, walkthroughsResult, proposalsResult, routedJobsResult, routedAgreementsResult, jobsResult, invoicesResult] = await Promise.all([
     db
       .from("estimates")
       .select("id")
@@ -94,14 +102,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       .gt("balance_due", 0)
       .not("status", "in", "(Paid,Cancelled,Archived)")
       .is("archived_at", null),
-    db
-      .from("time_entries")
-      .select("employee_id")
-      .eq("status", "Open")
-      .is("clock_out", null)
-      .is("archived_at", null),
   ]);
-  const results = [estimatesResult, linkedWalkthroughsResult, walkthroughsResult, proposalsResult, routedJobsResult, routedAgreementsResult, jobsResult, invoicesResult, timeEntriesResult];
+  const results = [estimatesResult, linkedWalkthroughsResult, walkthroughsResult, proposalsResult, routedJobsResult, routedAgreementsResult, jobsResult, invoicesResult];
   const failed = results.find((result) => result.error);
   if (failed?.error) throw failed.error;
   const routedProposalIds = new Set([
@@ -113,14 +115,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     pendingStatuses.has(proposal.status) ||
     (proposal.status === "Accepted" && proposal.accepted && !routedProposalIds.has(proposal.id)),
   ).length;
-  const clockedInEmployees = new Set((timeEntriesResult.data ?? []).map((entry) => entry.employee_id).filter((id): id is string => Boolean(id)));
   return {
     openEstimates: activeEstimateCount(estimatesResult.data, linkedWalkthroughsResult.data),
     upcomingWalkthroughs: walkthroughsResult.count ?? 0,
     pendingProposals,
     jobsToday: jobsResult.count ?? 0,
     pastDueInvoices: invoicesResult.count ?? 0,
-    employeesClockedIn: clockedInEmployees.size,
   };
 }
 export async function getTodaysJobs() {

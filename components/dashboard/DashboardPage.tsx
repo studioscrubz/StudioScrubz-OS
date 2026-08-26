@@ -14,6 +14,7 @@ export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showActive, setShowActive] = useState(false);
   async function load() {
     setError(null);
     try {
@@ -25,7 +26,7 @@ export function DashboardPage() {
       );
     }
   }
-  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees"]);
+  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees", "time_entries"]);
   useEffect(() => {
     let active = true;
     void getDashboardData()
@@ -52,7 +53,7 @@ export function DashboardPage() {
     { label: "Open Estimates", value: data.metrics.openEstimates, permission: "estimates.view" },
     { label: "Pending Proposals", value: data.metrics.pendingProposals, permission: "proposals.view" },
     { label: "Past Due Invoices", value: data.metrics.pastDueInvoices, permission: "invoices.view" },
-    { label: "Employees Clocked In", value: data.metrics.employeesClockedIn, permission: "timeClock.view" },
+    { label: "ACTIVE Employees", value: data.metrics.employeesClockedIn, permission: "timeClock.view" },
   ] : [];
   return (
     <>
@@ -72,11 +73,17 @@ export function DashboardPage() {
         <>
           <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
             {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
-              <Metric key={kpi.label} label={kpi.label} value={kpi.value} />
+              <Metric
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                active={kpi.label === "ACTIVE Employees" ? showActive : undefined}
+                onClick={kpi.label === "ACTIVE Employees" ? () => setShowActive((current) => !current) : undefined}
+              />
             ))}
           </section>
           {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
-          {profile && ["Master Admin", "Administrator", "Manager", "Crew Lead"].includes(profile.role) && <ActiveStaffPanel />}
+          {showActive && hasPermission(profile, "timeClock.view") && <ActiveStaffPanel entries={data.activeEmployees} />}
           {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
@@ -382,13 +389,13 @@ function Panel({
     </section>
   );
 }
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <article className="rounded-2xl border bg-white p-5">
+function Metric({ label, value, active, onClick }: { label: string; value: number; active?: boolean; onClick?: () => void }) {
+  const content = <>
       <p className="text-xs font-bold uppercase text-neutral-500">{label}</p>
       <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{value}</p>
-    </article>
-  );
+    </>;
+  if (onClick) return <button type="button" aria-pressed={active} onClick={onClick} className={`rounded-2xl border p-5 text-left transition ${active ? "border-emerald-400 bg-emerald-50 shadow-sm" : "bg-white hover:border-emerald-300"}`}>{content}</button>;
+  return <article className="rounded-2xl border bg-white p-5">{content}</article>;
 }
 function Stats({ values }: { values: [string, number][] }) {
   return (
