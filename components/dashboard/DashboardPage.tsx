@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, permissionForPath, type Permission } from "@/lib/auth/permissions";
 import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
+import { ActiveStaffPanel } from "@/components/time/ActiveStaffPanel";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -75,6 +76,7 @@ export function DashboardPage() {
             ))}
           </section>
           {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
+          {profile && ["Master Admin", "Administrator", "Manager", "Crew Lead"].includes(profile.role) && <ActiveStaffPanel />}
           {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">

@@ -307,7 +307,7 @@ function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canC
   const canJoin = canUsePersonalTimeClock && job.status === "In Progress" && !currentEntry;
   const canEnd = job.status === "In Progress" && Boolean(currentEntry);
   const canCardComplete = job.status === "In Progress" && activeEntries.length === 0 && canComplete && (role !== "Crew Lead" || assignedToJob);
-  const endLabel = activeEntries.length > 1 ? "END MY WORK" : "END JOB";
+  const canCardEndJob = canComplete && (role !== "Crew Lead" || assignedToJob);
   const content = (
     <>
     <div className="text-left">
@@ -330,15 +330,16 @@ function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canC
       <span className="mt-2 inline-block rounded-full bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">
         {job.division}
       </span>
-      {job.status === "In Progress" && <JobCardActiveTime entries={timeEntries} />}
+      {job.status === "In Progress" && <JobCardActiveTime job={job} entries={timeEntries} />}
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
     <div className="mt-3 grid gap-2">
       {canManagementStart && <button type="button" disabled={busy} onClick={() => act(() => startOperationalJob(job.id), "Job started. No employee time entry was created.")} className={`${primary} w-full`}>START JOB</button>}
-      {canStartWork && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "Your work started. You are now active.")} className={`${primary} w-full`}>{canManageJobLifecycle ? "START MY WORK" : "START WORK"}</button>}
-      {canJoin && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "You joined the Job and are now active.")} className={`${primary} w-full`}>JOIN JOB</button>}
-      {canEnd && <button type="button" disabled={busy} onClick={() => act(() => finishJobAndClockOut(job.id, 0), cardClockOutMessage)} className={`${primary} w-full`}>{endLabel}</button>}
-      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={`${primary} w-full`}>COMPLETE JOB</button>}
+      {canStartWork && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "Your Job participation started.")} className={`${primary} w-full`}>START JOB WORK</button>}
+      {canJoin && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "You joined the Job.")} className={`${primary} w-full`}>JOIN JOB</button>}
+      {canEnd && <button type="button" disabled={busy} onClick={() => act(() => finishJobAndClockOut(job.id, 0), cardClockOutMessage)} className={`${primary} w-full`}>END MY JOB WORK</button>}
+      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
+      {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">{activeEntries.length} crew {activeEntries.length === 1 ? "member is" : "members are"} still on Job</p>}
       <button type="button" onClick={open} className={`${secondary} w-full`}>MANAGE JOB</button>
     </div>
     </>
@@ -351,7 +352,7 @@ function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canC
     </article>
   );
 }
-function JobCardActiveTime({ entries }: { entries: TimeEntryWithRelations[] }) {
+function JobCardActiveTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     const initial = window.setTimeout(() => setNow(Date.now()), 0);
@@ -359,15 +360,14 @@ function JobCardActiveTime({ entries }: { entries: TimeEntryWithRelations[] }) {
     return () => { window.clearTimeout(initial); window.clearInterval(id); };
   }, []);
   const active = entries.filter((entry) => entry.status === "Open" && !entry.clock_out);
-  const startedAt = entries.reduce<string | null>((earliest, entry) => !earliest || entry.clock_in < earliest ? entry.clock_in : earliest, null);
-  return <div className={`mt-3 rounded-lg p-2 text-xs font-bold ${active.length ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}><p>IN PROGRESS · {active.length ? `${active.length} ${active.length === 1 ? "Tech" : "Techs"} Active` : "No Techs Active"}</p>{startedAt && <p className="mt-1 font-medium">Elapsed {shortDuration((now ?? Date.parse(startedAt)) - Date.parse(startedAt))}</p>}</div>;
+  const startedAt = job.operational_started_at;
+  return <div className={`mt-3 rounded-lg p-2 text-xs font-bold ${active.length ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}><p>IN PROGRESS · {active.length ? `${active.length} ${active.length === 1 ? "Tech" : "Techs"} On Job` : "No Techs On Job"}</p>{startedAt ? <><p className="mt-1 font-medium">Started {displayTime(startedAt)}</p><p className="font-medium">Elapsed {shortDuration((now ?? Date.parse(startedAt)) - Date.parse(startedAt))}</p></> : <p className="mt-1 font-medium">Operational start unavailable</p>}</div>;
 }
 function JobCardCompletedTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const completedEntries = entries.filter((entry) => ["Completed", "Approved"].includes(entry.status) && Boolean(entry.clock_out));
-  const startedAt = entries.reduce<string | null>((earliest, entry) => !earliest || entry.clock_in < earliest ? entry.clock_in : earliest, null);
   const totalLabor = completedEntries.reduce((sum, entry) => sum + Number(entry.total_hours || 0), 0);
-  const actualDuration = startedAt && job.completed_at ? shortDuration(Date.parse(job.completed_at) - Date.parse(startedAt)) : "—";
-  return <div className="mt-3 rounded-lg bg-[#f6f8f5] p-2 text-xs text-neutral-700"><p className="font-extrabold text-[#143d1a]">COMPLETED</p><p className="mt-1">{job.completed_at ? new Date(job.completed_at).toLocaleString() : "Completion time unavailable"}</p><p className="mt-1">Actual {actualDuration} · Total labor {shortDuration(totalLabor * 3_600_000)}</p></div>;
+  const actualDuration = job.operational_started_at && job.operational_ended_at ? shortDuration(Date.parse(job.operational_ended_at) - Date.parse(job.operational_started_at)) : "—";
+  return <div className="mt-3 rounded-lg bg-[#f6f8f5] p-2 text-xs text-neutral-700"><p className="font-extrabold text-[#143d1a]">COMPLETED</p><p className="mt-1">{job.operational_started_at ? `Started ${displayTime(job.operational_started_at)}` : "Start time unavailable"}</p><p>{job.operational_ended_at ? `Ended ${displayTime(job.operational_ended_at)}` : "End time unavailable"}</p><p className="mt-1">Actual {actualDuration} · Total labor {shortDuration(totalLabor * 3_600_000)}</p></div>;
 }
 function JobModal({
   job,
@@ -448,19 +448,17 @@ function JobModal({
     );
     await assignJobCrew(job.id, crew, Boolean(job.scheduled_date || date));
   }
-  const assignedCrew = crews.find((crew) => crew.id === job.assigned_crew_id) ?? null;
   const canManageJobLifecycle = Boolean(role && ["Master Admin", "Administrator", "Manager"].includes(role));
-  const canSupervisorComplete = canComplete && (role !== "Crew Lead" || assignedCrew?.crew_lead_id === employeeId);
+  const canSupervisorComplete = canComplete && (role !== "Crew Lead" || assignedToJob);
   const canUsePersonalTimeClock = canClock && Boolean(employeeId && job.assigned_crew_id && assignedToJob);
   const canManagementStart = canManageJobLifecycle && Boolean(job.assigned_crew_id) && ["Scheduled", "Crew Assigned"].includes(job.status);
   const showLifecycle = ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status)
     && (canManagementStart || canUsePersonalTimeClock || (job.status === "In Progress" && canSupervisorComplete));
   function clockOutMessage(result: unknown) {
     const value = result as JobClockOutResult;
-    if (value.jobCompleted) return "Your time was recorded and the Job was completed.";
-    if (value.remainingActiveWorkers > 0) return `Your time was recorded. ${value.remainingActiveWorkers} worker${value.remainingActiveWorkers === 1 ? " remains" : "s remain"} clocked in.`;
-    if (value.completionPending) return "Your time has been recorded. A supervisor must complete this Job.";
-    return "Your time was recorded.";
+    if (value.remainingActiveWorkers > 0) return `Your Job time was recorded. ${value.remainingActiveWorkers} worker${value.remainingActiveWorkers === 1 ? " remains" : "s remain"} on Job.`;
+    if (value.completionPending) return "Your Job time was recorded. The Job remains In Progress until an authorized supervisor selects END JOB.";
+    return "Your Job time was recorded.";
   }
   return (
     <Modal title={job.job_number} close={close}>
@@ -576,7 +574,7 @@ function JobModal({
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
-      {showLifecycle && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>{clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}{canManagementStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => startOperationalJob(job.id), "Job started. No employee time entry was created.")}>START JOB</button>}{canUsePersonalTimeClock && !clockError && (clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">Active since {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>{clock.activeWorkerCount > 1 ? "END MY WORK" : "END JOB"}</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You joined the Job and are now active." : "Your work started. You are now active.")}>{job.status === "In Progress" ? "JOIN JOB" : canManageJobLifecycle ? "START MY WORK" : "START WORK"}</button>)}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Active workers currently visible: {clock.activeWorkerCount}</p>}{job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job completed by supervisor.")} className={`${primary} mt-3`}>COMPLETE JOB</button>}</section>}
+      {showLifecycle && <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4"><h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>{clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}{canManagementStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => startOperationalJob(job.id), "Job started. No employee time entry was created.")}>START JOB</button>}{canUsePersonalTimeClock && !clockError && (clock?.clockedIn ? <><p className="mt-2 text-sm text-neutral-700">On Job since {clock.clockedInAt ? new Date(clock.clockedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</p><button disabled={busy} className={`${primary} mt-3`} onClick={() => mutate(() => finishJobAndClockOut(job.id, 0), clockOutMessage)}>END MY JOB WORK</button></> : <button disabled={busy || clock === null} className={`${primary} mt-3`} onClick={() => mutate(() => startOrClockInToJob(job.id), job.status === "In Progress" ? "You joined the Job." : "Your Job participation started.")}>{job.status === "In Progress" ? "JOIN JOB" : "START JOB WORK"}</button>)}{job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Crew members currently on Job: {clock.activeWorkerCount}</p>}{job.status === "In Progress" && canSupervisorComplete && clock && clock.activeWorkerCount > 0 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">{clock.activeWorkerCount} crew {clock.activeWorkerCount === 1 ? "member is" : "members are"} still on Job</p>}{job.status === "In Progress" && canSupervisorComplete && clock?.activeWorkerCount === 0 && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} mt-3`}>END JOB</button>}</section>}
       <div className="mt-6 flex flex-wrap gap-2">
         <ContractServiceRecordAction jobId={job.id} />
         {canEdit && nextStatuses(job.status).filter((next) => next !== "In Progress" && next !== "Completed").map((x) => (
@@ -754,7 +752,8 @@ function money(v: number) {
 }
 function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
 function isEmployeeAssigned(crews: CrewWithRelations[], employeeId: string | null, crewId: string | null) { if (!employeeId || !crewId) return false; const crew = crews.find((candidate) => candidate.id === crewId); return crew?.crew_lead_id === employeeId || crew?.members.some((member) => member.employee_id === employeeId) === true; }
-function cardClockOutMessage(result: unknown) { const value = result as JobClockOutResult; if (value.jobCompleted) return "Work time recorded. Job completed."; if (value.remainingActiveWorkers > 0) return `Work time recorded. ${value.remainingActiveWorkers} worker${value.remainingActiveWorkers === 1 ? " remains" : "s remain"} active.`; if (value.completionPending) return "Work time recorded. Supervisor completion required."; return "Work time recorded."; }
+function cardClockOutMessage(result: unknown) { const value = result as JobClockOutResult; if (value.remainingActiveWorkers > 0) return `Job time recorded. ${value.remainingActiveWorkers} worker${value.remainingActiveWorkers === 1 ? " remains" : "s remain"} on Job.`; if (value.completionPending) return "Job time recorded. An authorized supervisor may now END JOB."; return "Job time recorded."; }
+function displayTime(value: string) { return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 function message(x: unknown, f: string) {
   if (x instanceof Error) return x.message;
   if (x && typeof x === "object" && "message" in x && typeof x.message === "string") return x.message;

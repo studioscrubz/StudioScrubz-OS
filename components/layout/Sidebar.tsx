@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
 import { getAttentionSummary } from "@/lib/services/attention";
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
+import { WorkClockControl } from "@/components/time/WorkClockControl";
 
 type NavLink = { label: string; href: string; marker: string; permission: Permission };
 type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
@@ -160,6 +161,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
       <div className="border-t border-white/10 p-3">
         {signOutError && <p role="alert" className="mb-2 rounded-lg bg-red-950/40 px-3 py-2 text-xs text-red-100">{signOutError}</p>}
         <div className="mb-2 px-3 text-xs text-white/65"><p className="font-bold text-white">{auth.profile?.display_name || auth.profile?.email || "StudioScrubz User"}</p><p>{auth.profile?.role}</p></div>
+        <WorkClockControl employeeId={auth.profile?.employee_id ?? null} />
         <button type="button" onClick={() => { setSignOutError(null); void auth.signOut().then(() => router.replace("/login")).catch((error: unknown) => { console.error("Sign out failed", error); setSignOutError(error instanceof Error ? error.message : "Sign out failed. Please try again."); }); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-white/65 transition hover:bg-white/[.07] hover:text-white">
           <NavMarker value="↗" />
           Sign Out

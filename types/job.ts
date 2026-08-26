@@ -56,6 +56,8 @@ export type Job = {
   access_instructions: string | null;
   internal_notes: string | null;
   completed_at: string | null;
+  operational_started_at: string | null;
+  operational_ended_at: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -68,10 +70,14 @@ export type JobInsert = Omit<
   | "updated_at"
   | "archived_at"
   | "service_occurrence_id"
+  | "operational_started_at"
+  | "operational_ended_at"
 > & {
   job_number?: string;
   archived_at?: string | null;
   service_occurrence_id?: string | null;
+  operational_started_at?: string | null;
+  operational_ended_at?: string | null;
 };
 export type JobUpdate = Partial<
   Omit<Job, "id" | "job_number" | "proposal_id" | "created_at" | "updated_at">
@@ -122,12 +128,12 @@ export type JobClockInResult = {
 };
 export type JobClockOutResult = {
   jobId: string;
-  jobStatus: "In Progress" | "Completed";
+  jobStatus: "In Progress";
   clockedIn: false;
   clockedOutAt: string;
   timeEntryId: string;
   remainingActiveWorkers: number;
-  jobCompleted: boolean;
+  jobCompleted: false;
   completionPending: boolean;
 };
 export type CrewConflict = Pick<

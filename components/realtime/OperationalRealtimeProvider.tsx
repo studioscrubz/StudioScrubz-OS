@@ -9,7 +9,7 @@ export const OPERATIONAL_TABLES = [
   "invoices", "attention_item_states", "client_communications", "service_occurrences",
   "invoice_job_photos",
   "service_agreement_documents",
-  "payments", "expenses", "time_entries", "clients", "properties", "crews", "employees",
+  "payments", "expenses", "time_entries", "employee_work_sessions", "clients", "properties", "crews", "employees",
   "services", "service_addons", "service_addon_links", "service_price_tiers",
   "recurring_pricing_rules",
 ] as const;

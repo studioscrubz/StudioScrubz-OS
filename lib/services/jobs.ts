@@ -31,39 +31,18 @@ export function isJobCompletionResult(value: unknown): value is JobCompletionRes
 
 const select =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
-const workflowStatuses: Exclude<JobStatus, "Archived">[] = [
-  "Ready to Schedule",
-  "Scheduled",
-  "Crew Assigned",
-  "In Progress",
-  "Completed",
-  "Cancelled",
-];
 export async function getJobs(): Promise<JobWithRelations[]> {
   if (!(await master())) {
-    const [{ data, error }, activeInvoices] = await Promise.all([
-      getSupabaseClient().rpc("get_operational_jobs", {}),
-      getSupabaseClient().from("invoices").select("job_id").is("archived_at", null).neq("status", "Cancelled"),
-    ]);
+    const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
     if (error) throw error;
-    if (activeInvoices.error) throw activeInvoices.error;
-    const invoicedJobIds = new Set((activeInvoices.data ?? []).map((invoice) => invoice.job_id).filter(Boolean));
-    return data.map(operationalJob).filter((job) =>
-      !job.archived_at
-      && job.status !== "Archived"
-      && (job.status !== "Completed" || !invoicedJobIds.has(job.id))
-    );
+    return data.map(operationalJob);
   }
-  const [jobsResult, activeInvoices] = await Promise.all([
-    getSupabaseClient().from("jobs").select(select).is("archived_at", null).in("status", workflowStatuses).order("created_at", { ascending: false }),
-    getSupabaseClient().from("invoices").select("job_id").is("archived_at", null).neq("status", "Cancelled"),
-  ]);
+  const { data: ids, error: idsError } = await getSupabaseClient().rpc("get_operational_job_ids", {});
+  if (idsError) throw idsError;
+  if (!ids.length) return [];
+  const jobsResult = await getSupabaseClient().from("jobs").select(select).in("id", ids).order("created_at", { ascending: false });
   if (jobsResult.error) throw jobsResult.error;
-  if (activeInvoices.error) throw activeInvoices.error;
-  const invoicedJobIds = new Set((activeInvoices.data ?? []).map((invoice) => invoice.job_id).filter(Boolean));
-  return (jobsResult.data as JobWithRelations[]).filter((job) =>
-    job.status !== "Completed" || !invoicedJobIds.has(job.id)
-  );
+  return jobsResult.data as JobWithRelations[];
 }
 export async function getJobsForDateRange(
   start: string,
@@ -74,12 +53,13 @@ export async function getJobsForDateRange(
     if (error) throw error;
     return data.map(operationalJob).filter((job) => !job.archived_at && job.status !== "Archived").sort((a,b)=>(a.scheduled_date??"").localeCompare(b.scheduled_date??"")||(a.start_time??"").localeCompare(b.start_time??""));
   }
+  const { data: ids, error: idsError } = await getSupabaseClient().rpc("get_operational_job_ids", { p_start: start, p_end: end });
+  if (idsError) throw idsError;
+  if (!ids.length) return [];
   const { data, error } = await getSupabaseClient()
     .from("jobs")
     .select(select)
-    .is("archived_at", null)
-    .gte("scheduled_date", start)
-    .lte("scheduled_date", end)
+    .in("id", ids)
     .order("scheduled_date")
     .order("start_time");
   if (error) throw error;
@@ -376,10 +356,7 @@ export async function startOperationalJob(id: string): Promise<JobWithRelations>
 export async function finishJobAndClockOut(id: string, breakMinutes = 0): Promise<JobClockOutResult> {
   const { data, error } = await getSupabaseClient().rpc("finish_job_and_clock_out", { p_job_id: id, p_break_minutes: breakMinutes });
   if (error) throw new Error(safeDatabaseMessage(error, "Job clock-out failed."));
-  const result = data as JobClockOutResult;
-  if (!result.jobCompleted) return result;
-  const job = await getJobById(id);
-  return { ...result, ...await createCompletedJobInvoice(job) };
+  return data as JobClockOutResult;
 }
 export async function completeInProgressJob(id: string): Promise<JobCompletionResult> {
   const { data, error } = await getSupabaseClient().rpc("complete_in_progress_job", { p_job_id: id });

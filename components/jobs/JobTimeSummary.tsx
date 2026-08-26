@@ -10,7 +10,7 @@ import type { TimeEntryWithRelations } from "@/types/timeEntry";
 export function JobTimeSummary({ job }: { job: JobWithRelations }) {
   const [entries, setEntries] = useState<TimeEntryWithRelations[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const now = useCurrentTime(entries.some(isOpen));
+  const now = useCurrentTime(job.status === "In Progress" || entries.some(isOpen));
   const load = useCallback(async () => {
     try {
       setEntries((await getTimeEntriesForJob(job.id)).filter(isJobTime));
@@ -36,8 +36,14 @@ export function JobTimeSummary({ job }: { job: JobWithRelations }) {
   );
   const open = ordered.filter(isOpen);
   const completed = ordered.filter((entry) => !isOpen(entry) && ["Completed", "Approved"].includes(entry.status));
-  const startedAt = ordered[0]?.clock_in ?? null;
-  const jobEnd = job.completed_at;
+  const startedAt = job.operational_started_at;
+  const jobEnd = job.operational_ended_at;
+  const durationLabel = job.status === "In Progress" ? "Elapsed" : "Actual Job Duration";
+  const jobDuration = startedAt && jobEnd
+    ? duration(Date.parse(jobEnd) - Date.parse(startedAt))
+    : startedAt && job.status === "In Progress" && now !== null
+      ? duration(now - Date.parse(startedAt))
+      : "—";
   const totalLaborHours = completed.reduce((sum, entry) => sum + Number(entry.total_hours || 0), 0);
 
   return (
@@ -51,9 +57,9 @@ export function JobTimeSummary({ job }: { job: JobWithRelations }) {
       </div>
       {error ? <p role="alert" className="mt-3 text-sm font-bold text-red-700">{error}</p> : <>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric label="Job Started" value={startedAt ? displayDateTime(startedAt) : "Not started"} />
-          <Metric label="Job Ended" value={jobEnd ? displayDateTime(jobEnd) : job.status === "In Progress" ? "In progress" : "—"} />
-          <Metric label={jobEnd ? "Actual Job Duration" : "Elapsed"} value={startedAt ? duration(Date.parse(jobEnd ?? new Date(now ?? Date.parse(startedAt)).toISOString()) - Date.parse(startedAt)) : "—"} />
+          <Metric label="Job Started" value={startedAt ? displayDateTime(startedAt) : "Unavailable"} />
+          <Metric label="Job Ended" value={jobEnd ? displayDateTime(jobEnd) : job.status === "In Progress" ? "In progress" : "Unavailable"} />
+          <Metric label={durationLabel} value={jobDuration} />
           <Metric label="Total Labor" value={formatHours(totalLaborHours)} />
         </div>
         {open.length > 0 && <><h4 className="mt-5 font-bold text-[#143d1a]">Active Crew</h4><div className="mt-2 grid gap-2">{open.map((entry) => <CrewRow key={entry.id} entry={entry} now={now ?? Date.parse(entry.clock_in)} active />)}</div></>}
@@ -68,7 +74,7 @@ function CrewRow({ entry, now, active = false }: { entry: TimeEntryWithRelations
   const elapsed = active
     ? duration(now - Date.parse(entry.clock_in))
     : formatHours(Number(entry.total_hours || 0));
-  return <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-50 p-3 text-sm"><div><b>{employeeName(entry.employee)}</b><p className="text-xs text-neutral-500">{active ? `Clocked in ${displayTime(entry.clock_in)}` : `${displayTime(entry.clock_in)} – ${entry.clock_out ? displayTime(entry.clock_out) : "—"}`}</p></div><span className={active ? "font-extrabold text-green-700" : "font-bold text-neutral-700"}>{active ? "Active · " : "Completed · "}{elapsed}</span></div>;
+  return <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-50 p-3 text-sm"><div><b>{employeeName(entry.employee)}</b><p className="text-xs text-neutral-500">{active ? `Joined ${displayTime(entry.clock_in)}` : `${displayTime(entry.clock_in)} – ${entry.clock_out ? displayTime(entry.clock_out) : "—"}`}</p></div><span className={active ? "font-extrabold text-green-700" : "font-bold text-neutral-700"}>{active ? "On Job · " : "Completed · "}{elapsed}</span></div>;
 }
 function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-lg bg-neutral-50 p-3"><p className="text-xs text-neutral-500">{label}</p><b className="mt-1 block">{value}</b></div>; }
 function isJobTime(entry: TimeEntryWithRelations) { return !entry.archived_at && entry.entry_type === "Job"; }
