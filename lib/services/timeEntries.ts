@@ -41,16 +41,11 @@ export async function getOpenTimeEntries() {
   return data as TimeEntryWithRelations[];
 }
 export async function getOperationalActiveTimeEntries(): Promise<OperationalActiveTimeEntry[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("time_entries_operational_safe")
-    .select("id,employee_id,employee_name,clock_in,job_id,job_number")
-    .eq("status", "Open")
-    .is("clock_out", null)
-    .is("archived_at", null)
-    .order("clock_in");
+  const { data, error } = await getSupabaseClient().rpc("get_operational_time_entries");
   if (error) throw error;
-  return data
-    .filter((entry) => Boolean(entry.employee_id))
+  return (data ?? [])
+    .filter((entry) => entry.status === "Open" && !entry.clock_out && !entry.archived_at && Boolean(entry.employee_id))
+    .sort((a, b) => Date.parse(a.clock_in) - Date.parse(b.clock_in))
     .map((entry) => ({
       id: entry.id,
       employee_id: entry.employee_id as string,

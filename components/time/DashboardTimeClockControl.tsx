@@ -1,23 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { clockInCurrentEmployeeGeneral, clockOutCurrentEmployeeGeneral } from "@/lib/services/timeEntries";
+import { useCallback, useEffect, useState } from "react";
+import { clockInCurrentEmployeeGeneral, clockOutCurrentEmployeeGeneral, getOperationalActiveTimeEntries } from "@/lib/services/timeEntries";
 import type { OperationalActiveTimeEntry } from "@/types/timeEntry";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 export function DashboardTimeClockControl({
   employeeId,
-  activeEntry,
-  refresh,
 }: {
   employeeId: string | null;
-  activeEntry: OperationalActiveTimeEntry | null;
-  refresh: () => Promise<void>;
 }) {
+  const [activeEntry, setActiveEntry] = useState<OperationalActiveTimeEntry | null>(null);
+  const [loading, setLoading] = useState(Boolean(employeeId));
   const [busy, setBusy] = useState(false);
   const [breakMinutes, setBreakMinutes] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const now = useCurrentTime(Boolean(activeEntry));
+
+  const load = useCallback(async () => {
+    if (!employeeId) {
+      setActiveEntry(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const entries = await getOperationalActiveTimeEntries();
+      setActiveEntry(entries.find((entry) => entry.employee_id === employeeId) ?? null);
+      setError(null);
+    } catch (cause) {
+      console.error("Personal time clock load failed", cause);
+      setActiveEntry(null);
+      setError("Time clock unavailable. Refresh or try again shortly.");
+    } finally {
+      setLoading(false);
+    }
+  }, [employeeId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [load]);
+  useOperationalRealtime(["time_entries"], load);
 
   if (!employeeId) return null;
 
@@ -26,7 +54,7 @@ export function DashboardTimeClockControl({
     setError(null);
     try {
       await clockInCurrentEmployeeGeneral();
-      await refresh();
+      await load();
     } catch (cause) {
       setError(message(cause, "Clock-in failed. Please try again."));
     } finally {
@@ -45,7 +73,7 @@ export function DashboardTimeClockControl({
     setError(null);
     try {
       await clockOutCurrentEmployeeGeneral(activeEntry.id, minutes);
-      await refresh();
+      await load();
       setBreakMinutes("0");
     } catch (cause) {
       setError(message(cause, "Clock-out failed. Please try again."));
@@ -58,7 +86,9 @@ export function DashboardTimeClockControl({
     <section className="mt-6 rounded-2xl border border-[#143d1a]/15 bg-[#f6f8f5] p-5 shadow-sm">
       <h2 className="text-xs font-extrabold uppercase tracking-[.14em] text-[#143d1a]">My Time</h2>
       {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
-      {!activeEntry ? (
+      {loading ? (
+        <p className="mt-3 text-sm text-neutral-500">Loading time clock...</p>
+      ) : error && !activeEntry ? null : !activeEntry ? (
         <button type="button" disabled={busy} onClick={() => void clockIn()} className="mt-4 min-h-12 w-full rounded-xl bg-[#143d1a] px-5 py-3 font-extrabold text-white disabled:cursor-wait disabled:opacity-60 sm:w-auto">
           {busy ? "CLOCKING IN…" : "CLOCK IN"}
         </button>

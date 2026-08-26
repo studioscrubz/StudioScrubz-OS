@@ -9,13 +9,12 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, permissionForPath, type Permission } from "@/lib/auth/permissions";
 import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
-import { ActiveStaffPanel } from "@/components/time/ActiveStaffPanel";
 import { DashboardTimeClockControl } from "@/components/time/DashboardTimeClockControl";
+import { DashboardActiveEmployeesMonitor } from "@/components/time/DashboardActiveEmployeesMonitor";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showActive, setShowActive] = useState(false);
   async function load() {
     setError(null);
     try {
@@ -27,7 +26,7 @@ export function DashboardPage() {
       );
     }
   }
-  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees", "time_entries"]);
+  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees"]);
   useEffect(() => {
     let active = true;
     void getDashboardData()
@@ -54,7 +53,6 @@ export function DashboardPage() {
     { label: "Open Estimates", value: data.metrics.openEstimates, permission: "estimates.view" },
     { label: "Pending Proposals", value: data.metrics.pendingProposals, permission: "proposals.view" },
     { label: "Past Due Invoices", value: data.metrics.pastDueInvoices, permission: "invoices.view" },
-    { label: "ACTIVE Employees", value: data.metrics.employeesClockedIn, permission: "timeClock.view" },
   ] : [];
   return (
     <>
@@ -70,26 +68,20 @@ export function DashboardPage() {
           </button>
         </div>
       )}
+      <DashboardTimeClockControl employeeId={profile?.employee_id ?? null} />
+      <DashboardActiveEmployeesMonitor />
       {data && (
         <>
-          <DashboardTimeClockControl
-            employeeId={profile?.employee_id ?? null}
-            activeEntry={data.activeEmployees.find((entry) => entry.employee_id === profile?.employee_id) ?? null}
-            refresh={load}
-          />
           <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
             {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
               <Metric
                 key={kpi.label}
                 label={kpi.label}
                 value={kpi.value}
-                active={kpi.label === "ACTIVE Employees" ? showActive : undefined}
-                onClick={kpi.label === "ACTIVE Employees" ? () => setShowActive((current) => !current) : undefined}
               />
             ))}
           </section>
           {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
-          {showActive && hasPermission(profile, "timeClock.view") && <ActiveStaffPanel entries={data.activeEmployees} />}
           {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
