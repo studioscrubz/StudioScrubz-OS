@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactBand, EstimateCta, FeatureList, SectionHeading, ServiceGrid } from "@/components/site/SiteSections";
+import { ProjectResults } from "@/components/site/ProjectResults";
 
 export const metadata: Metadata = {
   title: { absolute: "StudioScrubz | Residential & Commercial Cleaning" },
@@ -36,6 +37,8 @@ export default function MarketingHome() {
     </section>
 
     <section id="services" className="scroll-mt-24 bg-[#f1f4ee] px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="What we clean" title="Cleaning support for every kind of space." copy="From recurring home upkeep to commercial care and detailed project cleanup, every service starts with a clear understanding of your space."/><ServiceGrid/></div></section>
+
+    <ProjectResults />
 
     <section className="px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2">
       <article className="flex flex-col rounded-[2rem] bg-[#143d1a] p-8 text-white sm:p-12"><p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e5cd7d]">Commercial cleaning</p><h2 className="mt-4 text-4xl font-extrabold tracking-[-.045em]">A reliable partner for properties and workplaces.</h2><p className="mt-5 flex-1 leading-7 text-white/70">Recurring janitorial service, office cleaning, apartment common areas, unit turns, studios, salons, gyms, commercial facilities, and post-construction projects—all scoped around the real property.</p><div className="mt-8 flex flex-wrap items-center gap-5"><Link href="/commercial" className="font-extrabold text-[#e5cd7d]">Explore Commercial →</Link><EstimateCta label="Schedule a Walkthrough" className="bg-[#d4af37] text-[#143d1a] hover:bg-[#e5cd7d]"/></div></article>
