@@ -1,7 +1,7 @@
 import { getSquarePayment, getSquarePaymentAmounts, verifySquareWebhookSignature } from "@/lib/square";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-type SquareWebhook = { type?: string; data?: { object?: { payment?: { id?: string } } } };
+type SquareWebhook = { type?: string; data?: { object?: { payment?: { id?: string; order_id?: string } } } };
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -9,14 +9,17 @@ export async function POST(request: Request) {
   try {
     const event = JSON.parse(rawBody) as SquareWebhook;
     if (!["payment.created", "payment.updated"].includes(event.type || "")) return Response.json({ received: true, ignored: true });
-    const paymentId = event.data?.object?.payment?.id;
+    const webhookPayment = event.data?.object?.payment;
+    const paymentId = webhookPayment?.id;
     if (!paymentId) return Response.json({ error: "Square Payment ID is missing." }, { status: 400 });
-    const payment = await getSquarePayment(paymentId);
-    if (!payment.id || !payment.order_id) return Response.json({ error: "Square Payment details are invalid." }, { status: 400 });
+    const orderId = webhookPayment?.order_id;
+    if (!orderId) return Response.json({ error: "Square Order ID is missing." }, { status: 400 });
     const admin = createSupabaseAdminClient();
-    const { data: attempt, error: attemptError } = await admin.from("square_checkout_attempts").select("id").eq("square_order_id", payment.order_id).maybeSingle();
+    const { data: attempt, error: attemptError } = await admin.from("square_checkout_attempts").select("id").eq("square_order_id", orderId).maybeSingle();
     if (attemptError) throw attemptError;
-    if (!attempt) return Response.json({ received: true, ignored: true });
+    if (!attempt) return Response.json({ received: true, ignored: true, reason: "Unknown Square order" });
+    const payment = await getSquarePayment(paymentId);
+    if (!payment.id || !payment.order_id || payment.order_id !== orderId) return Response.json({ error: "Square Payment details are invalid." }, { status: 400 });
     if (payment.status !== "COMPLETED") {
       if (["FAILED", "CANCELED"].includes(payment.status || "")) await admin.from("square_checkout_attempts").update({ status: payment.status === "CANCELED" ? "Cancelled" : "Failed", updated_at: new Date().toISOString() }).eq("id", attempt.id);
       return Response.json({ received: true, ignored: true, status: payment.status });
