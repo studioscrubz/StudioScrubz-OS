@@ -23,6 +23,7 @@ export async function updateSession(request: NextRequest) {
   const { data, error } = await supabase.auth.getClaims();
   const isLogin = request.nextUrl.pathname === "/login";
   const isPublicDocument = request.nextUrl.pathname === "/request-estimate"
+    || request.nextUrl.pathname === "/api/webhooks/square"
     || request.nextUrl.pathname.startsWith("/api/public/request-estimate")
     || request.nextUrl.pathname.startsWith("/api/public/invoices/")
     || ["/agreement/", "/estimate/", "/invoice/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
