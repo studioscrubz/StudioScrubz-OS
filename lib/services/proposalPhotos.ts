@@ -86,6 +86,7 @@ function normalizeProposalPricingPhotos(value: unknown): ProposalPricingPhoto[] 
       ...(typeof item.caption === "string" || item.caption === null ? { caption: item.caption as string | null } : {}),
       ...(item.source === "camera" || item.source === "library" ? { source: item.source } : {}),
       ...(item.ownership === "walkthrough-reference" || item.ownership === "proposal" ? { ownership: item.ownership } : {}),
+      customerVisible: item.customerVisible === true,
     }];
   });
 }

@@ -18,10 +18,11 @@ export type OperationalPhoto = {
   uploadedBy: string;
   caption: string | null;
   source: "camera" | "library";
+  customerVisible: boolean;
 };
 
 export type OperationalPhotoWithUrl = OperationalPhoto & { signedUrl: string | null };
-export type PendingOperationalPhoto = { id: string; file: File; category: OperationalPhotoCategory; caption: string; source: "camera" | "library" };
+export type PendingOperationalPhoto = { id: string; file: File; category: OperationalPhotoCategory; caption: string; source: "camera" | "library"; customerVisible: boolean };
 
 export type InvoiceJobPhoto = {
   id: string;
@@ -29,7 +30,7 @@ export type InvoiceJobPhoto = {
   job_id: string;
   job_photo_id: string;
   storage_path: string;
-  category: "After";
+  category: OperationalPhotoCategory | "Pricing";
   original_filename: string;
   mime_type: string;
   size_bytes: number;

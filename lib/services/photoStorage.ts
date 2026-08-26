@@ -25,7 +25,7 @@ export async function createPhotoSignedUrls(photos: OperationalPhoto[]): Promise
   return photos.map((photo, index) => ({ ...photo, signedUrl: data[index]?.signedUrl ?? null }));
 }
 
-export async function uploadOperationalPhoto(input: { recordType: OperationalPhotoRecordType; recordId: string; category: OperationalPhotoCategory; caption: string | null; source: "camera" | "library"; file: File }): Promise<OperationalPhoto[]> {
+export async function uploadOperationalPhoto(input: { recordType: OperationalPhotoRecordType; recordId: string; category: OperationalPhotoCategory; caption: string | null; source: "camera" | "library"; customerVisible: boolean; file: File }): Promise<OperationalPhoto[]> {
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("An internet connection is required to upload photos.");
   assertSavedRecordId(input.recordId);
   validateOperationalPhoto(input.file);
@@ -35,7 +35,7 @@ export async function uploadOperationalPhoto(input: { recordType: OperationalPho
   const extension = operationalPhotoExtension(file);
   const categoryFolder = input.recordType === "jobs" ? jobFolder(input.category) : null;
   const storagePath = [input.recordType, input.recordId, categoryFolder, `${id}.${extension}`].filter(Boolean).join("/");
-  const photo: OperationalPhoto = { id, storagePath, category: input.category, originalFilename: input.file.name, mimeType: file.type, sizeBytes: file.size, uploadedAt: new Date().toISOString(), uploadedBy: user, caption: input.caption?.trim() || null, source: input.source };
+  const photo: OperationalPhoto = { id, storagePath, category: input.category, originalFilename: input.file.name, mimeType: file.type, sizeBytes: file.size, uploadedAt: new Date().toISOString(), uploadedBy: user, caption: input.caption?.trim() || null, source: input.source, customerVisible: input.customerVisible };
   const storage = getSupabaseClient().storage.from(OPERATIONAL_PHOTO_BUCKET);
   const { error: uploadError } = await storage.upload(storagePath, file, { contentType: file.type, upsert: false, cacheControl: "3600" });
   if (uploadError) { console.error("Operational photo Storage upload failed", { bucket: OPERATIONAL_PHOTO_BUCKET, recordType: input.recordType, recordId: input.recordId, category: input.category, storagePath, message: uploadError.message }); throw new Error(uploadError.message || "Photo upload failed."); }
@@ -72,6 +72,11 @@ export async function updateOperationalPhotoCaption(recordType: OperationalPhoto
   return next;
 }
 
+export async function updateOperationalPhotoVisibility(recordType: OperationalPhotoRecordType, recordId: string, currentPhotos: OperationalPhoto[], photoId: string, customerVisible: boolean): Promise<OperationalPhoto[]> {
+  const next = currentPhotos.map((photo) => photo.id === photoId ? { ...photo, customerVisible } : photo);
+  return saveMetadata(recordType, recordId, next);
+}
+
 export async function deleteOperationalPhoto(recordType: OperationalPhotoRecordType, recordId: string, currentPhotos: OperationalPhoto[], photo: OperationalPhoto): Promise<OperationalPhoto[]> {
   const next = currentPhotos.filter((item) => item.id !== photo.id);
   await saveMetadata(recordType, recordId, next);
@@ -104,6 +109,11 @@ export function operationalPhotoExtension(file: File) { return file.type === "im
 function assertSavedRecordId(recordId: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recordId)) throw new Error("Save this record before uploading photos."); }
 function jobFolder(category: OperationalPhotoCategory) { return category === "Before" ? "before" : category === "After" ? "after" : category === "Damage / Issue" ? "damage" : "other"; }
 
+export function defaultOperationalPhotoCustomerVisibility(recordType: OperationalPhotoRecordType, category: OperationalPhotoCategory) {
+  if (recordType === "walkthroughs") return true;
+  return category !== "Other";
+}
+
 export async function prepareOperationalPhoto(file: File): Promise<File> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size < 1_500_000) return file;
   const bitmap = await createImageBitmap(file);
@@ -119,7 +129,7 @@ export async function prepareOperationalPhoto(file: File): Promise<File> {
 
 function normalizePhotos(value: unknown): OperationalPhoto[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is OperationalPhoto => Boolean(item && typeof item === "object" && typeof (item as OperationalPhoto).id === "string" && typeof (item as OperationalPhoto).storagePath === "string")).map((photo) => ({ ...photo, source: photo.source === "camera" ? "camera" : "library" }));
+  return value.filter((item): item is OperationalPhoto => Boolean(item && typeof item === "object" && typeof (item as OperationalPhoto).id === "string" && typeof (item as OperationalPhoto).storagePath === "string")).map((photo) => ({ ...photo, source: photo.source === "camera" ? "camera" : "library", customerVisible: photo.customerVisible === true }));
 }
 
 function message(error: unknown, fallback: string) { return error instanceof Error && error.message ? error.message : fallback; }
