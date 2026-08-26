@@ -1,8 +1,8 @@
 export const ATTENTION_SEVERITIES = ["Info", "Attention", "Urgent"] as const;
-export const ATTENTION_CATEGORIES = ["Jobs", "Walkthroughs", "Proposals", "Agreements", "Invoices", "Communications", "Time"] as const;
+export const ATTENTION_CATEGORIES = ["Estimates", "Jobs", "Walkthroughs", "Proposals", "Agreements", "Invoices", "Communications", "Time"] as const;
 export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
 export type AttentionCategory = (typeof ATTENTION_CATEGORIES)[number];
-export type AttentionType = "Unscheduled Job" | "Job Needs Crew" | "Upcoming Job" | "Completed Job Needs Invoice" | "Walkthrough Requested" | "Service Reminder Due" | "Proposal Awaiting Approval" | "Proposal Awaiting Client" | "Accepted Proposal Needs Routing" | "Agreement Awaiting Signature" | "Agreement Accepted Not Active" | "Agreement Expiring" | "Invoice Due Soon" | "Overdue Invoice" | "Failed Client Communication" | "Open Time Entry";
+export type AttentionType = "New Estimate Request" | "Unscheduled Job" | "Job Needs Crew" | "Upcoming Job" | "Completed Job Needs Invoice" | "Walkthrough Requested" | "Service Reminder Due" | "Proposal Awaiting Approval" | "Proposal Awaiting Client" | "Accepted Proposal Needs Routing" | "Agreement Awaiting Signature" | "Agreement Accepted Not Active" | "Agreement Expiring" | "Invoice Due Soon" | "Overdue Invoice" | "Failed Client Communication" | "Open Time Entry";
 export type AttentionState = "Snoozed" | "Dismissed";
 export type AttentionView = "Active" | "Snoozed" | "Dismissed" | "All";
 export type AttentionStateRecord = { id: string; user_id: string; attention_key: string; state: AttentionState; snoozed_until: string | null; dismissed_at: string | null; created_at: string; updated_at: string };

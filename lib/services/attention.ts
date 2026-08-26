@@ -8,6 +8,7 @@ import { getAllClientCommunications } from "@/lib/services/clientCommunications"
 import { getOpenTimeEntries } from "@/lib/services/timeEntries";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
 import { getWalkthroughs } from "@/lib/services/walkthroughs";
+import { getEstimates } from "@/lib/services/estimates";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { AttentionItem, AttentionStateRecord, AttentionSummary, AttentionView } from "@/types/attention";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
@@ -15,6 +16,7 @@ import type { CommunicationComposerContext } from "@/types/clientCommunication";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 
 export const ATTENTION_REALTIME_TABLES = [
+  "estimates",
   "walkthroughs",
   "proposals",
   "service_agreements",
@@ -31,7 +33,8 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
   const canManageCommunications = hasPermission(profile, "communications.view") && hasPermission(profile, "communications.create");
-  const [jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings] = await Promise.all([
+  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings] = await Promise.all([
+    hasPermission(profile, "estimates.view") ? getEstimates() : Promise.resolve([]),
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
     hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
     hasPermission(profile, "proposals.view") ? getProposals() : Promise.resolve([]),
@@ -59,6 +62,22 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const contractJobIds=new Set((contractOccurrences??[]).filter(row=>{const type=(row.agreement as {billing_type:string}|null)?.billing_type;return Boolean(type&&type!=="Per Visit")}).map(row=>row.job_id).filter(Boolean));
   const routedProposalIds = new Set([...jobRouteIds, ...(agreementRoutes.data ?? []).map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(financiallyResolvedJobIds);
+
+  for (const estimate of estimates.filter((row) => !row.archived_at && row.result.submission?.source === "Customer Self-Service")) {
+    const submission = estimate.result.submission!;
+    const customer = estimate.division === "Commercial" && estimate.client?.company_name
+      ? estimate.client.company_name
+      : [estimate.customer_first_name, estimate.customer_last_name].filter(Boolean).join(" ") || "Customer";
+    const city = estimate.property?.city?.trim();
+    const context = [
+      `${customer} requested a ${estimate.division} estimate.`,
+      estimate.service_name || estimate.result.serviceName,
+      city,
+      `Prefers ${submission.preferredContactMethod}`,
+      `Submitted ${friendlyDate(submission.submittedAt.slice(0, 10))}`,
+    ].filter(Boolean).join(" · ");
+    items.push(item(`estimate:${estimate.id}:public-request`, "New Estimate Request", "Attention", "Estimates", "New Estimate Request", context, "Estimate", estimate.id, estimate.client_id, estimate.estimate_number, null, null, submission.submittedAt || estimate.created_at, `/open-estimates?estimateId=${estimate.id}`, "Open Estimate"));
+  }
 
   for (const walkthrough of walkthroughs.filter((row) => row.status === "New" && !row.walkthrough_date && !row.archived_at && row.measurements.requestSource === "Public Estimate")) {
     const requestedAt = walkthrough.measurements.requestedAt ?? walkthrough.created_at;
