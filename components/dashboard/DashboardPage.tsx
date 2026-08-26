@@ -10,6 +10,7 @@ import { hasPermission, permissionForPath, type Permission } from "@/lib/auth/pe
 import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryWidget";
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
 import { ActiveStaffPanel } from "@/components/time/ActiveStaffPanel";
+import { DashboardTimeClockControl } from "@/components/time/DashboardTimeClockControl";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -71,6 +72,11 @@ export function DashboardPage() {
       )}
       {data && (
         <>
+          <DashboardTimeClockControl
+            employeeId={profile?.employee_id ?? null}
+            activeEntry={data.activeEmployees.find((entry) => entry.employee_id === profile?.employee_id) ?? null}
+            refresh={load}
+          />
           <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
             {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
               <Metric
