@@ -97,11 +97,20 @@ type SentDocumentInput = {
   provider?: "mailto" | "device";
 };
 
+type PreparedDeviceSmsInput = {
+  id: string; number: string; clientId: string | null; propertyId: string | null;
+  recipientPhone: string; subject: string; messageBody: string; requestId: string;
+};
+
 export const recordEstimateSent = (input: SentDocumentInput) => recordDocumentSent("Estimate", "estimate_id", "estimate_number", input);
 export const recordProposalSent = (input: SentDocumentInput) => recordDocumentSent("Proposal", "proposal_id", "proposal_number", input);
 export const recordAgreementSent = (input: SentDocumentInput) => recordDocumentSent("Service Agreement", "agreement_id", "agreement_number", input);
 export const recordInvoiceSent = (input: SentDocumentInput) => recordDocumentSent("Invoice", "invoice_id", "invoice_number", input);
 export const recordPaymentReminderSent = (input: SentDocumentInput) => recordDocumentSent("Payment Reminder", "invoice_id", "invoice_number", input);
+export const recordEstimateSmsPrepared = (input: PreparedDeviceSmsInput) => recordDocumentSmsPrepared("Estimate", "estimate_id", "estimate_number", input);
+export const recordProposalSmsPrepared = (input: PreparedDeviceSmsInput) => recordDocumentSmsPrepared("Proposal", "proposal_id", "proposal_number", input);
+export const recordAgreementSmsPrepared = (input: PreparedDeviceSmsInput) => recordDocumentSmsPrepared("Service Agreement", "agreement_id", "agreement_number", input);
+export const recordInvoiceSmsPrepared = (input: PreparedDeviceSmsInput) => recordDocumentSmsPrepared("Invoice", "invoice_id", "invoice_number", input);
 
 export async function markCommunicationSent(id: string): Promise<ClientCommunication> {
   return updateDeliveryStatus(id, "Sent", null);
@@ -130,6 +139,16 @@ async function recordDocumentSent(type: "Estimate" | "Proposal" | "Service Agree
     communication_type: type, channel: input.channel ?? "Email", direction: "Outbound", status: "Sent", provider: input.provider ?? (input.channel === "SMS" ? "device" : "mailto"),
     recipient_email: input.recipientEmail, recipient_phone: input.recipientPhone ?? null, subject: input.subject, message_body: input.messageBody, sent_at: input.sentAt,
     metadata: { [numberKey]: input.number }, event_key: `${type.toLowerCase().replaceAll(" ", "-")}:${input.id}:sent:${input.sentAt}`,
+  });
+}
+
+async function recordDocumentSmsPrepared(type: "Estimate" | "Proposal" | "Service Agreement" | "Invoice", linkColumn: "estimate_id" | "proposal_id" | "agreement_id" | "invoice_id", numberKey: string, input: PreparedDeviceSmsInput) {
+  return createCommunicationOnce({
+    client_id: input.clientId, property_id: input.propertyId, [linkColumn]: input.id,
+    communication_type: type, channel: "SMS", direction: "Outbound", status: "Prepared", provider: "device",
+    recipient_phone: input.recipientPhone, subject: input.subject, message_body: input.messageBody,
+    metadata: { [numberKey]: input.number, device_handoff: true },
+    event_key: `device-sms:${type.toLowerCase().replaceAll(" ", "-")}:${input.id}:${input.requestId}`,
   });
 }
 

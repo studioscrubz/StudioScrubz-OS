@@ -250,7 +250,7 @@ async function transition(id: string, allowed: ServiceAgreement["status"][], sta
   return updateAgreement(id, { ...extra, status });
 }
 export async function markAgreementSent(id: string, sentTo: string, sentBy: string, token: string, tokenExpiresAt: string) {
-  if (!sentTo.trim()) throw new Error("A client email address is required.");
+  if (!sentTo.trim()) throw new Error("A client delivery recipient is required.");
   if (!token) throw new Error("A secure agreement access token is required.");
   return transition(id, ["Draft", "Sent"], "Sent", { sent_at: new Date().toISOString(), sent_to: sentTo.trim(), sent_by: sentBy.trim() || null, client_access_token: token, client_access_token_expires_at: tokenExpiresAt });
 }
