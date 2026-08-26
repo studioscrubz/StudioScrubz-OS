@@ -11,10 +11,13 @@ import { AttentionSummaryWidget } from "@/components/attention/AttentionSummaryW
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
 import { DashboardTimeClockControl } from "@/components/time/DashboardTimeClockControl";
 import { DashboardActiveEmployeesMonitor } from "@/components/time/DashboardActiveEmployeesMonitor";
+import { dismissAttentionItem } from "@/lib/services/attention";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attentionError, setAttentionError] = useState<string | null>(null);
+  const [dismissingAttention, setDismissingAttention] = useState<string | null>(null);
   async function load() {
     setError(null);
     try {
@@ -24,6 +27,19 @@ export function DashboardPage() {
       setError(
         x instanceof Error ? x.message : "Dashboard data could not be loaded.",
       );
+    }
+  }
+  async function dismissAttention(attentionKey: string) {
+    setDismissingAttention(attentionKey);
+    setAttentionError(null);
+    try {
+      await dismissAttentionItem(attentionKey);
+      await load();
+    } catch (cause) {
+      console.error("Dashboard Attention dismissal failed", cause);
+      setAttentionError("The message could not be dismissed. Please try again.");
+    } finally {
+      setDismissingAttention(null);
     }
   }
   useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees"]);
@@ -96,6 +112,7 @@ export function DashboardPage() {
           {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
           <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
             <Panel title="Attention Required">
+              {attentionError && <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{attentionError}</p>}
               {data.attention.length ? (
                 <div className="space-y-3">
                   {data.attention.filter((item) => hasPermission(profile, permissionForPath(item.href))).map((a) => (
@@ -108,7 +125,10 @@ export function DashboardPage() {
                         <p className="font-bold text-[#143d1a]">{a.record}</p>
                         <p className="text-sm text-neutral-600">{a.description}</p>
                       </div>
-                      <Link className={secondary} href={a.href}>{a.action}</Link>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" disabled={dismissingAttention === a.id} onClick={() => void dismissAttention(a.id)} aria-label={`Dismiss ${a.description}`} className={`${secondary} min-h-11 disabled:opacity-50`}>{dismissingAttention === a.id ? "Dismissing…" : "Dismiss"}</button>
+                        <Link className={`${secondary} inline-flex min-h-11 items-center`} href={a.href}>{a.action}</Link>
+                      </div>
                     </div>
                   ))}
                 </div>
