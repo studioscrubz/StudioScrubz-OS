@@ -13,7 +13,6 @@ import { canManageProposalPricingPhotos, hasPermission } from "@/lib/auth/permis
 import {
   ACCEPTANCE_METHODS,
   APPROVAL_STATUSES,
-  PROPOSAL_STATUSES,
   type ProposalAcceptanceMethod,
   type ProposalApprovalStatus,
   type ProposalHistory,
@@ -50,15 +49,23 @@ type Sort =
   | "Expiration Date"
   | "Price High to Low"
   | "Price Low to High";
-const columns: ProposalStatus[] = [
+const OPEN_PROPOSAL_STATUSES: ProposalStatus[] = [
   "Draft",
   "Ready for Approval",
   "Approved",
   "Sent",
+  "Viewed",
   "Accepted",
   "Declined",
   "Expired",
-  "Archived",
+];
+const workflowGroups: Array<{ title: string; description: string; statuses: ProposalStatus[] }> = [
+  { title: "Needs Work", description: "Draft proposals being prepared or revised.", statuses: ["Draft"] },
+  { title: "Waiting for Approval", description: "Submitted proposals awaiting an approval decision.", statuses: ["Ready for Approval"] },
+  { title: "Ready to Send", description: "Approved proposals ready for client delivery.", statuses: ["Approved"] },
+  { title: "Awaiting Client Action", description: "Delivered proposals awaiting acceptance or decline.", statuses: ["Sent", "Viewed"] },
+  { title: "Accepted — Handoff", description: "Accepted proposals awaiting Job or Service Agreement creation.", statuses: ["Accepted"] },
+  { title: "Attention Needed", description: "Declined or expired proposals requiring follow-up.", statuses: ["Declined", "Expired"] },
 ];
 export function OpenProposalsPage() {
   const { profile } = useAuth();
@@ -143,8 +150,7 @@ export function OpenProposalsPage() {
       window.removeEventListener(PROPOSAL_JOB_CREATED_EVENT, handleJobCreated);
   }, []);
   const visibleRows = useMemo(
-    () =>
-      rows.filter((p) => p.status !== "Accepted" || !jobProposalIds.has(p.id)),
+    () => rows.filter((p) => !p.archived_at && p.status !== "Archived" && (p.status !== "Accepted" || !jobProposalIds.has(p.id))),
     [jobProposalIds, rows],
   );
   const filtered = useMemo(
@@ -201,18 +207,13 @@ export function OpenProposalsPage() {
         <Summary l="Accepted" v={loading ? "—" : summary.accepted} />
         <Summary l="Expired" v={loading ? "—" : summary.expired} />
       </section>
-      <section className="mt-6 rounded-2xl border bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_170px_170px_180px_190px]">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search proposals"
-            className={input}
-          />
+      <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
+        <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_170px_150px_180px_190px]">
+          <label><span className="sr-only">Search proposals</span><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search proposals" className={input} /></label>
           <Filter
             v={status}
             set={(v) => setStatus(v as typeof status)}
-            opts={["All", ...PROPOSAL_STATUSES]}
+            opts={["All", ...OPEN_PROPOSAL_STATUSES]}
           />
           <Filter
             v={division}
@@ -238,11 +239,7 @@ export function OpenProposalsPage() {
             ]}
           />
         </div>
-      </section>
-      {loading ? (
-        <Loading />
-      ) : (
-        <Pipeline
+        {loading ? <Loading /> : <ProposalList
           rows={filtered}
           busy={busy}
           view={setView}
@@ -251,8 +248,8 @@ export function OpenProposalsPage() {
           history={(p) => void showHistory(p)}
           send={setSending}
           mutate={mutate}
-        />
-      )}{" "}
+        />}
+      </section>{" "}
       {view && <SharedProposalPreview p={view} close={() => setView(null)} />}{" "}
       {edit && (
         <EditModal
@@ -281,7 +278,7 @@ export function OpenProposalsPage() {
     </>
   );
 }
-function Pipeline({
+function ProposalList({
   rows,
   busy,
   view,
@@ -304,37 +301,17 @@ function Pipeline({
     text: string,
   ) => Promise<void>;
 }) {
-  return (
-    <div className="mt-6 overflow-x-auto pb-4">
-      <div className="grid min-w-[2100px] grid-cols-8 gap-4">
-        {columns.map((c) => (
-          <section key={c} className="rounded-2xl bg-[#eef1ed] p-3">
-            <h2 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#143d1a]">
-              {c}{" "}
-              <span className="float-right">
-                {rows.filter((p) => pipelineStatus(p) === c).length}
-              </span>
-            </h2>
-            {rows
-              .filter((p) => pipelineStatus(p) === c)
-              .map((p) => (
-                <Card
-                  key={p.id}
-                  p={p}
-                  busy={busy === p.id}
-                  view={() => view(p)}
-                  edit={() => edit(p)}
-                  accept={() => accept(p)}
-                  history={() => history(p)}
-                  openSend={() => send(p)}
-                  mutate={(fn, t) => void mutate(p, fn, t)}
-                />
-              ))}
-          </section>
-        ))}
-      </div>
-    </div>
-  );
+  if (rows.length === 0) return <Empty />;
+  return <div className="divide-y divide-neutral-100">
+    {workflowGroups.map((group) => {
+      const groupRows = rows.filter((proposal) => group.statuses.includes(proposal.status));
+      if (groupRows.length === 0) return null;
+      return <section key={group.title} aria-label={group.title} className="p-4 sm:p-5">
+        <header className="mb-3 flex items-start justify-between gap-4"><div><h2 className="text-sm font-extrabold text-[#143d1a]">{group.title}</h2><p className="mt-1 text-xs text-neutral-500">{group.description}</p></div><span className="rounded-full bg-[#edf4ec] px-2.5 py-1 text-xs font-bold text-[#143d1a]">{groupRows.length}</span></header>
+        <div className="grid gap-3">{groupRows.map((proposal) => <Card key={proposal.id} p={proposal} busy={busy === proposal.id} view={() => view(proposal)} edit={() => edit(proposal)} accept={() => accept(proposal)} history={() => history(proposal)} openSend={() => send(proposal)} mutate={(fn, text) => void mutate(proposal, fn, text)} />)}</div>
+      </section>;
+    })}
+  </div>;
 }
 function Card({
   p,
@@ -377,31 +354,13 @@ function Card({
       mutate(() => renewProposal(p.id, value), "Proposal renewed.");
   }
   return (
-    <article className="mb-3 rounded-xl bg-white p-4 shadow-sm">
-      <button type="button" onClick={view} className="w-full text-left">
-        <p className="font-extrabold text-[#143d1a]">{p.proposal_number}</p>
-        <p className="mt-1 text-sm text-neutral-600">{p.client_name}</p>
-        <p className="mt-1 text-xs text-neutral-500">{p.property_name}</p>
-        <p className="mt-3 text-xl font-extrabold text-[#143d1a]">
-          {money(p.result.perVisitTotal)}
-        </p>
-        <div className="mt-2 flex flex-wrap gap-1">
-          <Badge t={p.division} />
-          <Badge t={p.frequency} />
-          {p.status === "Viewed" && <Badge t="Viewed" />}
-        </div>
-        <p className="mt-2 text-xs text-neutral-500">
-          Approval: {p.approval_status}
-        </p>
-        <p className="text-xs text-neutral-500">Expires: {p.expiration_date}</p>
-        {p.estimate_id && (
-          <p className="text-xs text-[#9a7a17]">Estimate linked</p>
-        )}
-        {p.walkthrough_id && (
-          <p className="text-xs text-[#9a7a17]">Walkthrough linked</p>
-        )}
+    <article className="rounded-xl border border-[#143d1a]/10 bg-white p-4 shadow-sm">
+      <button type="button" onClick={view} className="grid w-full gap-4 text-left md:grid-cols-[minmax(0,1.25fr)_minmax(180px,.9fr)_140px] md:items-center">
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-extrabold text-[#143d1a]">{p.proposal_number}</p><StatusBadge status={p.status} /></div><p className="mt-2 truncate text-sm font-bold text-neutral-700">{p.client_name || "Unnamed client"}</p><p className="mt-1 truncate text-xs text-neutral-500">{proposalProperty(p)}</p></div>
+        <div className="min-w-0"><p className="truncate text-sm font-bold text-[#143d1a]">{p.result.serviceName || "Service not selected"}</p><p className="mt-1 text-xs text-neutral-500">{p.division} · {p.frequency}</p><p className="mt-2 text-xs text-neutral-500">Approval: <span className="font-bold text-neutral-700">{p.approval_status}</span></p></div>
+        <div className="md:text-right"><p className="text-xl font-extrabold text-[#143d1a]">{money(p.result.perVisitTotal)}</p><p className="mt-1 text-xs text-neutral-500">{proposalActivityDate(p)}</p><div className="mt-2 flex flex-wrap gap-1 md:justify-end">{p.estimate_id && <Badge t="Estimate" />}{p.walkthrough_id && <Badge t="Walkthrough" />}</div></div>
       </button>
-      <div className="mt-3 flex flex-wrap gap-1 border-t pt-3">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
         <Action t="Preview" f={view} />
         {p.status === "Draft" && (
           <>
@@ -485,6 +444,8 @@ function SendProposalModal({proposal,sender,close,sent}:{proposal:ProposalWithRe
 
 function DeliverySummary({email,phone}:{email:string;phone:string}){return <div className="rounded-lg border bg-neutral-50 p-3 text-sm"><p className="font-bold text-[#143d1a]">Delivery</p><p className="mt-2">{email?`✓ Email: ${email}`:"— Email: No email address on file"}</p><p className="mt-1">{phone?`✓ Text: ${phone}`:"— Text: No phone number on file"}</p></div>}
 
+// Retained for the legacy compact proposal print preview.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ViewModal({
   p,
   close,
@@ -684,9 +645,6 @@ async function loadAndExpire() {
   if (await expireDueProposals(r)) r = await getProposals();
   return r;
 }
-function pipelineStatus(p: ProposalWithRelations): ProposalStatus {
-  return p.status === "Viewed" ? "Sent" : p.status;
-}
 function compare(a: ProposalWithRelations, b: ProposalWithRelations, s: Sort) {
   if (s === "Oldest")
     return Date.parse(a.created_at) - Date.parse(b.created_at);
@@ -724,12 +682,12 @@ function printProposal(p: ProposalWithRelations) {
 }
 function Header() {
   return (
-    <header className="border-b border-[#143d1a]/10 pb-7">
+    <header className="border-b border-[#143d1a]/10 pb-7 sm:pb-8">
       <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">
         Operations workspace
       </p>
-      <h1 className="text-3xl font-extrabold text-[#143d1a]">Open Proposals</h1>
-      <p className="mt-3 text-neutral-600">
+      <h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">Open Proposals</h1>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">
         Review, approve, send, and track StudioScrubz proposals.
       </p>
     </header>
@@ -737,9 +695,9 @@ function Header() {
 }
 function Summary({ l, v }: { l: string; v: number | string }) {
   return (
-    <article className="rounded-2xl border bg-white p-5">
-      <p className="text-xs font-bold uppercase text-neutral-500">{l}</p>
-      <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{v}</p>
+    <article className="rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-[0_8px_25px_rgba(20,61,26,.045)]">
+      <p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-neutral-500 sm:text-xs">{l}</p>
+      <p className="mt-5 text-3xl font-extrabold text-[#143d1a]">{v}</p>
     </article>
   );
 }
@@ -787,6 +745,13 @@ function Badge({ t }: { t: string }) {
     </span>
   );
 }
+function StatusBadge({ status }: { status: ProposalStatus }) {
+  const tone = status === "Accepted" ? "bg-emerald-50 text-emerald-700" : status === "Declined" || status === "Expired" ? "bg-red-50 text-red-700" : status === "Ready for Approval" || status === "Approved" ? "bg-amber-50 text-amber-800" : "bg-[#edf4ec] text-[#143d1a]";
+  return <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${tone}`}>{status}</span>;
+}
+function proposalProperty(p: ProposalWithRelations): string { return p.property ? [p.property.property_name, p.property.address].filter(Boolean).join(" · ") : p.property_name || "Deleted Property"; }
+function proposalActivityDate(p: ProposalWithRelations): string { if (p.sent_at) return `Sent ${formatDate(p.sent_at)}`; if (p.status === "Ready for Approval" || p.status === "Approved") return `Submitted ${formatDate(p.updated_at)}`; return `Created ${formatDate(p.created_at)}`; }
+function formatDate(value: string): string { return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)); }
 function Alert({ text, success }: { text: string; success?: boolean }) {
   return (
     <div
@@ -797,8 +762,9 @@ function Alert({ text, success }: { text: string; success?: boolean }) {
   );
 }
 function Loading() {
-  return <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />;
+  return <div className="space-y-3 p-5" aria-label="Loading proposals">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-neutral-100" />)}</div>;
 }
+function Empty() { return <div className="flex min-h-64 flex-col items-center justify-center text-center"><span className="mb-5 h-1 w-10 rounded-full bg-[#d4af37]" /><h2 className="font-extrabold text-[#143d1a]">No open proposals match these filters</h2><p className="mt-2 text-sm text-neutral-500">Adjust search or filters to see other open proposal work.</p></div>; }
 function Modal({
   title,
   close,
