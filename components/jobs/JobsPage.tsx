@@ -10,6 +10,7 @@ import {
   finishJobAndClockOut,
   getCrewConflicts,
   getCurrentJobClockState,
+  getArchivedJobs,
   getJobs,
   isJobCompletionResult,
   scheduleJob,
@@ -30,20 +31,13 @@ import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRe
 import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
 import { getTimeEntries } from "@/lib/services/timeEntries";
 import {
+  JOB_STATUSES,
   type JobStatus,
   type JobClockOutResult,
   type JobWithRelations,
 } from "@/types/job";
 import type { TimeEntryWithRelations } from "@/types/timeEntry";
 
-type Sort =
-  | "Newest"
-  | "Oldest"
-  | "Scheduled Date"
-  | "Client Name"
-  | "Job Number"
-  | "Price High to Low"
-  | "Price Low to High";
 type ScheduleFilter = "All" | "Scheduled" | "Unscheduled" | "Upcoming" | "Past";
 const activeStatuses: JobStatus[] = [
   "Ready to Schedule",
@@ -51,11 +45,12 @@ const activeStatuses: JobStatus[] = [
   "Crew Assigned",
   "In Progress",
 ];
-const jobBoardStatuses: JobStatus[] = [...activeStatuses, "Completed"];
+const terminalStatuses: JobStatus[] = ["Completed", "Cancelled", "Archived"];
 const jobPhotoCategories: readonly JobPhotoCategory[] = ["After", "Before", "Damage / Issue", "Other"];
 export function JobsPage() {
   const { profile } = useAuth();
   const [rows, setRows] = useState<JobWithRelations[]>([]);
+  const [archivedRows, setArchivedRows] = useState<JobWithRelations[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntryWithRelations[]>([]);
   const [activeCrews, setActiveCrews] = useState<CrewWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,14 +59,21 @@ export function JobsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"All" | JobStatus>("All");
   const [division, setDivision] = useState("All");
+  const [crew, setCrew] = useState("All");
   const [schedule, setSchedule] = useState<ScheduleFilter>("All");
-  const [sort, setSort] = useState<Sort>("Newest");
   const [selected, setSelected] = useState<JobWithRelations | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const canViewArchived = Boolean(profile && ["Master Admin", "Administrator"].includes(profile.role));
   async function load() {
-    const [next, entries, crews] = await Promise.all([getJobs(), getTimeEntries(), getActiveCrews()]);
+    const [next, entries, crews, nextArchived] = await Promise.all([
+      getJobs(),
+      getTimeEntries(),
+      getActiveCrews(),
+      canViewArchived ? getArchivedJobs() : Promise.resolve([]),
+    ]);
     setRows(next);
+    setArchivedRows(nextArchived);
     setTimeEntries(entries);
     setActiveCrews(crews);
     return next;
@@ -79,16 +81,22 @@ export function JobsPage() {
   useOperationalRealtime(["jobs", "time_entries", "crews", "employees", "invoices", "service_occurrences"], async () => { await load(); });
   useEffect(() => {
     let active = true;
-    void Promise.all([getJobs(), getTimeEntries(), getActiveCrews()])
-      .then(([x, entries, crews]) => {
+    void Promise.all([
+      getJobs(),
+      getTimeEntries(),
+      getActiveCrews(),
+      canViewArchived ? getArchivedJobs() : Promise.resolve([]),
+    ])
+      .then(([x, entries, crews, archivedJobs]) => {
         if (active) {
           setRows(x);
+          setArchivedRows(archivedJobs);
           setTimeEntries(entries);
           setActiveCrews(crews);
           const jobId = new URLSearchParams(window.location.search).get(
             "jobId",
           );
-          if (jobId) setSelected(x.find((job) => job.id === jobId && jobBoardStatuses.includes(job.status)) ?? null);
+          if (jobId) setSelected([...x, ...archivedJobs].find((job) => job.id === jobId) ?? null);
         }
       })
       .catch((x: unknown) => {
@@ -101,7 +109,7 @@ export function JobsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [canViewArchived]);
   async function mutate(
     job: JobWithRelations,
     fn: () => Promise<unknown>,
@@ -113,7 +121,7 @@ export function JobsPage() {
       const result = await fn();
       const next = await load();
       setSelected((current) => current?.id === job.id
-        ? next.find((row) => row.id === job.id && jobBoardStatuses.includes(row.status)) ?? null
+        ? next.find((row) => row.id === job.id) ?? null
         : current);
       if (isJobCompletionResult(result)) {
         if (result.invoiceError) {
@@ -136,18 +144,10 @@ export function JobsPage() {
       setBusy(null);
     }
   }
-  const workflowRows = useMemo(
-    () =>
-      rows.filter(
-        (job) =>
-          job.archived_at === null &&
-          jobBoardStatuses.includes(job.status),
-      ),
-    [rows],
-  );
+  const availableRows = useMemo(() => [...rows, ...archivedRows], [archivedRows, rows]);
   const filtered = useMemo(
     () =>
-      workflowRows
+      availableRows
         .filter((j) => {
           const hay = [
             j.job_number,
@@ -162,7 +162,7 @@ export function JobsPage() {
             .join(" ")
             .toLowerCase();
           const date = j.scheduled_date;
-          const today = new Date().toISOString().slice(0, 10);
+          const today = localDateKey(new Date());
           const scheduleMatch =
             schedule === "All" ||
             (schedule === "Scheduled" && Boolean(date)) ||
@@ -173,13 +173,19 @@ export function JobsPage() {
             (!search || hay.includes(search.toLowerCase())) &&
             (status === "All" || j.status === status) &&
             (division === "All" || j.division === division) &&
+            (crew === "All" || j.assigned_crew_id === crew) &&
             scheduleMatch
           );
         })
-        .sort((a, b) => compare(a, b, sort)),
-    [division, schedule, search, sort, status, workflowRows],
+        .sort(compareSchedule),
+    [availableRows, crew, division, schedule, search, status],
   );
-  const active = workflowRows.filter((job) => activeStatuses.includes(job.status));
+  const scheduledGroups = useMemo(() => groupScheduledJobs(filtered), [filtered]);
+  const unscheduled = filtered.filter((job) => !job.scheduled_date && !terminalStatuses.includes(job.status));
+  const completed = filtered.filter((job) => job.status === "Completed").sort(compareRecent);
+  const cancelled = filtered.filter((job) => job.status === "Cancelled").sort(compareRecent);
+  const archived = filtered.filter((job) => job.status === "Archived" || job.archived_at !== null).sort(compareRecent);
+  const active = rows.filter((job) => job.archived_at === null && activeStatuses.includes(job.status));
   const metrics = [
     ["Total Jobs", active.length],
     [
@@ -194,6 +200,20 @@ export function JobsPage() {
     ],
     ["In Progress", active.filter((j) => j.status === "In Progress").length],
   ] as const;
+  const renderJob = (job: JobWithRelations) => (
+    <JobCard
+      key={job.id}
+      job={job}
+      open={() => setSelected(job)}
+      timeEntries={timeEntries.filter((entry) => entry.job_id === job.id && !entry.archived_at && entry.entry_type === "Job")}
+      employeeId={profile?.employee_id ?? null}
+      assignedToJob={isEmployeeAssigned(activeCrews, profile?.employee_id ?? null, job.assigned_crew_id)}
+      role={profile?.role ?? null}
+      canComplete={hasPermission(profile, "jobs.complete")}
+      busy={busy === job.id}
+      act={(fn, text) => void mutate(job, fn, text)}
+    />
+  );
   return (
     <>
       <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
@@ -215,7 +235,7 @@ export function JobsPage() {
           <Select
             value={status}
             set={(v) => setStatus(v as typeof status)}
-            options={["All", ...jobBoardStatuses]}
+            options={["All", ...JOB_STATUSES]}
           />
           <Select
             value={division}
@@ -223,57 +243,30 @@ export function JobsPage() {
             options={["All", "Residential", "Commercial"]}
           />
           <Select
+            value={crew}
+            set={setCrew}
+            options={["All", ...activeCrews.map((candidate) => candidate.id)]}
+            labels={new Map(activeCrews.map((candidate) => [candidate.id, candidate.crew_name]))}
+          />
+          <Select
             value={schedule}
             set={(v) => setSchedule(v as ScheduleFilter)}
             options={["All", "Scheduled", "Unscheduled", "Upcoming", "Past"]}
-          />
-          <Select
-            value={sort}
-            set={(v) => setSort(v as Sort)}
-            options={[
-              "Newest",
-              "Oldest",
-              "Scheduled Date",
-              "Client Name",
-              "Job Number",
-              "Price High to Low",
-              "Price Low to High",
-            ]}
           />
         </div>
       </section>
       {loading ? (
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
-        <div className="mt-6 overflow-x-auto pb-5">
-          <div className="grid min-w-[1300px] grid-cols-5 gap-4">
-            {jobBoardStatuses.map((column) => (
-              <section key={column} className="rounded-2xl bg-[#eef1ed] p-3">
-                <h2 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#143d1a]">
-                  {column}
-                  <span className="float-right">
-                    {filtered.filter((j) => j.status === column).length}
-                  </span>
-                </h2>
-                {filtered
-                  .filter((j) => j.status === column)
-                  .map((j) => (
-                    <JobCard
-                      key={j.id}
-                      job={j}
-                      open={() => setSelected(j)}
-                      timeEntries={timeEntries.filter((entry) => entry.job_id === j.id && !entry.archived_at && entry.entry_type === "Job")}
-                      employeeId={profile?.employee_id ?? null}
-                      assignedToJob={isEmployeeAssigned(activeCrews, profile?.employee_id ?? null, j.assigned_crew_id)}
-                      role={profile?.role ?? null}
-                      canComplete={hasPermission(profile, "jobs.complete")}
-                      busy={busy === j.id}
-                      act={(fn, text) => void mutate(j, fn, text)}
-                    />
-                  ))}
-              </section>
-            ))}
-          </div>
+        <div className="mt-6 space-y-7 pb-5">
+          {scheduledGroups.map(([date, jobs]) => (
+            <JobSection key={date} title={dateHeading(date)} count={jobs.length} jobs={jobs} renderJob={renderJob} />
+          ))}
+          <JobSection title="Unscheduled" count={unscheduled.length} jobs={unscheduled} renderJob={renderJob} muted />
+          <JobSection title="Completed" count={completed.length} jobs={completed} renderJob={renderJob} muted />
+          <JobSection title="Cancelled" count={cancelled.length} jobs={cancelled} renderJob={renderJob} muted />
+          <JobSection title="Archived" count={archived.length} jobs={archived} renderJob={renderJob} muted />
+          {filtered.length === 0 && <div className="rounded-2xl border border-dashed bg-white p-8 text-center text-sm text-neutral-500">No jobs match the current filters.</div>}
         </div>
       )}
       {selected && (
@@ -310,44 +303,45 @@ function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canC
   const canCardEndJob = canComplete && (role !== "Crew Lead" || assignedToJob);
   const content = (
     <>
+    <div className="grid gap-4 text-left md:grid-cols-[7rem_minmax(0,1.4fr)_minmax(12rem,1fr)_auto] md:items-start">
+      <div>
+        <p className="text-xl font-extrabold text-[#143d1a]">{formatJobTime(job.start_time)}</p>
+        <p className="mt-1 text-xs font-bold text-neutral-500">{job.job_number}</p>
+      </div>
+      <div className="min-w-0">
+        <p className="font-extrabold text-neutral-800">{job.client_name || "Unnamed client"}</p>
+        <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
+        <p className="mt-2 text-sm font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
+      </div>
+      <div className="text-sm text-neutral-600">
+        <p><span className="font-bold text-neutral-800">Crew:</span> {job.assigned_crew_name || "Unassigned"}</p>
+        <p className="mt-1"><span className="font-bold text-neutral-800">Lead:</span> {job.crew_lead_name || "Not assigned"}</p>
+        <p className="mt-1 text-xs">{job.financials_available === false ? "Price restricted" : money(job.price)}</p>
+      </div>
+      <div className="flex flex-wrap gap-2 md:max-w-40 md:justify-end">
+        <span className="rounded-full bg-[#edf4ec] px-2.5 py-1 text-[10px] font-bold text-[#143d1a]">{job.division}</span>
+        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-bold text-neutral-700">{job.status}</span>
+      </div>
+    </div>
     <div className="text-left">
-      <p className="font-extrabold text-[#143d1a]">{job.job_number}</p>
-      <p className="mt-1 text-sm font-bold text-neutral-700">
-        {job.client_name || "Unnamed client"}
-      </p>
-      <p className="text-xs text-neutral-500">{job.property_name}</p>
-      <p className="mt-2 text-sm">{job.service_name}</p>
-      <p className="mt-2 text-xl font-extrabold text-[#143d1a]">
-        {job.financials_available === false ? "Price restricted" : money(job.price)}
-      </p>
-      <p className="mt-2 text-xs text-neutral-500">
-        {job.scheduled_date || "Unscheduled"}{" "}
-        {job.start_time?.slice(0, 5) || ""}
-      </p>
-      <p className="text-xs text-neutral-500">
-        Crew: {job.assigned_crew_name || "Unassigned"}
-      </p>
-      <span className="mt-2 inline-block rounded-full bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">
-        {job.division}
-      </span>
       {job.status === "In Progress" && <JobCardActiveTime job={job} entries={timeEntries} />}
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
-    <div className="mt-3 grid gap-2">
+    <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
       {canManagementStart && <button type="button" disabled={busy} onClick={() => act(() => startOperationalJob(job.id), "Job started. No employee time entry was created.")} className={`${primary} w-full`}>START JOB</button>}
       {canStartWork && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "Your Job participation started.")} className={`${primary} w-full`}>START JOB WORK</button>}
       {canJoin && <button type="button" disabled={busy} onClick={() => act(() => startOrClockInToJob(job.id), "You joined the Job.")} className={`${primary} w-full`}>JOIN JOB</button>}
       {canEnd && <button type="button" disabled={busy} onClick={() => act(() => finishJobAndClockOut(job.id, 0), cardClockOutMessage)} className={`${primary} w-full`}>END MY JOB WORK</button>}
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">{activeEntries.length} crew {activeEntries.length === 1 ? "member is" : "members are"} still on Job</p>}
-      <button type="button" onClick={open} className={`${secondary} w-full`}>MANAGE JOB</button>
+      <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
     </div>
     </>
   );
   if (job.status === "Completed")
     return <JobInvoiceAction jobId={job.id}>{content}</JobInvoiceAction>;
   return (
-    <article className="mb-3 rounded-xl bg-white p-4 shadow-sm">
+    <article className="mb-3 rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">
       {content}
     </article>
   );
@@ -640,10 +634,12 @@ function Select({
   value,
   set,
   options,
+  labels,
 }: {
   value: string;
   set: (x: string) => void;
   options: readonly string[];
+  labels?: ReadonlyMap<string, string>;
 }) {
   return (
     <select
@@ -652,7 +648,7 @@ function Select({
       onChange={(e) => set(e.target.value)}
     >
       {options.map((x) => (
-        <option key={x}>{x}</option>
+        <option key={x} value={x}>{labels?.get(x) ?? (x === "All" && labels ? "All crews" : x)}</option>
       ))}
     </select>
   );
@@ -730,19 +726,49 @@ function nextStatuses(status: JobStatus): JobStatus[] {
   if (status === "In Progress") return ["Completed"];
   return [];
 }
-function compare(a: JobWithRelations, b: JobWithRelations, s: Sort) {
-  if (s === "Oldest")
-    return Date.parse(a.created_at) - Date.parse(b.created_at);
-  if (s === "Scheduled Date")
-    return (a.scheduled_date ?? "9999").localeCompare(
-      b.scheduled_date ?? "9999",
-    );
-  if (s === "Client Name")
-    return (a.client_name ?? "").localeCompare(b.client_name ?? "");
-  if (s === "Job Number") return a.job_number.localeCompare(b.job_number);
-  if (s === "Price High to Low") return a.financials_available === false || b.financials_available === false ? 0 : b.price - a.price;
-  if (s === "Price Low to High") return a.financials_available === false || b.financials_available === false ? 0 : a.price - b.price;
-  return Date.parse(b.created_at) - Date.parse(a.created_at);
+function compareSchedule(a: JobWithRelations, b: JobWithRelations) {
+  const date = (a.scheduled_date ?? "9999-12-31").localeCompare(b.scheduled_date ?? "9999-12-31");
+  if (date) return date;
+  const time = (a.start_time ?? "99:99:99").localeCompare(b.start_time ?? "99:99:99");
+  return time || a.job_number.localeCompare(b.job_number);
+}
+function compareRecent(a: JobWithRelations, b: JobWithRelations) {
+  return (b.scheduled_date ?? b.created_at).localeCompare(a.scheduled_date ?? a.created_at) || compareSchedule(a, b);
+}
+function groupScheduledJobs(jobs: JobWithRelations[]) {
+  const groups = new Map<string, JobWithRelations[]>();
+  for (const job of jobs) {
+    if (!job.scheduled_date || terminalStatuses.includes(job.status) || job.archived_at) continue;
+    const group = groups.get(job.scheduled_date) ?? [];
+    group.push(job);
+    groups.set(job.scheduled_date, group);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+function dateHeading(date: string) {
+  const value = new Date(`${date}T12:00:00`);
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const label = date === localDateKey(today) ? "Today" : date === localDateKey(tomorrow) ? "Tomorrow" : null;
+  const formatted = value.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: value.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+  return label ? `${label} — ${formatted}` : formatted;
+}
+function localDateKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+function formatJobTime(value: string | null) {
+  if (!value) return "Time TBD";
+  const [hour, minute] = value.split(":").map(Number);
+  return new Date(2000, 0, 1, hour, minute).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+function JobSection({ title, count, jobs, renderJob, muted = false }: { title: string; count: number; jobs: JobWithRelations[]; renderJob: (job: JobWithRelations) => React.ReactNode; muted?: boolean }) {
+  if (!count) return null;
+  return <section className={`rounded-2xl border p-3 sm:p-4 ${muted ? "bg-[#f6f7f5]" : "bg-[#eef1ed]"}`}><header className="mb-3 flex items-center justify-between gap-4"><h2 className="text-sm font-extrabold text-[#143d1a] sm:text-base">{title}</h2><span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#143d1a]">{count}</span></header><div>{jobs.map(renderJob)}</div></section>;
 }
 function money(v: number) {
   return new Intl.NumberFormat("en-US", {
