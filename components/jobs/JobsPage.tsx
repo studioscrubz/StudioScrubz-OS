@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { hasPermission } from "@/lib/auth/permissions";
+import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import {
   archiveJob,
   assignJobCrew,
@@ -12,6 +12,7 @@ import {
   getCurrentJobClockState,
   getArchivedJobs,
   getJobs,
+  permanentlyDeleteCancelledJob,
   isJobCompletionResult,
   scheduleJob,
   startOperationalJob,
@@ -64,6 +65,7 @@ export function JobsPage() {
   const [selected, setSelected] = useState<JobWithRelations | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState<JobWithRelations | null>(null);
   const canViewArchived = Boolean(profile && ["Master Admin", "Administrator"].includes(profile.role));
   async function load() {
     const [next, entries, crews, nextArchived] = await Promise.all([
@@ -144,6 +146,24 @@ export function JobsPage() {
       setBusy(null);
     }
   }
+  async function removeCancelledJob(job: JobWithRelations) {
+    setBusy(job.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await permanentlyDeleteCancelledJob(job.id);
+      setRows((current) => current.filter((row) => row.id !== job.id));
+      setSelected((current) => current?.id === job.id ? null : current);
+      setConfirmingDelete(null);
+      setNotice(`${job.job_number} permanently deleted.`);
+    } catch (cause) {
+      console.error("Cancelled Job permanent deletion failed", cause);
+      setError(message(cause, "The Cancelled Job could not be permanently deleted."));
+      setConfirmingDelete(null);
+    } finally {
+      setBusy(null);
+    }
+  }
   const availableRows = useMemo(() => [...rows, ...archivedRows], [archivedRows, rows]);
   const filtered = useMemo(
     () =>
@@ -210,7 +230,9 @@ export function JobsPage() {
       assignedToJob={isEmployeeAssigned(activeCrews, profile?.employee_id ?? null, job.assigned_crew_id)}
       role={profile?.role ?? null}
       canComplete={hasPermission(profile, "jobs.complete")}
+      canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
+      requestDelete={() => setConfirmingDelete(job)}
       act={(fn, text) => void mutate(job, fn, text)}
     />
   );
@@ -287,10 +309,23 @@ export function JobsPage() {
         />
       )}
       {creating && <DirectJobModal close={() => setCreating(false)} created={async () => { setCreating(false); await load(); setNotice("Job created successfully."); }} />}
+      {confirmingDelete && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-[#07190a]/70 p-5">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="delete-cancelled-job-title" className="w-full max-w-lg rounded-2xl bg-white p-6">
+            <h2 id="delete-cancelled-job-title" className="text-xl font-extrabold text-red-800">Permanently delete this Cancelled Job?</h2>
+            <p className="mt-3 text-sm text-neutral-700">This deletion cannot be undone. Jobs with invoice, payment, service, time, mileage, expense, or other protected history will be retained.</p>
+            <p className="mt-3 rounded-xl bg-red-50 p-3 font-bold text-red-800">{confirmingDelete.job_number} — {confirmingDelete.client_name || "Unnamed client"}</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button className={secondary} onClick={() => setConfirmingDelete(null)}>Cancel</button>
+              <button disabled={busy === confirmingDelete.id} className={danger} onClick={() => void removeCancelledJob(confirmingDelete)}>Confirm Permanent Delete</button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }
-function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canComplete, busy, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; assignedToJob: boolean; role: string | null; canComplete: boolean; busy: boolean; act: (fn: () => Promise<unknown>, text: string | ((result: unknown) => string)) => void }) {
+function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; assignedToJob: boolean; role: string | null; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: (fn: () => Promise<unknown>, text: string | ((result: unknown) => string)) => void }) {
   const activeEntries = timeEntries.filter((entry) => entry.status === "Open" && !entry.clock_out);
   const currentEntry = employeeId ? activeEntries.find((entry) => entry.employee_id === employeeId) ?? null : null;
   const canManageJobLifecycle = Boolean(role && ["Master Admin", "Administrator", "Manager"].includes(role));
@@ -335,6 +370,7 @@ function JobCard({ job, open, timeEntries, employeeId, assignedToJob, role, canC
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">{activeEntries.length} crew {activeEntries.length === 1 ? "member is" : "members are"} still on Job</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
+      {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
     </div>
     </>
   );
@@ -791,3 +827,5 @@ const primary =
   "rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
 const secondary =
   "rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] disabled:opacity-50";
+const danger =
+  "rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50";

@@ -12,10 +12,11 @@ import type {
 } from "@/types/job";
 import type { CrewWithRelations } from "@/types/crew";
 import { getCurrentProfile } from "@/lib/services/auth";
-import { isMasterAdmin } from "@/lib/auth/permissions";
+import { canPermanentlyDelete, isMasterAdmin } from "@/lib/auth/permissions";
 import { employeeName } from "@/types/employee";
 import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import type { Invoice } from "@/types/invoice";
+import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 
 export type JobCompletionResult = {
   job: JobWithRelations;
@@ -378,6 +379,13 @@ export async function getArchivedJobs(): Promise<JobWithRelations[]> {
   const { data, error } = await getSupabaseClient().rpc("get_archived_operational_jobs");
   if (error) throw new Error(safeDatabaseMessage(error, "Archived Jobs could not be loaded."));
   return data.map(operationalJob);
+}
+export async function permanentlyDeleteCancelledJob(id: string): Promise<void> {
+  const profile = await getCurrentProfile();
+  if (!canPermanentlyDelete(profile)) throw new Error("Master Admin authorization is required for permanent deletion.");
+  const { error } = await getSupabaseClient().rpc("master_admin_permanently_delete_cancelled_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "The Cancelled Job could not be permanently deleted."));
+  notifyAttentionRefresh();
 }
 export async function restoreArchivedJob(id: string): Promise<JobWithRelations> {
   const { data, error } = await getSupabaseClient().rpc("restore_archived_operational_job", { p_job_id: id });
