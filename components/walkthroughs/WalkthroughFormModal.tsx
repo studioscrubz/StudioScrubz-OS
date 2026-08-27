@@ -69,7 +69,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const selectedEstimate = estimates.find((item) => item.id === estimateId) ?? initialEstimate;
   const selectedClient = selectedEstimate?.client ?? clients.find((item) => item.id === clientId) ?? walkthrough?.client;
   const selectedProperty = selectedEstimate?.property ?? properties.find((item) => item.id === propertyId) ?? walkthrough?.property;
-  const division = selectedEstimate?.division ?? selectedProperty?.property_type ?? selectedClient?.client_type ?? "Residential";
+  const division = selectedEstimate?.division ?? selectedProperty?.property_type ?? (selectedClient?.client_type === "Contractor" ? "Residential" : selectedClient?.client_type) ?? "Residential";
   const filteredEstimates = useMemo(() => { const term = estimateSearch.trim().toLocaleLowerCase(); return estimates.filter((item) => !term || [item.estimate_number, displayClient(item.client), item.property?.address||"Deleted Property", item.service_name].filter(Boolean).join(" ").toLocaleLowerCase().includes(term)); }, [estimateSearch, estimates]);
   const clientProperties = properties.filter((item) => item.client_id === clientId);
   const catalogService=catalog?findCatalogService(catalog.services,division,measurements.serviceType):undefined;
@@ -126,7 +126,7 @@ function Select({ label, value, set, options, placeholder, disabled }: { label: 
 function Label({ text, required }: { text: string; required?: boolean }) { return <span className="mb-2 block text-xs font-bold text-neutral-700">{text}{required && <span className="ml-1 text-[#9a7a17]">*</span>}</span>; }
 function Info({ label, value }: { label: string; value: string }) { return <div><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-neutral-400">{label}</p><p className="mt-1 font-semibold text-neutral-700">{value}</p></div>; }
 function Alert({ text }: { text: string }) { return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{text}</div>; }
-export function displayClient(client: Client | null): string { if (!client) return "Deleted Client"; const name = [client.first_name, client.last_name].filter(Boolean).join(" "); return client.client_type === "Commercial" ? client.company_name || name || "Unnamed client" : name || client.company_name || "Unnamed client"; }
+export function displayClient(client: Client | null): string { if (!client) return "Deleted Client"; const name = [client.first_name, client.last_name].filter(Boolean).join(" "); return client.client_type !== "Residential" ? client.company_name || name || "Unnamed client" : name || client.company_name || "Unnamed client"; }
 function customerName(estimate: AvailableEstimate): string { return [estimate.customer_first_name, estimate.customer_last_name].filter(Boolean).join(" ") || estimate.client?.company_name || displayClient(estimate.client); }
 function mergeById<T extends { id: string }>(primary: T[], extra: T[]): T[] { return [...new Map([...primary, ...extra].map((item) => [item.id, item])).values()]; }
 function clean(value: string): string | null { return value.trim() || null; }

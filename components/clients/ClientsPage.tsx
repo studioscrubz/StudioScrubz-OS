@@ -62,6 +62,7 @@ export function ClientsPage() {
     total: activeClients.length,
     residential: activeClients.filter((client) => client.client_type === "Residential").length,
     commercial: activeClients.filter((client) => client.client_type === "Commercial").length,
+    contractor: activeClients.filter((client) => client.client_type === "Contractor").length,
     leads: activeClients.filter((client) => client.status === "Lead").length,
   };
 
@@ -152,10 +153,11 @@ export function ClientsPage() {
       {notice && <div role="status" className="mt-6 flex items-center justify-between rounded-xl border border-[#143d1a]/15 bg-[#edf4ec] px-4 py-3 text-sm font-semibold text-[#143d1a]"><span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss message" className="text-lg text-[#143d1a]/50">×</button></div>}
       {error && <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
 
-      <section aria-label="Client summary" className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section aria-label="Client summary" className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-5">
         <SummaryCard label="Total Clients" value={loading ? "—" : summary.total} />
         <SummaryCard label="Residential" value={loading ? "—" : summary.residential} />
         <SummaryCard label="Commercial" value={loading ? "—" : summary.commercial} />
+        <SummaryCard label="Contractors" value={loading ? "—" : summary.contractor} />
         <SummaryCard label="Leads" value={loading ? "—" : summary.leads} />
       </section>
 
@@ -178,7 +180,7 @@ export function ClientsPage() {
 }
 
 function PageHeaderContent() {
-  return <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#143d1a] sm:text-4xl">Clients</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">Manage StudioScrubz residential and commercial clients.</p></div>;
+  return <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#143d1a] sm:text-4xl">Clients</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">Manage StudioScrubz residential, commercial, and contractor clients.</p></div>;
 }
 
 function SummaryCard({ label, value }: { label: string; value: number | string }) {

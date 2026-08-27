@@ -1,4 +1,4 @@
-export const CLIENT_TYPES = ["Residential", "Commercial"] as const;
+export const CLIENT_TYPES = ["Residential", "Commercial", "Contractor"] as const;
 export const CLIENT_STATUSES = ["Lead", "Active", "Inactive"] as const;
 
 export type ClientType = (typeof CLIENT_TYPES)[number];

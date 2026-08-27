@@ -346,7 +346,7 @@ export function validateAgreementConfiguration(
   if (!client) return "Select an active client.";
   if (!property) return "Select an active property or service site.";
   if (property.client_id !== client.id) return "The selected property or site does not belong to the selected client.";
-  if (client.client_type !== agreement.division) return `Select a ${agreement.division} client for this agreement.`;
+  if (client.client_type !== agreement.division && client.client_type !== "Contractor") return `Select a ${agreement.division} or Contractor client for this agreement.`;
   if (property.property_type !== agreement.division) return `Select a ${agreement.division} property or site for this agreement.`;
   if (agreement.division === "Commercial" && !client.company_name?.trim()) return "Commercial agreements require a client with a company or business name.";
   if (!service) return `Select an active service compatible with the ${agreement.division} division.`;

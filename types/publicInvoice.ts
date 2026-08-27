@@ -1,4 +1,4 @@
-import type { ContractBillingType, InvoiceLineItem, InvoiceStatus } from "@/types/invoice";
+import type { ContractBillingType, InvoiceJobLine, InvoiceLineItem, InvoiceStatus } from "@/types/invoice";
 
 export type PublicInvoicePayment = {
   amount: number;
@@ -20,6 +20,8 @@ export type PublicInvoice = {
   agreement_number: string | null;
   contract_billing_type: ContractBillingType | null;
   billing_period_start: string | null;
+  is_consolidated: boolean;
+  job_lines: Omit<InvoiceJobLine, "invoice_id">[];
   line_items: InvoiceLineItem[];
   subtotal: number;
   discount: number;

@@ -55,7 +55,7 @@ export function ClientFormModal({ client, saving, onClose, onSubmit }: ClientFor
         <form onSubmit={handleSubmit} className="space-y-6 px-6 py-6 sm:px-7">
           <fieldset>
             <legend className="mb-2 text-xs font-bold text-neutral-700">Client Type</legend>
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#f1f4f0] p-1.5">
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-[#f1f4f0] p-1.5">
               {CLIENT_TYPES.map((type) => (
                 <label key={type} className={`cursor-pointer rounded-lg px-4 py-2.5 text-center text-sm font-bold transition ${clientType === type ? "bg-white text-[#143d1a] shadow-sm" : "text-neutral-500"}`}>
                   <input type="radio" name="clientType" value={type} checked={clientType === type} onChange={() => setClientType(type)} className="sr-only" />

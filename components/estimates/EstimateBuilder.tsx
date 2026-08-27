@@ -160,7 +160,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         const selectedClient = selectedClientId ? clients.find((entry)=>entry.id===selectedClientId) : null;
         if (selectedClientId && !selectedClient) throw new Error("The selected client no longer exists. Choose another client.");
         if (selectedClient?.archived_at) throw new Error("The selected client is archived. Choose an active client.");
-        if (selectedClient && selectedClient.client_type!==division) throw new Error(`The selected client must be a ${division} client.`);
+        if (selectedClient && selectedClient.client_type!==division&&selectedClient.client_type!=="Contractor") throw new Error(`The selected client must be a ${division} or Contractor client.`);
         const client = selectedClient ?? await findOrCreateEstimateClient(customer, division);
         const selectedProperty = selectedPropertyId ? properties.find((entry)=>entry.id===selectedPropertyId) : null;
         if (selectedPropertyId && !selectedProperty) throw new Error("The selected property no longer exists. Choose another property.");
@@ -207,7 +207,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     {!estimate && <div className="flex justify-end"><button type="button" onClick={requestClearDraft} className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] hover:border-[#d4af37]">Clear Draft</button></div>}
     <Section title="Customer Information" subtitle="Customer and service-location details are matched automatically when you save.">
       {!estimate && <div className="mb-5 grid gap-4 rounded-xl border border-[#143d1a]/10 bg-[#f7f9f6] p-4 sm:grid-cols-2">
-        <SelectField label="Existing Client" value={selectedClientId} options={["",...clients.filter(entry=>!entry.archived_at&&entry.client_type===division).map(entry=>entry.id)]} labels={new Map(clients.map(entry=>[entry.id,clientOptionLabel(entry)]))} placeholder="New client / enter details below" set={selectExistingClient} />
+        <SelectField label="Existing Client" value={selectedClientId} options={["",...clients.filter(entry=>!entry.archived_at&&(entry.client_type===division||entry.client_type==="Contractor")).map(entry=>entry.id)]} labels={new Map(clients.map(entry=>[entry.id,clientOptionLabel(entry)]))} placeholder="New client / enter details below" set={selectExistingClient} />
         {selectedClientId && <SelectField label="Existing Property" value={selectedPropertyId} options={["",...properties.filter(entry=>entry.client_id===selectedClientId&&!entry.archived_at&&entry.property_type===division).map(entry=>entry.id)]} labels={new Map(properties.map(entry=>[entry.id,propertyOptionLabel(entry)]))} placeholder="New property / enter location below" set={selectExistingProperty} />}
       </div>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

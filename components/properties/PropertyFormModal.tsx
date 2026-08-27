@@ -79,7 +79,7 @@ export function PropertyFormModal({ property, clients, saving, onClose, onSubmit
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) { return <label className="block"><span className="mb-2 block text-xs font-bold text-neutral-700">{label}{required && <span className="ml-1 text-[#9a7a17]">*</span>}</span>{children}</label>; }
 function NumberField({ value, setValue, step = "1" }: { value: string; setValue: (value: string) => void; step?: string }) { return <input type="number" min="0" step={step} value={value} onChange={(e) => setValue(e.target.value)} className={inputClass} />; }
-export function clientDisplayName(client: Client | null): string { if (!client) return "Deleted Client"; const contact = [client.first_name, client.last_name].filter(Boolean).join(" "); return client.client_type === "Commercial" ? client.company_name || contact || "Unnamed client" : contact || client.company_name || "Unnamed client"; }
+export function clientDisplayName(client: Client | null): string { if (!client) return "Deleted Client"; const contact = [client.first_name, client.last_name].filter(Boolean).join(" "); return client.client_type !== "Residential" ? client.company_name || contact || "Unnamed client" : contact || client.company_name || "Unnamed client"; }
 const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
 function clean(value: string): string | null { return value.trim() || null; }
 function numeric(value: string): number | null { return value === "" ? null : Number(value); }

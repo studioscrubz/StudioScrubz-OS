@@ -309,7 +309,7 @@ export function CreateInvoiceModal({
                 </button>
               </div>
               <div className="mt-3 space-y-3">
-                {items.map((line) => (
+                {items.map((line, index) => (
                   <div
                     key={line.id}
                     className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_90px_120px_110px_auto]"
@@ -346,7 +346,7 @@ export function CreateInvoiceModal({
                       }
                     />
                     <div className="px-2 py-2.5 text-right text-sm font-bold">
-                      {money(previewInvoiceAmounts(draftItems([line]), 0, 0).total)}
+                      {money(totals.line_items[index]?.amount ?? 0)}
                     </div>
                     <button
                       type="button"
