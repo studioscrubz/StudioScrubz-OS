@@ -25,7 +25,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
   if (input.pets) adjustments.push({ label: "Pets / heavy pet hair", amount: 35 });
   adjustments.push(...configured.addonAdjustments);
   const oneTimePrice = basePrice + adjustments.reduce((sum, item) => sum + item.amount, 0);
-  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,manualDiscountPercent:input.additionalDiscountPercent});
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent});
   const recurringDiscountPercent = pricing.recurringDiscountPercent;
   const recurringDiscount = pricing.recurringDiscountAmount;
   const manualDiscount = pricing.manualDiscount;
@@ -36,15 +36,15 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
   const crewSize = laborHours >= 7 ? 3 : laborHours >= 3.5 ? 2 : 1;
   const laborCost = laborHours * 22;
   const supplyCost = Math.max(12, finalPrice * 0.07);
-  return result({ input, serviceName: `${input.serviceType} Cleaning`, catalogAddons:snapshots(input.addOns,availableAddons), basePrice, adjustments, oneTimePrice, recurringDiscount, recurringDiscountPercent, manualDiscount, totalDiscount, taxes, finalPrice, laborHours, crewSize, laborCost, supplyCost, scope: [`${input.serviceType} residential cleaning`, ...input.addOns] });
+  return result({ input, serviceName: `${input.serviceType} Cleaning`, catalogAddons:snapshots(input.addOns,availableAddons), basePrice, adjustments, oneTimePrice, recurringPricingRuleId:pricing.recurringPricingRuleId, recurringPricingRuleName:pricing.recurringPricingRuleName, recurringDiscount, recurringDiscountPercent, manualDiscount, totalDiscount, taxes, finalPrice, laborHours, crewSize, laborCost, supplyCost, scope: [] });
 }
 
 function calculateResidentialProductionEstimate(input:ResidentialCalculatorInput,catalog:ServiceCatalogBundle,service:ServiceCatalogBundle["services"][number]):EstimateResult{
   const targetCompletionHours=catalogConfigNumber(service,"default_target_completion_hours"),workerHourlyPay=catalogConfigNumber(service,"default_worker_hourly_pay"),targetProfitMarginPercent=catalogConfigNumber(service,"default_target_profit_margin_percent");
   if(targetCompletionHours<=0||workerHourlyPay<=0||targetProfitMarginPercent<=0)throw new Error(`Custom Pricing Required for ${service.service_name}: configure residential completion hours, worker pay, and target margin.`);
-  const commercialInput:CommercialCalculatorInput={division:"Commercial",commercialType:input.serviceType,frequency:input.frequency,squareFeet:input.squareFeet,floors:1,restrooms:input.bathrooms,kitchens:1,stations:0,units:input.bedrooms,condition:input.condition,targetCompletionHours,workerHourlyPay,targetProfitMarginPercent,additionalDiscountPercent:input.additionalDiscountPercent,taxRatePercent:0,additionalServices:input.addOns,targetProjectDays:input.targetProjectDays??3,workdayHours:input.workdayHours??8};
+  const commercialInput:CommercialCalculatorInput={division:"Commercial",commercialType:input.serviceType,frequency:input.frequency,recurringPricingRuleId:input.recurringPricingRuleId,squareFeet:input.squareFeet,floors:1,restrooms:input.bathrooms,kitchens:1,stations:0,units:input.bedrooms,condition:input.condition,targetCompletionHours,workerHourlyPay,targetProfitMarginPercent,additionalDiscountPercent:input.additionalDiscountPercent,taxRatePercent:0,additionalServices:input.addOns,targetProjectDays:input.targetProjectDays??3,workdayHours:input.workdayHours??8};
   const calculated=calculateCommercialEstimate(commercialInput,catalog,service,"Residential");
-  return{...calculated,serviceName:service.service_name,scope:[`${input.serviceType} residential cleaning`,...input.addOns],calculatorInput:input};
+  return{...calculated,serviceName:service.service_name,scope:[],calculatorInput:input};
 }
 
 export function calculateCommercialEstimate(input: CommercialCalculatorInput, catalog: ServiceCatalogBundle, resolvedService?:ServiceCatalogBundle["services"][number], addonDivision:"Residential"|"Commercial"="Commercial"): EstimateResult {
@@ -68,17 +68,17 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
   const basePrice = directCost / Math.max(configured.minimumMarginDenominator, 1 - margin);
   const adjustments = configured.addonAdjustments;
   const oneTimePrice = basePrice;
-  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,manualDiscountPercent:input.additionalDiscountPercent});
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent});
   const recurringDiscountPercent = pricing.recurringDiscountPercent;
   const recurringDiscount = pricing.recurringDiscountAmount;
   const manualDiscount = pricing.manualDiscount;
   const totalDiscount = recurringDiscount + manualDiscount;
   const taxes = pricing.taxes;
   const finalPrice = pricing.finalPrice;
-  return result({ input, serviceName: `${input.commercialType} Cleaning`, catalogAddons:snapshots(input.additionalServices,availableAddons), basePrice, adjustments, oneTimePrice, recurringDiscount, recurringDiscountPercent, manualDiscount, totalDiscount, taxes, finalPrice, laborHours, crewSize, laborCost, supplyCost, scope: [`${input.commercialType} commercial cleaning`, ...input.additionalServices] });
+  return result({ input, serviceName: `${input.commercialType} Cleaning`, catalogAddons:snapshots(input.additionalServices,availableAddons), basePrice, adjustments, oneTimePrice, recurringPricingRuleId:pricing.recurringPricingRuleId, recurringPricingRuleName:pricing.recurringPricingRuleName, recurringDiscount, recurringDiscountPercent, manualDiscount, totalDiscount, taxes, finalPrice, laborHours, crewSize, laborCost, supplyCost, scope: [] });
 }
 
-function result(values: { input: ResidentialCalculatorInput | CommercialCalculatorInput; serviceName: string; catalogAddons:EstimateResult["catalogAddons"]; basePrice: number; adjustments: { label: string; amount: number }[]; oneTimePrice: number; recurringDiscount: number; recurringDiscountPercent: number; manualDiscount: number; totalDiscount: number; taxes: number; finalPrice: number; laborHours: number; crewSize: number; laborCost: number; supplyCost: number; scope: string[] }): EstimateResult {
+function result(values: { input: ResidentialCalculatorInput | CommercialCalculatorInput; serviceName: string; catalogAddons:EstimateResult["catalogAddons"]; basePrice: number; adjustments: { label: string; amount: number }[]; oneTimePrice: number; recurringPricingRuleId:string|null; recurringPricingRuleName:string|null; recurringDiscount: number; recurringDiscountPercent: number; manualDiscount: number; totalDiscount: number; taxes: number; finalPrice: number; laborHours: number; crewSize: number; laborCost: number; supplyCost: number; scope: string[] }): EstimateResult {
   const frequency = values.input.frequency;
   return { ...values, serviceDescription: null, basePrice: money(values.basePrice), adjustments: values.adjustments.map((item) => ({ ...item, amount: money(item.amount) })), oneTimePrice: money(values.oneTimePrice), recurringDiscount: money(values.recurringDiscount), manualDiscount: money(values.manualDiscount), totalDiscount: money(values.totalDiscount), taxes: money(values.taxes), finalPrice: money(values.finalPrice), monthlyPrice: estimatedMonthlyTotal(values.finalPrice,frequency), visitsPerMonth: estimatedVisitsPerMonth(frequency), laborHours: tenth(values.laborHours), crewSize: values.crewSize, estimatedDuration: tenth(values.laborHours / values.crewSize), laborCost: money(values.laborCost), supplyCost: money(values.supplyCost), estimatedProfit: money(values.finalPrice - values.laborCost - values.supplyCost), calculatorInput: values.input };
 }

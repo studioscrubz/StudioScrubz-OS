@@ -29,6 +29,7 @@ export type ResidentialCalculatorInput = {
   division: "Residential";
   serviceType: string;
   frequency: Frequency;
+  recurringPricingRuleId?: string | null;
   condition: Condition;
   squareFeet: number;
   bedrooms: number;
@@ -46,6 +47,7 @@ export type CommercialCalculatorInput = {
   division: "Commercial";
   commercialType: string;
   frequency: Frequency;
+  recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;
   restrooms: number;
@@ -74,6 +76,8 @@ export type EstimateResult = {
   oneTimePrice: number;
   recurringDiscount: number;
   recurringDiscountPercent: number;
+  recurringPricingRuleId?: string | null;
+  recurringPricingRuleName?: string | null;
   manualDiscount: number;
   totalDiscount: number;
   taxes: number;

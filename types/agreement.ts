@@ -16,6 +16,8 @@ export type AgreementPricingSnapshot = {
   service_description?: string | null;
   standard_service_price: number;
   frequency: AgreementFrequency;
+  recurring_pricing_rule_id?: string | null;
+  recurring_pricing_rule_name?: string | null;
   frequency_discount_label: string;
   frequency_discount_percent: number;
   frequency_discount_amount: number;
