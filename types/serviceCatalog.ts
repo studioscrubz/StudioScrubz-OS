@@ -16,6 +16,6 @@ export type ServiceLabel = { id:string; name:string; normalized_name:string; cre
 export type ServiceLabelAssignment = { service_id:string; label_id:string; created_at:string };
 export type CatalogAddonSnapshot = { id:string; catalogAddonId:string; name:string; description:string|null; price:number; pricingModel:ServicePricingModel; unitLabel:string|null };
 export type ServiceAddonInput = Omit<ServiceAddon,"id"|"created_at"|"updated_at"|"archived_at">;
-export type RecurringPricingRule = { id:string; service_id:string|null; frequency:string; adjustment_type:RecurringAdjustmentType; adjustment_value:number; is_active:boolean; created_at:string; updated_at:string };
+export type RecurringPricingRule = { id:string; rule_name:string|null; service_id:string|null; frequency:string; adjustment_type:RecurringAdjustmentType; adjustment_value:number; is_active:boolean; created_at:string; updated_at:string };
 export type RecurringPricingRuleInput = Omit<RecurringPricingRule,"id"|"created_at"|"updated_at">;
 export type ServiceCatalogBundle = { services:CatalogService[]; tiers:ServicePriceTier[]; addons:ServiceAddon[]; addonLinks:ServiceAddonLink[]; recurringRules:RecurringPricingRule[] };
