@@ -344,11 +344,12 @@ export async function getCurrentJobClockState(jobId: string): Promise<JobClockSt
     : null;
   return { clockedIn: Boolean(current), clockedInAt: current?.clock_in ?? null, timeEntryId: current?.id ?? null, activeWorkerCount: open.length };
 }
-export async function startOrClockInToJob(id: string): Promise<JobClockInResult> {
+export async function joinJob(id: string): Promise<JobClockInResult> {
   const { data, error } = await getSupabaseClient().rpc("start_or_clock_in_to_job", { p_job_id: id });
-  if (error) throw new Error(safeDatabaseMessage(error, "Job clock-in failed."));
+  if (error) throw new Error(safeDatabaseMessage(error, "Unable to join the Job."));
   return data as JobClockInResult;
 }
+export const startOrClockInToJob = joinJob;
 export async function startOperationalJob(id: string): Promise<JobWithRelations> {
   const { data, error } = await getSupabaseClient().rpc("start_operational_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be started."));
@@ -364,7 +365,7 @@ export async function completeInProgressJob(id: string): Promise<JobCompletionRe
   if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
   return createCompletedJobInvoice(operationalJob(data));
 }
-export const startJob = startOrClockInToJob;
+export const startJob = joinJob;
 export const updateJobInternalNotes = (id: string, notes: string) =>
   updateJob(id, { internal_notes: notes || null });
 export const completeJob = completeInProgressJob;
