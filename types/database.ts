@@ -16,7 +16,7 @@ import type {ServiceAgreement,AgreementInput,AgreementUpdate} from "@/types/agre
 import type {ServiceOccurrence} from "@/types/serviceOccurrence";
 import type {AgreementDocumentInsert,ServiceAgreementDocument} from "@/types/agreementDocument";
 import type {UserProfile} from "@/types/auth";
-import type {CatalogService,RecurringPricingRule,RecurringPricingRuleInput,ServiceAddon,ServiceAddonInput,ServiceAddonLink,ServiceInput,ServicePriceTier,ServicePriceTierInput} from "@/types/serviceCatalog";
+import type {CatalogService,RecurringPricingRule,RecurringPricingRuleInput,ServiceAddon,ServiceAddonInput,ServiceAddonLink,ServiceInput,ServiceLabel,ServiceLabelAssignment,ServicePriceTier,ServicePriceTierInput} from "@/types/serviceCatalog";
 import type {BusinessIdentitySettings,BusinessSettings,BusinessSettingsUpdate} from "@/types/businessSettings";
 import type {ClientCommunication,ClientCommunicationInput} from "@/types/clientCommunication";
 import type {AttentionStateRecord} from "@/types/attention";
@@ -93,6 +93,8 @@ export interface Database {
       service_price_tiers:{Row:ServicePriceTier;Insert:ServicePriceTierInput;Update:Partial<ServicePriceTierInput>;Relationships:[{foreignKeyName:"service_price_tiers_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
       service_addons:{Row:ServiceAddon;Insert:ServiceAddonInput;Update:Partial<ServiceAddonInput>&{archived_at?:string|null};Relationships:[]};
       service_addon_links:{Row:ServiceAddonLink;Insert:ServiceAddonLink;Update:never;Relationships:[{foreignKeyName:"service_addon_links_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]},{foreignKeyName:"service_addon_links_addon_id_fkey";columns:["addon_id"];isOneToOne:false;referencedRelation:"service_addons";referencedColumns:["id"]}]};
+      service_labels:{Row:ServiceLabel;Insert:{id?:string;name:string;created_at?:string;updated_at?:string};Update:{name?:string;updated_at?:string};Relationships:[]};
+      service_label_assignments:{Row:ServiceLabelAssignment;Insert:{service_id:string;label_id:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"service_label_assignments_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]},{foreignKeyName:"service_label_assignments_label_id_fkey";columns:["label_id"];isOneToOne:false;referencedRelation:"service_labels";referencedColumns:["id"]}]};
       recurring_pricing_rules:{Row:RecurringPricingRule;Insert:RecurringPricingRuleInput;Update:Partial<RecurringPricingRuleInput>;Relationships:[{foreignKeyName:"recurring_pricing_rules_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
       business_settings:{Row:BusinessSettings;Insert:BusinessSettingsUpdate&{id?:string};Update:Partial<BusinessSettingsUpdate>;Relationships:[]};
       client_communications:{Row:ClientCommunication;Insert:ClientCommunicationInput&{id?:string;communication_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:Partial<ClientCommunication>;Relationships:[{foreignKeyName:"client_communications_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"client_communications_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"client_communications_estimate_id_fkey";columns:["estimate_id"];isOneToOne:false;referencedRelation:"estimates";referencedColumns:["id"]},{foreignKeyName:"client_communications_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"client_communications_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"client_communications_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"client_communications_sent_by_user_id_fkey";columns:["sent_by_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
@@ -110,6 +112,7 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
       get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
       get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
