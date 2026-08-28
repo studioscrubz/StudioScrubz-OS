@@ -1,0 +1,3 @@
+{
+  "crons": [{ "path": "/api/integrations/google-calendar/process", "schedule": "* * * * *" }]
+}

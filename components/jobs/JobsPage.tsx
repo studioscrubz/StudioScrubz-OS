@@ -30,6 +30,7 @@ import { useOperationalRealtime } from "@/components/realtime/OperationalRealtim
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
+import { JobCalendarStatus } from "@/components/jobs/JobCalendarStatus";
 import { getTimeEntries } from "@/lib/services/timeEntries";
 import {
   JOB_STATUSES,
@@ -601,6 +602,7 @@ function JobModal({
       <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
+      <JobCalendarStatus jobId={job.id} />
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       {showLifecycle && (
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">

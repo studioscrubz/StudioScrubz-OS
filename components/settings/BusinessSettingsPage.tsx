@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getBusinessSettings, updateBusinessSettings } from "@/lib/services/businessSettings";
 import type { BusinessSettings, BusinessSettingsUpdate } from "@/types/businessSettings";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
+import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
 
 const textFields: Array<[keyof BusinessSettings, string]> = [
   ["business_name","Business Name"],["tagline","Tagline"],["business_email","Business Email"],
@@ -21,7 +22,7 @@ export function BusinessSettingsPage(){
     <Section title="Proposal Defaults"><Grid><NumberField label="Default proposal expiration days" value={value.default_proposal_expiration_days} set={x=>set("default_proposal_expiration_days",x)}/><Area label="Default proposal terms" value={value.default_proposal_terms??""} set={x=>set("default_proposal_terms",x||null)}/></Grid></Section>
     <Section title="Service Agreement Defaults"><Grid><Area label="Default Service Agreement Terms" value={value.default_service_agreement_terms??""} set={x=>set("default_service_agreement_terms",x||null)} large/><Area label="Default Cancellation Terms" value={value.default_cancellation_terms??""} set={x=>set("default_cancellation_terms",x||null)} large/></Grid></Section>
     <Section title="Invoice Defaults"><Grid><NumberField label="Default invoice due days" value={value.default_invoice_due_days} set={x=>set("default_invoice_due_days",x)}/><Area label="Default payment terms" value={value.default_payment_terms??""} set={x=>set("default_payment_terms",x||null)}/><Area label="Default invoice terms" value={value.default_invoice_terms??""} set={x=>set("default_invoice_terms",x||null)}/></Grid></Section>
-    <button disabled={saving} className="mt-6 rounded-lg bg-[#143d1a] px-5 py-3 font-bold text-white" onClick={()=>void save()}>{saving?"Saving…":"Save Business Settings"}</button></>;
+    <GoogleCalendarSettings/><button disabled={saving} className="mt-6 rounded-lg bg-[#143d1a] px-5 py-3 font-bold text-white" onClick={()=>void save()}>{saving?"Saving…":"Save Business Settings"}</button></>;
 }
 function Section({title,children}:{title:string;children:React.ReactNode}){return <section className="mt-6 rounded-xl border bg-white p-6"><h2 className="text-lg font-extrabold text-[#143d1a]">{title}</h2><div className="mt-4">{children}</div></section>}
 function Grid({children}:{children:React.ReactNode}){return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</div>}
