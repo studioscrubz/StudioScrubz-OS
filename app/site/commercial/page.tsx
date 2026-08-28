@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ContactBand, EstimateCta, FeatureList, PageHero, SectionHeading } from "@/components/site/SiteSections";
-export const metadata: Metadata = { title: { absolute: "Commercial Cleaning | StudioScrubz" }, description: "Commercial janitorial, recurring cleaning, unit turns, common-area cleaning, and one-time deep cleaning in Greater Los Angeles.", alternates: { canonical: "https://studioscrubz.com/commercial" } };
+export const metadata: Metadata = { title: { absolute: "Commercial Cleaning in Greater Los Angeles | StudioScrubz" }, description: "Commercial janitorial, office, apartment-community, property-management, and recurring cleaning across Greater Los Angeles and the San Fernando Valley.", alternates: { canonical: "https://studioscrubz.com/commercial" } };
 
 const commercialSpaces = [
   ["Offices", "Professional cleaning designed for offices, reception areas, workspaces, breakrooms, restrooms, and common areas. Service may focus on accessible surfaces, floors, trash, high-touch areas, and the overall presentation of the workplace."],

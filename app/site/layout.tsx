@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://studioscrubz.com"),
   applicationName: "StudioScrubz",
   manifest: null,
-  title: { default: "StudioScrubz | Residential & Commercial Cleaning", template: "%s | StudioScrubz" },
-  description: "Residential cleaning, commercial cleaning, post-construction cleaning, and pressure washing in the Los Angeles area.",
+  title: { default: "StudioScrubz | Cleaning Services in Greater Los Angeles", template: "%s | StudioScrubz" },
+  description: "Residential, commercial, property, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
   keywords: ["residential cleaning", "commercial cleaning", "property management cleaning", "post-construction cleaning", "San Fernando Valley cleaning", "Los Angeles cleaning"],
   alternates: { canonical: "https://studioscrubz.com" },
   robots: { index: true, follow: true },
@@ -19,5 +19,15 @@ export const metadata: Metadata = {
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const contact = await getPublicBusinessContact();
-  return <div className="min-h-screen bg-[#fbfcf9] text-[#18201a]"><SiteHeader phone={contact.phone}/><main>{children}</main><SiteFooter businessName={contact.businessName} phone={contact.phone} email={contact.email}/></div>;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CleaningService",
+    name: contact.businessName,
+    url: "https://studioscrubz.com",
+    logo: "https://studioscrubz.com/branding/studioscrubz-logo.png",
+    areaServed: ["Greater Los Angeles", "San Fernando Valley", "High Desert"],
+    ...(contact.phone ? { telephone: contact.phone } : {}),
+    ...(contact.email ? { email: contact.email } : {}),
+  };
+  return <div className="min-h-screen bg-[#fbfcf9] text-[#18201a]"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}/><SiteHeader phone={contact.phone}/><main>{children}</main><SiteFooter businessName={contact.businessName} phone={contact.phone} email={contact.email}/></div>;
 }

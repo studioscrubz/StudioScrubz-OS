@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ContactBand, FeatureList, PageHero, SectionHeading } from "@/components/site/SiteSections";
-export const metadata: Metadata = { title: { absolute: "Residential Cleaning | StudioScrubz" }, description: "Flexible residential cleaning, deep cleaning, move-in and move-out cleaning, and monthly upkeep in the Los Angeles area.", alternates: { canonical: "https://studioscrubz.com/residential" } };
+export const metadata: Metadata = { title: { absolute: "Residential Cleaning in Los Angeles | StudioScrubz" }, description: "Standard, deep, move-in and move-out, and recurring residential cleaning across Greater Los Angeles and the San Fernando Valley.", alternates: { canonical: "https://studioscrubz.com/residential" } };
 
 const residentialServices = [
   ["Standard Cleaning", "Routine cleaning designed to keep your home fresh, comfortable, and maintained. Depending on the space, service may include general dusting, accessible surfaces, kitchen and bathroom cleaning, mirrors, floors, trash removal, and light tidying."],
