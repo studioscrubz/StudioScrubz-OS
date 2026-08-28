@@ -17,6 +17,7 @@ import { employeeName } from "@/types/employee";
 import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import type { Invoice } from "@/types/invoice";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
+import { requestPendingJobCalendarSync } from "@/lib/google-calendar/client";
 
 export type JobCompletionResult = {
   job: JobWithRelations;
@@ -122,7 +123,9 @@ export async function createJobFromProposal(
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be created."));
   if (!data) throw new Error("The Job creation result was empty.");
   const visible = await getJobForProposal(proposalId).catch(() => null);
-  return visible ?? fullJob(data);
+  const job = visible ?? fullJob(data);
+  await requestPendingJobCalendarSync(job.id);
+  return job;
 }
 export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
   const { data, error } = await getSupabaseClient().rpc("create_direct_operational_job", {
@@ -141,7 +144,9 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
   });
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be created."));
   if (!data) throw new Error("The Job creation result was empty.");
-  return getJobById(data.id).catch(() => fullJob(data));
+  const job = await getJobById(data.id).catch(() => fullJob(data));
+  await requestPendingJobCalendarSync(job.id);
+  return job;
 }
 export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRelations> {
   if (!(await master())) {
@@ -152,7 +157,10 @@ export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRe
       p_estimated_duration:input.estimated_duration,p_assigned_crew_id:input.assigned_crew_id,
       p_internal_notes:input.internal_notes,p_status:input.status,
     });
-    if (error) throw error; return operationalJob(data);
+    if (error) throw error;
+    const job=operationalJob(data);
+    await requestPendingJobCalendarSync(job.id);
+    return job;
   }
   const { data, error } = await getSupabaseClient()
     .from("jobs")
@@ -161,7 +169,9 @@ export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRe
     .select()
     .single();
   if (error) throw error;
-  return fullJob(data);
+  const job=fullJob(data);
+  await requestPendingJobCalendarSync(job.id);
+  return job;
 }
 export async function updateJobStatus(id: string, status: JobStatus) {
   if (status === "Scheduled") {

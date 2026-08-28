@@ -4,6 +4,7 @@ import { getAgreementById } from "@/lib/services/agreements";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
 import type { ServiceOccurrence, ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 import type { JobWithRelations } from "@/types/job";
+import { requestPendingJobCalendarSync } from "@/lib/google-calendar/client";
 
 const deletedOccurrenceMarker = "[Deleted upcoming service — retained to prevent schedule regeneration]";
 const reconciledOccurrenceMarker = "[Cancelled by Agreement schedule reconciliation]";
@@ -52,7 +53,9 @@ export async function createJobFromOccurrence(id: string): Promise<JobWithRelati
   const { data, error } = await getSupabaseClient().rpc("create_job_from_service_occurrence", { p_occurrence_id: id });
   if (error) throw error;
   const { getJobById } = await import("@/lib/services/jobs");
-  return getJobById(data.id);
+  const job=await getJobById(data.id);
+  await requestPendingJobCalendarSync(job.id);
+  return job;
 }
 
 export const skipOccurrence = (id: string) => update(id, { status: "Skipped" });
