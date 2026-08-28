@@ -25,7 +25,18 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     name: contact.businessName,
     url: "https://studioscrubz.com",
     logo: "https://studioscrubz.com/branding/studioscrubz-logo.png",
-    areaServed: ["Greater Los Angeles", "San Fernando Valley", "High Desert"],
+    description: "Residential, commercial, post-construction, and pressure-washing services for properties across Los Angeles County and surrounding service areas.",
+    areaServed: ["Los Angeles County", "Greater Los Angeles", "San Fernando Valley", "Winnetka", "Canoga Park", "Woodland Hills", "Reseda", "Chatsworth", "Northridge", "Van Nuys", "Encino", "Tarzana", "High Desert"],
+    hasOfferCatalog: {
+      "@type": "OfferCatalog",
+      name: "Cleaning services",
+      itemListElement: [
+        ["Residential Cleaning", "https://studioscrubz.com/residential"],
+        ["Commercial Cleaning", "https://studioscrubz.com/commercial"],
+        ["Post-Construction Cleaning", "https://studioscrubz.com/post-construction"],
+        ["Pressure Washing", "https://studioscrubz.com/pressure-washing"],
+      ].map(([name, url]) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name, url } })),
+    },
     ...(contact.phone ? { telephone: contact.phone } : {}),
     ...(contact.email ? { email: contact.email } : {}),
   };
