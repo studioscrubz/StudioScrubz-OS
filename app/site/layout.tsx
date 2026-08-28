@@ -12,6 +12,10 @@ export const metadata: Metadata = {
   description: "Residential, commercial, property, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
   keywords: ["residential cleaning", "commercial cleaning", "property management cleaning", "post-construction cleaning", "San Fernando Valley cleaning", "Los Angeles cleaning"],
   alternates: { canonical: "https://studioscrubz.com" },
+  icons: {
+    icon: [{ url: "/branding/site-icon-192.png", type: "image/png", sizes: "192x192" }],
+    apple: [{ url: "/branding/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+  },
   robots: { index: true, follow: true },
   openGraph: { type: "website", siteName: "StudioScrubz", title: "StudioScrubz | Residential & Commercial Cleaning", description: "Professional residential and commercial cleaning across the Los Angeles area.", url: "https://studioscrubz.com", images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }] },
   twitter: { card: "summary_large_image", title: "StudioScrubz | Residential & Commercial Cleaning", description: "Professional residential and commercial cleaning across the Los Angeles area.", images: ["/branding/studioscrubz-logo.png"] },
