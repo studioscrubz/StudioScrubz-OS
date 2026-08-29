@@ -37,6 +37,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       itemListElement: [
         ["Residential Cleaning", "https://studioscrubz.com/residential"],
         ["Commercial Cleaning", "https://studioscrubz.com/commercial"],
+        ["Property Management Cleaning", "https://studioscrubz.com/property-management"],
+        ["Airbnb / Short-Term Rental Cleaning", "https://studioscrubz.com/airbnb-cleaning"],
         ["Post-Construction Cleaning", "https://studioscrubz.com/post-construction"],
         ["Pressure Washing", "https://studioscrubz.com/pressure-washing"],
       ].map(([name, url]) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name, url } })),

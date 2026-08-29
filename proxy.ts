@@ -19,7 +19,7 @@ export async function proxy(request: NextRequest) {
     const publicDocument = pathname.startsWith("/api/public/")
       || ["/agreement/", "/estimate/", "/invoice/", "/proposal/"].some((prefix) => pathname.startsWith(prefix));
     if (publicDocument) return updateSession(request);
-    const marketingPaths = new Set(["/", "/residential", "/commercial", "/post-construction", "/pressure-washing", "/about", "/contact"]);
+    const marketingPaths = new Set(["/", "/residential", "/commercial", "/property-management", "/airbnb-cleaning", "/post-construction", "/pressure-washing", "/about", "/contact"]);
     if (marketingPaths.has(pathname)) {
       const destination = request.nextUrl.clone();
       destination.pathname = pathname === "/" ? "/site" : `/site${pathname}`;
