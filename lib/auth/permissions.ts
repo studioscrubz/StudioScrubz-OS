@@ -10,7 +10,7 @@ export const PERMISSIONS = [
   "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "employees.manage",
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll",
   "payrollPrep.view", "agreements.view", "agreements.manage",
-  "invoices.view", "invoices.create", "invoices.edit", "invoices.recordPayment",
+  "invoices.view", "invoices.create", "invoices.edit", "invoices.send", "invoices.recordPayment",
   "finances.view", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage",
   "communications.view", "communications.create", "communications.archive",
@@ -28,7 +28,7 @@ const operationalAdmin: Permission[] = [
   "jobs.complete", "jobs.archive", "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "employees.manage",
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll",
   "agreements.view", "agreements.manage", "invoices.view", "invoices.create",
-  "invoices.edit", "archives.view", "archives.restore", "communications.view",
+  "invoices.edit", "invoices.send", "archives.view", "archives.restore", "communications.view",
   "communications.create", "communications.archive", "attention.view",
 ];
 
@@ -42,7 +42,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
     "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "crews.view", "crews.manage",
     "timeClock.view", "timeClock.manageAll", "agreements.view", "agreements.manage",
-    "invoices.view", "communications.view", "communications.create", "communications.archive", "attention.view",
+    "invoices.view", "invoices.send", "communications.view", "communications.create", "communications.archive", "attention.view",
   ]),
   Sales: new Set([
     "dashboard.view", "clients.view", "clients.create", "clients.edit", "properties.view",

@@ -114,7 +114,7 @@ async function loadReplyTo(admin: ReturnType<typeof createSupabaseAdminClient>):
   if (!EMAIL_PATTERN.test(replyTo)) throw new Error("A valid Business Email is required in Business Settings before sending customer email.");
   return replyTo;
 }
-function permissionFor(type: DocumentType): Permission { return type === "Estimate" ? "estimates.edit" : type === "Proposal" ? "proposals.send" : type === "Service Agreement" ? "agreements.manage" : "invoices.edit"; }
+function permissionFor(type: DocumentType): Permission { return type === "Estimate" ? "estimates.edit" : type === "Proposal" ? "proposals.send" : type === "Service Agreement" ? "agreements.manage" : "invoices.send"; }
 function documentTypeValue(value: unknown): DocumentType { if (["Estimate", "Proposal", "Service Agreement", "Invoice"].includes(String(value))) return value as DocumentType; throw new Error("A supported document type is required."); }
 function requiredText(value: unknown, label: string, max = 100) { if (typeof value !== "string" || !value.trim() || value.trim().length > max) throw new Error(`${label} is required.`); return value.trim(); }
 function communicationNumber() { const date = new Date().toISOString().slice(0, 10).replaceAll("-", ""); return `COMM-${date}-${String(randomInt(10000)).padStart(4, "0")}`; }
