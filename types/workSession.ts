@@ -17,3 +17,10 @@ export type ActiveEmployeeWorkSession = Pick<
   employee_number: string;
   employee_name: string;
 };
+
+export type ActiveStaffStatus = ActiveEmployeeWorkSession & {
+  availability: "Active / Available" | "On Job / Unavailable";
+  job_id: string | null;
+  job_number: string | null;
+  joined_at: string | null;
+};

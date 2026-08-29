@@ -29,11 +29,12 @@ export async function getTimeEntries(): Promise<TimeEntryWithRelations[]> {
   return data as TimeEntryWithRelations[];
 }
 export async function getOpenTimeEntries() {
-  if (!(await master())) return (await getOperationalTimeEntries()).filter((entry)=>entry.status==="Open"&&!entry.clock_out&&!entry.archived_at);
+  if (!(await master())) return (await getOperationalTimeEntries()).filter((entry)=>Boolean(entry.job_id)&&entry.status==="Open"&&!entry.clock_out&&!entry.archived_at);
   const { data, error } = await getSupabaseClient()
     .from("time_entries")
     .select(select)
     .eq("status", "Open")
+    .not("job_id", "is", null)
     .is("clock_out", null)
     .is("archived_at", null)
     .order("clock_in");
@@ -44,7 +45,7 @@ export async function getOperationalActiveTimeEntries(): Promise<OperationalActi
   const { data, error } = await getSupabaseClient().rpc("get_operational_time_entries");
   if (error) throw error;
   return (data ?? [])
-    .filter((entry) => entry.status === "Open" && !entry.clock_out && !entry.archived_at && Boolean(entry.employee_id))
+    .filter((entry) => entry.status === "Open" && !entry.clock_out && !entry.archived_at && Boolean(entry.employee_id) && Boolean(entry.job_id))
     .sort((a, b) => Date.parse(a.clock_in) - Date.parse(b.clock_in))
     .map((entry) => ({
       id: entry.id,
@@ -55,103 +56,14 @@ export async function getOperationalActiveTimeEntries(): Promise<OperationalActi
       job_number: entry.job_number,
     }));
 }
-export async function clockInCurrentEmployeeGeneral() {
-  const profile = await getCurrentProfile();
-  if (!profile?.employee_id) throw new Error("Your user profile is not linked to an Employee.");
-  const { data, error } = await getSupabaseClient().rpc("clock_in_operational", {
-    p_employee_id: profile.employee_id,
-    p_job_id: null,
-    p_crew_id: null,
-    p_entry_type: "Other",
-    p_clock_in: new Date().toISOString(),
-    p_notes: "General work clock-in from Dashboard",
-  });
-  if (error) throw new Error(safeOperationalMessage(error, "Clock-in failed. Please try again."));
-  return data;
-}
-export async function clockOutCurrentEmployeeGeneral(timeEntryId: string, breakMinutes: number) {
-  const profile = await getCurrentProfile();
-  if (!profile?.employee_id) throw new Error("Your user profile is not linked to an Employee.");
-  const current = (await getOperationalActiveTimeEntries()).find((entry) => entry.employee_id === profile.employee_id);
-  if (!current || current.id !== timeEntryId) throw new Error("Your active time entry could not be confirmed.");
-  if (current.job_id) throw new Error("End Job participation from the Job workflow.");
-  const { data, error } = await getSupabaseClient().rpc("clock_out_operational", {
-    p_time_entry_id: timeEntryId,
-    p_clock_out: new Date().toISOString(),
-    p_break_minutes: breakMinutes,
-  });
-  if (error) throw new Error(safeOperationalMessage(error, "Clock-out failed. Please try again."));
-  return data;
-}
 export async function getTimeEntriesForEmployee(employeeId: string) {
   return filtered("employee_id", employeeId);
 }
 export async function getTimeEntriesForJob(jobId: string) {
   return filtered("job_id", jobId);
 }
-export async function clockInEmployee(
-  input: Omit<TimeEntryInput, "clock_out" | "break_minutes">,
-): Promise<TimeEntry> {
-  if (!(await master())) {
-    const {data,error}=await getSupabaseClient().rpc("clock_in_operational",{p_employee_id:input.employee_id,p_job_id:input.job_id,p_crew_id:input.crew_id,p_entry_type:input.entry_type,p_clock_in:input.clock_in,p_notes:input.notes});
-    if(error)throw error;return operationalEntry(data);
-  }
-  const existing = await getOpenForEmployee(input.employee_id);
-  if (existing)
-    throw new Error(
-      `${employeeName(existing.employee)} is already clocked in.`,
-    );
-  for (let i = 0; i < 5; i++) {
-    const { data, error } = await getSupabaseClient()
-      .from("time_entries")
-      .insert({
-        ...input,
-        clock_out: null,
-        break_minutes: 0,
-        time_entry_number: number(),
-        status: "Open",
-      })
-      .select()
-      .single();
-    if (!error) return data;
-    if (error.code === "23505") {
-      const open = await getOpenForEmployee(input.employee_id);
-      if (open)
-        throw new Error(
-          `${employeeName(open.employee)} is already clocked in.`,
-        );
-      continue;
-    }
-    throw error;
-  }
-  throw new Error("A unique time entry number could not be generated.");
-}
-export async function clockOutEmployee(
-  id: string,
-  clockOut: string,
-  breakMinutes: number,
-) {
-  if (!(await master())) {
-    const {data,error}=await getSupabaseClient().rpc("clock_out_operational",{p_time_entry_id:id,p_clock_out:clockOut,p_break_minutes:breakMinutes});
-    if(error)throw error;return operationalEntry(data);
-  }
-  const entry = await getById(id);
-  if (entry.status !== "Open" || entry.clock_out)
-    throw new Error("This time entry is not currently open.");
-  calculatePaidHours(entry.clock_in, clockOut, breakMinutes);
-  const { error } = await getSupabaseClient()
-    .from("time_entries")
-    .update({
-      clock_out: clockOut,
-      break_minutes: breakMinutes,
-      status: "Completed",
-    })
-    .eq("id", id);
-  if (error) throw error;
-  await recalculateEmployeeDay(entry.employee_id, entry.work_date);
-  return getById(id);
-}
 export async function createManualTimeEntry(input: TimeEntryInput) {
+  if (!input.job_id) throw new Error("A Job is required for payable time.");
   if (!(await master())) return saveOperational(null,input);
   if (!input.clock_out)
     throw new Error("Manual completed entries require a clock-out time.");
@@ -179,6 +91,7 @@ export async function createManualTimeEntry(input: TimeEntryInput) {
   throw new Error("A unique time entry number could not be generated.");
 }
 export async function updateTimeEntry(id: string, input: TimeEntryInput) {
+  if (!input.job_id) throw new Error("A Job is required for payable time.");
   if (!(await master())) return saveOperational(id,input);
   const before = await getById(id);
   if (input.clock_out)
@@ -456,7 +369,7 @@ async function employeeRow(id: string) {
   return data;
 }
 function paid(x: TimeEntry) {
-  return ["Completed", "Approved"].includes(x.status) && !x.archived_at;
+  return Boolean(x.job_id) && ["Completed", "Approved"].includes(x.status) && !x.archived_at;
 }
 function sum(
   rows: TimeEntry[],
@@ -480,5 +393,4 @@ async function master(){return isMasterAdmin(await getCurrentProfile())}
 async function getOperationalTimeEntries(){const{data,error}=await getSupabaseClient().rpc("get_operational_time_entries");if(error)throw error;return data.map(operationalEntry)}
 function operationalEntry(row:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}):TimeEntryWithRelations{return{...row,hourly_rate_snapshot:0,overtime_rate_snapshot:0,regular_pay:0,overtime_pay:0,gross_pay:0,employee:row.employee_id?{id:row.employee_id,employee_number:row.employee_number,first_name:row.employee_name,last_name:"",preferred_name:null,email:null,phone:null,department:"Scrub Technicians",job_title:null,employment_status:"Active",employment_type:null,hourly_rate:0,overtime_rate:0,commission_rate:0,hire_date:null,notes:null,created_at:row.created_at,updated_at:row.updated_at,archived_at:null}:null,job:null,crew:null}}
 async function saveOperational(id:string|null,input:TimeEntryInput){const{data,error}=await getSupabaseClient().rpc("save_operational_time_entry",{p_time_entry_id:id,p_employee_id:input.employee_id,p_job_id:input.job_id,p_crew_id:input.crew_id,p_entry_type:input.entry_type,p_clock_in:input.clock_in,p_clock_out:input.clock_out??null,p_break_minutes:input.break_minutes??0,p_notes:input.notes});if(error)throw error;return operationalEntry(data)}
-function safeOperationalMessage(cause: unknown, fallback: string) { const detail = cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string" ? cause.message.trim() : ""; return detail && !/jwt|token|secret|authorization header|service[_ -]?role/i.test(detail) ? detail : fallback; }
 async function reviewOperational(id:string,status:"Approved"|"Rejected"|"Archived",notes:string|null){const{data,error}=await getSupabaseClient().rpc("review_operational_time_entry",{p_time_entry_id:id,p_status:status,p_notes:notes});if(error)throw error;return operationalEntry(data)}

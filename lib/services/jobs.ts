@@ -7,7 +7,6 @@ import type {
   JobWithRelations,
   DirectJobInput,
   JobClockInResult,
-  JobClockOutResult,
   JobClockState,
 } from "@/types/job";
 import type { CrewWithRelations } from "@/types/crew";
@@ -365,11 +364,6 @@ export async function startOperationalJob(id: string): Promise<JobWithRelations>
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be started."));
   return operationalJob(data);
 }
-export async function finishJobAndClockOut(id: string, breakMinutes = 0): Promise<JobClockOutResult> {
-  const { data, error } = await getSupabaseClient().rpc("finish_job_and_clock_out", { p_job_id: id, p_break_minutes: breakMinutes });
-  if (error) throw new Error(safeDatabaseMessage(error, "Job clock-out failed."));
-  return data as JobClockOutResult;
-}
 export async function completeInProgressJob(id: string): Promise<JobCompletionResult> {
   const { data, error } = await getSupabaseClient().rpc("complete_in_progress_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
@@ -379,8 +373,11 @@ export const startJob = joinJob;
 export const updateJobInternalNotes = (id: string, notes: string) =>
   updateJob(id, { internal_notes: notes || null });
 export const completeJob = completeInProgressJob;
-export const cancelJob = (id: string, note: string) =>
-  updateJob(id, { status: "Cancelled", internal_notes: note || null });
+export async function cancelJob(id: string, note: string) {
+  const { data, error } = await getSupabaseClient().rpc("cancel_operational_job", { p_job_id: id, p_note: note || null });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job cancellation failed."));
+  return operationalJob(data);
+}
 export async function archiveJob(id: string): Promise<JobWithRelations> {
   const { data, error } = await getSupabaseClient().rpc("archive_operational_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be archived."));

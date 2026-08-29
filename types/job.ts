@@ -126,16 +126,6 @@ export type JobClockInResult = {
   timeEntryId: string;
   jobStarted: boolean;
 };
-export type JobClockOutResult = {
-  jobId: string;
-  jobStatus: "In Progress";
-  clockedIn: false;
-  clockedOutAt: string;
-  timeEntryId: string;
-  remainingActiveWorkers: number;
-  jobCompleted: false;
-  completionPending: boolean;
-};
 export type CrewConflict = Pick<
   JobWithRelations,
   | "id"

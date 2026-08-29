@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   approveTimeEntry,
   archiveTimeEntry,
-  clockInEmployee,
-  clockOutEmployee,
   createManualTimeEntry,
   getTimeEntries,
   rejectTimeEntry,
@@ -37,7 +35,7 @@ export function TimeClockPage() {
     [error, setError] = useState<string | null>(null),
     [notice, setNotice] = useState<string | null>(null),
     [modal, setModal] = useState<
-      "clock" | "manual" | TimeEntryWithRelations | null
+      "manual" | TimeEntryWithRelations | null
     >(null),
     [employee, setEmployee] = useState("All"),
     [crew, setCrew] = useState("All"),
@@ -76,7 +74,7 @@ export function TimeClockPage() {
     };
   }, []);
   const open = rows.filter(
-      (x) => x.status === "Open" && !x.clock_out && !x.archived_at,
+      (x) => Boolean(x.job_id) && x.status === "Open" && !x.clock_out && !x.archived_at,
     ),
     visible = useMemo(
       () =>
@@ -119,14 +117,11 @@ export function TimeClockPage() {
       <header className="border-b pb-7">
         <h1 className="text-3xl font-extrabold text-[#143d1a]">Time Clock</h1>
         <p className="mt-3 text-neutral-600">
-          Track StudioScrubz employee hours and job labor.
+          Review job-linked payroll time and approved corrections.
         </p>
         <div className="mt-5 flex gap-2">
-          <button className={primary} onClick={() => setModal("clock")}>
-            Clock In Employee
-          </button>
           {canCorrectTime && <button className={secondary} onClick={() => setModal("manual")}>
-            Add Time Entry
+            Add Job Time Correction
           </button>}
         </div>
       </header>
@@ -149,36 +144,12 @@ export function TimeClockPage() {
               <p className="text-xs">
                 Clocked in {new Date(x.clock_in).toLocaleString()}
               </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  className={primary}
-                  onClick={() => {
-                    const value = window.prompt("Break minutes", "0");
-                    if (value !== null)
-                      void act(
-                        () =>
-                          clockOutEmployee(
-                            x.id,
-                            new Date().toISOString(),
-                            Number(value),
-                          ),
-                        "Employee clocked out.",
-                      );
-                  }}
-                >
-                  Clock Out
-                </button>
-                {x.job_id && (
-                  <Link className={secondary} href={`/jobs?jobId=${x.job_id}`}>
-                    View Job
-                  </Link>
-                )}
-              </div>
+              <div className="mt-3 flex gap-2"><Link className={secondary} href={`/jobs?jobId=${x.job_id}`}>View Job</Link></div>
             </article>
           ))}
         </div>
         {!open.length && !loading && (
-          <Empty text="No employees are currently clocked in." />
+          <Empty text="No employees are currently On Job." />
         )}
       </section>
       <section className="mt-8 grid gap-2 rounded-2xl border bg-white p-4 md:grid-cols-3 xl:grid-cols-7">
@@ -361,7 +332,7 @@ function EntryForm({
   close,
   saved,
 }: {
-  mode: "clock" | "manual" | TimeEntryWithRelations;
+  mode: "manual" | TimeEntryWithRelations;
   employees: Employee[];
   crews: CrewWithRelations[];
   jobs: JobWithRelations[];
@@ -369,7 +340,6 @@ function EntryForm({
   saved: () => Promise<void>;
 }) {
   const existing = typeof mode === "object" ? mode : null,
-    isClock = mode === "clock",
     [v, setV] = useState<TimeEntryInput>(
       existing
         ? pick(existing)
@@ -379,7 +349,7 @@ function EntryForm({
             crew_id: null,
             work_date: today(),
             clock_in: toLocalInput(new Date()),
-            clock_out: isClock ? null : toLocalInput(new Date()),
+            clock_out: toLocalInput(new Date()),
             break_minutes: 0,
             entry_type: "Job",
             notes: null,
@@ -400,6 +370,7 @@ function EntryForm({
   }
   async function submit() {
     if (!v.employee_id) return setError("Employee is required.");
+    if (!v.job_id) return setError("A Job is required for payable time.");
     setSaving(true);
     try {
       const input = {
@@ -408,10 +379,6 @@ function EntryForm({
         clock_out: v.clock_out ? new Date(v.clock_out).toISOString() : null,
       };
       if (existing) await updateTimeEntry(existing.id, input);
-      else if (isClock)
-        await clockInEmployee({
-          ...input,
-        });
       else await createManualTimeEntry(input);
       await saved();
     } catch (x) {
@@ -424,9 +391,7 @@ function EntryForm({
       title={
         existing
           ? `Edit ${existing.time_entry_number}`
-          : isClock
-            ? "Clock In Employee"
-            : "Add Time Entry"
+          : "Add Job Time Correction"
       }
       close={close}
     >
@@ -441,7 +406,7 @@ function EntryForm({
           ])}
         />
         <Assoc
-          l="Job (optional)"
+          l="Job"
           v={v.job_id}
           set={job}
           rows={jobs.map((x) => [
@@ -473,22 +438,8 @@ function EntryForm({
           v={v.clock_in}
           set={(x) => set("clock_in", x)}
         />
-        {!isClock && (
-          <>
-            <Field
-              l="Clock Out"
-              type="datetime-local"
-              v={v.clock_out ?? ""}
-              set={(x) => set("clock_out", x || null)}
-            />
-            <Field
-              l="Break Minutes"
-              type="number"
-              v={String(v.break_minutes)}
-              set={(x) => set("break_minutes", Number(x))}
-            />
-          </>
-        )}
+        <Field l="Clock Out" type="datetime-local" v={v.clock_out ?? ""} set={(x) => set("clock_out", x || null)} />
+        <Field l="Break Minutes" type="number" v={String(v.break_minutes)} set={(x) => set("break_minutes", Number(x))} />
       </div>
       <label className="mt-3 block">
         Notes
@@ -504,7 +455,7 @@ function EntryForm({
         className={`${primary} mt-4`}
         onClick={() => void submit()}
       >
-        {saving ? "Saving…" : isClock ? "Clock In" : "Save Time Entry"}
+        {saving ? "Saving…" : "Save Job Time Correction"}
       </button>
     </Modal>
   );

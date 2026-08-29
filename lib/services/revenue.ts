@@ -113,7 +113,7 @@ export async function getRevenueReport(
     topCustomers: byClient.slice(0, 10),
   };
 }
-async function getActualLaborCost(range:RevenueDateRange){let query=getSupabaseClient().from("time_entries").select("gross_pay").in("status",["Completed","Approved"]).is("archived_at",null);if(range.start)query=query.gte("work_date",range.start);if(range.end)query=query.lte("work_date",range.end);const{data,error}=await query;if(error)throw error;return sum((data??[]).map(x=>Number(x.gross_pay)))}
+async function getActualLaborCost(range:RevenueDateRange){let query=getSupabaseClient().from("time_entries").select("gross_pay").not("job_id","is",null).in("status",["Completed","Approved"]).is("archived_at",null);if(range.start)query=query.gte("work_date",range.start);if(range.end)query=query.lte("work_date",range.end);const{data,error}=await query;if(error)throw error;return sum((data??[]).map(x=>Number(x.gross_pay)))}
 export function getRevenueSummary(
   payments: RevenuePaymentRecord[],
   invoices: InvoiceWithRelations[],
