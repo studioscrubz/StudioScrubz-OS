@@ -5,7 +5,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { getOperationalActiveTimeEntries } from "@/lib/services/timeEntries";
-import { getActiveEmployeeWorkSessions } from "@/lib/services/workSessions";
+import { getActiveEmployeeWorkSessions, PLATFORM_PRESENCE_CHANGED_EVENT } from "@/lib/services/workSessions";
 import type { ActiveStaffStatus } from "@/types/workSession";
 import { ActiveStaffPanel } from "@/components/time/ActiveStaffPanel";
 
@@ -30,6 +30,11 @@ export function DashboardActiveEmployeesMonitor() {
     finally { setLoading(false); }
   }, [canView]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener(PLATFORM_PRESENCE_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(PLATFORM_PRESENCE_CHANGED_EVENT, refresh);
+  }, [load]);
   useOperationalRealtime(["employee_work_sessions", "time_entries"], load);
   if (!canView) return null;
   return <div className="mt-7">

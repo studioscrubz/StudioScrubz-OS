@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
-import { getMyWorkSession, startMyWork, stopMyWork } from "@/lib/services/workSessions";
+import { getMyWorkSession, notifyPlatformPresenceChanged, toggleMyWorkAuthoritatively } from "@/lib/services/workSessions";
 import { getOperationalActiveTimeEntries } from "@/lib/services/timeEntries";
 import type { EmployeeWorkSession } from "@/types/workSession";
 import type { OperationalActiveTimeEntry } from "@/types/timeEntry";
@@ -34,8 +34,13 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
 
   async function toggle() {
     setBusy(true); setError(null);
-    try { if (session) await stopMyWork(); else await startMyWork(); await load(); }
-    catch (cause) { setError(message(cause, session ? "Deactivation failed." : "Activation failed.")); }
+    try {
+      const result = await toggleMyWorkAuthoritatively(session);
+      setSession(result.session);
+      await load();
+      if (result.error) setError(message(result.error, result.action === "stop" ? "Deactivation failed." : "Activation failed."));
+      else notifyPlatformPresenceChanged();
+    } catch (cause) { setError(message(cause, "Authoritative presence could not be refreshed.")); }
     finally { setBusy(false); }
   }
 
