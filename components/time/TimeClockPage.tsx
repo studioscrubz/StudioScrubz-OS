@@ -11,7 +11,7 @@ import {
 } from "@/lib/services/timeEntries";
 import { getEmployees } from "@/lib/services/employees";
 import { getCrews } from "@/lib/services/crews";
-import { getJobs } from "@/lib/services/jobs";
+import { getTimeEntryCorrectionJobs } from "@/lib/services/jobs";
 import {
   TIME_ENTRY_STATUSES,
   TIME_ENTRY_TYPES,
@@ -49,7 +49,7 @@ export function TimeClockPage() {
       getTimeEntries(),
       getEmployees(),
       getCrews(),
-      getJobs(),
+      getTimeEntryCorrectionJobs(),
     ]);
     setRows(t);
     setEmployees(e.filter((x) => !x.archived_at));
@@ -58,7 +58,7 @@ export function TimeClockPage() {
   }
   useEffect(() => {
     let active = true;
-    void Promise.all([getTimeEntries(), getEmployees(), getCrews(), getJobs()])
+    void Promise.all([getTimeEntries(), getEmployees(), getCrews(), getTimeEntryCorrectionJobs()])
       .then(([t, e, c, j]) => {
         if (active) {
           setRows(t);
@@ -411,7 +411,7 @@ function EntryForm({
           set={job}
           rows={jobs.map((x) => [
             x.id,
-            `${x.job_number} · ${x.client_name || "Client"} · ${x.property_name || "Property"}`,
+            `${x.job_number} · ${x.client_name || "Client"} / ${x.property_name || "Property"} — ${x.status}`,
           ])}
         />
         <Assoc

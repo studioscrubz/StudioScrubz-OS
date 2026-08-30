@@ -11,7 +11,7 @@ import type {
 } from "@/types/job";
 import type { CrewWithRelations } from "@/types/crew";
 import { getCurrentProfile } from "@/lib/services/auth";
-import { canPermanentlyDelete, isMasterAdmin } from "@/lib/auth/permissions";
+import { canPermanentlyDelete, hasPermission, isMasterAdmin } from "@/lib/auth/permissions";
 import { employeeName } from "@/types/employee";
 import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import type { Invoice } from "@/types/invoice";
@@ -44,6 +44,18 @@ export async function getJobs(): Promise<JobWithRelations[]> {
   const jobsResult = await getSupabaseClient().from("jobs").select(select).in("id", ids).order("created_at", { ascending: false });
   if (jobsResult.error) throw jobsResult.error;
   return jobsResult.data as JobWithRelations[];
+}
+export async function getTimeEntryCorrectionJobs(): Promise<JobWithRelations[]> {
+  const profile = await getCurrentProfile();
+  if (!hasPermission(profile, "employees.manage")) throw new Error("Time correction access is denied.");
+  const { data, error } = await getSupabaseClient()
+    .from("jobs_operational_safe")
+    .select("*")
+    .is("archived_at", null)
+    .neq("status", "Archived")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(safeDatabaseMessage(error, "Jobs for time corrections could not be loaded."));
+  return data.map(operationalJob);
 }
 export async function getJobsForDateRange(
   start: string,
