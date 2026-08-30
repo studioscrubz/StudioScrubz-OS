@@ -29,9 +29,17 @@ export async function getMyWorkSession(): Promise<EmployeeWorkSession | null> {
 export async function getActiveEmployeeWorkSessions(): Promise<ActiveEmployeeWorkSession[]> {
   const { data, error } = await getSupabaseClient().rpc("get_active_employee_work_sessions");
   if (error) throw new Error(safeMessage(error, "Active staff could not be loaded."));
-  return (data ?? []).filter((session): session is ActiveEmployeeWorkSession =>
-    Boolean(normalizeWorkSession(session) && session.employee_number && session.employee_name),
-  );
+  return (data ?? []).flatMap((session) => {
+    const normalized = normalizeWorkSession(session);
+    if (!normalized || normalized.status !== "Open" || normalized.clock_out) return [];
+    const employeeName = typeof session.employee_name === "string" && session.employee_name.trim()
+      ? session.employee_name.trim()
+      : "Employee";
+    const employeeNumber = typeof session.employee_number === "string" && session.employee_number.trim()
+      ? session.employee_number.trim()
+      : null;
+    return [{ ...normalized, employee_number: employeeNumber, employee_name: employeeName }];
+  });
 }
 
 export type PresenceToggleDependencies = {

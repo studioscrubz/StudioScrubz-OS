@@ -19,7 +19,11 @@ export function DashboardActiveEmployeesMonitor() {
   const load = useCallback(async () => {
     if (!canView) { setLoading(false); return; }
     try {
-      const [sessions, entries] = await Promise.all([getActiveEmployeeWorkSessions(), getOperationalActiveTimeEntries()]);
+      const sessions = await getActiveEmployeeWorkSessions();
+      const entries = await getOperationalActiveTimeEntries().catch((cause: unknown) => {
+        console.error("Active employee Job details load failed", cause);
+        return [];
+      });
       setStaff(sessions.map((session) => {
         const job = entries.find((entry) => entry.employee_id === session.employee_id && Boolean(entry.job_id));
         return { ...session, availability: job ? "On Job / Unavailable" : "Active / Available",

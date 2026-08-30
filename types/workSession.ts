@@ -14,7 +14,7 @@ export type ActiveEmployeeWorkSession = Pick<
   EmployeeWorkSession,
   "id" | "employee_id" | "clock_in" | "status" | "created_at" | "updated_at"
 > & {
-  employee_number: string;
+  employee_number: string | null;
   employee_name: string;
 };
 
