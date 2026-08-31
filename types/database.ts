@@ -24,6 +24,7 @@ import type {PublicEstimate} from "@/types/publicEstimate";
 import type {PublicProposal} from "@/types/publicProposal";
 import type {InvoiceJobPhoto} from "@/types/photo";
 import type {ActiveEmployeeWorkSession,EmployeeWorkSession} from "@/types/workSession";
+import type {JobPerformanceRow} from "@/types/jobPerformance";
 
 export interface Database {
   public: {
@@ -116,6 +117,7 @@ export interface Database {
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
       get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
       get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};
+      get_job_performance_rows:{Args:{p_start_date:string|null;p_end_date:string|null};Returns:JobPerformanceRow[]};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
       get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};

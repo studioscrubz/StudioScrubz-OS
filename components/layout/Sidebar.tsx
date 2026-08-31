@@ -37,6 +37,7 @@ const navItems: Array<NavLink | NavGroup> = [
   },
   { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
   { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
+  { label: "Job Performance", href: "/job-performance", marker: "R", permission: "reports.view" },
   { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },

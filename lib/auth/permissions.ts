@@ -14,7 +14,7 @@ export const PERMISSIONS = [
   "finances.view", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage",
   "communications.view", "communications.create", "communications.archive",
-  "attention.view",
+  "attention.view", "reports.view",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -29,7 +29,7 @@ const operationalAdmin: Permission[] = [
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll",
   "agreements.view", "agreements.manage", "invoices.view", "invoices.create",
   "invoices.edit", "invoices.send", "archives.view", "archives.restore", "communications.view",
-  "communications.create", "communications.archive", "attention.view",
+  "communications.create", "communications.archive", "attention.view", "reports.view",
 ];
 
 export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
@@ -42,7 +42,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
     "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "crews.view", "crews.manage",
     "timeClock.view", "timeClock.manageAll", "agreements.view", "agreements.manage",
-    "invoices.view", "invoices.send", "communications.view", "communications.create", "communications.archive", "attention.view",
+    "invoices.view", "invoices.send", "communications.view", "communications.create", "communications.archive", "attention.view", "reports.view",
   ]),
   Sales: new Set([
     "dashboard.view", "clients.view", "clients.create", "clients.edit", "properties.view",
@@ -81,6 +81,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => 
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/attention", "attention.view"],
+  ["/job-performance", "reports.view"],
   ["/users", "users.manage"], ["/revenue", "finances.view"], ["/expenses", "expenses.view"],
   ["/vehicles", "vehicles.view"], ["/payroll-prep", "payrollPrep.view"],
   ["/archives", "archives.view"], ["/clients", "clients.view"],
