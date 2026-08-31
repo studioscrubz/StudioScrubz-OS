@@ -42,9 +42,14 @@ select public.start_operational_job('fa500000-0000-0000-0000-000000000030');
 select public.start_operational_job('fa500000-0000-0000-0000-000000000030');
 insert into feature_results select 'start_atomic_idempotent',
   (select status='In Progress' from public.jobs where id='fa500000-0000-0000-0000-000000000030')
-  and (select count(*)=1 from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030' and employee_id='fa500000-0000-0000-0000-000000000011')
-  and exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000011' and status='Open'),
-  'Start begins Job, joins starter, snapshots payroll, activates presence, and retry is stable.';
+  and (select count(*)=0 from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030')
+  and not exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000011' and status='Open'),
+  'Start begins only the master Job timer and retry is stable.';
+select public.start_or_clock_in_to_job('fa500000-0000-0000-0000-000000000030');
+insert into feature_results select 'starter_joins_separately',
+  (select count(*)=1 from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030' and employee_id='fa500000-0000-0000-0000-000000000011')
+  and not exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000011' and status='Open'),
+  'The starter joins payroll separately without changing platform presence.';
 do $$ begin
   begin perform public.stop_my_work(); raise exception 'Expected active Job Clock Out protection';
   exception when others then if sqlerrm not like 'End active Job % before Clock Out.%' then raise; end if; end;
@@ -57,8 +62,8 @@ select public.start_or_clock_in_to_job('fa500000-0000-0000-0000-000000000030');
 update public.time_entries set clock_in=clock_in+interval '5 minutes' where job_id='fa500000-0000-0000-0000-000000000030' and employee_id='fa500000-0000-0000-0000-000000000012';
 insert into feature_results select 'join_idempotent_own_time',
   (select count(*)=1 from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030' and employee_id='fa500000-0000-0000-0000-000000000012')
-  and exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000012' and status='Open'),
-  'Join starts one individual payroll entry and presence.';
+  and not exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000012' and status='Open'),
+  'Join starts one individual payroll entry without changing presence.';
 do $$ begin
   begin perform public.start_or_clock_in_to_job('fa500000-0000-0000-0000-000000000031'); raise exception 'Expected multiple Job protection';
   exception when others then if sqlerrm not like 'You are already On Job%' then raise; end if; end;
@@ -76,8 +81,8 @@ select public.complete_in_progress_job('fa500000-0000-0000-0000-000000000030');
 insert into feature_results select 'end_everyone_shared_time_retry',
   (select count(*)=3 and count(distinct clock_out)=1 and bool_and(status='Completed') from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030')
   and not exists(select 1 from public.time_entries current join ended_snapshot prior using(id) where current.clock_out is distinct from prior.clock_out or current.gross_pay is distinct from prior.gross_pay)
-  and (select count(*)=3 from public.employee_work_sessions where status='Open' and employee_id in ('fa500000-0000-0000-0000-000000000011','fa500000-0000-0000-0000-000000000012','fa500000-0000-0000-0000-000000000013')),
-  'End closes all entries at one timestamp, leaves presence Active, and retry changes nothing.';
+  and (select count(*)=0 from public.employee_work_sessions where status='Open' and employee_id in ('fa500000-0000-0000-0000-000000000011','fa500000-0000-0000-0000-000000000012','fa500000-0000-0000-0000-000000000013')),
+  'End closes all entries at one timestamp, leaves presence unchanged, and retry changes nothing.';
 insert into feature_results select 'rate_snapshot_stable',
   (select hourly_rate_snapshot=25 from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030' and employee_id='fa500000-0000-0000-0000-000000000012'),
   'Changing current employee rate does not change prior participation snapshot.';
@@ -90,9 +95,9 @@ select set_config('request.jwt.claim.sub','fa500000-0000-0000-0000-000000000001'
 select public.cancel_operational_job('fa500000-0000-0000-0000-000000000032','Synthetic cancellation');
 insert into feature_results select 'cancellation_closes_payroll',
   not exists(select 1 from public.time_entries where job_id='fa500000-0000-0000-0000-000000000032' and status='Open')
-  and exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000013' and status='Open')
+  and not exists(select 1 from public.employee_work_sessions where employee_id='fa500000-0000-0000-0000-000000000013' and status='Open')
   and (select status='Cancelled' from public.jobs where id='fa500000-0000-0000-0000-000000000032'),
-  'Cancellation closes active payroll and leaves participants Active.';
+  'Cancellation closes active payroll and leaves platform presence unchanged.';
 insert into feature_results select 'calendar_trigger_compatible',
   exists(select 1 from pg_trigger where tgname='jobs_queue_google_calendar_sync' and tgenabled<>'D'),
   'Existing Job status Calendar queue trigger remains installed and enabled.';

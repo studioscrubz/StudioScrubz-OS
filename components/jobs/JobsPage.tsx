@@ -361,7 +361,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, canComplete, canDel
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
     <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
-      {eligibility.showStart && <><button type="button" disabled={busy || !eligibility.canStart} onClick={() => lifecycleAct(() => startOperationalJob(job.id), "Job started. You joined automatically and your Job payroll began.")} className={`${primary} w-full`}>START JOB</button>{eligibility.missingEmployeeLink && <p className="w-full rounded-lg bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">Your user profile must be linked to an Employee before starting jobs.</p>}</>}
+      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(() => startOperationalJob(job.id), "Job started. Join the Job separately to begin your payroll time.")} className={`${primary} w-full`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
@@ -598,7 +598,7 @@ function JobModal({
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
           {clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}
-          {eligibility.showStart && <><button disabled={busy || !eligibility.canStart} className={`${primary} mt-3`} onClick={() => lifecycleAct(() => startOperationalJob(job.id), "Job started. You joined automatically and your Job payroll began.")}>START JOB</button>{eligibility.missingEmployeeLink && <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">Your user profile must be linked to an Employee before starting jobs.</p>}</>}
+          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => lifecycleAct(() => startOperationalJob(job.id), "Job started. Join the Job separately to begin your payroll time.")}>START JOB</button>}
           {canClock && eligibility.canJoin && !clockError && (
             <>
               <button
@@ -831,8 +831,6 @@ function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | nul
   const showStart = Boolean(job.assigned_crew_id) && ["Scheduled", "Crew Assigned"].includes(job.status) && canStartByRole;
   return {
     showStart,
-    canStart: showStart && Boolean(employeeId),
-    missingEmployeeLink: showStart && !employeeId,
     canJoin: job.status === "In Progress" && Boolean(job.assigned_crew_id) && Boolean(employeeId) && canParticipate,
   };
 }
