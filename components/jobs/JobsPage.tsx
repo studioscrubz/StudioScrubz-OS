@@ -7,6 +7,8 @@ import {
   assignJobCrew,
   cancelJob,
   completeInProgressJob,
+  correctCompletedJobMasterTime,
+  type CompletedJobMasterTimeInput,
   getCrewConflicts,
   getCurrentJobClockState,
   getArchivedJobs,
@@ -29,6 +31,7 @@ import { useOperationalRealtime } from "@/components/realtime/OperationalRealtim
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
+import { JobMasterTimeEditor } from "@/components/jobs/JobMasterTimeEditor";
 import { JobCalendarStatus } from "@/components/jobs/JobCalendarStatus";
 import { getTimeEntries } from "@/lib/services/timeEntries";
 import {
@@ -298,6 +301,11 @@ export function JobsPage() {
           busy={busy === selected.id}
           close={() => setSelected(null)}
           mutate={(fn, text, onError) => void mutate(selected, fn, text, onError)}
+          saveJobTime={async (input, onError) => {
+            let failed = false;
+            await mutate(selected, () => correctCompletedJobMasterTime(selected.id, input), "Master Job time saved.", (detail) => { failed = true; onError(detail); });
+            return !failed;
+          }}
           canEdit={hasPermission(profile, "jobs.edit")}
           canSchedule={hasPermission(profile, "jobs.schedule")}
           canArchive={hasPermission(profile, "jobs.archive")}
@@ -401,6 +409,7 @@ function JobModal({
   busy,
   close,
   mutate,
+  saveJobTime,
   canEdit,
   canSchedule,
   canArchive,
@@ -414,6 +423,7 @@ function JobModal({
   busy: boolean;
   close: () => void;
   mutate: JobAction;
+  saveJobTime: (input: CompletedJobMasterTimeInput, onError: (detail: string) => void) => Promise<boolean>;
   canEdit: boolean;
   canSchedule: boolean;
   canArchive: boolean;
@@ -592,6 +602,7 @@ function JobModal({
       <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
+      <JobMasterTimeEditor key={job.id} job={job} canEdit={canEdit} busy={busy} save={saveJobTime} />
       <JobCalendarStatus jobId={job.id} />
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       {showLifecycle && (

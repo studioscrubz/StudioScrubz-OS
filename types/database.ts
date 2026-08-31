@@ -138,6 +138,7 @@ export interface Database {
       start_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       start_or_clock_in_to_job:{Args:{p_job_id:string};Returns:import("@/types/job").JobClockInResult};
       complete_in_progress_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
+      correct_completed_job_master_time:{Args:{p_job_id:string;p_start_date:string;p_start_time:string;p_end_date:string;p_end_time:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       cancel_operational_job:{Args:{p_job_id:string;p_note?:string|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       update_operational_job:{Args:{p_job_id:string;p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_internal_notes?:string|null;p_status?:string|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       create_completed_job_invoice:{Args:{p_job_id:string};Returns:{invoice_id:string|null;invoice_number:string|null;created:boolean;skipped:boolean;financially_resolved?:boolean}};

@@ -381,6 +381,23 @@ export async function completeInProgressJob(id: string): Promise<JobCompletionRe
   if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
   return createCompletedJobInvoice(operationalJob(data));
 }
+export type CompletedJobMasterTimeInput = {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+};
+export async function correctCompletedJobMasterTime(id: string, input: CompletedJobMasterTimeInput): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("correct_completed_job_master_time", {
+    p_job_id: id,
+    p_start_date: input.startDate,
+    p_start_time: input.startTime,
+    p_end_date: input.endDate,
+    p_end_time: input.endTime,
+  });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job time could not be saved."));
+  return operationalJob(data);
+}
 export const startJob = joinJob;
 export const updateJobInternalNotes = (id: string, notes: string) =>
   updateJob(id, { internal_notes: notes || null });
