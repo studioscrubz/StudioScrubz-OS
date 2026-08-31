@@ -34,7 +34,6 @@ export const ATTENTION_REALTIME_TABLES = [
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
-  const canManageCommunications = hasPermission(profile, "communications.view") && hasPermission(profile, "communications.create");
   const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings] = await Promise.all([
     hasPermission(profile, "estimates.view") ? getEstimates() : Promise.resolve([]),
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
@@ -48,8 +47,6 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     getAttentionItemStates(),
     getBusinessSettings().catch(() => null),
   ]);
-  const clock = businessClock(settings?.timezone ?? null);
-  const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const [jobRouteIds, agreementRoutes] = await Promise.all([
     hasPermission(profile, "jobs.view")
       ? getJobProposalIds()
@@ -61,9 +58,40 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   if (agreementRoutes.error) throw agreementRoutes.error;
   const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
-  const contractJobIds=new Set((contractOccurrences??[]).filter(row=>{const type=(row.agreement as {billing_type:string}|null)?.billing_type;return Boolean(type&&type!=="Per Visit")}).map(row=>row.job_id).filter(Boolean));
-  const routedProposalIds = new Set([...jobRouteIds, ...(agreementRoutes.data ?? []).map((row) => row.proposal_id)].filter((id): id is string => Boolean(id)));
-  const financiallyResolvedJobs = new Set(financiallyResolvedJobIds);
+  const contractJobIds=new Set((contractOccurrences??[]).filter(row=>{const type=(row.agreement as {billing_type:string}|null)?.billing_type;return Boolean(type&&type!=="Per Visit")}).map(row=>row.job_id).filter((id): id is string => Boolean(id)));
+  const input: AttentionRuleInput = { profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const result = buildAttentionItems(input, view);
+  const actionableKeys = new Set(result.allKeys);
+  await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
+  return result.items;
+}
+
+export type AttentionRuleInput = {
+  profile: NonNullable<Awaited<ReturnType<typeof getCurrentProfile>>>;
+  estimates: Awaited<ReturnType<typeof getEstimates>>;
+  jobs: Awaited<ReturnType<typeof getJobs>>;
+  walkthroughs: Awaited<ReturnType<typeof getWalkthroughs>>;
+  proposals: Awaited<ReturnType<typeof getProposals>>;
+  agreements: Awaited<ReturnType<typeof getAgreements>>;
+  invoices: Awaited<ReturnType<typeof getInvoices>>;
+  financiallyResolvedJobIds: Awaited<ReturnType<typeof getFinanciallyResolvedJobIds>>;
+  communications: Awaited<ReturnType<typeof getAllClientCommunications>>;
+  timeEntries: Awaited<ReturnType<typeof getOpenTimeEntries>>;
+  states: AttentionStateRecord[];
+  timezone: string | null;
+  jobRouteIds: string[];
+  agreementProposalIds: Array<string | null>;
+  contractJobIds: Set<string>;
+  now?: Date;
+};
+
+export function buildAttentionItems(input: AttentionRuleInput, view: AttentionView = "Active"): { items: AttentionItem[]; allKeys: string[] } {
+  const { profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, contractJobIds } = input;
+  const canManageCommunications = hasPermission(profile, "communications.view") && hasPermission(profile, "communications.create");
+  const clock = businessClock(input.timezone, input.now);
+  const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
+  const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
+  const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
 
   for (const estimate of estimates.filter((row) => !row.archived_at && row.result.submission?.source === "Customer Self-Service")) {
     const submission = estimate.result.submission!;
@@ -138,11 +166,11 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   for (const entry of timeEntries.filter((row) => Boolean(row.job_id) && row.status === "Open" && !row.clock_out && !row.archived_at)) items.push(item(`time:${entry.id}:open`, "Open Time Entry", "Attention", "Time", "Job time entry is still open", `${entry.time_entry_number} · ${entry.employee ? [entry.employee.first_name, entry.employee.last_name].filter(Boolean).join(" ") : "Deleted Employee"}`, "Time Entry", entry.id, null, entry.time_entry_number, null, entry.work_date, entry.created_at, "/time-clock", "Open Job"));
   const actionableKeys = new Set(items.map((entry) => entry.id));
   const activeStates = states.filter((state) => actionableKeys.has(state.attention_key));
-  await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
   const stateMap = new Map(activeStates.map((state) => [state.attention_key, state]));
-  return items.map((entry) => ({ ...entry, attention_state: effectiveState(stateMap.get(entry.id), clock.now) }))
+  const visible = items.map((entry) => ({ ...entry, attention_state: effectiveState(stateMap.get(entry.id), clock.now) }))
     .filter((entry) => view === "All" || (view === "Active" ? !entry.attention_state : entry.attention_state?.state === view))
     .sort((a, b) => rank(a.severity) - rank(b.severity) || (a.due_date ?? a.scheduled_date ?? "9999").localeCompare(b.due_date ?? b.scheduled_date ?? "9999") || b.created_at.localeCompare(a.created_at));
+  return { items: visible, allKeys: [...actionableKeys] };
 }
 
 export async function getAttentionSummary(): Promise<AttentionSummary> { const all = await getAttentionItems("All"), active = all.filter((item) => !item.attention_state); return { ...summarizeAttention(active), snoozed: all.filter((item) => item.attention_state?.state === "Snoozed").length }; }
@@ -162,7 +190,7 @@ function money(value: number) { return new Intl.NumberFormat("en-US", { style: "
 function effectiveState(state: AttentionStateRecord | undefined, now: Date) { if (!state) return null; if (state.state === "Snoozed" && (!state.snoozed_until || Date.parse(state.snoozed_until) <= now.getTime())) return null; return state; }
 function withinReminderWindow(date: string, time: string | null, now: Date) { const scheduled = new Date(`${date}T${time?.slice(0, 5) || "09:00"}:00`); const delta = scheduled.getTime() - now.getTime(); return delta >= 0 && delta <= 48 * 60 * 60 * 1000; }
 function reminderWasSent(rows: Awaited<ReturnType<typeof getAllClientCommunications>>, source: string, sourceId: string, scheduledDate: string) { return rows.some((row) => row.communication_type === "Service Reminder" && row.status === "Sent" && row.metadata.source === source && row.metadata.source_id === sourceId && row.metadata.scheduled_date === scheduledDate); }
-function businessClock(timeZone: string | null) { const now = new Date(); if (!timeZone) return { now, date: localDate(now) }; try { const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now); const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "00"; const date = `${get("year")}-${get("month")}-${get("day")}`; return { date, now: new Date(`${date}T${get("hour")}:${get("minute")}:00`) }; } catch { return { now, date: localDate(now) }; } }
+function businessClock(timeZone: string | null, reference = new Date()) { const now = reference; if (!timeZone) return { now, date: localDate(now) }; try { const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now); const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "00"; const date = `${get("year")}-${get("month")}-${get("day")}`; return { date, now: new Date(`${date}T${get("hour")}:${get("minute")}:00`) }; } catch { return { now, date: localDate(now) }; } }
 function composer(input: { clientId: string | null; propertyId?: string | null; proposalId?: string; agreementId?: string; invoiceId?: string; jobId?: string; communicationType: CommunicationComposerContext["communicationType"]; client: { first_name: string | null; last_name: string | null; company_name: string | null; email: string | null; phone: string | null } | null; fallbackName: string | null; email?: string | null; phone?: string | null; subject: string; message: string; handoffSuffix?: string | null; sourceType: string; sourceId: string; metadata: CommunicationComposerContext["metadata"] }): CommunicationComposerContext { return { clientId: input.clientId, propertyId: input.propertyId, proposalId: input.proposalId, agreementId: input.agreementId, invoiceId: input.invoiceId, jobId: input.jobId, communicationType: input.communicationType, channel: "Email", clientName: displayName(input.client, input.fallbackName), recipientEmail: input.email ?? null, recipientPhone: input.phone ?? null, subject: input.subject, messageBody: input.message, handoffSuffix: input.handoffSuffix, sourceType: input.sourceType, sourceId: input.sourceId, metadata: input.metadata }; }
 function displayName(client: { first_name: string | null; last_name: string | null; company_name: string | null } | null, fallback: string | null) { return client?.company_name || [client?.first_name, client?.last_name].filter(Boolean).join(" ") || fallback || "Client"; }
 function greeting(client: { first_name: string | null; company_name: string | null } | null, fallback: string | null) { return client?.first_name?.trim() || client?.company_name?.trim() || fallback || "Client"; }

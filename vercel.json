@@ -3,6 +3,10 @@
     {
       "path": "/api/integrations/google-calendar/process",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/attention-push",
+      "schedule": "30 8 * * *"
     }
   ]
 }

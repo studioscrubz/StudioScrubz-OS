@@ -92,6 +92,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/employees/scrub-technicians", "employees.view"], ["/employees/sales", "employees.view"],
   ["/employees/administration", "employees.view"], ["/employees", "employees.directory_view"], ["/time-clock", "timeClock.view"],
   ["/agreements", "agreements.view"], ["/invoices", "invoices.view"],
+  ["/settings/notifications", "attention.view"],
   ["/settings", "settings.manage"], ["/", "dashboard.view"],
 ];
 

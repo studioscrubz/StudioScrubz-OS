@@ -73,8 +73,8 @@ const navItems: Array<NavLink | NavGroup> = [
   {
     label: "Settings",
     marker: "S",
-    permission: "settings.manage",
     children: [
+      { label: "Notifications", href: "/settings/notifications", marker: "", permission: "attention.view" },
       { label: "Service Catalog", href: "/settings/services", marker: "", permission: "settings.manage" },
       { label: "Business Settings", href: "/settings/business", marker: "", permission: "settings.manage" },
     ],

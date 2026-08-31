@@ -6,8 +6,8 @@ import type { PushSetupState } from "@/types/pushNotification";
 
 const copy: Record<PushSetupState, { title: string; detail: string }> = {
   unsupported: { title: "Push notifications unsupported", detail: "This browser or device does not support web push notifications." },
-  "not-granted": { title: "Push notifications not enabled", detail: "Enable notifications to prepare this browser for future StudioScrubz alerts." },
-  enabled: { title: "Push notifications enabled", detail: "This browser is subscribed and ready for future StudioScrubz notifications." },
+  "not-granted": { title: "Push notifications not enabled", detail: "Enable notifications to receive StudioScrubz Attention alerts on this browser." },
+  enabled: { title: "Push notifications enabled", detail: "This browser is subscribed to StudioScrubz Attention alerts." },
   denied: { title: "Push notifications blocked", detail: "Notifications are blocked. Change this site’s notification permission in your browser settings." },
 };
 

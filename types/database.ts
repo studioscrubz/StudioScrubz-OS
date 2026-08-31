@@ -25,7 +25,7 @@ import type {PublicProposal} from "@/types/publicProposal";
 import type {InvoiceJobPhoto} from "@/types/photo";
 import type {ActiveEmployeeWorkSession,EmployeeWorkSession} from "@/types/workSession";
 import type {JobPerformanceRow} from "@/types/jobPerformance";
-import type {BrowserPushSubscription} from "@/types/pushNotification";
+import type {AttentionPushCheckpoint,AttentionPushDelivery,BrowserPushSubscription} from "@/types/pushNotification";
 
 export interface Database {
   public: {
@@ -103,6 +103,8 @@ export interface Database {
       client_communications:{Row:ClientCommunication;Insert:ClientCommunicationInput&{id?:string;communication_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:Partial<ClientCommunication>;Relationships:[{foreignKeyName:"client_communications_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"client_communications_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"client_communications_estimate_id_fkey";columns:["estimate_id"];isOneToOne:false;referencedRelation:"estimates";referencedColumns:["id"]},{foreignKeyName:"client_communications_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"client_communications_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"client_communications_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"client_communications_sent_by_user_id_fkey";columns:["sent_by_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       attention_item_states:{Row:AttentionStateRecord;Insert:{id?:string;user_id:string;attention_key:string;state:AttentionStateRecord["state"];snoozed_until?:string|null;dismissed_at?:string|null;created_at?:string;updated_at?:string};Update:Partial<Pick<AttentionStateRecord,"state"|"snoozed_until"|"dismissed_at">>;Relationships:[{foreignKeyName:"attention_item_states_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       browser_push_subscriptions:{Row:BrowserPushSubscription;Insert:Omit<BrowserPushSubscription,"id"|"created_at"|"updated_at">&{id?:string;created_at?:string;updated_at?:string};Update:Partial<Pick<BrowserPushSubscription,"user_id"|"p256dh"|"auth"|"user_agent"|"revoked_at"|"updated_at">>;Relationships:[]};
+      attention_push_deliveries:{Row:AttentionPushDelivery;Insert:Omit<AttentionPushDelivery,"id"|"created_at"|"updated_at"|"sent_at"|"failure_code"|"failure_message">&{id?:string;created_at?:string;updated_at?:string;sent_at?:string|null;failure_code?:string|null;failure_message?:string|null};Update:Partial<Pick<AttentionPushDelivery,"delivery_status"|"last_attempt_at"|"sent_at"|"failure_code"|"failure_message"|"updated_at">>;Relationships:[]};
+      attention_push_checkpoints:{Row:AttentionPushCheckpoint;Insert:Omit<AttentionPushCheckpoint,"initialized_at">&{initialized_at?:string};Update:never;Relationships:[]};
     };
     Views: {
       jobs_operational_safe:{Row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">;Relationships:[]};
