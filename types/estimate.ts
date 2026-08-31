@@ -81,6 +81,8 @@ export type EstimateResult = {
   manualDiscount: number;
   totalDiscount: number;
   taxes: number;
+  calculatedFinalPrice?: number;
+  manualPrice?: number | null;
   finalPrice: number;
   monthlyPrice: number | null;
   visitsPerMonth: number;

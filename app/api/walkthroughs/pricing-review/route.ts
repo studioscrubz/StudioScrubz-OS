@@ -2,6 +2,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/auth/permissions";
 import { calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
+import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 import { getAvailableServiceAddons, findCatalogService } from "@/lib/services/serviceCatalog";
 import type { CalculatorInput, CommercialCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     const profile = profileData as UserProfile;
     if (!hasPermission(profile, "proposals.create")) return Response.json({ error: "Proposal pricing permission is required." }, { status: 403 });
 
-    const body = await request.json() as { walkthroughId?: unknown; calculatorInput?: unknown };
+    const body = await request.json() as { walkthroughId?: unknown; calculatorInput?: unknown; manualPrice?: unknown };
     if (typeof body.walkthroughId !== "string") return Response.json({ error: "A Walkthrough is required." }, { status: 400 });
     const admin = createSupabaseAdminClient();
     const { data: walkthroughData, error: walkthroughError } = await admin.from("walkthroughs").select("*, estimate:estimates!walkthroughs_estimate_id_fkey(*)").eq("id", body.walkthroughId).single();
@@ -35,7 +36,9 @@ export async function POST(request: Request) {
     const service = findCatalogService(catalog.services, walkthrough.division, calculatorInput.division === "Residential" ? calculatorInput.serviceType : calculatorInput.commercialType);
     if (!service) return Response.json({ error: "Select an active Service Catalog service." }, { status: 400 });
     validateAddons(calculatorInput, catalog, service.id);
-    const estimateResult = calculatorInput.division === "Residential" ? calculateResidentialEstimate(calculatorInput, catalog) : calculateCommercialEstimate(calculatorInput, catalog);
+    const calculatedResult = calculatorInput.division === "Residential" ? calculateResidentialEstimate(calculatorInput, catalog) : calculateCommercialEstimate(calculatorInput, catalog);
+    const manualPrice = body.manualPrice === null || body.manualPrice === undefined ? null : nonnegative(body.manualPrice, "approved Walkthrough price");
+    const estimateResult = withAuthoritativeEstimatePrice(calculatedResult, manualPrice);
     estimateResult.serviceDescription = walkthrough.measurements.serviceDescription || service.description?.trim() || null;
     const reviewedAt = new Date().toISOString();
     const review: WalkthroughPricingReview = { version: 1, calculatorInput, estimateResult, serviceId: service.id, serviceName: estimateResult.serviceName, serviceDescription: estimateResult.serviceDescription, frequency: calculatorInput.frequency, catalogAddons: estimateResult.catalogAddons ?? [], scope: walkthrough.scope.map(item => item.label), finalReviewedPrice: estimateResult.finalPrice, reviewedAt, reviewedBy: { id: profile.id, displayName: profile.display_name || profile.email || profile.role } };

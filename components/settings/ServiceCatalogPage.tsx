@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   archiveAddon,
+  archiveRecurringPricingRule,
   archiveService,
+  archiveServicePriceTier,
   createAddon,
   createRecurringPricingRule,
   createService,
@@ -12,6 +14,8 @@ import {
   getRecurringPricingRules,
   getServicePriceTiers,
   getServices,
+  restoreRecurringPricingRule,
+  restoreServicePriceTier,
   updateAddon,
   updateRecurringPricingRule,
   updateService,
@@ -43,6 +47,7 @@ export function ServiceCatalogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [catalogView, setCatalogView] = useState<"Active" | "Archived">("Active");
 
   const load = useCallback(async () => {
     const [nextServices, nextTiers, nextAddons, nextRules] = await Promise.all([
@@ -62,7 +67,7 @@ export function ServiceCatalogPage() {
     catch (cause) { setError(message(cause)); }
   }
 
-  const rows: RecordRow[] = tab === "Services" ? services : tab === "Price Tiers" ? tiers : tab === "Add-Ons" ? addons : rules;
+  const rows: RecordRow[] = tab === "Services" ? services : tab === "Price Tiers" ? tiers.filter(item=>item.is_active===(catalogView==="Active")) : tab === "Add-Ons" ? addons : rules.filter(item=>item.is_active===(catalogView==="Active"));
   return <>
     <header className="border-b pb-7">
       <h1 className="text-3xl font-extrabold text-[#143d1a]">Service Catalog</h1>
@@ -71,7 +76,8 @@ export function ServiceCatalogPage() {
     </header>
     {error && <Alert text={error} />}{notice && <Alert text={notice} good />}
     <div className="mt-6 flex flex-wrap gap-2">{(["Services", "Price Tiers", "Add-Ons", "Recurring Pricing"] as Tab[]).map((item) =>
-      <button key={item} className={item === tab ? primary : secondary} onClick={() => setTab(item)}>{item}</button>)}</div>
+      <button key={item} className={item === tab ? primary : secondary} onClick={() => {setTab(item);setCatalogView("Active")}}>{item}</button>)}</div>
+    {(tab === "Price Tiers" || tab === "Recurring Pricing") && <div className="mt-4 flex gap-2" aria-label={`${tab} view`}>{(["Active","Archived"] as const).map(view=><button type="button" key={view} className={catalogView===view?primary:secondary} onClick={()=>setCatalogView(view)}>{view}</button>)}</div>}
     {tab === "Recurring Pricing" && <p className="mt-4 rounded-xl border border-[#d4af37]/40 bg-[#fffdf5] p-4 text-sm text-neutral-700"><b className="text-[#143d1a]">All Services</b> applies the configured frequency rule to every eligible Service Catalog service across Estimates, Proposals, and directly created Service Agreements. A service-specific rule for the same frequency takes precedence. Proposal-generated Agreements preserve the accepted Proposal pricing snapshot.</p>}
     {loading ? <div className="mt-6 h-60 animate-pulse rounded-xl bg-neutral-100" /> :
       <div className="mt-6 overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[900px] text-sm">
@@ -92,16 +98,19 @@ function CatalogRow({ tab, row, services, edit, run }: { tab: Tab; row: RecordRo
     values = [item.service_name, item.service_code, item.division, item.category, item.pricing_model, money(Math.max(item.base_price, item.minimum_price)), item.is_recurring_available ? "Yes" : "No", item.archived_at ? "Archived" : item.is_active ? "Active" : "Inactive"];
   } else if (tab === "Price Tiers") {
     const item = row as ServicePriceTier;
-    values = [serviceName(services, item.service_id), item.tier_name, String(item.min_value ?? "—"), String(item.max_value ?? "—"), money(item.price), item.unit_label ?? "—", item.is_active ? "Active" : "Inactive"];
+    archive = item.is_active ? () => void run(() => archiveServicePriceTier(item.id), "Price tier archived.") : () => void run(() => restoreServicePriceTier(item.id), "Price tier restored.");
+    values = [serviceName(services, item.service_id), item.tier_name, String(item.min_value ?? "—"), String(item.max_value ?? "—"), money(item.price), item.unit_label ?? "—", item.is_active ? "Active" : "Archived"];
   } else if (tab === "Add-Ons") {
     const item = row as ServiceAddon;
     values = [item.addon_name, item.addon_code, item.division, item.pricing_model, money(item.price), item.is_active ? "Active" : "Inactive", item.archived_at ? "Archived" : "Current"];
     if (!item.archived_at) archive = () => void run(() => archiveAddon(item.id), "Add-on archived.");
   } else {
     const item = row as RecurringPricingRule;
-    values = [item.rule_name ?? "Unnamed recurring rule", item.service_id ? serviceName(services, item.service_id) : "All Services", item.frequency, item.adjustment_type, String(item.adjustment_value), item.is_active ? "Active" : "Inactive"];
+    archive = item.is_active ? () => void run(() => archiveRecurringPricingRule(item.id), "Recurring pricing rule archived.") : () => void run(() => restoreRecurringPricingRule(item.id), "Recurring pricing rule restored.");
+    values = [item.rule_name ?? "Unnamed recurring rule", item.service_id ? serviceName(services, item.service_id) : "All Services", item.frequency, item.adjustment_type, String(item.adjustment_value), item.is_active ? "Active" : "Archived"];
   }
-  return <tr className="border-t"><Cells values={values} /><td className="p-3"><button className={secondary} onClick={edit}>Edit</button>{archive && <button className={secondary} onClick={archive}>Archive</button>}</td></tr>;
+  const active="is_active" in row&&row.is_active;
+  return <tr className="border-t"><Cells values={values} /><td className="p-3"><button className={secondary} onClick={edit}>Edit</button>{archive && <button className={secondary} onClick={archive}>{active?"Archive":"Restore"}</button>}</td></tr>;
 }
 
 function CatalogForm({ kind, value, services, close, saved }: { kind: Tab; value?: RecordRow; services: CatalogService[]; close: () => void; saved: () => Promise<void> }) {

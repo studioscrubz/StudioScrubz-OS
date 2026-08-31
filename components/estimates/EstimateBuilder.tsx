@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
+import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 import { matchingRecurringRules } from "@/lib/pricing/pricingEngine";
 import { createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
 import { getAvailableServiceAddons, getServiceCatalog } from "@/lib/services/serviceCatalog";
@@ -34,6 +35,7 @@ type EstimateDraft = {
   serviceDescription: string;
   notes: string;
   terms?: string;
+  manualPrice?: number | null;
 };
 type EstimateDraftDefaults = { residential:ResidentialCalculatorInput;commercial:CommercialCalculatorInput;serviceDescription:string;notes:string;terms:string };
 
@@ -48,6 +50,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [serviceDescription, setServiceDescription] = useState(estimate?.result.serviceDescription ?? "");
   const [notes, setNotes] = useState(estimate?.notes ?? "");
   const [terms, setTerms] = useState(estimate?.terms ?? "");
+  const [manualPrice, setManualPrice] = useState<number | null>(estimate?.result.manualPrice ?? null);
   const [defaults,setDefaults]=useState<BusinessSettings|null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +91,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           setServiceDescription(parsed.serviceDescription ?? "");
           setNotes(parsed.notes);
           setTerms(parsed.terms??"");
+          setManualPrice(parsed.manualPrice ?? null);
           setDraftNotice("Your unfinished estimate was restored.");
         } else {
           window.sessionStorage.removeItem(estimateDraftKey);
@@ -111,15 +115,15 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, serviceDescription, notes, terms };
+    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, serviceDescription, notes, terms, manualPrice };
     try {
       window.sessionStorage.setItem(estimateDraftKey, JSON.stringify(draft));
     } catch (caught) {
       console.warn("Estimate draft could not be saved", caught);
     }
-  }, [commercial, customer, division, draftDefaults, draftReady, estimate, notes, residential, serviceDescription, terms]);
+  }, [commercial, customer, division, draftDefaults, draftReady, estimate, manualPrice, notes, residential, serviceDescription, terms]);
   const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:division === "Residential" ? calculateResidentialEstimate(residential,catalog) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, division, residential]);
-  const result=calculation.result?{...calculation.result,serviceDescription:serviceDescription.trim()||null}:null;
+  const result=calculation.result?withAuthoritativeEstimatePrice({...calculation.result,serviceDescription:serviceDescription.trim()||null},manualPrice):null;
 
   function selectCatalogService(nextDivision:EstimateDivision, selection:string) { if (!catalog) { pendingCatalogSelection.current={division:nextDivision,selection}; return; } const service=selectedCatalogService(catalog,nextDivision,selection); setServiceDescription(service?.description?.trim()??""); }
 
@@ -232,7 +236,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
         <Section title="Estimate Terms & Conditions"><textarea value={terms} onChange={(event) => setTerms(event.target.value)} rows={6} className={inputClass} placeholder="Terms shown on the client Estimate" /></Section>
       </div>
-      {result?<EstimateSummary result={result} frequency={calculatorInput.frequency} saving={saving} save={save} editing={Boolean(estimate)} />:<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
+      {result?<EstimateSummary result={result} frequency={calculatorInput.frequency} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)} />:<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
     </div>
   </div>;
 }
@@ -258,7 +262,7 @@ function CommercialFields({ value, set,catalog,serviceChanged }: { value: Commer
   <div className="sm:col-span-2 xl:col-span-3"><CatalogAddonPicker addons={addons} selected={value.additionalServices} setSelected={(additionalServices) => set({ ...value, additionalServices })} /></div>
 </div>; }
 
-function EstimateSummary({ result, frequency, saving, save, editing }: { result: EstimateResult; frequency: Frequency; saving: boolean; save: () => Promise<void>; editing: boolean }) { const rows = [["Service", result.serviceName], ["Base Service Price",currency(result.basePrice)], ...result.adjustments.filter(item=>item.catalogAddonId).map(item=>[`Add-On: ${item.label}`,currency(item.amount)]), ["Subtotal",currency(result.oneTimePrice)],["Frequency", frequency], [`${frequency} Service Discount`,`${result.recurringDiscountPercent}%`],["Recurring Discount",`-${currency(result.recurringDiscount)}`],["Price After Recurring Discount",currency(Math.max(0,result.oneTimePrice-result.recurringDiscount))],["Manual / Custom Discount",`-${currency(result.manualDiscount)}`],...(result.taxes>0?[["Taxes",currency(result.taxes)]]:[]),["Final Per-Visit Price", currency(result.finalPrice)], ["Estimated Monthly Total", result.monthlyPrice == null ? "—" : currency(result.monthlyPrice)], ["Labor Hours", `${result.laborHours} hrs`], ["Crew Size", String(result.crewSize)], ["Duration", `${result.estimatedDuration} hrs`], ["Estimated Profit", currency(result.estimatedProfit)]]; return <aside className="sticky top-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-[#143d1a] text-white shadow-[0_18px_45px_rgba(20,61,26,.2)]"><div className="border-b border-white/10 p-6"><p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#d4af37]">Live calculation</p><h2 className="mt-2 text-xl font-extrabold">Estimate Summary</h2></div><dl className="divide-y divide-white/10 px-6">{rows.map(([label, display]) => <div key={label} className="flex justify-between gap-4 py-3 text-sm"><dt className="text-white/60">{label}</dt><dd className="text-right font-bold">{display}</dd></div>)}</dl><div className="bg-[#0d2b12] p-6"><p className="text-xs font-bold uppercase tracking-[.12em] text-white/55">Final Price</p><p className="mt-1 text-4xl font-extrabold text-[#d4af37]">{currency(result.finalPrice)}</p><button type="button" disabled={saving} onClick={() => void save()} className="mt-5 w-full rounded-lg bg-[#d4af37] px-5 py-3 text-sm font-extrabold text-[#143d1a] hover:bg-[#e1c056] disabled:opacity-60">{saving ? "Saving…" : editing ? "Update Estimate" : "Save Estimate"}</button></div></aside>; }
+function EstimateSummary({ result, frequency, manualPrice, setManualPrice, saving, save, editing }: { result: EstimateResult; frequency: Frequency; manualPrice: number | null; setManualPrice: (value: number | null) => void; saving: boolean; save: () => Promise<void>; editing: boolean }) { const rows = [["Service", result.serviceName], ["Base Service Price",currency(result.basePrice)], ...result.adjustments.filter(item=>item.catalogAddonId).map(item=>[`Add-On: ${item.label}`,currency(item.amount)]), ["Subtotal",currency(result.oneTimePrice)],["Frequency", frequency], [`${frequency} Service Discount`,`${result.recurringDiscountPercent}%`],["Recurring Discount",`-${currency(result.recurringDiscount)}`],["Price After Recurring Discount",currency(Math.max(0,result.oneTimePrice-result.recurringDiscount))],["Manual / Custom Discount",`-${currency(result.manualDiscount)}`],...(result.taxes>0?[["Taxes",currency(result.taxes)]]:[]),["Calculated Price", currency(result.calculatedFinalPrice ?? result.finalPrice)], ["Authoritative Per-Visit Price", currency(result.finalPrice)], ["Estimated Monthly Total", result.monthlyPrice == null ? "—" : currency(result.monthlyPrice)], ["Labor Hours", `${result.laborHours} hrs`], ["Crew Size", String(result.crewSize)], ["Duration", `${result.estimatedDuration} hrs`], ["Estimated Profit", currency(result.estimatedProfit)]]; return <aside className="sticky top-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-[#143d1a] text-white shadow-[0_18px_45px_rgba(20,61,26,.2)]"><div className="border-b border-white/10 p-6"><p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#d4af37]">Live calculation</p><h2 className="mt-2 text-xl font-extrabold">Estimate Summary</h2></div><div className="border-b border-white/10 px-6 py-4"><label className="text-xs font-bold text-white/70">Manual / Custom Estimate Amount<input aria-label="Manual or custom estimate amount" type="number" min="0" step="0.01" value={manualPrice ?? ""} placeholder={String(result.calculatedFinalPrice ?? result.finalPrice)} onChange={event=>setManualPrice(event.target.value===""?null:Number(event.target.value))} className="mt-2 h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-sm font-bold text-[#143d1a]" /></label><button type="button" disabled={manualPrice===null} onClick={()=>setManualPrice(null)} className="mt-2 text-xs font-bold text-[#d4af37] disabled:opacity-40">Use Calculated Price</button><p className="mt-2 text-xs text-white/55">A custom amount remains authoritative until you explicitly use the calculated price.</p></div><dl className="divide-y divide-white/10 px-6">{rows.map(([label, display]) => <div key={label} className="flex justify-between gap-4 py-3 text-sm"><dt className="text-white/60">{label}</dt><dd className="text-right font-bold">{display}</dd></div>)}</dl><div className="bg-[#0d2b12] p-6"><p className="text-xs font-bold uppercase tracking-[.12em] text-white/55">Final Price</p><p className="mt-1 text-4xl font-extrabold text-[#d4af37]">{currency(result.finalPrice)}</p><button type="button" disabled={saving} onClick={() => void save()} className="mt-5 w-full rounded-lg bg-[#d4af37] px-5 py-3 text-sm font-extrabold text-[#143d1a] hover:bg-[#e1c056] disabled:opacity-60">{saving ? "Saving…" : editing ? "Update Estimate" : "Save Estimate"}</button></div></aside>; }
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) { return <section className="rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-[0_8px_25px_rgba(20,61,26,.045)] sm:p-6"><h2 className="text-lg font-extrabold text-[#143d1a]">{title}</h2>{subtitle && <p className="mt-1 text-sm text-neutral-500">{subtitle}</p>}<div className="mt-5">{children}</div></section>; }
 function DivisionToggle({ value, set }: { value: EstimateDivision; set: (value: EstimateDivision) => void }) { return <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#f1f4f0] p-1.5">{(["Residential", "Commercial"] as const).map((item) => <button type="button" key={item} onClick={() => set(item)} className={`rounded-lg px-4 py-3 text-sm font-bold ${value === item ? "bg-white text-[#143d1a] shadow-sm" : "text-neutral-500"}`}>{item}</button>)}</div>; }
