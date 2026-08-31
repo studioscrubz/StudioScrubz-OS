@@ -44,13 +44,17 @@ async function initializeDevices(db: ReturnType<typeof createSupabaseAdminClient
   if (error) throw new Error("Push subscription baseline could not be completed.");
 }
 
-async function sendWebPush(subscription: BrowserPushSubscription, payload: PushPayload) {
+export async function sendWebPush(subscription: BrowserPushSubscription, payload: PushPayload) {
   const publicKey = process.env.NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY;
   const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY;
   const subject = process.env.WEB_PUSH_VAPID_SUBJECT;
   if (!publicKey || !privateKey || !subject) throw new Error("Web Push server configuration is incomplete.");
   webPush.setVapidDetails(subject, publicKey, privateKey);
   await webPush.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, JSON.stringify(payload), { TTL: 3600 });
+}
+
+export function webPushStatus(cause: unknown) {
+  return cause && typeof cause === "object" && "statusCode" in cause && typeof cause.statusCode === "number" ? cause.statusCode : null;
 }
 
 function deliveryRepository(db: ReturnType<typeof createSupabaseAdminClient>): DeliveryRepository {

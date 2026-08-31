@@ -22,7 +22,9 @@ export async function getPushSetupState(): Promise<PushSetupState> {
   if (Notification.permission === "denied") return "denied";
   const registration = await navigator.serviceWorker.getRegistration("/");
   const subscription = await registration?.pushManager.getSubscription();
-  return Notification.permission === "granted" && subscription ? "enabled" : "not-granted";
+  if (Notification.permission !== "granted" || !subscription) return "not-granted";
+  const { data } = await getSupabaseClient().from("browser_push_subscriptions").select("id").eq("endpoint", subscription.endpoint).is("revoked_at", null).maybeSingle();
+  return data ? "enabled" : "not-granted";
 }
 
 export async function subscribeCurrentBrowserToPush(): Promise<BrowserPushSubscription> {
@@ -59,6 +61,15 @@ export async function unsubscribeCurrentBrowserFromPush(): Promise<void> {
     .update({ revoked_at: new Date().toISOString() }).eq("endpoint", subscription.endpoint);
   if (error) throw new Error(safeMessage(error, "Push subscription could not be revoked."));
   await subscription.unsubscribe();
+}
+
+export async function sendTestNotificationToCurrentBrowser(): Promise<void> {
+  if (!isBrowserPushSupported() || Notification.permission !== "granted") throw new Error("Push notifications are not enabled on this browser.");
+  const registration = await navigator.serviceWorker.getRegistration("/"); const subscription = await registration?.pushManager.getSubscription();
+  if (!subscription) throw new Error("Push notifications are not enabled on this browser.");
+  const response = await fetch("/api/push/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: subscription.endpoint }) });
+  const result = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(result.error || "Test notification could not be sent.");
 }
 
 function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
