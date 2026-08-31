@@ -6,7 +6,6 @@ import type {
   JobUpdate,
   JobWithRelations,
   DirectJobInput,
-  CompletedHistoricalJobInput,
   JobClockInResult,
   JobClockState,
 } from "@/types/job";
@@ -159,16 +158,6 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
   const job = await getJobById(data.id).catch(() => fullJob(data));
   await requestPendingJobCalendarSync(job.id);
   return job;
-}
-export async function createCompletedHistoricalJob(input: CompletedHistoricalJobInput): Promise<JobWithRelations> {
-  const { data, error } = await getSupabaseClient().rpc("create_completed_historical_job", {
-    p_client_id: input.client_id, p_property_id: input.property_id, p_service_id: input.service_id,
-    p_start_date: input.start_date, p_start_time: input.start_time,
-    p_end_date: input.end_date, p_end_time: input.end_time,
-    p_assigned_crew_id: input.assigned_crew_id, p_internal_notes: input.internal_notes, p_price: input.price,
-  });
-  if (error) throw new Error(safeDatabaseMessage(error, "Completed Job could not be added."));
-  return operationalJob(data);
 }
 export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRelations> {
   if (!(await master())) {

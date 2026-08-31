@@ -96,18 +96,6 @@ export type DirectJobInput = {
   internal_notes: string | null;
   price_override?: number | null;
 };
-export type CompletedHistoricalJobInput = {
-  client_id: string;
-  property_id: string;
-  service_id: string;
-  start_date: string;
-  start_time: string;
-  end_date: string;
-  end_time: string;
-  assigned_crew_id: string | null;
-  internal_notes: string | null;
-  price: number | null;
-};
 type JobRelations = {
   proposal: Proposal | null;
   client: Client | null;

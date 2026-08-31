@@ -29,7 +29,6 @@ import { PhotoUploader } from "@/components/photos/PhotoUploader";
 import type { JobPhotoCategory } from "@/types/photo";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
-import { CompletedHistoricalJobModal } from "@/components/jobs/CompletedHistoricalJobModal";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
 import { JobMasterTimeEditor } from "@/components/jobs/JobMasterTimeEditor";
@@ -68,7 +67,6 @@ export function JobsPage() {
   const [selected, setSelected] = useState<JobWithRelations | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [creatingHistorical, setCreatingHistorical] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<JobWithRelations | null>(null);
   const canViewArchived = Boolean(profile && ["Master Admin", "Administrator"].includes(profile.role));
   async function load() {
@@ -244,7 +242,7 @@ export function JobsPage() {
   );
   return (
     <>
-      <Header canCreate={hasPermission(profile, "jobs.create")} canCreateHistorical={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))} create={() => setCreating(true)} createHistorical={() => setCreatingHistorical(true)} />
+      <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
       <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -319,7 +317,6 @@ export function JobsPage() {
         />
       )}
       {creating && <DirectJobModal close={() => setCreating(false)} created={async () => { setCreating(false); await load(); setNotice("Job created successfully."); }} />}
-      {creatingHistorical && <CompletedHistoricalJobModal close={() => setCreatingHistorical(false)} created={async () => { setCreatingHistorical(false); await load(); setNotice("Completed historical Job added successfully."); }} />}
       {confirmingDelete && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-[#07190a]/70 p-5">
           <section role="alertdialog" aria-modal="true" aria-labelledby="delete-cancelled-job-title" className="w-full max-w-lg rounded-2xl bg-white p-6">
@@ -668,7 +665,7 @@ function JobModal({
     </Modal>
   );
 }
-function Header({ canCreate, canCreateHistorical, create, createHistorical }: { canCreate: boolean; canCreateHistorical: boolean; create: () => void; createHistorical: () => void }) {
+function Header({ canCreate, create }: { canCreate: boolean; create: () => void }) {
   return (
     <header className="flex flex-col gap-5 border-b border-[#143d1a]/10 pb-7 sm:flex-row sm:items-end sm:justify-between">
       <div>
@@ -680,10 +677,7 @@ function Header({ canCreate, canCreateHistorical, create, createHistorical }: { 
         Manage active StudioScrubz service jobs.
       </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {canCreateHistorical && <button type="button" onClick={createHistorical} className="rounded-lg border border-[#143d1a] px-5 py-3 text-sm font-bold text-[#143d1a]">Add Completed Job</button>}
-        {canCreate && <button type="button" onClick={create} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)]">Create Job</button>}
-      </div>
+      {canCreate && <button type="button" onClick={create} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)]">Create Job</button>}
     </header>
   );
 }

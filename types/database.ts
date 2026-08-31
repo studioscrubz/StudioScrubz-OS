@@ -134,7 +134,6 @@ export interface Database {
       get_financially_handed_off_job_ids:{Args:Record<string,never>;Returns:string[]};
       create_job_from_accepted_proposal:{Args:{p_proposal_id:string};Returns:Job};
       create_direct_operational_job:{Args:{p_client_id:string;p_property_id:string;p_service_id:string;p_addon_ids?:string[];p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_labor_hours?:number;p_access_instructions?:string|null;p_internal_notes?:string|null;p_master_price_override?:number|null};Returns:Job};
-      create_completed_historical_job:{Args:{p_client_id:string;p_property_id:string;p_service_id:string;p_start_date:string;p_start_time:string;p_end_date:string;p_end_time:string;p_assigned_crew_id:string|null;p_internal_notes:string|null;p_price:number|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       archive_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       get_archived_operational_jobs:{Args:Record<string,never>;Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
       restore_archived_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
