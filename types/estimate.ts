@@ -88,6 +88,7 @@ export type EstimateResult = {
   finalPrice: number;
   monthlyPrice: number | null;
   visitsPerMonth: number;
+  upkeepPlan?: { standardCleaningValue: number; adjustmentPercent: number; upkeepVisitValue: number; visitsIncluded: 3; monthlyPackage: number } | null;
   laborHours: number;
   crewSize: number;
   estimatedDuration: number;

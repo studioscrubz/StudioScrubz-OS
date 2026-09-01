@@ -100,6 +100,7 @@ export type ProposalAgreementReview = {
   intervalWeeks: number;
   dayOfMonth: number | null;
   secondDayOfMonth: number | null;
+  thirdDayOfMonth?: number | null;
   customIntervalDays: number | null;
   billingType: AgreementBillingType;
   billingAmount: number | null;
@@ -145,6 +146,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     throw new Error("This Proposal has a deleted Client or Property relationship and cannot create an Agreement.");
   if (!review.startDate) throw new Error("Confirm the Agreement Start Date.");
   if (!AGREEMENT_BILLING_TYPES.includes(review.billingType)) throw new Error("Select a Billing Type.");
+  if (p.result.serviceName === "StudioScrubz Upkeep Plan" && review.billingType !== "Monthly") throw new Error("Upkeep Plan agreements must use Monthly billing so the package is billed once per month.");
   const pricing = { ...proposalAgreementPricing(p), service_description: agreementServiceDescriptionFromProposal(p, catalog.services) };
   const billingAmount = review.billingType === "Per Visit" ? pricing.final_per_visit_price : Number(review.billingAmount);
   if (!Number.isFinite(billingAmount) || billingAmount <= 0)
@@ -156,6 +158,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     interval_weeks: review.intervalWeeks,
     day_of_month: review.dayOfMonth,
     second_day_of_month: review.secondDayOfMonth,
+    third_day_of_month: review.thirdDayOfMonth ?? null,
     custom_interval_days: review.customIntervalDays,
     start_date: review.startDate,
     end_date: review.endDate,
@@ -174,6 +177,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     interval_weeks: review.intervalWeeks,
     day_of_month: review.dayOfMonth,
     second_day_of_month: review.secondDayOfMonth,
+    third_day_of_month: review.thirdDayOfMonth ?? null,
     custom_interval_days: review.customIntervalDays,
     start_date: review.startDate,
     end_date: review.endDate,
@@ -363,6 +367,8 @@ export function validateAgreementConfiguration(
   if (agreement.end_date && agreement.end_date < agreement.start_date) return "End date must be on or after the start date.";
   if (!AGREEMENT_BILLING_TYPES.includes(agreement.billing_type)) return "Select a valid billing type.";
   if (!Number.isFinite(agreement.billing_amount) || agreement.billing_amount < 0) return "Billing amount must be zero or greater.";
+  if (agreement.service_name === "StudioScrubz Upkeep Plan" && (agreement.division !== "Residential" || agreement.frequency !== "Monthly" || agreement.billing_type !== "Monthly")) return "Upkeep Plan agreements are Residential monthly packages.";
+  if (agreement.service_name === "StudioScrubz Upkeep Plan" && (!agreement.day_of_month || !agreement.second_day_of_month || !agreement.third_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.third_day_of_month < 1 || agreement.third_day_of_month > 28 || new Set([agreement.day_of_month, agreement.second_day_of_month, agreement.third_day_of_month]).size !== 3)) return "Upkeep Plan requires three distinct calendar days from 1 through 28.";
   const weekdayFrequency = ["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(agreement.frequency);
   if (weekdayFrequency && !agreement.days_of_week.length) return `Select at least one service day for ${agreement.frequency}.`;
   if (agreement.frequency === "Multiple Days Per Week" && (!Number.isInteger(agreement.interval_weeks) || agreement.interval_weeks < 1)) return "Interval weeks must be at least 1.";

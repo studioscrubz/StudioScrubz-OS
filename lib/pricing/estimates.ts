@@ -3,10 +3,16 @@ import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { calculateRecurringTotals, catalogConfigNumber, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling/frequency";
+import { calculateUpkeepPlan } from "@/lib/pricing/upkeepPlan";
 
 const conditionMultiplier: Record<Condition, number> = { Light: 0.92, Average: 1, Heavy: 1.22, Extreme: 1.48 };
 
-export function calculateResidentialEstimate(input: ResidentialCalculatorInput, catalog: ServiceCatalogBundle): EstimateResult {
+export function calculateResidentialEstimate(input: ResidentialCalculatorInput, catalog: ServiceCatalogBundle, upkeepAdjustmentPercent = 30): EstimateResult {
+  if (input.serviceType === "StudioScrubz Upkeep Plan") {
+    const standard = calculateResidentialEstimate({ ...input, serviceType: "Standard", frequency: "One-Time", customIntervalDays: null, recurringPricingRuleId: null }, catalog, upkeepAdjustmentPercent);
+    const upkeepPlan = calculateUpkeepPlan(standard.finalPrice, upkeepAdjustmentPercent);
+    return { ...standard, serviceName: "StudioScrubz Upkeep Plan", serviceDescription: "3 Light Maintenance Visits per Month", basePrice: upkeepPlan.standardCleaningValue, adjustments: [], oneTimePrice: upkeepPlan.standardCleaningValue, recurringDiscount: 0, recurringDiscountPercent: 0, totalDiscount: 0, calculatedFinalPrice: upkeepPlan.monthlyPackage, finalPrice: upkeepPlan.monthlyPackage, monthlyPrice: upkeepPlan.monthlyPackage, visitsPerMonth: 3, estimatedProfit: money(upkeepPlan.monthlyPackage - standard.laborCost - standard.supplyCost), calculatorInput: { ...input, frequency: "Monthly", customIntervalDays: null, recurringPricingRuleId: null }, upkeepPlan };
+  }
   const service=catalog.services.find(x=>x.division!=="Commercial"&&x.service_name===`${input.serviceType} Cleaning`);
   if(!service)throw new Error(`No active catalog service is configured for ${input.serviceType} Cleaning.`);
   const availableAddons=getAvailableServiceAddons(catalog,service.id,input.division);

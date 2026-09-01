@@ -10,7 +10,7 @@ export type AgreementStatus = (typeof AGREEMENT_STATUSES)[number];
 export type AgreementBillingType = (typeof AGREEMENT_BILLING_TYPES)[number];
 export type AgreementFrequency = (typeof AGREEMENT_FREQUENCIES)[number];
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-export type RecurrenceRule = { daysOfWeek: Weekday[]; intervalWeeks: number; dayOfMonth: number | null; secondDayOfMonth: number | null; customIntervalDays: number | null };
+export type RecurrenceRule = { daysOfWeek: Weekday[]; intervalWeeks: number; dayOfMonth: number | null; secondDayOfMonth: number | null; thirdDayOfMonth?: number | null; customIntervalDays: number | null };
 export type AgreementPricingSnapshot = {
   source: "Accepted Proposal" | "Service Catalog";
   service_description?: string | null;
@@ -26,13 +26,14 @@ export type AgreementPricingSnapshot = {
   taxes: number;
   final_per_visit_price: number;
   estimated_monthly_total: number | null;
+  upkeep_plan?: { standard_cleaning_value: number; adjustment_percent: number; upkeep_visit_value: number; visits_included: 3; monthly_package: number } | null;
   captured_at: string;
   catalog_addons?: ProposalAdjustment[];
 };
 export type ServiceAgreement = {
   id: string; agreement_number: string; client_id: string | null; property_id: string | null; proposal_id: string | null;
   division: "Residential" | "Commercial"; agreement_name: string; service_name: string; frequency: AgreementFrequency;
-  days_of_week: Weekday[]; interval_weeks: number; day_of_month: number | null; second_day_of_month: number | null; custom_interval_days: number | null;
+  days_of_week: Weekday[]; interval_weeks: number; day_of_month: number | null; second_day_of_month: number | null; third_day_of_month?: number | null; custom_interval_days: number | null;
   start_date: string; end_date: string | null; auto_renew: boolean; billing_type: AgreementBillingType; billing_amount: number; pricing_snapshot: AgreementPricingSnapshot | null;
   payment_terms: string | null; agreement_terms: string | null; cancellation_terms: string | null; scope: ProposalScopeItem[];
   special_instructions: string | null; assigned_crew_id: string | null; default_start_time: string | null; estimated_duration: number | null;

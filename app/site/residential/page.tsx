@@ -6,7 +6,7 @@ const residentialServices = [
   ["Standard Cleaning", "Routine cleaning designed to keep your home fresh, comfortable, and maintained. Depending on the space, service may include general dusting, accessible surfaces, kitchen and bathroom cleaning, mirrors, floors, trash removal, and light tidying."],
   ["Deep Cleaning", "A more detailed clean for homes that need extra attention, including the core tasks of Standard Cleaning. The service focuses more closely on buildup, baseboards, doors and trim, fixtures, detailed kitchen and bathroom surfaces, and commonly overlooked areas."],
   ["Move-In / Move-Out", "Thorough cleaning designed for empty or mostly empty homes between occupants. Service may include kitchens, bathrooms, cabinets and drawers, floors, baseboards, fixtures, closets, and other interior surfaces to help prepare the property for occupancy or turnover."],
-  ["Monthly Upkeep", "Recurring maintenance cleaning designed to keep your home consistently cared for from month to month. Regular visits focus on reducing dust, dirt, and everyday buildup between professional cleanings."],
+  ["StudioScrubz Upkeep Plan", "3 Light Maintenance Visits Per Month designed to help maintain your home between heavier cleanings. Regular visits focus on reducing dust, dirt, and everyday buildup."],
 ] as const;
 
 const includedServices = [
