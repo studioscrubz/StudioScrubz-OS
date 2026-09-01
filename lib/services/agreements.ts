@@ -99,6 +99,7 @@ export type ProposalAgreementReview = {
   daysOfWeek: (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
   intervalWeeks: number;
   dayOfMonth: number | null;
+  secondDayOfMonth: number | null;
   customIntervalDays: number | null;
   billingType: AgreementBillingType;
   billingAmount: number | null;
@@ -154,6 +155,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     days_of_week: review.daysOfWeek,
     interval_weeks: review.intervalWeeks,
     day_of_month: review.dayOfMonth,
+    second_day_of_month: review.secondDayOfMonth,
     custom_interval_days: review.customIntervalDays,
     start_date: review.startDate,
     end_date: review.endDate,
@@ -171,6 +173,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     days_of_week: review.daysOfWeek,
     interval_weeks: review.intervalWeeks,
     day_of_month: review.dayOfMonth,
+    second_day_of_month: review.secondDayOfMonth,
     custom_interval_days: review.customIntervalDays,
     start_date: review.startDate,
     end_date: review.endDate,
@@ -191,12 +194,14 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
   });
 }
 
-function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_week" | "interval_weeks" | "day_of_month" | "custom_interval_days" | "start_date" | "end_date">) {
+function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_week" | "interval_weeks" | "day_of_month" | "second_day_of_month" | "custom_interval_days" | "start_date" | "end_date">) {
   if (input.end_date && input.end_date < input.start_date) return "End date must be on or after the start date.";
   if (["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(input.frequency) && !input.days_of_week.length)
     return `Select at least one service day for ${input.frequency}.`;
   if (input.frequency === "Monthly" && (!input.day_of_month || input.day_of_month < 1 || input.day_of_month > 31))
     return "Select a monthly service day from 1 through 31.";
+  if (input.frequency === "Twice Monthly" && (!input.day_of_month || !input.second_day_of_month || input.day_of_month < 1 || input.day_of_month > 28 || input.second_day_of_month < 1 || input.second_day_of_month > 28 || input.day_of_month === input.second_day_of_month))
+    return "Select two distinct monthly service days from 1 through 28.";
   return null;
 }
 export async function updateAgreement(id: string, input: AgreementUpdate) {
@@ -323,7 +328,9 @@ export function estimatedMonthlyAmount(a: ServiceAgreement) {
         : a.frequency === "Daily"
           ? 365 / 12
         : a.frequency === "Biweekly"
-          ? 26 / 12
+            ? 26 / 12
+          : a.frequency === "Twice Monthly"
+            ? 2
           : a.frequency === "Every 4 Weeks"
             ? 13 / 12
             : a.frequency === "Monthly"
@@ -358,6 +365,7 @@ export function validateAgreementConfiguration(
   if (weekdayFrequency && !agreement.days_of_week.length) return `Select at least one service day for ${agreement.frequency}.`;
   if (agreement.frequency === "Multiple Days Per Week" && (!Number.isInteger(agreement.interval_weeks) || agreement.interval_weeks < 1)) return "Interval weeks must be at least 1.";
   if (agreement.frequency === "Monthly" && (!agreement.day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 31)) return "Select a monthly service day from 1 through 31.";
+  if (agreement.frequency === "Twice Monthly" && (!agreement.day_of_month || !agreement.second_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.day_of_month === agreement.second_day_of_month)) return "Select two distinct monthly service days from 1 through 28.";
   if (agreement.frequency === "Custom" && (!agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be at least 1.";
   if (activation && !agreement.default_start_time) return "A default service start time is required before activation.";
   if (activation && agreement.division === "Commercial" && !agreement.assigned_crew_id) return "Assign a crew before activating a Commercial agreement.";

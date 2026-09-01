@@ -5,12 +5,12 @@ import type { Crew } from "@/types/crew";
 
 export const AGREEMENT_STATUSES = ["Draft", "Sent", "Accepted", "Active", "Paused", "Completed", "Cancelled", "Expired", "Archived"] as const;
 export const AGREEMENT_BILLING_TYPES = ["Per Visit", "Weekly", "Biweekly", "Monthly", "Flat Contract"] as const;
-export const AGREEMENT_FREQUENCIES = ["One-Time", "Daily", "Weekly", "Biweekly", "Monthly", "Every 4 Weeks", "Multiple Days Per Week", "Custom"] as const;
+export const AGREEMENT_FREQUENCIES = ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Every 4 Weeks", "Multiple Days Per Week", "Custom"] as const;
 export type AgreementStatus = (typeof AGREEMENT_STATUSES)[number];
 export type AgreementBillingType = (typeof AGREEMENT_BILLING_TYPES)[number];
 export type AgreementFrequency = (typeof AGREEMENT_FREQUENCIES)[number];
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-export type RecurrenceRule = { daysOfWeek: Weekday[]; intervalWeeks: number; dayOfMonth: number | null; customIntervalDays: number | null };
+export type RecurrenceRule = { daysOfWeek: Weekday[]; intervalWeeks: number; dayOfMonth: number | null; secondDayOfMonth: number | null; customIntervalDays: number | null };
 export type AgreementPricingSnapshot = {
   source: "Accepted Proposal" | "Service Catalog";
   service_description?: string | null;
@@ -32,7 +32,7 @@ export type AgreementPricingSnapshot = {
 export type ServiceAgreement = {
   id: string; agreement_number: string; client_id: string | null; property_id: string | null; proposal_id: string | null;
   division: "Residential" | "Commercial"; agreement_name: string; service_name: string; frequency: AgreementFrequency;
-  days_of_week: Weekday[]; interval_weeks: number; day_of_month: number | null; custom_interval_days: number | null;
+  days_of_week: Weekday[]; interval_weeks: number; day_of_month: number | null; second_day_of_month: number | null; custom_interval_days: number | null;
   start_date: string; end_date: string | null; auto_renew: boolean; billing_type: AgreementBillingType; billing_amount: number; pricing_snapshot: AgreementPricingSnapshot | null;
   payment_terms: string | null; agreement_terms: string | null; cancellation_terms: string | null; scope: ProposalScopeItem[];
   special_instructions: string | null; assigned_crew_id: string | null; default_start_time: string | null; estimated_duration: number | null;

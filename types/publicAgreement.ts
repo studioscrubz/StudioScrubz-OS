@@ -11,6 +11,7 @@ export type PublicAgreement = {
   frequency: AgreementFrequency;
   days_of_week: Weekday[];
   day_of_month?: number | null;
+  second_day_of_month?: number | null;
   custom_interval_days?: number | null;
   default_start_time: string | null;
   start_date: string;

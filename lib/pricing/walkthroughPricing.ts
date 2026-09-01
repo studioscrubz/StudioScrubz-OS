@@ -56,7 +56,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
   } satisfies CommercialCalculatorInput;
 }
 
-export function validFrequency(value: unknown): value is Frequency { return ["One-Time", "Daily", "Weekly", "Biweekly", "Monthly"].includes(String(value)); }
+export function validFrequency(value: unknown): value is Frequency { return ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly"].includes(String(value)); }
 function value(primary: number | null | undefined, fallback: number | null | undefined, defaultValue: number) { return primary ?? fallback ?? defaultValue; }
 function trimCleaning(value: string) { return value.replace(/ Cleaning$/i, "").trim(); }
 function configNumber(value: unknown, fallback: number) { const parsed = Number(value); return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback; }

@@ -27,7 +27,7 @@ export async function reconcileFutureOccurrences(agreementId: string, horizonDay
   const [agreement, settings, existing] = await Promise.all([getAgreementById(agreementId), getBusinessSettings(), getOccurrencesForAgreement(agreementId)]);
   const currentDate = businessDate(settings.timezone), end = add(currentDate, horizonDays), windowStart = agreement.start_date > currentDate ? agreement.start_date : currentDate;
   const desired = agreement.status === "Active"
-    ? new Set(generateServiceDates(agreement.start_date, end, agreement.frequency, { daysOfWeek: agreement.days_of_week, intervalWeeks: agreement.interval_weeks, dayOfMonth: agreement.day_of_month, customIntervalDays: agreement.custom_interval_days }, agreement.end_date, agreement.auto_renew).filter((date) => date >= windowStart))
+    ? new Set(generateServiceDates(agreement.start_date, end, agreement.frequency, { daysOfWeek: agreement.days_of_week, intervalWeeks: agreement.interval_weeks, dayOfMonth: agreement.day_of_month, secondDayOfMonth: agreement.second_day_of_month, customIntervalDays: agreement.custom_interval_days }, agreement.end_date, agreement.auto_renew).filter((date) => date >= windowStart))
     : new Set<string>();
   const future = existing.filter((row) => row.scheduled_date >= currentDate), byDate = new Map(future.map((row) => [row.scheduled_date, row]));
   for (const row of future) {
