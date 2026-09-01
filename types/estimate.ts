@@ -5,7 +5,7 @@ import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
 export type EstimateStatus = "Open" | "Archived";
-export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly";
+export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Custom";
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 export type PreferredContactMethod = "Call" | "Text" | "Email";
 export type PreferredContactTime = "Anytime" | "Morning" | "Afternoon" | "Evening";
@@ -29,6 +29,7 @@ export type ResidentialCalculatorInput = {
   division: "Residential";
   serviceType: string;
   frequency: Frequency;
+  customIntervalDays?: number | null;
   recurringPricingRuleId?: string | null;
   condition: Condition;
   squareFeet: number;
@@ -47,6 +48,7 @@ export type CommercialCalculatorInput = {
   division: "Commercial";
   commercialType: string;
   frequency: Frequency;
+  customIntervalDays?: number | null;
   recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;

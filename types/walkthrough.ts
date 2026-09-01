@@ -19,6 +19,7 @@ export type WalkthroughMeasurements = {
   preferredContactMethod: WalkthroughContactMethod | null;
   estimateNumber: string | null;
   frequency?: Frequency | null;
+  customIntervalDays?: number | null;
   overallCondition: "" | "Light" | "Average" | "Heavy" | "Extreme";
   squareFeet: number | null;
   bedrooms: number | null;
