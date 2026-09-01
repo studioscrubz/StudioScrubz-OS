@@ -202,6 +202,8 @@ function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_wee
     return "Select a monthly service day from 1 through 31.";
   if (input.frequency === "Twice Monthly" && (!input.day_of_month || !input.second_day_of_month || input.day_of_month < 1 || input.day_of_month > 28 || input.second_day_of_month < 1 || input.second_day_of_month > 28 || input.day_of_month === input.second_day_of_month))
     return "Select two distinct monthly service days from 1 through 28.";
+  if (input.frequency === "Custom" && (!Number.isInteger(input.custom_interval_days) || !input.custom_interval_days || input.custom_interval_days < 1))
+    return "Enter a whole-number custom interval of at least 1 day.";
   return null;
 }
 export async function updateAgreement(id: string, input: AgreementUpdate) {
@@ -366,7 +368,7 @@ export function validateAgreementConfiguration(
   if (agreement.frequency === "Multiple Days Per Week" && (!Number.isInteger(agreement.interval_weeks) || agreement.interval_weeks < 1)) return "Interval weeks must be at least 1.";
   if (agreement.frequency === "Monthly" && (!agreement.day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 31)) return "Select a monthly service day from 1 through 31.";
   if (agreement.frequency === "Twice Monthly" && (!agreement.day_of_month || !agreement.second_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.day_of_month === agreement.second_day_of_month)) return "Select two distinct monthly service days from 1 through 28.";
-  if (agreement.frequency === "Custom" && (!agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be at least 1.";
+  if (agreement.frequency === "Custom" && (!Number.isInteger(agreement.custom_interval_days) || !agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be a whole number of at least 1.";
   if (activation && !agreement.default_start_time) return "A default service start time is required before activation.";
   if (activation && agreement.division === "Commercial" && !agreement.assigned_crew_id) return "Assign a crew before activating a Commercial agreement.";
   if (activation && agreement.billing_type !== "Per Visit" && agreement.billing_amount <= 0) return `${agreement.billing_type} agreements require a contract amount greater than zero.`;

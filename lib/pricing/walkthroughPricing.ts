@@ -10,6 +10,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
   const service = findCatalogService(catalog.services, walkthrough.division, serviceName);
   const config = service?.pricing_config ?? {};
   const frequency = measurements.frequency ?? walkthrough.estimate?.frequency ?? fallback?.frequency ?? "One-Time";
+  const customIntervalDays = frequency === "Custom" ? measurements.customIntervalDays ?? fallback?.customIntervalDays ?? null : null;
   const condition = measurements.overallCondition || fallback?.condition || "Average";
   const addons = (measurements.catalogAddons?.length ? measurements.catalogAddons : walkthrough.estimate?.result.catalogAddons ?? []).map(item => item.name);
 
@@ -19,6 +20,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
       division: "Residential",
       serviceType: trimCleaning(serviceName),
       frequency,
+      customIntervalDays,
       condition,
       squareFeet: value(measurements.squareFeet, previous?.squareFeet, 0),
       bedrooms: value(measurements.bedrooms, previous?.bedrooms, 0),
@@ -38,6 +40,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
     division: "Commercial",
     commercialType: trimCleaning(serviceName),
     frequency,
+    customIntervalDays,
     condition,
     squareFeet: value(measurements.squareFeet, previous?.squareFeet, 0),
     floors: value(measurements.floors, previous?.floors, 1),
@@ -56,7 +59,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
   } satisfies CommercialCalculatorInput;
 }
 
-export function validFrequency(value: unknown): value is Frequency { return ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly"].includes(String(value)); }
+export function validFrequency(value: unknown): value is Frequency { return ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Custom"].includes(String(value)); }
 function value(primary: number | null | undefined, fallback: number | null | undefined, defaultValue: number) { return primary ?? fallback ?? defaultValue; }
 function trimCleaning(value: string) { return value.replace(/ Cleaning$/i, "").trim(); }
 function configNumber(value: unknown, fallback: number) { const parsed = Number(value); return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback; }

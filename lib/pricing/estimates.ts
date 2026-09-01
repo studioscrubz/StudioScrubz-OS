@@ -25,7 +25,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
   if (input.pets) adjustments.push({ label: "Pets / heavy pet hair", amount: 35 });
   adjustments.push(...configured.addonAdjustments);
   const oneTimePrice = basePrice + adjustments.reduce((sum, item) => sum + item.amount, 0);
-  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent});
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,customIntervalDays:input.customIntervalDays,rules:catalog.recurringRules,serviceId:service.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent});
   const recurringDiscountPercent = pricing.recurringDiscountPercent;
   const recurringDiscount = pricing.recurringDiscountAmount;
   const manualDiscount = pricing.manualDiscount;
@@ -68,7 +68,7 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
   const basePrice = directCost / Math.max(configured.minimumMarginDenominator, 1 - margin);
   const adjustments = configured.addonAdjustments;
   const oneTimePrice = basePrice;
-  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,rules:catalog.recurringRules,serviceId:service.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent});
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,customIntervalDays:input.customIntervalDays,rules:catalog.recurringRules,serviceId:service.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent});
   const recurringDiscountPercent = pricing.recurringDiscountPercent;
   const recurringDiscount = pricing.recurringDiscountAmount;
   const manualDiscount = pricing.manualDiscount;
@@ -80,7 +80,7 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
 
 function result(values: { input: ResidentialCalculatorInput | CommercialCalculatorInput; serviceName: string; catalogAddons:EstimateResult["catalogAddons"]; basePrice: number; adjustments: { label: string; amount: number }[]; oneTimePrice: number; recurringPricingRuleId:string|null; recurringPricingRuleName:string|null; recurringDiscount: number; recurringDiscountPercent: number; manualDiscount: number; totalDiscount: number; taxes: number; finalPrice: number; laborHours: number; crewSize: number; laborCost: number; supplyCost: number; scope: string[] }): EstimateResult {
   const frequency = values.input.frequency;
-  return { ...values, serviceDescription: null, basePrice: money(values.basePrice), adjustments: values.adjustments.map((item) => ({ ...item, amount: money(item.amount) })), oneTimePrice: money(values.oneTimePrice), recurringDiscount: money(values.recurringDiscount), manualDiscount: money(values.manualDiscount), totalDiscount: money(values.totalDiscount), taxes: money(values.taxes), finalPrice: money(values.finalPrice), monthlyPrice: estimatedMonthlyTotal(values.finalPrice,frequency), visitsPerMonth: estimatedVisitsPerMonth(frequency), laborHours: tenth(values.laborHours), crewSize: values.crewSize, estimatedDuration: tenth(values.laborHours / values.crewSize), laborCost: money(values.laborCost), supplyCost: money(values.supplyCost), estimatedProfit: money(values.finalPrice - values.laborCost - values.supplyCost), calculatorInput: values.input };
+  return { ...values, serviceDescription: null, basePrice: money(values.basePrice), adjustments: values.adjustments.map((item) => ({ ...item, amount: money(item.amount) })), oneTimePrice: money(values.oneTimePrice), recurringDiscount: money(values.recurringDiscount), manualDiscount: money(values.manualDiscount), totalDiscount: money(values.totalDiscount), taxes: money(values.taxes), finalPrice: money(values.finalPrice), monthlyPrice: estimatedMonthlyTotal(values.finalPrice,frequency,values.input.customIntervalDays), visitsPerMonth: estimatedVisitsPerMonth(frequency,values.input.customIntervalDays), laborHours: tenth(values.laborHours), crewSize: values.crewSize, estimatedDuration: tenth(values.laborHours / values.crewSize), laborCost: money(values.laborCost), supplyCost: money(values.supplyCost), estimatedProfit: money(values.finalPrice - values.laborCost - values.supplyCost), calculatorInput: values.input };
 }
 function snapshots(names:string[],addons:ServiceCatalogBundle["addons"]):EstimateResult["catalogAddons"]{return names.map(name=>addons.find(addon=>addon.addon_name===name)).filter((addon):addon is NonNullable<typeof addon>=>Boolean(addon)).map(addon=>({id:addon.id,catalogAddonId:addon.id,name:addon.addon_name,description:addon.description,price:addon.price,pricingModel:addon.pricing_model,unitLabel:addon.unit_label}))}
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value || 0)); }
