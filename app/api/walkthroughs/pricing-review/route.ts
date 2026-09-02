@@ -1,10 +1,10 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/auth/permissions";
-import { calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
+import { calculateCommercialEstimate, calculatePostConstructionCatalogEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 import { getAvailableServiceAddons, findCatalogService } from "@/lib/services/serviceCatalog";
-import type { CalculatorInput, CommercialCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
+import type { CalculatorInput, CommercialCalculatorInput, PostConstructionCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import type { UserProfile } from "@/types/auth";
 import type { WalkthroughPricingReview, WalkthroughWithRelations } from "@/types/walkthrough";
@@ -33,10 +33,10 @@ export async function POST(request: Request) {
 
     const catalog = await loadCatalog(admin);
     const calculatorInput = normalizeInput(body.calculatorInput, walkthrough.division);
-    const service = findCatalogService(catalog.services, walkthrough.division, calculatorInput.division === "Residential" ? calculatorInput.serviceType : calculatorInput.commercialType);
+    const service = findCatalogService(catalog.services, walkthrough.division, isPostConstructionInput(calculatorInput) ? calculatorInput.serviceType : calculatorInput.division === "Residential" ? calculatorInput.serviceType : calculatorInput.commercialType);
     if (!service) return Response.json({ error: "Select an active Service Catalog service." }, { status: 400 });
     validateAddons(calculatorInput, catalog, service.id);
-    const calculatedResult = calculatorInput.division === "Residential" ? calculateResidentialEstimate(calculatorInput, catalog) : calculateCommercialEstimate(calculatorInput, catalog);
+    const calculatedResult = isPostConstructionInput(calculatorInput) ? calculatePostConstructionCatalogEstimate(calculatorInput, catalog, service) : calculatorInput.division === "Residential" ? calculateResidentialEstimate(calculatorInput, catalog) : calculateCommercialEstimate(calculatorInput, catalog);
     const manualPrice = body.manualPrice === null || body.manualPrice === undefined ? null : nonnegative(body.manualPrice, "approved Walkthrough price");
     const estimateResult = withAuthoritativeEstimatePrice(calculatedResult, manualPrice);
     estimateResult.serviceDescription = walkthrough.measurements.serviceDescription || service.description?.trim() || null;
@@ -68,6 +68,7 @@ async function loadCatalog(admin: ReturnType<typeof createSupabaseAdminClient>):
 function normalizeInput(value: unknown, division: "Residential" | "Commercial"): CalculatorInput {
   if (!value || typeof value !== "object") throw new Error("Calculator input is required.");
   const row = value as Record<string, unknown>;
+  if (row.calculatorType === "Post-Construction") throw new Error("Post-Construction pricing review is not available in Walkthroughs yet.");
   const frequency = oneOf(row.frequency, ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Custom"] as const, "frequency");
   const customIntervalDays = frequency === "Custom" ? positiveInteger(row.customIntervalDays, "custom interval days") : undefined;
   const condition = oneOf(row.condition, ["Light", "Average", "Heavy", "Extreme"] as const, "condition");
@@ -75,7 +76,8 @@ function normalizeInput(value: unknown, division: "Residential" | "Commercial"):
   if (division === "Commercial" && row.division === "Commercial") return { division: "Commercial", commercialType: text(row.commercialType, "service"), frequency, customIntervalDays, condition, squareFeet: positive(row.squareFeet, "square feet"), floors: positive(row.floors, "floors"), restrooms: nonnegative(row.restrooms, "restrooms"), kitchens: nonnegative(row.kitchens, "kitchens"), stations: nonnegative(row.stations, "stations"), units: nonnegative(row.units, "units"), targetCompletionHours: positive(row.targetCompletionHours, "target completion hours"), workerHourlyPay: positive(row.workerHourlyPay, "worker hourly pay"), targetProfitMarginPercent: percent(row.targetProfitMarginPercent), additionalDiscountPercent: percent(row.additionalDiscountPercent), taxRatePercent: 0, additionalServices: strings(row.additionalServices), targetProjectDays: optionalPositive(row.targetProjectDays), workdayHours: workday(row.workdayHours) } satisfies CommercialCalculatorInput;
   throw new Error("Calculator division does not match the Walkthrough.");
 }
-function validateAddons(input: CalculatorInput, catalog: ServiceCatalogBundle, serviceId: string) { const allowed = new Set(getAvailableServiceAddons(catalog, serviceId, input.division).map(item => item.addon_name)); const selected = input.division === "Residential" ? input.addOns : input.additionalServices; if (selected.some(item => !allowed.has(item))) throw new Error("An add-on is not available for this service."); }
+function validateAddons(input: CalculatorInput, catalog: ServiceCatalogBundle, serviceId: string) { const allowed = new Set(getAvailableServiceAddons(catalog, serviceId, input.division).map(item => item.addon_name)); const selected = isPostConstructionInput(input) ? input.additionalServices : input.division === "Residential" ? input.addOns : input.additionalServices; if (selected.some(item => !allowed.has(item))) throw new Error("An add-on is not available for this service."); }
+function isPostConstructionInput(input: CalculatorInput): input is PostConstructionCalculatorInput { return "calculatorType" in input && input.calculatorType === "Post-Construction"; }
 function text(value: unknown, label: string) { if (typeof value !== "string" || !value.trim()) throw new Error(`Valid ${label} is required.`); return value.trim(); }
 function number(value: unknown, label: string) { const n = typeof value === "number" ? value : Number.NaN; if (!Number.isFinite(n)) throw new Error(`Valid ${label} is required.`); return n; }
 function positive(value: unknown, label: string) { const n = number(value, label); if (n <= 0) throw new Error(`${label} must be greater than zero.`); return n; }

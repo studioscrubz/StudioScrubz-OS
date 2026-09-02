@@ -15,7 +15,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
   const addons = (measurements.catalogAddons?.length ? measurements.catalogAddons : walkthrough.estimate?.result.catalogAddons ?? []).map(item => item.name);
 
   if (walkthrough.division === "Residential") {
-    const previous = fallback?.division === "Residential" ? fallback : null;
+    const previous = fallback?.division === "Residential" && !("calculatorType" in fallback) ? fallback : null;
     return {
       division: "Residential",
       serviceType: trimCleaning(serviceName),
@@ -35,7 +35,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
     } satisfies ResidentialCalculatorInput;
   }
 
-  const previous = fallback?.division === "Commercial" ? fallback : null;
+  const previous = fallback?.division === "Commercial" && !("calculatorType" in fallback) ? fallback : null;
   return {
     division: "Commercial",
     commercialType: trimCleaning(serviceName),
