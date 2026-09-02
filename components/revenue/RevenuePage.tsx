@@ -11,7 +11,7 @@ import {
 } from "@/types/revenue";
 
 export function RevenuePage() {
-  const [period, setPeriod] = useState<RevenuePeriod>("This Month");
+  const [period, setPeriod] = useState<RevenuePeriod>("This Year");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [group, setGroup] = useState<RevenueGroup>("Day");
@@ -122,6 +122,22 @@ export function RevenuePage() {
         <div className="mt-5 flex justify-between rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
           <span>{error}</span>
           <button onClick={() => void load()}>Retry</button>
+        </div>
+      )}
+      {data && data.payments.length === 0 && data.invoices.length === 0 && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+          <span>No revenue activity was found for the selected period.</span>
+          {period !== "All Time" && (
+            <button
+              className={secondary}
+              onClick={() => {
+                setPeriod("All Time");
+                setGroup(defaultGroup("All Time"));
+              }}
+            >
+              View All Time
+            </button>
+          )}
         </div>
       )}
       {loading && !data ? <Skeleton /> : data && <Report data={data} />}
