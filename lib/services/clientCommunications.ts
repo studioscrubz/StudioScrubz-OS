@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { withImmediateAttentionPush } from "@/lib/push/client";
 import { getJobs } from "@/lib/services/jobs";
 import { getUpcomingOccurrences } from "@/lib/services/serviceOccurrences";
 import { getProperties } from "@/lib/services/properties";
@@ -118,7 +119,7 @@ export async function markCommunicationSent(id: string): Promise<ClientCommunica
 
 export async function markCommunicationFailed(id: string, reason: string): Promise<ClientCommunication> {
   if (!reason.trim()) throw new Error("A failure reason is required.");
-  return updateDeliveryStatus(id, "Failed", reason.trim());
+  return withImmediateAttentionPush(() => updateDeliveryStatus(id, "Failed", reason.trim()));
 }
 
 export async function archiveCommunication(id: string): Promise<ClientCommunication> {

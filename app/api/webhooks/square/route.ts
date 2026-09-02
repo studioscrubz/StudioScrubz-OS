@@ -1,5 +1,6 @@
 import { getSquarePayment, getSquarePaymentAmounts, verifySquareWebhookSignature } from "@/lib/square";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
 
 type SquareWebhook = { type?: string; data?: { object?: { payment?: { id?: string; order_id?: string } } } };
 
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     const orderId = webhookPayment?.order_id;
     if (!orderId) return Response.json({ error: "Square Order ID is missing." }, { status: 400 });
     const admin = createSupabaseAdminClient();
-    const { data: attempt, error: attemptError } = await admin.from("square_checkout_attempts").select("id").eq("square_order_id", orderId).maybeSingle();
+    const { data: attempt, error: attemptError } = await admin.from("square_checkout_attempts").select("id,invoice_id").eq("square_order_id", orderId).maybeSingle();
     if (attemptError) throw attemptError;
     if (!attempt) return Response.json({ received: true, ignored: true, reason: "Unknown Square order" });
     const payment = await getSquarePayment(paymentId);
@@ -29,6 +30,10 @@ export async function POST(request: Request) {
     const { data, error } = await admin.rpc("record_square_invoice_payment_v2", { p_attempt_id: attempt.id, p_square_payment_id: payment.id, p_square_order_id: payment.order_id, p_service_amount_cents: amounts.serviceCents, p_tip_amount_cents: amounts.tipCents, p_gross_amount_cents: amounts.grossCents, p_currency: amounts.currency, p_paid_at: payment.updated_at || payment.created_at || new Date().toISOString() });
     if (error) throw error;
     if (data && typeof data === "object" && "conflict" in data && data.conflict) console.error("Square payment requires manual reconciliation", { paymentId: payment.id, orderId: payment.order_id, attemptId: attempt.id });
+    if (!(data && typeof data === "object" && "conflict" in data && data.conflict)) {
+      const { data: paidInvoice, error: invoiceError } = await admin.from("invoices").select("status").eq("id", attempt.invoice_id).single();
+      if (!invoiceError && paidInvoice.status === "Paid") scheduleAttentionPushAfterResponse();
+    }
     return Response.json({ received: true, settlement: data });
   } catch (cause) {
     console.error("Square webhook processing failed", cause);

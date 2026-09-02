@@ -5,6 +5,7 @@ import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { UserProfile } from "@/types/auth";
+import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
 
 type DocumentType = "Estimate" | "Proposal" | "Service Agreement" | "Invoice";
 type DocumentContext = {
@@ -75,7 +76,8 @@ export async function POST(request: Request) {
     const internal = errorMessage(cause);
     console.error("Transactional customer email failed", cause);
     if (communicationId) {
-      await admin.from("client_communications").update({ status: "Failed", failure_reason: internal.slice(0, 1000) }).eq("id", communicationId);
+      const { error: failureError } = await admin.from("client_communications").update({ status: "Failed", failure_reason: internal.slice(0, 1000) }).eq("id", communicationId);
+      if (!failureError) scheduleAttentionPushAfterResponse();
     }
     const configurationError = internal.includes("RESEND_API_KEY") || internal.includes("Reply-To") || internal.includes("Business Email");
     return Response.json({ error: configurationError ? internal : "Resend did not accept the customer email. Please try again." }, { status: configurationError ? 503 : 502 });

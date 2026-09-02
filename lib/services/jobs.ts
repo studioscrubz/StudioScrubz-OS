@@ -17,6 +17,7 @@ import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import type { Invoice } from "@/types/invoice";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import { requestPendingJobCalendarSync } from "@/lib/google-calendar/client";
+import { requestImmediateAttentionPush } from "@/lib/push/client";
 
 export type JobCompletionResult = {
   job: JobWithRelations;
@@ -136,6 +137,7 @@ export async function createJobFromProposal(
   const visible = await getJobForProposal(proposalId).catch(() => null);
   const job = visible ?? fullJob(data);
   await requestPendingJobCalendarSync(job.id);
+  await requestJobAttentionPush(job);
   return job;
 }
 export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
@@ -158,6 +160,7 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
   if (!data) throw new Error("The Job creation result was empty.");
   const job = await getJobById(data.id).catch(() => fullJob(data));
   await requestPendingJobCalendarSync(job.id);
+  await requestJobAttentionPush(job);
   return job;
 }
 export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRelations> {
@@ -172,6 +175,7 @@ export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRe
     if (error) throw error;
     const job=operationalJob(data);
     await requestPendingJobCalendarSync(job.id);
+    if (jobAttentionFieldsChanged(input)) await requestJobAttentionPush(job);
     return job;
   }
   const { data, error } = await getSupabaseClient()
@@ -183,6 +187,7 @@ export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRe
   if (error) throw error;
   const job=fullJob(data);
   await requestPendingJobCalendarSync(job.id);
+  if (jobAttentionFieldsChanged(input)) await requestJobAttentionPush(job);
   return job;
 }
 export async function updateJobStatus(id: string, status: JobStatus) {
@@ -195,7 +200,9 @@ export async function updateJobStatus(id: string, status: JobStatus) {
   }
   if (status === "Completed") {
     const job = await updateJob(id, { status, completed_at: new Date().toISOString() });
-    return createCompletedJobInvoice(job);
+    const result = await createCompletedJobInvoice(job);
+    await requestImmediateAttentionPush();
+    return result;
   }
   return updateJob(id, { status, completed_at: null });
 }
@@ -369,6 +376,7 @@ export async function getCurrentJobClockState(jobId: string): Promise<JobClockSt
 export async function joinJob(id: string): Promise<JobClockInResult> {
   const { data, error } = await getSupabaseClient().rpc("start_or_clock_in_to_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Unable to join the Job."));
+  await requestImmediateAttentionPush();
   return data as JobClockInResult;
 }
 export const startOrClockInToJob = joinJob;
@@ -380,7 +388,9 @@ export async function startOperationalJob(id: string): Promise<JobWithRelations>
 export async function completeInProgressJob(id: string): Promise<JobCompletionResult> {
   const { data, error } = await getSupabaseClient().rpc("complete_in_progress_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
-  return createCompletedJobInvoice(operationalJob(data));
+  const result = await createCompletedJobInvoice(operationalJob(data));
+  await requestImmediateAttentionPush();
+  return result;
 }
 export type CompletedJobMasterTimeInput = {
   startDate: string;
@@ -432,6 +442,15 @@ export async function restoreArchivedJob(id: string): Promise<JobWithRelations> 
 }
 
 async function master(){ return isMasterAdmin(await getCurrentProfile()); }
+async function requestJobAttentionPush(job: JobWithRelations) {
+  if ((job.status === "Ready to Schedule" && !job.scheduled_date)
+    || (["Scheduled", "Ready to Schedule"].includes(job.status) && Boolean(job.scheduled_date) && !job.assigned_crew_id)) {
+    await requestImmediateAttentionPush();
+  }
+}
+function jobAttentionFieldsChanged(input: JobUpdate) {
+  return "status" in input || "scheduled_date" in input || "assigned_crew_id" in input;
+}
 function operationalJob(row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">):JobWithRelations{return{...row,price:null,deposit:null,balance:null,labor_hours:null,recommended_crew_size:null,photos:[],financials_available:false,proposal:null,client:null,property:null}}
 function fullJob(row:Job):JobWithRelations{return{...row,financials_available:true,proposal:null,client:null,property:null}}
 function errorMessage(cause:unknown){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return""}

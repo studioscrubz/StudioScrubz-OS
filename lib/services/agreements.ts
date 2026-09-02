@@ -17,6 +17,7 @@ import type {
   ServiceAgreement,
 } from "@/types/agreement";
 import { AGREEMENT_BILLING_TYPES } from "@/types/agreement";
+import { withImmediateAttentionPush } from "@/lib/push/client";
 import type { Client } from "@/types/client";
 import type { Property } from "@/types/property";
 import type { CatalogService } from "@/types/serviceCatalog";
@@ -265,9 +266,9 @@ async function transition(id: string, allowed: ServiceAgreement["status"][], sta
 export async function markAgreementSent(id: string, sentTo: string, sentBy: string, token: string, tokenExpiresAt: string) {
   if (!sentTo.trim()) throw new Error("A client delivery recipient is required.");
   if (!token) throw new Error("A secure agreement access token is required.");
-  return transition(id, ["Draft", "Sent"], "Sent", { sent_at: new Date().toISOString(), sent_to: sentTo.trim(), sent_by: sentBy.trim() || null, client_access_token: token, client_access_token_expires_at: tokenExpiresAt });
+  return withImmediateAttentionPush(() => transition(id, ["Draft", "Sent"], "Sent", { sent_at: new Date().toISOString(), sent_to: sentTo.trim(), sent_by: sentBy.trim() || null, client_access_token: token, client_access_token_expires_at: tokenExpiresAt }));
 }
-export const markAgreementAccepted = (id: string) => transition(id, ["Sent"], "Accepted", { accepted_at: new Date().toISOString() });
+export const markAgreementAccepted = (id: string) => withImmediateAttentionPush(() => transition(id, ["Sent"], "Accepted", { accepted_at: new Date().toISOString() }));
 export async function activateAgreement(id: string) {
   const agreement = await getAgreementById(id);
   if (agreement.status !== "Accepted") throw new Error(`A ${agreement.status} agreement cannot be changed to Active.`);

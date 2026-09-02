@@ -17,6 +17,7 @@ import type {
 } from "@/types/timeEntry";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { isMasterAdmin } from "@/lib/auth/permissions";
+import { requestImmediateAttentionPush } from "@/lib/push/client";
 const select =
   "*, employee:employees!time_entries_employee_id_fkey(*), job:jobs!time_entries_job_id_fkey(*), crew:crews!time_entries_crew_id_fkey(*)";
 export async function getTimeEntries(): Promise<TimeEntryWithRelations[]> {
@@ -64,7 +65,11 @@ export async function getTimeEntriesForJob(jobId: string) {
 }
 export async function createManualTimeEntry(input: TimeEntryInput) {
   if (!input.job_id) throw new Error("A Job is required for payable time.");
-  if (!(await master())) return saveOperational(null,input);
+  if (!(await master())) {
+    const entry = await saveOperational(null,input);
+    if (entry.status === "Open" && !entry.clock_out) await requestImmediateAttentionPush();
+    return entry;
+  }
   if (!input.clock_out)
     throw new Error("Manual completed entries require a clock-out time.");
   calculatePaidHours(input.clock_in, input.clock_out, input.break_minutes ?? 0);
@@ -92,7 +97,11 @@ export async function createManualTimeEntry(input: TimeEntryInput) {
 }
 export async function updateTimeEntry(id: string, input: TimeEntryInput) {
   if (!input.job_id) throw new Error("A Job is required for payable time.");
-  if (!(await master())) return saveOperational(id,input);
+  if (!(await master())) {
+    const entry = await saveOperational(id,input);
+    if (entry.status === "Open" && !entry.clock_out) await requestImmediateAttentionPush();
+    return entry;
+  }
   const before = await getById(id);
   if (input.clock_out)
     calculatePaidHours(
@@ -123,7 +132,9 @@ export async function updateTimeEntry(id: string, input: TimeEntryInput) {
     before.work_date !== input.work_date
   )
     await recalculateEmployeeDay(input.employee_id, input.work_date);
-  return getById(id);
+  const updated = await getById(id);
+  if (updated.status === "Open" && !updated.clock_out) await requestImmediateAttentionPush();
+  return updated;
 }
 export async function approveTimeEntry(id: string) {
   if (!(await master())) return reviewOperational(id,"Approved",null);

@@ -5,6 +5,7 @@ import { getBusinessSettings } from "@/lib/services/businessSettings";
 import type { ServiceOccurrence, ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 import type { JobWithRelations } from "@/types/job";
 import { requestPendingJobCalendarSync } from "@/lib/google-calendar/client";
+import { requestImmediateAttentionPush } from "@/lib/push/client";
 
 const deletedOccurrenceMarker = "[Deleted upcoming service — retained to prevent schedule regeneration]";
 const reconciledOccurrenceMarker = "[Cancelled by Agreement schedule reconciliation]";
@@ -55,6 +56,7 @@ export async function createJobFromOccurrence(id: string): Promise<JobWithRelati
   const { getJobById } = await import("@/lib/services/jobs");
   const job=await getJobById(data.id);
   await requestPendingJobCalendarSync(job.id);
+  if (["Scheduled", "Ready to Schedule"].includes(job.status) && job.scheduled_date && !job.assigned_crew_id) await requestImmediateAttentionPush();
   return job;
 }
 
