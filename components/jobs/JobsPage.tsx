@@ -514,7 +514,7 @@ function JobModal({
           ]}
         />
       </div>
-      {(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-6 font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-2 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
+      {((job.contracted_addons??job.pricing_snapshot?.addons)?.length??0)>0?<><h3 className="mt-6 font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-2 list-disc pl-5 text-sm">{(job.contracted_addons??job.pricing_snapshot!.addons).map((item)=><li key={item.id}>{item.pricingType==="Per Unit"?`${item.label} — ${item.quantity} ${item.unitName}${item.quantity===1?"":"s"}`:item.label}</li>)}</ul></>:(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-6 font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-2 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
       <h3 className="mt-6 font-extrabold text-[#143d1a]">Operational Scope / Instructions</h3>
       <ul className="mt-2 list-disc pl-5 text-sm">
         {job.scope.map((x) => (
