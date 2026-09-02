@@ -144,6 +144,7 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
     p_property_id: input.property_id,
     p_service_id: input.service_id,
     p_addon_ids: input.addon_ids,
+    p_addon_quantities: input.addon_quantities,
     p_scheduled_date: input.scheduled_date,
     p_start_time: input.start_time,
     p_estimated_duration: input.estimated_duration,

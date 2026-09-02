@@ -23,7 +23,7 @@ export type CustomerInformation = {
   zip: string;
 };
 
-export type PriceAdjustment = { label: string; amount: number; catalogAddonId?:string; description?:string|null; pricingModel?:string; unitLabel?:string|null };
+export type PriceAdjustment = { label: string; amount: number; catalogAddonId?:string; description?:string|null; pricingModel?:string; unitLabel?:string|null; quantity?:number; unitName?:string|null; unitPrice?:number };
 
 export type ResidentialCalculatorInput = {
   division: "Residential";
@@ -40,6 +40,7 @@ export type ResidentialCalculatorInput = {
   additionalDiscountPercent: number;
   taxRatePercent: number;
   addOns: string[];
+  addonSelections?: CatalogAddonSnapshot[];
   targetProjectDays?: number;
   workdayHours?: 8 | 10;
 };
@@ -63,6 +64,7 @@ export type CommercialCalculatorInput = {
   additionalDiscountPercent: number;
   taxRatePercent: number;
   additionalServices: string[];
+  addonSelections?: CatalogAddonSnapshot[];
   targetProjectDays?: number;
   workdayHours?: 8 | 10;
 };

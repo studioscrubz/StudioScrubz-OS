@@ -58,6 +58,8 @@ export type Job = {
   completed_at: string | null;
   operational_started_at: string | null;
   operational_ended_at: string | null;
+  pricing_snapshot: import("@/types/proposal").AcceptedPricingAllocation | null;
+  contracted_addons?: Array<{ id: string; label: string; pricingType: "Flat Price" | "Per Unit"; quantity: number; unitName: string | null }> | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -80,13 +82,14 @@ export type JobInsert = Omit<
   operational_ended_at?: string | null;
 };
 export type JobUpdate = Partial<
-  Omit<Job, "id" | "job_number" | "proposal_id" | "created_at" | "updated_at">
+  Omit<Job, "id" | "job_number" | "proposal_id" | "pricing_snapshot" | "contracted_addons" | "created_at" | "updated_at">
 >;
 export type DirectJobInput = {
   client_id: string;
   property_id: string;
   service_id: string;
   addon_ids: string[];
+  addon_quantities: Array<{ addonId: string; quantity: number }>;
   scheduled_date: string | null;
   start_time: string | null;
   estimated_duration: number | null;

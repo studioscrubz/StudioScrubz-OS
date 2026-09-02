@@ -1,5 +1,10 @@
 type AddonLike = { label: string; catalogAddonId?: string | null };
 
+export function addonDisplayLabel(addon: AddonLike & { quantity?: number; unitName?: string | null; unitPrice?: number }): string {
+  if (!addon.quantity || !addon.unitName || addon.unitPrice === undefined) return addon.label;
+  return `${addon.label} - ${addon.quantity} ${addon.unitName}${addon.quantity === 1 ? "" : "s"} x $${addon.unitPrice.toFixed(2)}`;
+}
+
 function comparable(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
