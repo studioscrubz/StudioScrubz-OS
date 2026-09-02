@@ -1,11 +1,27 @@
-import type { CommercialCalculatorInput, Condition, EstimateResult, ResidentialCalculatorInput } from "@/types/estimate";
+import type { CalculatorInput, CommercialCalculatorInput, Condition, EstimateResult, PostConstructionCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { calculateRecurringTotals, catalogConfigNumber, commercialCatalogContext, residentialCatalogPrice } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling/frequency";
 import { calculateUpkeepPlan } from "@/lib/pricing/upkeepPlan";
+import { calculatePostConstructionEstimate } from "@/lib/pricing/postConstruction";
 
 const conditionMultiplier: Record<Condition, number> = { Light: 0.92, Average: 1, Heavy: 1.22, Extreme: 1.48 };
+
+export function calculateEstimate(input: CalculatorInput, catalog: ServiceCatalogBundle): EstimateResult {
+  if (isPostConstructionInput(input)) return calculatePostConstructionCatalogEstimate(input,catalog);
+  return input.division === "Residential" ? calculateResidentialEstimate(input, catalog) : calculateCommercialEstimate(input, catalog);
+}
+
+export function calculatePostConstructionCatalogEstimate(input:PostConstructionCalculatorInput,catalog:ServiceCatalogBundle,service?:ServiceCatalogBundle["services"][number]):EstimateResult{
+  const resolved=service??catalog.services.find(item=>(item.division===input.division||item.division==="Both")&&(item.service_code.toUpperCase()==="BOTH-POST-CONSTRUCTION"||item.service_code.toUpperCase()==="COM-POST-CONSTRUCTION"));
+  if(!resolved)throw new Error("No active Post-Construction catalog service is configured for this division.");
+  const core=calculatePostConstructionEstimate({...input,additionalDiscountPercent:0,taxRatePercent:0,recurringPricingRuleId:null,frequency:"One-Time",customIntervalDays:null});
+  const oneTimePrice=core.basePrice;
+  const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,customIntervalDays:input.customIntervalDays,rules:catalog.recurringRules,serviceId:resolved.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent,taxRatePercent:input.taxRatePercent});
+  const calculatorInput={...(core.calculatorInput as PostConstructionCalculatorInput),...input,serviceCode:resolved.service_code};
+  return {...core,serviceName:resolved.service_name,serviceDescription:resolved.description,basePrice:core.basePrice,adjustments:[],catalogAddons:undefined,oneTimePrice:money(oneTimePrice),recurringPricingRuleId:pricing.recurringPricingRuleId,recurringPricingRuleName:pricing.recurringPricingRuleName,recurringDiscount:pricing.recurringDiscountAmount,recurringDiscountPercent:pricing.recurringDiscountPercent,manualDiscount:pricing.manualDiscount,totalDiscount:money(pricing.recurringDiscountAmount+pricing.manualDiscount),taxes:pricing.taxes,calculatedFinalPrice:pricing.finalPrice,finalPrice:pricing.finalPrice,monthlyPrice:pricing.finalPrice===0?0:estimatedMonthlyTotal(pricing.finalPrice,input.frequency,input.customIntervalDays),visitsPerMonth:estimatedVisitsPerMonth(input.frequency,input.customIntervalDays),estimatedProfit:money(pricing.finalPrice-core.laborCost-core.supplyCost),calculatorInput};
+}
 
 export function calculateResidentialEstimate(input: ResidentialCalculatorInput, catalog: ServiceCatalogBundle, upkeepAdjustmentPercent = 30): EstimateResult {
   if (input.serviceType === "StudioScrubz Upkeep Plan") {
@@ -92,3 +108,4 @@ function snapshots(names:string[],addons:ServiceCatalogBundle["addons"],selected
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value || 0)); }
 function money(value: number): number { return Math.round(value * 100) / 100; }
 function tenth(value: number): number { return Math.round(value * 10) / 10; }
+function isPostConstructionInput(input:CalculatorInput):input is PostConstructionCalculatorInput{return "calculatorType" in input&&input.calculatorType==="Post-Construction"}

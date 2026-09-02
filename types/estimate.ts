@@ -7,6 +7,8 @@ export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
 export type EstimateStatus = "Open" | "Archived";
 export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Custom";
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
+export type PostConstructionSeverity = "Light" | "Average" | "Heavy" | "Extreme";
+export type PostConstructionDetailLevel = "Standard" | "Detailed" | "High Detail";
 export type PreferredContactMethod = "Call" | "Text" | "Email";
 export type PreferredContactTime = "Anytime" | "Morning" | "Afternoon" | "Evening";
 
@@ -69,7 +71,38 @@ export type CommercialCalculatorInput = {
   workdayHours?: 8 | 10;
 };
 
-export type CalculatorInput = ResidentialCalculatorInput | CommercialCalculatorInput;
+export type PostConstructionCalculatorInput = {
+  calculatorType: "Post-Construction";
+  division: EstimateDivision;
+  serviceType: "Post-Construction Cleaning";
+  serviceCode?: string | null;
+  frequency: Frequency;
+  customIntervalDays?: number | null;
+  recurringPricingRuleId?: string | null;
+  squareFeet: number;
+  floors: number;
+  rooms: number;
+  bathrooms: number;
+  kitchens: number;
+  condition: Condition;
+  dustSeverity: PostConstructionSeverity;
+  debrisSeverity: PostConstructionSeverity;
+  detailLevel: PostConstructionDetailLevel;
+  windowsOrGlassCount: number;
+  cabinetOrDrawerCount: number;
+  applianceInteriorCount: number;
+  stairFlights: number;
+  targetProjectDays: number;
+  workdayHours: number;
+  workerHourlyPay: number;
+  targetProfitMarginPercent: number;
+  additionalDiscountPercent: number;
+  taxRatePercent: number;
+  additionalServices: string[];
+  addonSelections?: CatalogAddonSnapshot[];
+};
+
+export type CalculatorInput = ResidentialCalculatorInput | CommercialCalculatorInput | PostConstructionCalculatorInput;
 
 export type EstimateResult = {
   serviceName: string;
@@ -97,6 +130,15 @@ export type EstimateResult = {
   laborCost: number;
   supplyCost: number;
   estimatedProfit: number;
+  postConstructionBreakdown?: {
+    baseProductionHours: number;
+    adjustments: Array<{ label: string; laborHours: number }>;
+    totalLaborHours: number;
+    availableCrewHoursPerWorker: number;
+    recommendedCrewSize: number;
+    estimatedProjectDays: number;
+    projectedMarginPercent: number;
+  };
   scope: string[];
   calculatorInput: CalculatorInput;
   submission?: {
