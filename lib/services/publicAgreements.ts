@@ -13,8 +13,12 @@ export async function acceptPublicAgreement(token: string, signedName: string, c
   const name = signedName.trim();
   if (name.length < 2) throw new Error("Enter your full legal name.");
   if (!consent) throw new Error("You must agree to the Service Agreement before signing.");
-  const signature = `/s/ ${name}`;
-  const { data, error } = await getSupabaseClient().rpc("accept_service_agreement_by_token", { p_token: token, p_signed_name: name, p_signature: signature, p_consent: consent });
-  if (error) throw new Error(error.message || "The agreement could not be signed.");
-  return data as PublicAgreement;
+  const response = await fetch("/api/public/agreements/accept", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token, signedName: name, consent }),
+  });
+  const result = await response.json() as PublicAgreement & { error?: string };
+  if (!response.ok) throw new Error(result.error || "The agreement could not be signed.");
+  return result;
 }
