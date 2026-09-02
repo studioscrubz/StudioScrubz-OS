@@ -6,7 +6,8 @@
     },
     {
       "path": "/api/cron/attention-push",
-      "schedule": "30 8 * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
+
