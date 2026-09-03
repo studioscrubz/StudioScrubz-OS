@@ -11,6 +11,7 @@ test("platform presence uses only work-session RPCs", async () => {
   assert.match(service, /rpc\("stop_my_work"\)/);
   assert.doesNotMatch(service, /time_entries|clock_in_operational|clock_out_operational/);
   assert.match(service, /normalizeWorkSession\(data\)/);
+  assert.match(service, /normalizeWorkSession\(\{ \.\.\.session, clock_out: null \}\)/);
   assert.match(service, /session\?\.status === "Open" && !session\.clock_out \? session : null/);
 });
 
