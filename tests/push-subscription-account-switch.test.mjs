@@ -28,9 +28,24 @@ test("the server endpoint derives the user from the authenticated session and ig
   assert.match(route, /user_id: userId,/);
 });
 
-test("reassignment only happens via the trusted admin client, scoped to endpoint reconciliation", () => {
-  assert.match(route, /createSupabaseAdminClient/);
-  assert.match(route, /admin\.from\("browser_push_subscriptions"\)\.upsert/);
+test("a different-owner endpoint is retired and re-inserted, never reassigned with user_id in place", () => {
+  assert.match(route, /existing\.user_id === userId/);
+  assert.match(route, /admin\.from\("browser_push_subscriptions"\)\.delete\(\)\.eq\("id", existing\.id\)/);
+  assert.match(route, /admin\.from\("browser_push_subscriptions"\)\.insert\(\{/);
+  assert.doesNotMatch(route, /\.update\(\{[^}]*user_id/);
+});
+
+test("the old subscription row is deleted before the fresh row is inserted, relying on ON DELETE CASCADE for messaging_push_deliveries", () => {
+  const deleteIndex = route.indexOf(".delete().eq(\"id\", existing.id)");
+  const insertIndex = route.indexOf("browser_push_subscriptions\").insert({");
+  assert.ok(deleteIndex > -1 && insertIndex > -1 && deleteIndex < insertIndex);
+  assert.match(route, /ON DELETE CASCADE clears its historical delivery rows/);
+  assert.doesNotMatch(route, /\.update\(\{[\s\S]*?messaging_push_deliveries/);
+});
+
+test("a same-owner endpoint still updates normally via upsert", () => {
+  assert.match(route, /!existing \|\| existing\.user_id === userId/);
+  assert.match(route, /admin\.from\("browser_push_subscriptions"\)\.upsert\(\{/);
   assert.match(route, /onConflict: "endpoint"/);
   assert.match(route, /revoked_at: null/);
 });

@@ -20,11 +20,28 @@ export async function POST(request: Request) {
     if (!endpoint || !p256dh || !auth) return Response.json({ error: "The browser returned an incomplete push subscription." }, { status: 400 });
 
     const admin = createSupabaseAdminClient();
-    // Reassigns this browser/device's subscription row to the authenticated caller only;
-    // the target user_id always comes from the verified session, never from client input.
-    const { data, error } = await admin.from("browser_push_subscriptions").upsert({
+    // The target user_id always comes from the verified session, never from client input.
+    const { data: existing, error: lookupError } = await admin.from("browser_push_subscriptions").select("id,user_id").eq("endpoint", endpoint).maybeSingle();
+    if (lookupError) throw new Error("Push subscription could not be registered.");
+
+    if (!existing || existing.user_id === userId) {
+      const { data, error } = await admin.from("browser_push_subscriptions").upsert({
+        user_id: userId, endpoint, p256dh, auth, user_agent: userAgent, revoked_at: null,
+      }, { onConflict: "endpoint" }).select().single();
+      if (error || !data) throw new Error("Push subscription could not be registered.");
+      return Response.json({ subscription: data });
+    }
+
+    // A different user still owns this physical browser/device endpoint. Reassigning user_id in
+    // place would violate the composite FK from messaging_push_deliveries(subscription_id, user_id),
+    // so the old row is retired first; ON DELETE CASCADE clears its historical delivery rows,
+    // then a fresh row is inserted for the current authenticated user on the same endpoint.
+    const { error: deleteError } = await admin.from("browser_push_subscriptions").delete().eq("id", existing.id);
+    if (deleteError) throw new Error("Push subscription could not be registered.");
+
+    const { data, error } = await admin.from("browser_push_subscriptions").insert({
       user_id: userId, endpoint, p256dh, auth, user_agent: userAgent, revoked_at: null,
-    }, { onConflict: "endpoint" }).select().single();
+    }).select().single();
     if (error || !data) throw new Error("Push subscription could not be registered.");
     return Response.json({ subscription: data });
   } catch (cause) {
