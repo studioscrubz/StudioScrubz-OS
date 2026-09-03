@@ -1,7 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendWebPush } from "@/lib/push/server";
-import { deliverDirectMessagePush, directMessagePushPayload, type MessagingDeliveryRepository } from "@/lib/push/messagingDelivery";
+import { announcementPushPayload, deliverDirectMessagePush, directMessagePushPayload, type MessagingDeliveryRepository, type MessagingPushPayload } from "@/lib/push/messagingDelivery";
 import type { BrowserPushSubscription } from "@/types/pushNotification";
 
 export async function processDirectMessagePush(input: {
@@ -11,19 +11,41 @@ export async function processDirectMessagePush(input: {
   senderDisplayName: string | null;
 }) {
   const db = createSupabaseAdminClient();
+  const payload = directMessagePushPayload({ conversationId: input.conversationId, senderDisplayName: input.senderDisplayName });
+  return pushToRecipient(db, input.recipientUserId, input.messageId, payload);
+}
+
+export async function processAnnouncementPush(input: {
+  messageId: string;
+  recipientUserIds: string[];
+  title: string | null;
+  priority: "Normal" | "Important" | "Requires Acknowledgment";
+}) {
+  const db = createSupabaseAdminClient();
+  const payload = announcementPushPayload({ messageId: input.messageId, title: input.title, priority: input.priority });
+  const results = await Promise.all(input.recipientUserIds.map((recipientUserId) => pushToRecipient(db, recipientUserId, input.messageId, payload)));
+  return results.reduce((total, result) => ({
+    devices: total.devices + result.devices,
+    sent: total.sent + result.sent,
+    failed: total.failed + result.failed,
+    duplicates: total.duplicates + result.duplicates,
+    revoked: total.revoked + result.revoked,
+  }), { devices: 0, sent: 0, failed: 0, duplicates: 0, revoked: 0 });
+}
+
+async function pushToRecipient(db: ReturnType<typeof createSupabaseAdminClient>, recipientUserId: string, messageId: string, payload: MessagingPushPayload) {
   const { data: subscriptions, error } = await db
     .from("browser_push_subscriptions")
     .select("*")
-    .eq("user_id", input.recipientUserId)
+    .eq("user_id", recipientUserId)
     .is("revoked_at", null);
   if (error) throw new Error("Push recipient devices could not be loaded.");
   const devices = (subscriptions ?? []) as BrowserPushSubscription[];
   if (!devices.length) return { devices: 0, sent: 0, failed: 0, duplicates: 0, revoked: 0 };
-  const payload = directMessagePushPayload({ conversationId: input.conversationId, senderDisplayName: input.senderDisplayName });
   const repository = deliveryRepository(db);
   return deliverDirectMessagePush({
-    recipientUserId: input.recipientUserId,
-    messageId: input.messageId,
+    recipientUserId,
+    messageId,
     payload,
     subscriptions: devices,
     repository,

@@ -107,7 +107,22 @@ export async function sendCompanyAnnouncement(title: string, body: string, prior
   if (!trimmedBody) throw new Error("Enter an announcement message before sending.");
   const { data, error } = await getSupabaseClient().rpc("send_company_announcement", { p_title: trimmedTitle, p_body: trimmedBody, p_priority: priority });
   if (error) throw new Error(`Announcement could not be sent: ${error.message}`);
-  return data as Message;
+  const message = data as Message;
+  notifyAnnouncementPushBestEffort(message.id);
+  return message;
+}
+
+// Fire-and-forget: push delivery must never affect whether an announcement send succeeds.
+function notifyAnnouncementPushBestEffort(messageId: string): void {
+  try {
+    void fetch("/api/messages/notify-announcement", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messageId }),
+    }).catch(() => undefined);
+  } catch {
+    // Push notification triggering must never fail announcement sending.
+  }
 }
 
 export async function acknowledgeRequiredAnnouncement(messageId: string): Promise<AnnouncementAcknowledgment> {

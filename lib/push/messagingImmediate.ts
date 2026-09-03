@@ -1,5 +1,5 @@
 import "server-only";
-import { processDirectMessagePush } from "@/lib/push/messagingServer";
+import { processAnnouncementPush, processDirectMessagePush } from "@/lib/push/messagingServer";
 
 export async function sendDirectMessagePushBestEffort(input: {
   recipientUserId: string;
@@ -12,6 +12,23 @@ export async function sendDirectMessagePushBestEffort(input: {
   } catch (cause) {
     try {
       console.error("Immediate Direct Message push processing failed", sanitizeMessagingPushError(cause));
+    } catch {
+      // Logging must not turn a notification failure into an application failure.
+    }
+  }
+}
+
+export async function sendAnnouncementPushBestEffort(input: {
+  messageId: string;
+  recipientUserIds: string[];
+  title: string | null;
+  priority: "Normal" | "Important" | "Requires Acknowledgment";
+}): Promise<void> {
+  try {
+    await processAnnouncementPush(input);
+  } catch (cause) {
+    try {
+      console.error("Immediate Company Announcement push processing failed", sanitizeMessagingPushError(cause));
     } catch {
       // Logging must not turn a notification failure into an application failure.
     }

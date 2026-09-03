@@ -49,6 +49,22 @@ export function directMessagePushPayload(input: { conversationId: string; sender
   };
 }
 
+export function announcementPushPayload(input: { messageId: string; title: string | null; priority: "Normal" | "Important" | "Requires Acknowledgment" }): MessagingPushPayload {
+  const label = safeAnnouncementTitle(input.title);
+  const prefix = input.priority === "Requires Acknowledgment" ? "Action required" : input.priority === "Important" ? "Important company announcement" : "New company announcement";
+  return {
+    title: "StudioScrubz Announcement",
+    body: label ? `${prefix}: ${label}` : `${prefix}.`,
+    url: "/messages",
+    tag: `announcement:${stableTag(input.messageId)}`,
+  };
+}
+
+function safeAnnouncementTitle(value: string | null) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed && trimmed.length <= 200 ? trimmed : null;
+}
+
 function safeSenderName(value: string | null) {
   const trimmed = value?.trim() ?? "";
   return trimmed && trimmed.length <= 120 ? trimmed : null;
