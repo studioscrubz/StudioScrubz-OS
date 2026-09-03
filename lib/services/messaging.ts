@@ -51,7 +51,22 @@ export async function sendDirectMessage(conversationId: string, body: string): P
   if (!trimmed) throw new Error("Enter a message before sending.");
   const { data, error } = await getSupabaseClient().rpc("send_direct_message", { p_conversation_id: conversationId, p_body: trimmed });
   if (error) throw new Error(`Message could not be sent: ${error.message}`);
-  return data as Message;
+  const message = data as Message;
+  notifyDirectMessagePushBestEffort(conversationId, message.id);
+  return message;
+}
+
+// Fire-and-forget: push delivery must never affect whether a message send succeeds.
+function notifyDirectMessagePushBestEffort(conversationId: string, messageId: string): void {
+  try {
+    void fetch("/api/messages/notify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ conversationId, messageId }),
+    }).catch(() => undefined);
+  } catch {
+    // Push notification triggering must never fail message sending.
+  }
 }
 
 export async function markConversationMessagesRead(conversationId: string, messageIds?: string[]): Promise<number> {
