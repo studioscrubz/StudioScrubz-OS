@@ -48,8 +48,29 @@ export async function savePushSubscription(subscription: PushSubscription): Prom
     user_id: userResult.user.id, endpoint: subscription.endpoint, p256dh, auth,
     user_agent: typeof navigator === "undefined" ? null : navigator.userAgent, revoked_at: null,
   }, { onConflict: "endpoint" }).select().single();
-  if (error) throw new Error(safeMessage(error, "Push subscription could not be saved."));
-  return data;
+  if (!error) return data;
+  // A previous user on this browser/device still owns the endpoint; RLS correctly blocks the
+  // client-side reassignment, so fall back to the narrow authenticated server reconciliation path.
+  if (!isRowLevelSecurityViolation(error)) throw new Error(safeMessage(error, "Push subscription could not be saved."));
+  return reconcilePushSubscriptionOwnership(subscription.endpoint, p256dh, auth);
+}
+
+async function reconcilePushSubscriptionOwnership(endpoint: string, p256dh: string, auth: string): Promise<BrowserPushSubscription> {
+  const response = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ endpoint, p256dh, auth, userAgent: typeof navigator === "undefined" ? null : navigator.userAgent }),
+  });
+  const result = await response.json().catch(() => ({})) as { subscription?: BrowserPushSubscription; error?: string };
+  if (!response.ok || !result.subscription) throw new Error(result.error || "Push subscription could not be registered.");
+  return result.subscription;
+}
+
+function isRowLevelSecurityViolation(cause: unknown): boolean {
+  if (!cause || typeof cause !== "object") return false;
+  const code = "code" in cause && typeof cause.code === "string" ? cause.code : "";
+  const message = "message" in cause && typeof cause.message === "string" ? cause.message : "";
+  return code === "42501" || /row-level security/i.test(message);
 }
 
 export async function unsubscribeCurrentBrowserFromPush(): Promise<void> {
