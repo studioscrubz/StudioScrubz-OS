@@ -10,6 +10,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
 import { getAttentionSummary } from "@/lib/services/attention";
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
+import { getUnreadDirectMessageCount } from "@/lib/services/messaging";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
 type NavLink = { label: string; href: string; marker: string; permission: Permission };
 type NavGroup = { label: string; marker: string; permission?: Permission; children: NavLink[] };
@@ -91,6 +93,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const auth = useAuth();
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [attentionCount, setAttentionCount] = useState(0);
+  const [messageCount, setMessageCount] = useState(0);
   async function loadAttentionCount() {
     if (!hasPermission(auth.profile, "attention.view")) return setAttentionCount(0);
     setAttentionCount((await getAttentionSummary()).total);
@@ -102,6 +105,12 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     return () => { active = false; };
   }, [auth.profile]);
   useAttentionRefresh(loadAttentionCount);
+  async function loadMessageCount() {
+    if (!auth.user || !hasPermission(auth.profile, "messages.view")) return setMessageCount(0);
+    try { setMessageCount(await getUnreadDirectMessageCount(auth.user.id)); } catch (error) { console.error("Messages badge load failed", error); }
+  }
+  useOperationalRealtime(["conversations", "conversation_members", "messages", "message_read_states"], loadMessageCount);
+  useEffect(() => { const timer = window.setTimeout(() => { void loadMessageCount(); }, 0); return () => window.clearTimeout(timer); }, [auth.profile, auth.user]);
   const visibleItems = navItems.reduce<Array<NavLink | NavGroup>>((items, item) => {
     if (!isGroup(item)) return hasPermission(auth.profile, item.permission) ? [...items, item] : items;
     if (item.permission && !hasPermission(auth.profile, item.permission)) return items;
@@ -153,7 +162,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                 </li>
               );
             }
-            return <NavItem key={item.href} item={item} active={item.href === pathname} onNavigate={onClose} badge={item.href === "/attention" ? attentionCount : undefined} />;
+            return <NavItem key={item.href} item={item} active={item.href === pathname} onNavigate={onClose} badge={item.href === "/attention" ? attentionCount : item.href === "/messages" ? messageCount : undefined} />;
           })}
         </ul>
       </nav>

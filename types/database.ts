@@ -26,11 +26,16 @@ import type {InvoiceJobPhoto} from "@/types/photo";
 import type {ActiveEmployeeWorkSession,EmployeeWorkSession} from "@/types/workSession";
 import type {JobPerformanceRow} from "@/types/jobPerformance";
 import type {AttentionPushCheckpoint,AttentionPushDelivery,BrowserPushSubscription} from "@/types/pushNotification";
+import type {Conversation,ConversationMember,Message,MessageReadState} from "@/types/messaging";
 
 export interface Database {
   public: {
     Tables: {
       user_profiles:{Row:UserProfile;Insert:UserProfile;Update:Partial<Pick<UserProfile,"display_name"|"role"|"is_active"|"employee_id">>;Relationships:[{foreignKeyName:"user_profiles_employee_id_fkey";columns:["employee_id"];isOneToOne:true;referencedRelation:"employees";referencedColumns:["id"]}]};
+      conversations:{Row:Conversation;Insert:Omit<Conversation,"id"|"created_at"|"updated_at"|"last_message_at"> & {id?:string;created_at?:string;updated_at?:string;last_message_at?:string};Update:Partial<Conversation>;Relationships:[]};
+      conversation_members:{Row:ConversationMember;Insert:ConversationMember;Update:Partial<ConversationMember>;Relationships:[{foreignKeyName:"conversation_members_conversation_id_fkey";columns:["conversation_id"];isOneToOne:false;referencedRelation:"conversations";referencedColumns:["id"]},{foreignKeyName:"conversation_members_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
+      messages:{Row:Message;Insert:Omit<Message,"id"|"created_at"|"edited_at"|"archived_at"> & {id?:string;created_at?:string;edited_at?:string|null;archived_at?:string|null};Update:Partial<Message>;Relationships:[{foreignKeyName:"messages_conversation_id_fkey";columns:["conversation_id"];isOneToOne:false;referencedRelation:"conversations";referencedColumns:["id"]},{foreignKeyName:"messages_sender_user_id_fkey";columns:["sender_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
+      message_read_states:{Row:MessageReadState;Insert:MessageReadState;Update:Partial<MessageReadState>;Relationships:[{foreignKeyName:"message_read_states_message_id_fkey";columns:["message_id"];isOneToOne:false;referencedRelation:"messages";referencedColumns:["id"]},{foreignKeyName:"message_read_states_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       clients: {
         Row: Client;
         Insert: ClientInput & { id?: string; created_at?: string; updated_at?: string; archived_at?: string | null };
@@ -181,6 +186,9 @@ export interface Database {
       set_proposal_pricing_photo_caption:{Args:{p_proposal_id:string;p_photo_id:string;p_caption:string};Returns:import("@/types/proposal").ProposalPricingPhoto[]};
       remove_proposal_pricing_photo:{Args:{p_proposal_id:string;p_photo_id:string};Returns:import("@/types/proposal").ProposalPricingPhotoRemoval};
       set_invoice_job_photo_visibility:{Args:{p_invoice_id:string;p_photo_id:string;p_customer_visible:boolean};Returns:InvoiceJobPhoto};
+      start_direct_conversation:{Args:{p_other_user_id:string};Returns:Conversation};
+      send_direct_message:{Args:{p_conversation_id:string;p_body:string};Returns:Message};
+      mark_messages_read:{Args:{p_conversation_id:string;p_message_ids?:string[]|null};Returns:number};
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage",
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
+  "messages.view", "messages.send",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -30,6 +31,7 @@ const operationalAdmin: Permission[] = [
   "agreements.view", "agreements.manage", "invoices.view", "invoices.create",
   "invoices.edit", "invoices.send", "archives.view", "archives.restore", "communications.view",
   "communications.create", "communications.archive", "attention.view", "reports.view",
+  "messages.view", "messages.send",
 ];
 
 export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
@@ -43,21 +45,22 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "crews.view", "crews.manage",
     "timeClock.view", "timeClock.manageAll", "agreements.view", "agreements.manage",
     "invoices.view", "invoices.send", "communications.view", "communications.create", "communications.archive", "attention.view", "reports.view",
+    "messages.view", "messages.send",
   ]),
   Sales: new Set([
     "dashboard.view", "clients.view", "clients.create", "clients.edit", "properties.view",
     "properties.create", "properties.edit", "estimates.view", "estimates.create",
     "estimates.edit", "walkthroughs.view", "walkthroughs.create", "walkthroughs.edit",
     "proposals.view", "proposals.create", "proposals.send", "agreements.view",
-    "agreements.manage", "timeClock.view", "employees.directory_view", "communications.view", "communications.create", "attention.view",
+    "agreements.manage", "timeClock.view", "employees.directory_view", "communications.view", "communications.create", "attention.view", "messages.view", "messages.send",
   ]),
   "Crew Lead": new Set([
     "dashboard.view", "jobs.view", "jobs.edit", "jobs.complete", "schedule.view",
-    "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view",
+    "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send",
   ]),
   "Scrub Technician": new Set([
     "dashboard.view", "jobs.view", "schedule.view", "timeClock.view", "clients.view",
-    "properties.view", "vehicles.view", "attention.view",
+    "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send",
   ]),
 };
 
@@ -81,6 +84,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => 
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/attention", "attention.view"],
+  ["/messages", "messages.view"],
   ["/job-performance", "reports.view"],
   ["/users", "users.manage"], ["/revenue", "finances.view"], ["/expenses", "expenses.view"],
   ["/vehicles", "vehicles.view"], ["/payroll-prep", "payrollPrep.view"],
