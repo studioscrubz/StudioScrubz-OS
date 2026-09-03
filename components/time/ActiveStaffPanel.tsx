@@ -6,8 +6,8 @@ import type { ActiveStaffStatus } from "@/types/workSession";
 export function ActiveStaffPanel({ staff }: { staff: ActiveStaffStatus[] }) {
   const now = useCurrentTime(staff.some((row) => Boolean(row.joined_at)));
   return <section className="mt-6 rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-sm">
-    <h2 className="font-extrabold text-[#143d1a]">Active Staff</h2>
-    <p className="mt-1 text-xs text-neutral-500">Platform presence and current Job availability. Presence time is not payroll time.</p>
+    <h2 className="font-extrabold text-[#143d1a]">Active Techs</h2>
+    <p className="mt-1 text-xs text-neutral-500">Platform presence and active Job participation. Presence time is not payroll time.</p>
     {staff.length === 0 && <p className="mt-4 text-sm text-neutral-500">No staff members are currently Active.</p>}
     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{staff.map((row) => {
       const onJob = row.availability === "On Job / Unavailable";

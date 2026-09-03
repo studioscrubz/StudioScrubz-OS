@@ -7,6 +7,7 @@ export type TimeEntryUpdate=Partial<TimeEntryInput&Pick<TimeEntry,"status"|"appr
 export type OperationalActiveTimeEntry = {
   id: string;
   employee_id: string;
+  employee_number: string | null;
   employee_name: string;
   clock_in: string;
   job_id: string | null;
