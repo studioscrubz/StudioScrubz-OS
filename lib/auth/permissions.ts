@@ -15,7 +15,7 @@ export const PERMISSIONS = [
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage",
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
-  "messages.view", "messages.send",
+  "messages.view", "messages.send", "messages.announce",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -31,7 +31,7 @@ const operationalAdmin: Permission[] = [
   "agreements.view", "agreements.manage", "invoices.view", "invoices.create",
   "invoices.edit", "invoices.send", "archives.view", "archives.restore", "communications.view",
   "communications.create", "communications.archive", "attention.view", "reports.view",
-  "messages.view", "messages.send",
+  "messages.view", "messages.send", "messages.announce",
 ];
 
 export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {

@@ -36,6 +36,12 @@ export type MessageReadState = {
   read_at: string;
 };
 
+export type AnnouncementAcknowledgment = {
+  message_id: string;
+  user_id: string;
+  acknowledged_at: string;
+};
+
 export type MessagingUser = {
   id: string;
   display_name: string | null;
@@ -47,5 +53,15 @@ export type DirectConversation = Conversation & {
   members: ConversationMember[];
   messages: Message[];
   participant: MessagingUser | null;
+  unreadCount: number;
+};
+
+export type AnnouncementMessage = Message & {
+  sender: MessagingUser | null;
+  acknowledgedAt: string | null;
+};
+
+export type AnnouncementConversation = Conversation & {
+  messages: AnnouncementMessage[];
   unreadCount: number;
 };

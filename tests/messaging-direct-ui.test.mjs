@@ -12,7 +12,7 @@ test("all roles receive Direct Messages permissions and route access", () => {
   assert.match(permissions, /"messages\.view", "messages\.send"/);
   assert.match(permissions, /\["\/messages", "messages\.view"\]/);
   assert.equal((permissions.match(/"messages\.view", "messages\.send"/g) ?? []).length >= 4, true);
-  assert.doesNotMatch(permissions, /messages\.announce/);
+  assert.equal((permissions.match(/"messages\.announce"/g) ?? []).length, 2);
 });
 
 test("recipient picker excludes the current user and uses active profiles", () => {
@@ -42,18 +42,17 @@ test("sidebar exposes the Messages navigation item with messages.view permission
   assert.match(sidebar, /href: "\/messages", marker: "M", permission: "messages\.view"/);
 });
 
-test("only the active conversation is marked read, including automatic selection", () => {
-  assert.match(page, /useEffect\(\(\) => \{/);
-  assert.match(page, /selected\.unreadCount === 0/);
-  assert.match(page, /markConversationMessagesRead\(selected\.id, unreadMessageIds\)/);
-  assert.match(page, /setConversations\(\(current\) => current\.map\(\(conversation\) => conversation\.id === selected\.id/);
-  assert.match(page, /markingReadConversation\.current === selected\.id/);
-  assert.doesNotMatch(page, /markConversationMessagesRead\(conversation\.id/);
+test("only the active Direct conversation is marked read, including automatic selection", () => {
+  const directEffect = page.slice(page.indexOf("if (!selected || selected.unreadCount === 0"), page.indexOf('}, [currentUserId, selected]);'));
+  assert.match(directEffect, /selected\.unreadCount === 0/);
+  assert.match(directEffect, /markConversationMessagesRead\(selected\.id, unreadMessageIds\)/);
+  assert.match(directEffect, /setConversations\(\(current\) => current\.map\(\(conversation\) => conversation\.id === selected\.id/);
+  assert.match(directEffect, /markingReadConversation\.current === selected\.id/);
+  assert.doesNotMatch(directEffect, /markConversationMessagesRead\(conversation\.id/);
 });
 
-test("realtime refresh covers Direct messaging tables and inbox excludes announcements", () => {
+test("Direct messaging realtime tables remain registered alongside the new Company Announcements tables", () => {
   for (const table of ["conversations", "conversation_members", "messages", "message_read_states"]) assert.match(realtime, new RegExp(`"${table}"`));
-  assert.match(page, /useOperationalRealtime\(\["conversations", "conversation_members", "messages", "message_read_states"\]/);
+  assert.match(page, /useOperationalRealtime\(\["conversations", "conversation_members", "messages", "message_read_states", "announcement_acknowledgments"\]/);
   assert.match(service, /\.eq\("kind", "Direct"\)/);
-  assert.doesNotMatch(page, /send_company_announcement|acknowledge_required_announcement/);
 });

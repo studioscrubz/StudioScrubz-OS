@@ -1,7 +1,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
-import type { Conversation, ConversationMember, DirectConversation, Message, MessageReadState, MessagingUser } from "@/types/messaging";
+import type { AnnouncementAcknowledgment, AnnouncementConversation, AnnouncementMessage, Conversation, ConversationMember, DirectConversation, Message, MessageReadState, MessagingUser } from "@/types/messaging";
 
-export const MESSAGING_REALTIME_TABLES = ["conversations", "conversation_members", "messages", "message_read_states"] as const;
+export const MESSAGING_REALTIME_TABLES = ["conversations", "conversation_members", "messages", "message_read_states", "announcement_acknowledgments"] as const;
 
 export async function getMessagingUsers(): Promise<MessagingUser[]> {
   const { data, error } = await getSupabaseClient()
@@ -78,6 +78,58 @@ export async function markConversationMessagesRead(conversationId: string, messa
 export async function getUnreadDirectMessageCount(userId: string): Promise<number> {
   const conversations = await getDirectConversations(userId);
   return conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
+}
+
+export async function getCompanyAnnouncements(userId: string): Promise<AnnouncementConversation[]> {
+  const client = getSupabaseClient();
+  const { data: conversations, error: conversationError } = await client.from("conversations").select("*").eq("kind", "Announcement").is("archived_at", null).order("last_message_at", { ascending: false });
+  if (conversationError) throw new Error(`Announcements could not be loaded: ${conversationError.message}`);
+  const rows = (conversations ?? []) as Conversation[];
+  if (!rows.length) return [];
+  const ids = rows.map((row) => row.id);
+  const [{ data: messages, error: messageError }, { data: reads, error: readError }, { data: acknowledgments, error: ackError }, { data: users, error: usersError }] = await Promise.all([
+    client.from("messages").select("*").in("conversation_id", ids).is("archived_at", null).order("created_at", { ascending: false }),
+    client.from("message_read_states").select("*").eq("user_id", userId),
+    client.from("announcement_acknowledgments").select("*").eq("user_id", userId),
+    client.from("user_profiles").select("id,display_name,email,role").eq("is_active", true),
+  ]);
+  if (messageError) throw new Error(`Announcement messages could not be loaded: ${messageError.message}`);
+  if (readError) throw new Error(`Message read states could not be loaded: ${readError.message}`);
+  if (ackError) throw new Error(`Announcement acknowledgments could not be loaded: ${ackError.message}`);
+  if (usersError) throw new Error(`Messaging users could not be loaded: ${usersError.message}`);
+  return buildAnnouncementConversations(rows, (messages ?? []) as Message[], (reads ?? []) as MessageReadState[], (acknowledgments ?? []) as AnnouncementAcknowledgment[], (users ?? []) as MessagingUser[], userId);
+}
+
+export async function sendCompanyAnnouncement(title: string, body: string, priority: Message["priority"]): Promise<Message> {
+  const trimmedTitle = title.trim();
+  const trimmedBody = body.trim();
+  if (!trimmedTitle) throw new Error("Enter an announcement title before sending.");
+  if (!trimmedBody) throw new Error("Enter an announcement message before sending.");
+  const { data, error } = await getSupabaseClient().rpc("send_company_announcement", { p_title: trimmedTitle, p_body: trimmedBody, p_priority: priority });
+  if (error) throw new Error(`Announcement could not be sent: ${error.message}`);
+  return data as Message;
+}
+
+export async function acknowledgeRequiredAnnouncement(messageId: string): Promise<AnnouncementAcknowledgment> {
+  const { data, error } = await getSupabaseClient().rpc("acknowledge_required_announcement", { p_message_id: messageId });
+  if (error) throw new Error(`Announcement could not be acknowledged: ${error.message}`);
+  return data as AnnouncementAcknowledgment;
+}
+
+function buildAnnouncementConversations(conversations: Conversation[], messages: Message[], reads: MessageReadState[], acknowledgments: AnnouncementAcknowledgment[], users: MessagingUser[], userId: string): AnnouncementConversation[] {
+  const readIds = new Set(reads.map((read) => read.message_id));
+  const acknowledgedIds = new Map(acknowledgments.map((ack) => [ack.message_id, ack.acknowledged_at]));
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  return conversations.map((conversation) => {
+    const conversationMessages: AnnouncementMessage[] = messages
+      .filter((message) => message.conversation_id === conversation.id)
+      .map((message) => ({ ...message, sender: usersById.get(message.sender_user_id) ?? null, acknowledgedAt: acknowledgedIds.get(message.id) ?? null }));
+    return {
+      ...conversation,
+      messages: conversationMessages,
+      unreadCount: conversationMessages.filter((message) => message.sender_user_id !== userId && !readIds.has(message.id)).length,
+    };
+  });
 }
 
 function buildConversations(conversations: Conversation[], members: ConversationMember[], messages: Message[], reads: MessageReadState[], users: MessagingUser[], userId: string): DirectConversation[] {

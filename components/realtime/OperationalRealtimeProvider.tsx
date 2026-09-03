@@ -12,7 +12,7 @@ export const OPERATIONAL_TABLES = [
   "payments", "expenses", "time_entries", "employee_work_sessions", "clients", "properties", "crews", "employees",
   "services", "service_addons", "service_addon_links", "service_price_tiers",
   "recurring_pricing_rules",
-  "conversations", "conversation_members", "messages", "message_read_states",
+  "conversations", "conversation_members", "messages", "message_read_states", "announcement_acknowledgments",
 ] as const;
 export type OperationalTable = (typeof OPERATIONAL_TABLES)[number];
 type Revisions = Record<OperationalTable, number>;
