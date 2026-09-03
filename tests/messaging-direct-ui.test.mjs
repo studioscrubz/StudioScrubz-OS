@@ -38,6 +38,10 @@ test("unread state is based on messages and read states", () => {
   assert.match(sidebar, /getUnreadDirectMessageCount/);
 });
 
+test("sidebar exposes the Messages navigation item with messages.view permission", () => {
+  assert.match(sidebar, /href: "\/messages", marker: "M", permission: "messages\.view"/);
+});
+
 test("only the active conversation is marked read, including automatic selection", () => {
   assert.match(page, /useEffect\(\(\) => \{/);
   assert.match(page, /selected\.unreadCount === 0/);

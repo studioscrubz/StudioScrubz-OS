@@ -18,6 +18,7 @@ type NavGroup = { label: string; marker: string; permission?: Permission; childr
 
 const navItems: Array<NavLink | NavGroup> = [
   { label: "Attention Center", href: "/attention", marker: "A", permission: "attention.view" },
+  { label: "Messages", href: "/messages", marker: "M", permission: "messages.view" },
   { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
   { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
   {
