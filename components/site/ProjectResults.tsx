@@ -20,7 +20,7 @@ const comparisons = [
 
 const projectPhotos = [
   ["/images/projects/bathroom-vanity.webp", "Clean residential bathroom vanity completed by StudioScrubz"],
-  ["/images/projects/clean-kitchen.webp", "StudioScrubz kitchen cleaning result"],
+  ["/site/details-ready-living-room.jpg", "Clean living and dining room completed by StudioScrubz"],
   ["/images/projects/move-out-kitchen.webp", "Move-out kitchen cleaning completed by StudioScrubz"],
   ["/images/projects/move-out-room-1.webp", "Clean room after a StudioScrubz move-out service"],
   ["/images/projects/move-out-room-2.webp", "Move-out room cleaning result by StudioScrubz"],
