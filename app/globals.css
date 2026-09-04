@@ -5,7 +5,27 @@
   --brand-green-deep: #0d2b12;
   --brand-gold: #d4af37;
   --canvas: #f5f6f4;
+  --surface: #ffffff;
+  --surface-elevated: #f8faf7;
   --ink: #18201a;
+  --muted: #626b64;
+  --border: #dfe4df;
+  --input-background: #ffffff;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --brand-green: #79b584;
+  --brand-green-deep: #071a0d;
+  --brand-gold: #d4af37;
+  --canvas: #101713;
+  --surface: #18211b;
+  --surface-elevated: #202b23;
+  --ink: #edf3ee;
+  --muted: #aab6ad;
+  --border: #344139;
+  --input-background: #131b16;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -25,6 +45,54 @@ body {
   background: var(--canvas);
   color: var(--ink);
   font-family: "Avenir Next", "Segoe UI", Arial, Helvetica, sans-serif;
+}
+
+:root[data-theme="dark"] .workspace-shell .bg-white,
+:root[data-theme="dark"] .workspace-shell [class~="bg-white/90"],
+:root[data-theme="dark"] .workspace-shell [class~="bg-white/95"] {
+  background-color: var(--surface);
+}
+
+:root[data-theme="dark"] .workspace-shell .bg-neutral-50,
+:root[data-theme="dark"] .workspace-shell .bg-neutral-100,
+:root[data-theme="dark"] .workspace-shell [class~="bg-[#f3f6f2]"],
+:root[data-theme="dark"] .workspace-shell [class~="bg-[#f5f7f4]"],
+:root[data-theme="dark"] .workspace-shell [class~="bg-[#f6f8f5]"],
+:root[data-theme="dark"] .workspace-shell [class~="bg-[#f8faf7]"] {
+  background-color: var(--surface-elevated);
+}
+
+:root[data-theme="dark"] .workspace-shell .text-neutral-800,
+:root[data-theme="dark"] .workspace-shell .text-neutral-700,
+:root[data-theme="dark"] .workspace-shell [class~="text-[#143d1a]"] {
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .workspace-shell .text-neutral-600,
+:root[data-theme="dark"] .workspace-shell .text-neutral-500,
+:root[data-theme="dark"] .workspace-shell .text-neutral-400 {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .workspace-shell .border,
+:root[data-theme="dark"] .workspace-shell .border-neutral-100,
+:root[data-theme="dark"] .workspace-shell .border-neutral-200,
+:root[data-theme="dark"] .workspace-shell .border-neutral-300 {
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .workspace-shell input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="dark"] .workspace-shell select,
+:root[data-theme="dark"] .workspace-shell textarea {
+  background-color: var(--input-background);
+  border-color: var(--border);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .workspace-shell input::placeholder,
+:root[data-theme="dark"] .workspace-shell textarea::placeholder {
+  color: var(--muted);
+  opacity: .8;
 }
 
 @media (display-mode: standalone) and (max-width: 1023px) {
@@ -57,6 +125,10 @@ a:focus-visible {
 }
 
 @media print {
+  :root, :root[data-theme="dark"] { --canvas: #fff; --surface: #fff; --surface-elevated: #fff; --ink: #18201a; --muted: #626b64; --border: #dfe4df; --input-background: #fff; color-scheme: light; }
+  body { background: #fff; color: #18201a; }
+  :root[data-theme="dark"] .workspace-shell .document-print-root,
+  :root[data-theme="dark"] .workspace-shell .document-print-root * { background-color: revert; border-color: revert; color: revert; }
   body * { visibility: hidden; }
   .document-print-root, .document-print-root * { visibility: visible; }
   .document-print-root { position: absolute; inset: 0; width: 100%; }

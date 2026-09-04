@@ -8,25 +8,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f5f6f4] lg:grid lg:grid-cols-[272px_1fr]">
+    <div className="workspace-shell min-h-screen bg-[var(--canvas)] text-[var(--ink)] lg:grid lg:grid-cols-[272px_1fr]">
       <a
         href="#main-content"
-        className="fixed left-4 top-4 z-[60] -translate-y-24 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#143d1a] shadow-lg transition-transform focus:translate-y-0"
+        className="fixed left-4 top-4 z-[60] -translate-y-24 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--brand-green)] shadow-lg transition-transform focus:translate-y-0"
       >
         Skip to content
       </a>
 
-      <div className="pwa-mobile-header sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#143d1a]/10 bg-white/95 px-5 backdrop-blur lg:hidden">
+      <div className="pwa-mobile-header sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-5 backdrop-blur lg:hidden">
         <div className="flex items-center gap-3">
           <StudioScrubzLogo size={40} priority />
-          <span className="text-sm font-extrabold tracking-tight text-[#143d1a]">StudioScrubz OS</span>
+          <span className="text-sm font-extrabold tracking-tight text-[var(--brand-green)]">StudioScrubz OS</span>
         </div>
         <button
           type="button"
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(true)}
-          className="grid size-10 place-items-center rounded-lg border border-[#143d1a]/15 text-[#143d1a]"
+          className="grid size-10 place-items-center rounded-lg border border-[var(--border)] text-[var(--brand-green)]"
         >
           <span aria-hidden className="text-xl leading-none">☰</span>
         </button>

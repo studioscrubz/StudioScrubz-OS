@@ -33,7 +33,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" data-theme="light" suppressHydrationWarning className="h-full antialiased">
+      <head><script dangerouslySetInnerHTML={{__html:`try{var theme=localStorage.getItem("studioscrubz-theme");document.documentElement.dataset.theme=theme==="dark"?"dark":"light"}catch{document.documentElement.dataset.theme="light"}`}} /></head>
       <body className="min-h-full"><PwaRegistration />{children}</body>
     </html>
   );
