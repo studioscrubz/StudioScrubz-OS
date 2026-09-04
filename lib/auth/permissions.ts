@@ -12,10 +12,10 @@ export const PERMISSIONS = [
   "payrollPrep.view", "agreements.view", "agreements.manage",
   "invoices.view", "invoices.create", "invoices.edit", "invoices.send", "invoices.recordPayment",
   "finances.view", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
-  "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage",
+  "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage", "appearance.view",
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
-  "messages.view", "messages.send", "messages.announce",
+  "messages.view", "messages.send", "messages.announce", "appearance.view",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -45,22 +45,22 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "crews.view", "crews.manage",
     "timeClock.view", "timeClock.manageAll", "agreements.view", "agreements.manage",
     "invoices.view", "invoices.send", "communications.view", "communications.create", "communications.archive", "attention.view", "reports.view",
-    "messages.view", "messages.send",
+    "messages.view", "messages.send", "appearance.view",
   ]),
   Sales: new Set([
     "dashboard.view", "clients.view", "clients.create", "clients.edit", "properties.view",
     "properties.create", "properties.edit", "estimates.view", "estimates.create",
     "estimates.edit", "walkthroughs.view", "walkthroughs.create", "walkthroughs.edit",
     "proposals.view", "proposals.create", "proposals.send", "agreements.view",
-    "agreements.manage", "timeClock.view", "employees.directory_view", "communications.view", "communications.create", "attention.view", "messages.view", "messages.send",
+    "agreements.manage", "timeClock.view", "employees.directory_view", "communications.view", "communications.create", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
   "Crew Lead": new Set([
     "dashboard.view", "jobs.view", "jobs.edit", "jobs.complete", "schedule.view",
-    "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send",
+    "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
   "Scrub Technician": new Set([
     "dashboard.view", "jobs.view", "schedule.view", "timeClock.view", "clients.view",
-    "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send",
+    "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
 };
 
@@ -97,7 +97,8 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/employees/administration", "employees.view"], ["/employees", "employees.directory_view"], ["/time-clock", "timeClock.view"],
   ["/agreements", "agreements.view"], ["/invoices", "invoices.view"],
   ["/settings/notifications", "attention.view"],
-  ["/settings", "settings.manage"], ["/", "dashboard.view"],
+  ["/settings/services", "settings.manage"], ["/settings/business", "settings.manage"],
+  ["/settings", "appearance.view"], ["/", "dashboard.view"],
 ];
 
 export function permissionForPath(pathname: string): Permission {
