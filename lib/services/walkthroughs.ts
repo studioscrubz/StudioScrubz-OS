@@ -3,6 +3,7 @@ import type { Client } from "@/types/client";
 import type { AvailableEstimate, Walkthrough, WalkthroughInput, WalkthroughStatus, WalkthroughUpdate, WalkthroughWithRelations } from "@/types/walkthrough";
 import type { Property } from "@/types/property";
 import { assertWalkthroughSchedule } from "@/lib/walkthroughWorkflow";
+import type { WalkthroughMeasurements } from "@/types/walkthrough";
 
 const walkthroughSelect = "*, client:clients!walkthroughs_client_id_fkey(*), property:properties!walkthroughs_property_id_fkey(*), estimate:estimates!walkthroughs_estimate_id_fkey(*)";
 const estimateSelect = "*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)";
@@ -20,9 +21,16 @@ export async function getWalkthroughsForEstimates(): Promise<WalkthroughWithRela
 export async function getWalkthroughClients(): Promise<Client[]> { const { data, error } = await getSupabaseClient().from("clients").select("*").order("last_name"); if (error) throw error; return data; }
 export async function getWalkthroughProperties(): Promise<Property[]> { const { data, error } = await getSupabaseClient().from("properties").select("*").order("address"); if (error) throw error; return data; }
 
+export async function syncQualificationRecords(input:{estimate:AvailableEstimate|null|undefined;property:Property|null|undefined;measurements:WalkthroughMeasurements;customerNotes:string}){
+  const db=getSupabaseClient();
+  if(input.property){const propertyUpdate={square_feet:input.measurements.squareFeet,floors:input.measurements.floors,bedrooms:input.measurements.bedrooms,bathrooms:input.measurements.bathrooms,access_instructions:clean(input.measurements.accessRestrictions)};const {error}=await db.from("properties").update(propertyUpdate).eq("id",input.property.id);if(error)throw new Error(`Property qualification could not be updated: ${error.message}`)}
+  if(input.estimate){const calculatorInput={...input.estimate.result.calculatorInput,frequency:input.measurements.frequency??input.estimate.frequency,squareFeet:input.measurements.squareFeet??input.estimate.result.calculatorInput.squareFeet,...(input.estimate.result.calculatorInput.division==="Residential"?{bedrooms:input.measurements.bedrooms??input.estimate.result.calculatorInput.bedrooms,bathrooms:input.measurements.bathrooms??input.estimate.result.calculatorInput.bathrooms}:{floors:input.measurements.floors??input.estimate.result.calculatorInput.floors,units:input.measurements.units??input.estimate.result.calculatorInput.units})};const submission=input.estimate.result.submission?{...input.estimate.result.submission,preferredServiceDate:input.measurements.desiredServiceDate??input.estimate.result.submission.preferredServiceDate}:undefined;const result={...input.estimate.result,serviceName:input.measurements.serviceType||input.estimate.result.serviceName,calculatorInput,...(submission?{submission}:{})};const {error}=await db.from("estimates").update({service_name:input.measurements.serviceType||input.estimate.service_name,frequency:input.measurements.frequency??input.estimate.frequency,notes:clean(input.customerNotes),result}).eq("id",input.estimate.id);if(error)throw new Error(`Estimate qualification could not be updated: ${error.message}`)}
+}
+
 export class WalkthroughDuplicateError extends Error { constructor(public walkthrough: WalkthroughWithRelations) { super("A walkthrough is already linked to this estimate."); this.name = "WalkthroughDuplicateError"; } }
 
 function withScheduledStatus<T extends { walkthrough_date?: string | null; walkthrough_time?: string | null; status?: WalkthroughStatus }>(input: T, currentStatus: WalkthroughStatus): T {
   if (input.walkthrough_date && input.walkthrough_time && !["Completed", "Proposal Ready", "Archived"].includes(currentStatus)) return { ...input, status: "Scheduled" };
   return input;
 }
+function clean(value:string){return value.trim()||null}

@@ -68,6 +68,7 @@ export interface Database {
           { foreignKeyName: "walkthroughs_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
         ];
       };
+      assessment_photo_access:{Row:{id:string;walkthrough_id:string;token_hash:string;expires_at:string;submitted_at:string|null;created_by:string|null;created_at:string;updated_at:string};Insert:{id?:string;walkthrough_id:string;token_hash:string;expires_at:string;submitted_at?:string|null;created_by?:string|null;created_at?:string;updated_at?:string};Update:Partial<{token_hash:string;expires_at:string;submitted_at:string|null;created_by:string|null;updated_at:string}>;Relationships:[{foreignKeyName:"assessment_photo_access_walkthrough_id_fkey";columns:["walkthrough_id"];isOneToOne:true;referencedRelation:"walkthroughs";referencedColumns:["id"]}]};
       proposals: { Row: Proposal; Insert: ProposalInsert & { id?: string; created_at?: string; updated_at?: string }; Update: ProposalUpdate; Relationships: [
         { foreignKeyName: "proposals_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
         { foreignKeyName: "proposals_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },

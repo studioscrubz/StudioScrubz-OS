@@ -29,7 +29,7 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Open Estimates", href: "/open-estimates", marker: "", permission: "estimates.view" },
     ],
   },
-  { label: "Walkthroughs", href: "/walkthroughs", marker: "W", permission: "walkthroughs.view" },
+  { label: "Sales Assessments", href: "/walkthroughs", marker: "S", permission: "walkthroughs.view" },
   {
     label: "Proposals",
     marker: "P",

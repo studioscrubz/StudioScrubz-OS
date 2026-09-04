@@ -7,6 +7,7 @@ import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 export const WALKTHROUGH_STATUSES = ["New", "Scheduled", "Completed", "Proposal Ready", "Archived"] as const;
 export type WalkthroughStatus = (typeof WALKTHROUGH_STATUSES)[number];
 export type WalkthroughContactMethod = "Phone" | "Text" | "Email";
+export type AssessmentMethod = "In-Person Walkthrough" | "Customer Photo Submission";
 export type WalkthroughScopeItem = { id: string; label: string };
 export type WalkthroughRecommendation = { id: string; text: string };
 export type WalkthroughPhoto = OperationalPhoto;
@@ -17,6 +18,14 @@ export type WalkthroughMeasurements = {
   requestSource: "Public Estimate" | null;
   requestedAt: string | null;
   preferredContactMethod: WalkthroughContactMethod | null;
+  assessmentMethod?: AssessmentMethod | null;
+  currentCleaningSituation?: string;
+  majorServiceConcerns?: string;
+  propertyContext?: string;
+  desiredServiceDate?: string | null;
+  salesNotes?: string;
+  photoSubmissionStatus?: "Not Sent" | "Sent" | "Submitted";
+  photoSubmittedAt?: string | null;
   estimateNumber: string | null;
   frequency?: Frequency | null;
   customIntervalDays?: number | null;
@@ -92,4 +101,4 @@ export type WalkthroughUpdate = Partial<Omit<Walkthrough, "id" | "created_at" | 
 export type WalkthroughWithRelations = Walkthrough & { client: Client | null; property: Property | null; estimate: Estimate | null };
 export type AvailableEstimate = EstimateWithRelations;
 
-export const EMPTY_MEASUREMENTS: WalkthroughMeasurements = { serviceType: "", serviceDescription: "", requestSource: null, requestedAt: null, preferredContactMethod: null, estimateNumber: null, overallCondition: "", squareFeet: null, bedrooms: null, bathrooms: null, floors: null, restrooms: null, kitchenAreas: null, specialtyAreas: "", accessRestrictions: "", parkingLoading: "", waterAccess: "", powerAccess: "", securityAlarm: "", pets: "", heavySoilBuildup: false, damageObserved: "", hazardsObserved: "" };
+export const EMPTY_MEASUREMENTS: WalkthroughMeasurements = { serviceType: "", serviceDescription: "", requestSource: null, requestedAt: null, preferredContactMethod: null, assessmentMethod: null, currentCleaningSituation: "", majorServiceConcerns: "", propertyContext: "", desiredServiceDate: null, salesNotes: "", photoSubmissionStatus: "Not Sent", photoSubmittedAt: null, estimateNumber: null, overallCondition: "", squareFeet: null, bedrooms: null, bathrooms: null, floors: null, restrooms: null, kitchenAreas: null, specialtyAreas: "", accessRestrictions: "", parkingLoading: "", waterAccess: "", powerAccess: "", securityAlarm: "", pets: "", heavySoilBuildup: false, damageObserved: "", hazardsObserved: "" };
