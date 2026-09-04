@@ -35,11 +35,14 @@ export function performanceChange(current: DurationSummary, previous: DurationSu
   const percentage = ((previous.average - current.average) / previous.average) * 100;
   return { percentage, direction: Math.abs(percentage) < 0.05 ? "unchanged" : percentage > 0 ? "faster" : "slower" };
 }
-export function groupTrend(rows: JobPerformanceRow[], range: JobPerformanceRange) {
-  const span = range.start && range.end ? Math.round((dateValue(range.end) - dateValue(range.start)) / DAY) + 1 : Infinity;
-  const grain = span <= 45 ? "day" : span <= 210 ? "week" : "month";
-  const groups = group(rows, (row) => grain === "day" ? row.ended_business_date : grain === "week" ? weekStart(row.ended_business_date) : row.ended_business_date.slice(0, 7));
-  return groups.sort(([a], [b]) => a.localeCompare(b)).map(([key, values]) => ({ key, label: trendLabel(key, grain), ...summarizeDurations(values) }));
+export function groupTrend(rows: JobPerformanceRow[]) {
+  return [...rows].sort((a, b) => a.operational_ended_at.localeCompare(b.operational_ended_at) || a.id.localeCompare(b.id)).map((row, index, ordered) => {
+    const duration = Number(row.duration_seconds);
+    const previous = index > 0 ? Number(ordered[index - 1].duration_seconds) : null;
+    const difference = previous === null ? null : duration - previous;
+    return { key: row.id, jobNumber: row.job_number, completedDate: row.ended_business_date, duration,
+      comparison: difference === null ? null : Math.abs(difference) < 30 ? "unchanged" as const : difference < 0 ? "faster" as const : "slower" as const };
+  });
 }
 export function groupByService(rows: JobPerformanceRow[]) {
   return group(rows, (row) => row.service_name || "Unspecified service").map(([name, values]) => ({ name, ...summarizeDurations(values) })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
@@ -72,5 +75,3 @@ function dateValue(value: string) { return Date.parse(`${value}T00:00:00Z`); }
 function iso(value: Date) { return value.toISOString().slice(0, 10); }
 function addDays(value: string, days: number) { return iso(new Date(dateValue(value) + days * DAY)); }
 function addMonths(value: string, months: number) { const source = new Date(`${value}T00:00:00Z`); const day = source.getUTCDate(); source.setUTCDate(1); source.setUTCMonth(source.getUTCMonth() + months); const lastDay = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + 1, 0)).getUTCDate(); source.setUTCDate(Math.min(day, lastDay)); return iso(source); }
-function weekStart(value: string) { const date = new Date(`${value}T00:00:00Z`); return addDays(value, -((date.getUTCDay() + 6) % 7)); }
-function trendLabel(key: string, grain: string) { return grain === "month" ? new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${key}-01T00:00:00Z`)) : key; }
