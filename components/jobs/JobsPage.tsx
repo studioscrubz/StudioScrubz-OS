@@ -306,7 +306,7 @@ export function JobsPage() {
             await mutate(selected, () => correctCompletedJobMasterTime(selected.id, input), "Master Job time saved.", (detail) => { failed = true; onError(detail); });
             return !failed;
           }}
-          canEdit={hasPermission(profile, "jobs.edit")}
+          canEdit={Boolean(profile?.is_active && profile.role === "Master Admin")}
           canSchedule={hasPermission(profile, "jobs.schedule")}
           canArchive={hasPermission(profile, "jobs.archive")}
           canComplete={hasPermission(profile, "jobs.complete")}

@@ -403,8 +403,8 @@ export async function correctCompletedJobMasterTime(id: string, input: Completed
     p_job_id: id,
     p_start_date: input.startDate,
     p_start_time: input.startTime,
-    p_end_date: input.endDate,
-    p_end_time: input.endTime,
+    p_end_date: input.endDate || null,
+    p_end_time: input.endTime || null,
   });
   if (error) throw new Error(safeDatabaseMessage(error, "Job time could not be saved."));
   return operationalJob(data);

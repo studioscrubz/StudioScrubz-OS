@@ -27,7 +27,7 @@ export function JobMasterTimeEditor({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!canEdit || job.status !== "Completed") return;
+    if (!canEdit) return;
     let active = true;
     void getBusinessSettings()
       .then((settings) => { if (active) setTimeZone(settings.timezone || "UTC"); })
@@ -37,7 +37,7 @@ export function JobMasterTimeEditor({
       })
       .finally(() => { if (active) setLoadingZone(false); });
     return () => { active = false; };
-  }, [canEdit, job.status]);
+  }, [canEdit]);
 
   function beginEditing() {
     if (!timeZone) return;
@@ -52,12 +52,13 @@ export function JobMasterTimeEditor({
   }
 
   const duration = useMemo(() => enteredDuration(startDate, startTime, endDate, endTime), [startDate, startTime, endDate, endTime]);
-  if (!canEdit || job.status !== "Completed") return null;
+  if (!canEdit) return null;
 
   async function submit() {
     setError(null);
     if (!startDate || !startTime) return setError("Job Start date and time are required.");
-    if (!endDate || !endTime) return setError("Job End date and time are required for Completed Jobs.");
+    if (Boolean(endDate) !== Boolean(endTime)) return setError("Job End date and time must be entered together.");
+    if (job.status === "Completed" && (!endDate || !endTime)) return setError("Job End date and time are required for Completed Jobs.");
     if (duration === null) return setError("Job End cannot be before Job Start.");
     setSaving(true);
     const saved = await save({ startDate, startTime, endDate, endTime }, setError);
