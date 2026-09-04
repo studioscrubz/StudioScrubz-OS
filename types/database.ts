@@ -27,11 +27,13 @@ import type {ActiveEmployeeWorkSession,EmployeeWorkSession} from "@/types/workSe
 import type {JobPerformanceRow} from "@/types/jobPerformance";
 import type {AttentionPushCheckpoint,AttentionPushDelivery,BrowserPushSubscription} from "@/types/pushNotification";
 import type {AnnouncementAcknowledgment,Conversation,ConversationMember,Message,MessageReadState} from "@/types/messaging";
+import type {NotificationPreferences} from "@/types/notificationPreferences";
 
 export interface Database {
   public: {
     Tables: {
       user_profiles:{Row:UserProfile;Insert:UserProfile;Update:Partial<Pick<UserProfile,"display_name"|"role"|"is_active"|"employee_id">>;Relationships:[{foreignKeyName:"user_profiles_employee_id_fkey";columns:["employee_id"];isOneToOne:true;referencedRelation:"employees";referencedColumns:["id"]}]};
+      notification_preferences:{Row:NotificationPreferences;Insert:Omit<NotificationPreferences,"created_at"|"updated_at">&{created_at?:string;updated_at?:string};Update:Partial<Pick<NotificationPreferences,"disabled_attention_categories"|"direct_messages_enabled"|"announcements_enabled"|"updated_at">>;Relationships:[{foreignKeyName:"notification_preferences_user_id_fkey";columns:["user_id"];isOneToOne:true;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       conversations:{Row:Conversation;Insert:Omit<Conversation,"id"|"created_at"|"updated_at"|"last_message_at"> & {id?:string;created_at?:string;updated_at?:string;last_message_at?:string};Update:Partial<Conversation>;Relationships:[]};
       conversation_members:{Row:ConversationMember;Insert:ConversationMember;Update:Partial<ConversationMember>;Relationships:[{foreignKeyName:"conversation_members_conversation_id_fkey";columns:["conversation_id"];isOneToOne:false;referencedRelation:"conversations";referencedColumns:["id"]},{foreignKeyName:"conversation_members_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       messages:{Row:Message;Insert:Omit<Message,"id"|"created_at"|"edited_at"|"archived_at"> & {id?:string;created_at?:string;edited_at?:string|null;archived_at?:string|null};Update:Partial<Message>;Relationships:[{foreignKeyName:"messages_conversation_id_fkey";columns:["conversation_id"];isOneToOne:false;referencedRelation:"conversations";referencedColumns:["id"]},{foreignKeyName:"messages_sender_user_id_fkey";columns:["sender_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};

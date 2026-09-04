@@ -8,23 +8,26 @@ import type { BrowserPushSubscription } from "@/types/pushNotification";
 
 export async function processAttentionPushes() {
   const db = createSupabaseAdminClient();
-  const [{ data: profiles, error: profileError }, { data: subscriptions, error: subscriptionError }, { data: checkpoints, error: checkpointError }, snapshot] = await Promise.all([
+  const [{ data: profiles, error: profileError }, { data: subscriptions, error: subscriptionError }, { data: checkpoints, error: checkpointError }, { data: preferences, error: preferenceError }, snapshot] = await Promise.all([
     db.from("user_profiles").select("*").eq("is_active", true),
     db.from("browser_push_subscriptions").select("*").is("revoked_at", null),
     db.from("attention_push_checkpoints").select("browser_push_subscription_id"),
+    db.from("notification_preferences").select("user_id,disabled_attention_categories"),
     loadAttentionServerSnapshot(db),
   ]);
-  if (profileError || subscriptionError || checkpointError) throw new Error("Push recipients could not be loaded.");
+  if (profileError || subscriptionError || checkpointError || preferenceError) throw new Error("Push recipients could not be loaded.");
   const activeSubscriptions = (subscriptions ?? []) as BrowserPushSubscription[];
   const initialized = new Set((checkpoints ?? []).map((row) => row.browser_push_subscription_id));
   const totals = { users: 0, candidates: 0, sent: 0, failed: 0, duplicates: 0, revoked: 0 };
   const repository = deliveryRepository(db);
+  const disabledByUser = new Map((preferences ?? []).map((row) => [row.user_id, new Set(row.disabled_attention_categories)]));
   for (const profile of (profiles ?? []) as UserProfile[]) {
     const allDevices = activeSubscriptions.filter((subscription) => subscription.user_id === profile.id);
     if (!allDevices.length) continue;
     totals.users += 1;
     try {
-      const items = attentionItemsForProfile(profile, snapshot);
+      const disabled = disabledByUser.get(profile.id);
+      const items = attentionItemsForProfile(profile, snapshot).filter((item) => !disabled?.has(item.category));
       const newDevices = allDevices.filter((subscription) => !initialized.has(subscription.id));
       if (newDevices.length) await initializeDevices(db, profile.id, items, newDevices);
       const devices = allDevices.filter((subscription) => initialized.has(subscription.id));

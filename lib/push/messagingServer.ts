@@ -11,6 +11,9 @@ export async function processDirectMessagePush(input: {
   senderDisplayName: string | null;
 }) {
   const db = createSupabaseAdminClient();
+  const { data: preferences, error } = await db.from("notification_preferences").select("direct_messages_enabled").eq("user_id", input.recipientUserId).maybeSingle();
+  if (error) throw new Error("Direct-message notification preferences could not be loaded.");
+  if (preferences?.direct_messages_enabled === false) return emptyDeliveryResult();
   const payload = directMessagePushPayload({ conversationId: input.conversationId, senderDisplayName: input.senderDisplayName });
   return pushToRecipient(db, input.recipientUserId, input.messageId, payload);
 }
@@ -22,8 +25,11 @@ export async function processAnnouncementPush(input: {
   priority: "Normal" | "Important" | "Requires Acknowledgment";
 }) {
   const db = createSupabaseAdminClient();
+  const { data: preferences, error } = await db.from("notification_preferences").select("user_id,announcements_enabled").in("user_id", input.recipientUserIds);
+  if (error) throw new Error("Announcement notification preferences could not be loaded.");
+  const disabled = new Set((preferences ?? []).filter((row) => row.announcements_enabled === false).map((row) => row.user_id));
   const payload = announcementPushPayload({ messageId: input.messageId, title: input.title, priority: input.priority });
-  const results = await Promise.all(input.recipientUserIds.map((recipientUserId) => pushToRecipient(db, recipientUserId, input.messageId, payload)));
+  const results = await Promise.all(input.recipientUserIds.filter((recipientUserId) => !disabled.has(recipientUserId)).map((recipientUserId) => pushToRecipient(db, recipientUserId, input.messageId, payload)));
   return results.reduce((total, result) => ({
     devices: total.devices + result.devices,
     sent: total.sent + result.sent,
@@ -32,6 +38,8 @@ export async function processAnnouncementPush(input: {
     revoked: total.revoked + result.revoked,
   }), { devices: 0, sent: 0, failed: 0, duplicates: 0, revoked: 0 });
 }
+
+function emptyDeliveryResult(){return{devices:0,sent:0,failed:0,duplicates:0,revoked:0}}
 
 async function pushToRecipient(db: ReturnType<typeof createSupabaseAdminClient>, recipientUserId: string, messageId: string, payload: MessagingPushPayload) {
   const { data: subscriptions, error } = await db
