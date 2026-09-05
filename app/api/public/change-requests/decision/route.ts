@@ -1,0 +1,3 @@
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+type DecisionRequest={token?:string;clientName?:string;consent?:boolean;decision?:string};
+export async function POST(request:Request){try{const body=await request.json() as DecisionRequest;const{data,error}=await(await createSupabaseServerClient()).rpc("decide_change_request_by_token",{p_token:body.token??"",p_client_name:body.clientName??"",p_consent:body.consent??false,p_decision:body.decision??""});if(error)throw error;return Response.json(data)}catch(error){return Response.json({error:error instanceof Error&&error.message?error.message:"The Change Request decision could not be saved."},{status:400})}}

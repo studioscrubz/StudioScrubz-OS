@@ -65,7 +65,10 @@ begin
     and service_occurrence_id is null
   order by created_at
   limit 1;
-  if found then return v_job; end if;
+  if found then
+    perform private.ensure_job_scope_v1(v_job.id, v_proposal.id);
+    return v_job;
+  end if;
 
   select * into v_client from public.clients
   where id = v_proposal.client_id and archived_at is null;
@@ -122,6 +125,7 @@ begin
         'Job ' || v_job.job_number || ' created.',
         coalesce((select profile.display_name from public.user_profiles profile where profile.id = auth.uid()), v_role)
       );
+      perform private.ensure_job_scope_v1(v_job.id, v_proposal.id);
       return v_job;
     exception when unique_violation then
       get stacked diagnostics v_constraint_name = constraint_name;

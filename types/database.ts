@@ -2,7 +2,7 @@ import type { Client, ClientInput } from "@/types/client";
 import type { Property, PropertyInput } from "@/types/property";
 import type { Estimate, EstimateInsert, EstimateUpdate } from "@/types/estimate";
 import type { Walkthrough, WalkthroughInput, WalkthroughUpdate } from "@/types/walkthrough";
-import type { Proposal, ProposalHistory, ProposalInsert, ProposalUpdate } from "@/types/proposal";
+import type { Proposal, ProposalHistory, ProposalInsert, ProposalResult, ProposalUpdate } from "@/types/proposal";
 import type { Job, JobInsert, JobUpdate } from "@/types/job";
 import type { Employee, EmployeeInput, EmployeeUpdate } from "@/types/employee";
 import type { Crew, CrewInput, CrewMember, CrewUpdate } from "@/types/crew";
@@ -28,6 +28,9 @@ import type {JobPerformanceRow} from "@/types/jobPerformance";
 import type {AttentionPushCheckpoint,AttentionPushDelivery,BrowserPushSubscription} from "@/types/pushNotification";
 import type {AnnouncementAcknowledgment,Conversation,ConversationMember,Message,MessageReadState} from "@/types/messaging";
 import type {NotificationPreferences} from "@/types/notificationPreferences";
+import type {FieldDiscovery,FieldDiscoveryMedia,OperationalFieldDiscovery} from "@/types/fieldDiscovery";
+import type {ChangeRequest,ChangeRequestApproval,ChangeRequestItem,OperationalChangeRequest,PublicChangeRequest} from "@/types/changeRequest";
+import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 
 export interface Database {
   public: {
@@ -86,6 +89,15 @@ export interface Database {
         { foreignKeyName: "jobs_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
         { foreignKeyName: "jobs_assigned_crew_id_fkey"; columns: ["assigned_crew_id"]; isOneToOne: false; referencedRelation: "crews"; referencedColumns: ["id"] },
       ] };
+      scope_snapshots:{Row:{id:string;job_id:string;proposal_id:string;version:number;snapshot_type:string;scope:ProposalResult["scope"];pricing:Record<string,unknown>;proposal_result:ProposalResult;proposal_notes:string|null;accepted_at:string|null;created_at:string};Insert:{id?:string;job_id:string;proposal_id:string;version?:number;snapshot_type?:string;scope?:ProposalResult["scope"];pricing?:Record<string,unknown>;proposal_result?:ProposalResult;proposal_notes?:string|null;accepted_at?:string|null;created_at?:string};Update:never;Relationships:[{foreignKeyName:"scope_snapshots_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"scope_snapshots_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]}]};
+      scope_snapshot_items:{Row:{id:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description:string|null;quantity:number|null;unit:string|null;unit_price:number|null;line_total:number|null;metadata:Record<string,unknown>;sort_order:number;created_at:string};Insert:{id?:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description?:string|null;quantity?:number|null;unit?:string|null;unit_price?:number|null;line_total?:number|null;metadata?:Record<string,unknown>;sort_order?:number;created_at?:string};Update:never;Relationships:[{foreignKeyName:"scope_snapshot_items_snapshot_job_fkey";columns:["scope_snapshot_id","job_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id","job_id"]},{foreignKeyName:"scope_snapshot_items_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
+      field_discoveries:{Row:FieldDiscovery;Insert:never;Update:never;Relationships:[{foreignKeyName:"field_discoveries_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"field_discoveries_scope_snapshot_id_fkey";columns:["scope_snapshot_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id"]},{foreignKeyName:"field_discoveries_discovered_by_fkey";columns:["discovered_by"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
+      field_discovery_media:{Row:FieldDiscoveryMedia;Insert:never;Update:never;Relationships:[{foreignKeyName:"field_discovery_media_field_discovery_id_fkey";columns:["field_discovery_id"];isOneToOne:false;referencedRelation:"field_discoveries";referencedColumns:["id"]}]};
+      change_requests:{Row:ChangeRequest;Insert:never;Update:never;Relationships:[{foreignKeyName:"change_requests_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"change_requests_scope_snapshot_id_fkey";columns:["scope_snapshot_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id"]},{foreignKeyName:"change_requests_field_discovery_id_fkey";columns:["field_discovery_id"];isOneToOne:false;referencedRelation:"field_discoveries";referencedColumns:["id"]},{foreignKeyName:"change_requests_created_by_fkey";columns:["created_by"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
+      change_request_items:{Row:ChangeRequestItem;Insert:never;Update:never;Relationships:[{foreignKeyName:"change_request_items_change_request_id_fkey";columns:["change_request_id"];isOneToOne:false;referencedRelation:"change_requests";referencedColumns:["id"]}]};
+      change_request_approvals:{Row:ChangeRequestApproval;Insert:never;Update:never;Relationships:[{foreignKeyName:"change_request_approvals_change_request_id_fkey";columns:["change_request_id"];isOneToOne:true;referencedRelation:"change_requests";referencedColumns:["id"]}]};
+      job_evidence:{Row:JobEvidence;Insert:never;Update:never;Relationships:[{foreignKeyName:"job_evidence_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"job_evidence_scope_snapshot_id_fkey";columns:["scope_snapshot_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id"]},{foreignKeyName:"job_evidence_change_request_id_fkey";columns:["change_request_id"];isOneToOne:false;referencedRelation:"change_requests";referencedColumns:["id"]},{foreignKeyName:"job_evidence_field_discovery_id_fkey";columns:["field_discovery_id"];isOneToOne:false;referencedRelation:"field_discoveries";referencedColumns:["id"]}]};
+      job_evidence_media:{Row:JobEvidenceMedia;Insert:never;Update:never;Relationships:[{foreignKeyName:"job_evidence_media_job_evidence_id_fkey";columns:["job_evidence_id"];isOneToOne:false;referencedRelation:"job_evidence";referencedColumns:["id"]}]};
       employees:{Row:Employee;Insert:EmployeeInput&{id?:string;employee_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:EmployeeUpdate;Relationships:[]};
       crews:{Row:Crew;Insert:CrewInput&{id?:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:CrewUpdate;Relationships:[{foreignKeyName:"crews_crew_lead_id_fkey";columns:["crew_lead_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
       crew_members:{Row:Omit<CrewMember,"employee">;Insert:{id?:string;crew_id:string;employee_id:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"crew_members_crew_id_fkey";columns:["crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]},{foreignKeyName:"crew_members_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
@@ -116,6 +128,11 @@ export interface Database {
       attention_push_checkpoints:{Row:AttentionPushCheckpoint;Insert:Omit<AttentionPushCheckpoint,"initialized_at">&{initialized_at?:string};Update:never;Relationships:[]};
     };
     Views: {
+      job_scope_operational_items:{Row:{id:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description:string|null;quantity:number|null;unit:string|null;sort_order:number;created_at:string};Relationships:[]};
+      field_discoveries_operational:{Row:OperationalFieldDiscovery;Relationships:[]};
+      change_requests_operational:{Row:OperationalChangeRequest;Relationships:[]};
+      scope_snapshots_operational:{Row:{id:string;job_id:string;version:number;snapshot_type:string;accepted_at:string|null;created_at:string};Relationships:[]};
+      change_request_approvals_operational:{Row:Pick<ChangeRequestApproval,"id"|"change_request_id"|"decision"|"decided_at">;Relationships:[]};
       jobs_operational_safe:{Row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">;Relationships:[]};
       employee_directory_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">;Relationships:[]};
       employee_directory_sales_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate"|"hire_date"|"notes">;Relationships:[]};
@@ -146,6 +163,17 @@ export interface Database {
       get_operational_job_ids:{Args:{p_start?:string|null;p_end?:string|null};Returns:string[]};
       get_financially_handed_off_job_ids:{Args:Record<string,never>;Returns:string[]};
       create_job_from_accepted_proposal:{Args:{p_proposal_id:string};Returns:Job};
+      create_field_discovery:{Args:{p_job_id:string;p_area?:string|null;p_description?:string|null;p_estimated_extra_minutes?:number|null;p_estimated_extra_amount?:number|null};Returns:string};
+      update_field_discovery_status:{Args:{p_field_discovery_id:string;p_status:string};Returns:undefined};
+      add_field_discovery_media:{Args:{p_field_discovery_id:string;p_storage_path:string;p_media_type?:string|null};Returns:FieldDiscoveryMedia};
+      create_change_request:{Args:{p_job_id:string;p_field_discovery_id?:string|null;p_title?:string|null;p_description?:string|null;p_area?:string|null;p_price_impact?:number;p_time_impact_minutes?:number};Returns:string};
+      update_change_request_draft:{Args:{p_change_request_id:string;p_title:string;p_description:string;p_area:string|null;p_price_impact:number;p_time_impact_minutes:number};Returns:undefined};
+      add_change_request_item:{Args:{p_change_request_id:string;p_description:string;p_quantity?:number|null;p_unit?:string|null;p_unit_price?:number|null;p_line_total?:number|null};Returns:string};
+      send_change_request:{Args:{p_change_request_id:string};Returns:ChangeRequest};
+      get_change_request_by_token:{Args:{p_token:string};Returns:PublicChangeRequest|null};
+      decide_change_request_by_token:{Args:{p_token:string;p_client_name:string;p_consent:boolean;p_decision:string};Returns:PublicChangeRequest};
+      create_job_evidence:{Args:{p_job_id:string;p_evidence_type:string;p_area?:string|null;p_description?:string|null;p_change_request_id?:string|null;p_field_discovery_id?:string|null};Returns:string};
+      add_job_evidence_media:{Args:{p_job_evidence_id:string;p_storage_path:string;p_media_type?:string|null};Returns:JobEvidenceMedia};
       create_direct_operational_job:{Args:{p_client_id:string;p_property_id:string;p_service_id:string;p_addon_ids?:string[];p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_labor_hours?:number;p_access_instructions?:string|null;p_internal_notes?:string|null;p_master_price_override?:number|null;p_addon_quantities?:Array<{addonId:string;quantity:number}>};Returns:Job};
       archive_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       get_archived_operational_jobs:{Args:Record<string,never>;Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};

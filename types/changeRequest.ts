@@ -1,0 +1,10 @@
+export const CHANGE_REQUEST_STATUSES = ["Draft", "Sent", "Approved", "Declined"] as const;
+export type ChangeRequestStatus = (typeof CHANGE_REQUEST_STATUSES)[number];
+export type ChangeRequestDecision = "Approved" | "Declined";
+export type ChangeRequest = { id:string; job_id:string; scope_snapshot_id:string|null; field_discovery_id:string|null; change_request_number:string; status:ChangeRequestStatus; title:string; description:string; area:string|null; price_impact:number; time_impact_minutes:number; public_token:string; created_by:string|null; created_at:string; sent_at:string|null; decided_at:string|null };
+export type OperationalChangeRequest = Omit<ChangeRequest, "price_impact" | "public_token">;
+export type ChangeRequestItem = { id:string; change_request_id:string; description:string; quantity:number|null; unit:string|null; unit_price:number|null; line_total:number|null; sort_order:number; created_at:string };
+export type ChangeRequestApproval = { id:string; change_request_id:string; decision:ChangeRequestDecision; client_name:string; consent:boolean; decided_at:string };
+export type VisibleChangeRequest = OperationalChangeRequest & { price_impact?:number; public_token?:string; items?:ChangeRequestItem[] };
+export type PublicChangeRequestItem = Omit<ChangeRequestItem, "change_request_id" | "sort_order" | "created_at">;
+export type PublicChangeRequest = { change_request_number:string; status:Exclude<ChangeRequestStatus,"Draft">; title:string; description:string; area:string|null; price_impact:number; time_impact_minutes:number; sent_at:string; decided_at:string|null; job_number:string; property_name:string|null; service_name:string|null; items:PublicChangeRequestItem[] };

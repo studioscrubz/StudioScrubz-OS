@@ -26,8 +26,9 @@ export async function updateSession(request: NextRequest) {
     || request.nextUrl.pathname === "/api/webhooks/square"
     || request.nextUrl.pathname.startsWith("/api/public/request-estimate")
     || request.nextUrl.pathname.startsWith("/api/public/assessments/")
+    || request.nextUrl.pathname.startsWith("/api/public/change-requests/")
     || request.nextUrl.pathname.startsWith("/api/public/invoices/")
-    || ["/agreement/", "/assessment/", "/estimate/", "/invoice/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
+    || ["/agreement/", "/assessment/", "/change-request/", "/estimate/", "/invoice/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
 
   if ((error || !data?.claims) && !isLogin && !isPublicDocument) {
     const loginUrl = request.nextUrl.clone();
