@@ -47,7 +47,16 @@ export async function getJobs(): Promise<JobWithRelations[]> {
   return jobsResult.data as JobWithRelations[];
 }
 export async function getJobsForMileageAssociation(): Promise<JobWithRelations[]> {
-  return (await getJobs()).filter((job) => !job.archived_at && job.status !== "Archived" && job.status !== "Cancelled");
+  if (!(await master())) throw new Error("Mileage Job association access is denied.");
+  const { data, error } = await getSupabaseClient()
+    .from("jobs")
+    .select(select)
+    .is("archived_at", null)
+    .neq("status", "Archived")
+    .neq("status", "Cancelled")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as JobWithRelations[];
 }
 export async function getTimeEntryCorrectionJobs(): Promise<JobWithRelations[]> {
   const profile = await getCurrentProfile();
