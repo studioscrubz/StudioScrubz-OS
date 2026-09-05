@@ -29,7 +29,7 @@ const operationalAdmin: Permission[] = [
   "jobs.complete", "jobs.archive", "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "employees.manage",
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll",
   "agreements.view", "agreements.manage", "invoices.view", "invoices.create",
-  "invoices.edit", "invoices.send", "archives.view", "archives.restore", "communications.view",
+  "invoices.edit", "invoices.send", "invoices.recordPayment", "archives.view", "archives.restore", "communications.view",
   "communications.create", "communications.archive", "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
 ];
