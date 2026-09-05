@@ -693,7 +693,7 @@ function MileageForm({
     setV((x) => ({ ...x, [k]: value }));
   }
   const routeLegs = stops.slice(1);
-  const routeAllocationMode = routeLegs.some((stop) => stop.miles_from_previous !== null);
+  const routeAllocationMode = !entry || routeLegs.some((stop) => stop.miles_from_previous !== null);
   const routeAllocationComplete = routeLegs.every((stop) => stop.miles_from_previous !== null && Number.isFinite(stop.miles_from_previous) && stop.miles_from_previous >= 0);
   const allocatedMiles = routeAllocationMode && routeAllocationComplete
     ? routeLegs.reduce((total, stop) => total + stop.miles_from_previous!, 0)
@@ -811,12 +811,6 @@ function MileageForm({
           type="number"
           v={v.end_odometer?.toString() ?? ""}
           set={(x) => set("end_odometer", x ? Number(x) : null)}
-        />
-        <Field
-          l={allocatedMiles === null ? "Manual One-Way Miles" : "Manual One-Way Miles (route legs used)"}
-          type="number"
-          v={String(manualMiles)}
-          set={(x) => setManualMiles(Number(x))}
         />
         <Field
           l="Mileage Rate"
