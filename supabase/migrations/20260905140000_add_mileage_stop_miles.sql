@@ -19,6 +19,7 @@ declare
   v_job_id uuid;
   v_property_id uuid;
   v_has_allocations boolean;
+  v_has_incomplete_legs boolean;
   v_total_miles numeric;
   v_deductible_amount numeric;
 begin
@@ -31,13 +32,17 @@ begin
   end if;
 
   select
-    coalesce(bool_or(value ? 'miles_from_previous' and value->>'miles_from_previous' is not null), false),
-    coalesce(sum(coalesce(nullif(value->>'miles_from_previous', '')::numeric, 0)), 0)
-  into v_has_allocations, v_total_miles
-  from jsonb_array_elements(p_stops);
+    coalesce(bool_or(nullif(value->>'miles_from_previous', '') is not null) filter (where ordinality > 1), false),
+    coalesce(bool_or(nullif(value->>'miles_from_previous', '') is null) filter (where ordinality > 1), false),
+    coalesce(sum(nullif(value->>'miles_from_previous', '')::numeric) filter (where ordinality > 1), 0)
+  into v_has_allocations, v_has_incomplete_legs, v_total_miles
+  from jsonb_array_elements(p_stops) with ordinality;
 
   if coalesce(nullif(p_stops->0->>'miles_from_previous', '')::numeric, 0) <> 0 then
     raise exception 'The origin stop cannot have miles from a previous stop.';
+  end if;
+  if v_has_allocations and v_has_incomplete_legs then
+    raise exception 'Enter mileage for every non-origin route leg.';
   end if;
   if v_total_miles < 0 then raise exception 'Mileage stop miles cannot be negative.'; end if;
 
@@ -97,7 +102,7 @@ begin
     v_job_id := nullif(v_stop->>'job_id', '')::uuid;
     v_property_id := nullif(v_stop->>'property_id', '')::uuid;
     insert into public.mileage_stops (mileage_entry_id, stop_order, job_id, property_id, address, label, miles_from_previous)
-    values (v_entry.id, v_order, v_job_id, v_property_id, btrim(v_stop->>'address'), nullif(btrim(v_stop->>'label'), ''), nullif(v_stop->>'miles_from_previous', '')::numeric);
+    values (v_entry.id, v_order, v_job_id, v_property_id, btrim(v_stop->>'address'), nullif(btrim(v_stop->>'label'), ''), case when v_order = 0 then null else nullif(v_stop->>'miles_from_previous', '')::numeric end);
     v_order := v_order + 1;
   end loop;
 

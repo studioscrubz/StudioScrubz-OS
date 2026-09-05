@@ -692,11 +692,15 @@ function MileageForm({
   function set<K extends keyof MileageInput>(k: K, value: MileageInput[K]) {
     setV((x) => ({ ...x, [k]: value }));
   }
-  const allocatedMiles = stops.some((stop) => stop.miles_from_previous !== null)
-    ? stops.reduce((total, stop) => total + (stop.miles_from_previous ?? 0), 0)
+  const routeLegs = stops.slice(1);
+  const routeAllocationMode = routeLegs.some((stop) => stop.miles_from_previous !== null);
+  const routeAllocationComplete = routeLegs.every((stop) => stop.miles_from_previous !== null && Number.isFinite(stop.miles_from_previous) && stop.miles_from_previous >= 0);
+  const allocatedMiles = routeAllocationMode && routeAllocationComplete
+    ? routeLegs.reduce((total, stop) => total + stop.miles_from_previous!, 0)
     : null;
   const calc = useMemo(() => {
     try {
+      if (routeAllocationMode && !routeAllocationComplete) return null;
       if (allocatedMiles !== null) return calculateMileage({ startOdometer: null, endOdometer: null, manualMiles: allocatedMiles, roundTrip: false, mileageRate: v.mileage_rate });
       return calculateMileage({
         startOdometer: v.start_odometer,
@@ -710,6 +714,8 @@ function MileageForm({
     }
   }, [
     allocatedMiles,
+    routeAllocationComplete,
+    routeAllocationMode,
     manualMiles,
     v.end_odometer,
     v.mileage_rate,
@@ -736,6 +742,8 @@ function MileageForm({
       return setError("Vehicle and trip purpose are required.");
     if (stops.length < 2 || stops.some((stop) => !stop.address.trim()))
       return setError("At least two stops with addresses are required.");
+    if (routeAllocationMode && !routeAllocationComplete)
+      return setError("Enter Miles from Origin / Previous Stop for every destination, including zero-mile legs.");
     if (!calc) return setError("Mileage calculation is invalid.");
     setSaving(true);
     try {
@@ -744,7 +752,7 @@ function MileageForm({
       const linkedJob = jobs.find((job) => job.id === firstLinkedJob?.job_id);
       const linkedProperty = properties.find((property) => property.id === firstLinkedProperty?.property_id);
       const data = { ...v, start_location: stops[0].address.trim(), end_location: stops[stops.length - 1].address.trim(), job_id: firstLinkedJob?.job_id ?? v.job_id ?? null, property_id: firstLinkedProperty?.property_id ?? v.property_id ?? null, client_id: linkedJob?.client_id ?? linkedProperty?.client_id ?? v.client_id ?? null, crew_id: v.crew_id ?? linkedJob?.assigned_crew_id ?? null, miles: allocatedMiles ?? manualMiles };
-      const normalizedStops = stops.map((stop) => ({ ...stop, address: stop.address.trim(), label: stop.label?.trim() || null }));
+      const normalizedStops = stops.map((stop, index) => ({ ...stop, job_id: index === 0 ? null : stop.job_id, property_id: index === 0 ? null : stop.property_id, address: stop.address.trim(), label: index === 0 ? null : stop.label?.trim() || null, miles_from_previous: index === 0 ? null : stop.miles_from_previous }));
       if (entry) await updateMileageEntry(entry.id, data, normalizedStops);
       else await createMileageEntry(data, normalizedStops);
       await saved();
@@ -845,7 +853,7 @@ function MileageForm({
           {stops.map((stop, index) => (
             <div key={index} className="rounded-xl bg-neutral-50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <b>Stop {index + 1}</b>
+                <b>Stop {index + 1} — {index === 0 ? "Origin" : "Job/Destination"}</b>
                 <div className="flex gap-1">
                   <button type="button" className={secondary} disabled={index === 0} onClick={() => moveStop(index, -1)}>Up</button>
                   <button type="button" className={secondary} disabled={index === stops.length - 1} onClick={() => moveStop(index, 1)}>Down</button>
@@ -853,14 +861,16 @@ function MileageForm({
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                <Assoc l="Job (optional)" v={stop.job_id} set={(id) => chooseStopJob(index, id)} rows={jobs.map((job) => [job.id, `${job.job_number} · ${job.client_name || job.property_name || "Client"} · ${job.status}`])} />
-                <Assoc l="Property (optional)" v={stop.property_id} set={(id) => chooseStopProperty(index, id)} rows={properties.map((property) => [property.id, property.property_name || property.address])} />
                 <Field l="Address" v={stop.address} set={(address) => updateStop(index, { address })} />
-                <Field l="Label (optional)" v={stop.label ?? ""} set={(label) => updateStop(index, { label: label || null })} />
-                <label className="text-sm font-bold">
-                  Miles From Previous
-                  <input className={input} type="number" min="0" step=".01" disabled={index === 0} value={index === 0 ? "" : stop.miles_from_previous?.toString() ?? ""} placeholder={index === 0 ? "Origin" : "0.00"} onChange={(event) => updateStop(index, { miles_from_previous: event.target.value === "" ? null : Number(event.target.value) })} />
-                </label>
+                {index > 0 && <>
+                  <Assoc l="Job (optional)" v={stop.job_id} set={(id) => chooseStopJob(index, id)} rows={jobs.map((job) => [job.id, `${job.job_number} · ${job.client_name || job.property_name || "Client"} · ${job.status}`])} />
+                  <Assoc l="Property (optional)" v={stop.property_id} set={(id) => chooseStopProperty(index, id)} rows={properties.map((property) => [property.id, property.property_name || property.address])} />
+                  <Field l="Label (optional)" v={stop.label ?? ""} set={(label) => updateStop(index, { label: label || null })} />
+                  <label className="text-sm font-bold">
+                    Miles from Origin / Previous Stop
+                    <input className={input} type="number" min="0" step=".01" value={stop.miles_from_previous?.toString() ?? ""} placeholder="Required when allocating route legs" onChange={(event) => updateStop(index, { miles_from_previous: event.target.value === "" ? null : Number(event.target.value) })} />
+                  </label>
+                </>}
               </div>
             </div>
           ))}
