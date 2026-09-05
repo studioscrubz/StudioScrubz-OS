@@ -46,6 +46,9 @@ export async function getJobs(): Promise<JobWithRelations[]> {
   if (jobsResult.error) throw jobsResult.error;
   return jobsResult.data as JobWithRelations[];
 }
+export async function getJobsForMileageAssociation(): Promise<JobWithRelations[]> {
+  return (await getJobs()).filter((job) => !job.archived_at && job.status !== "Archived" && job.status !== "Cancelled");
+}
 export async function getTimeEntryCorrectionJobs(): Promise<JobWithRelations[]> {
   const profile = await getCurrentProfile();
   if (!hasPermission(profile, "employees.manage")) throw new Error("Time correction access is denied.");

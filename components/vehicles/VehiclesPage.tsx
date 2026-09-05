@@ -20,8 +20,7 @@ import {
 } from "@/lib/services/mileage";
 import { getEmployees } from "@/lib/services/employees";
 import { getCrews } from "@/lib/services/crews";
-import { getJobs } from "@/lib/services/jobs";
-import { getClients } from "@/lib/services/clients";
+import { getJobsForMileageAssociation } from "@/lib/services/jobs";
 import { getProperties } from "@/lib/services/properties";
 import {
   VEHICLE_OWNERSHIP_TYPES,
@@ -35,12 +34,12 @@ import {
 import {
   MILEAGE_STATUSES,
   type MileageInput,
+  type MileageStopInput,
   type MileageWithRelations,
 } from "@/types/mileage";
 import type { Employee } from "@/types/employee";
 import type { CrewWithRelations } from "@/types/crew";
 import type { JobWithRelations } from "@/types/job";
-import type { Client } from "@/types/client";
 import type { PropertyWithClient } from "@/types/property";
 
 export function VehiclesPage() {
@@ -153,6 +152,7 @@ function VehicleAdministrationPage() {
             x.client?.first_name,
             x.start_location,
             x.end_location,
+            ...x.stops.flatMap((stop) => [stop.address, stop.label, stop.job?.job_number]),
           ]
             .filter(Boolean)
             .join(" ")
@@ -403,10 +403,10 @@ function VehicleAdministrationPage() {
                   <td className="p-3">
                     {x.trip_purpose}
                     <p className="text-xs text-neutral-500">
-                      {x.start_location || "—"} → {x.end_location || "—"}
+                      {mileageRoute(x)}
                     </p>
                   </td>
-                  <td className="p-3">{x.job?.job_number || "—"}</td>
+                  <td className="p-3">{mileageJobs(x)}</td>
                   <td className="p-3">
                     {x.employee
                       ? `${x.employee.first_name} ${x.employee.last_name}`
@@ -657,14 +657,20 @@ function MileageForm({
   const initial = entry
     ? pickMileage(entry)
     : blankMileage(vehicles[0]?.id ?? "");
+  const initialStops: MileageStopInput[] = entry?.stops.length
+    ? entry.stops.map(({ job_id, property_id, address, label }) => ({ job_id, property_id, address, label }))
+    : [
+        { job_id: null, property_id: null, address: entry?.start_location ?? "", label: null },
+        { job_id: entry?.job_id ?? null, property_id: entry?.property_id ?? null, address: entry?.end_location ?? "", label: null },
+      ];
   const [v, setV] = useState<MileageInput>(initial),
+    [stops, setStops] = useState<MileageStopInput[]>(initialStops),
     [manualMiles, setManualMiles] = useState(
       entry ? (entry.round_trip ? entry.miles / 2 : entry.miles) : 0,
     ),
     [employees, setEmployees] = useState<Employee[]>([]),
     [crews, setCrews] = useState<CrewWithRelations[]>([]),
     [jobs, setJobs] = useState<JobWithRelations[]>([]),
-    [clients, setClients] = useState<Client[]>([]),
     [properties, setProperties] = useState<PropertyWithClient[]>([]),
     [error, setError] = useState<string | null>(null),
     [saving, setSaving] = useState(false);
@@ -672,15 +678,13 @@ function MileageForm({
     void Promise.all([
       getEmployees(),
       getCrews(),
-      getJobs(),
-      getClients(),
+      getJobsForMileageAssociation(),
       getProperties(),
     ])
-      .then(([e, c, j, cl, p]) => {
+      .then(([e, c, j, p]) => {
         setEmployees(e);
         setCrews(c);
         setJobs(j);
-        setClients(cl);
         setProperties(p);
       })
       .catch((x) => setError(msg(x)));
@@ -707,34 +711,42 @@ function MileageForm({
     v.round_trip,
     v.start_odometer,
   ]);
-  function chooseJob(id: string | null) {
-    const j = jobs.find((x) => x.id === id);
-    setV((x) => ({
-      ...x,
-      job_id: id,
-      client_id: j?.client_id ?? x.client_id,
-      property_id: j?.property_id ?? x.property_id,
-      crew_id: j?.assigned_crew_id ?? x.crew_id,
-    }));
+  function updateStop(index: number, patch: Partial<MileageStopInput>) {
+    setStops((rows) => rows.map((stop, i) => i === index ? { ...stop, ...patch } : stop));
+  }
+  function chooseStopJob(index: number, id: string | null) {
+    const job = jobs.find((candidate) => candidate.id === id);
+    const property = properties.find((candidate) => candidate.id === job?.property_id);
+    updateStop(index, { job_id: id, property_id: job?.property_id ?? null, address: property ? propertyAddress(property) : stops[index].address });
+  }
+  function chooseStopProperty(index: number, id: string | null) {
+    const property = properties.find((candidate) => candidate.id === id);
+    updateStop(index, { property_id: id, address: property ? propertyAddress(property) : stops[index].address });
+  }
+  function moveStop(index: number, direction: -1 | 1) {
+    setStops((rows) => { const target = index + direction; if (target < 0 || target >= rows.length) return rows; const next = [...rows]; [next[index], next[target]] = [next[target], next[index]]; return next; });
   }
   async function submit() {
     if (!v.vehicle_id || !v.trip_purpose.trim())
       return setError("Vehicle and trip purpose are required.");
+    if (stops.length < 2 || stops.some((stop) => !stop.address.trim()))
+      return setError("At least two stops with addresses are required.");
     if (!calc) return setError("Mileage calculation is invalid.");
     setSaving(true);
     try {
-      const data = { ...v, miles: manualMiles };
-      if (entry) await updateMileageEntry(entry.id, data);
-      else await createMileageEntry(data);
+      const firstLinked = stops.find((stop) => stop.job_id || stop.property_id);
+      const linkedJob = jobs.find((job) => job.id === firstLinked?.job_id);
+      const linkedProperty = properties.find((property) => property.id === firstLinked?.property_id);
+      const data = { ...v, start_location: stops[0].address.trim(), end_location: stops[stops.length - 1].address.trim(), job_id: firstLinked?.job_id ?? null, property_id: firstLinked?.property_id ?? null, client_id: linkedJob?.client_id ?? linkedProperty?.client_id ?? null, crew_id: v.crew_id ?? linkedJob?.assigned_crew_id ?? null, miles: manualMiles };
+      const normalizedStops = stops.map((stop) => ({ ...stop, address: stop.address.trim(), label: stop.label?.trim() || null }));
+      if (entry) await updateMileageEntry(entry.id, data, normalizedStops);
+      else await createMileageEntry(data, normalizedStops);
       await saved();
     } catch (x) {
       setError(msg(x));
       setSaving(false);
     }
   }
-  const propertyRows = properties.filter(
-    (x) => !v.client_id || x.client_id === v.client_id,
-  );
   return (
     <Modal
       title={entry ? `Edit ${entry.mileage_number}` : "Add Mileage"}
@@ -769,49 +781,10 @@ function MileageForm({
           set={(x) => set("crew_id", x)}
           rows={crews.map((x) => [x.id, x.crew_name])}
         />
-        <Assoc
-          l="Job"
-          v={v.job_id}
-          set={chooseJob}
-          rows={jobs.map((x) => [
-            x.id,
-            `${x.job_number} · ${x.client_name || "Client"}`,
-          ])}
-        />
-        <Assoc
-          l="Client"
-          v={v.client_id}
-          set={(x) => {
-            set("client_id", x);
-            set("property_id", null);
-          }}
-          rows={clients.map((x) => [
-            x.id,
-            x.company_name ||
-              `${x.first_name ?? ""} ${x.last_name ?? ""}`.trim() ||
-              "Client",
-          ])}
-        />
-        <Assoc
-          l="Property"
-          v={v.property_id}
-          set={(x) => set("property_id", x)}
-          rows={propertyRows.map((x) => [x.id, x.property_name || x.address])}
-        />
         <Field
           l="Trip Purpose"
           v={v.trip_purpose}
           set={(x) => set("trip_purpose", x)}
-        />
-        <Field
-          l="Start Location"
-          v={v.start_location ?? ""}
-          set={(x) => set("start_location", x || null)}
-        />
-        <Field
-          l="End Location"
-          v={v.end_location ?? ""}
-          set={(x) => set("end_location", x || null)}
         />
         <Field
           l="Start Odometer"
@@ -854,6 +827,35 @@ function MileageForm({
           Business Use
         </label>
       </div>
+      <section className="mt-4 rounded-xl border p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-[#143d1a]">Route Stops</h3>
+            <p className="text-xs text-neutral-500">Link a Job or enter any address manually. Completed Jobs are historical references only.</p>
+          </div>
+          <button className={secondary} type="button" onClick={() => setStops((rows) => [...rows, { job_id: null, property_id: null, address: "", label: null }])}>+ Add Stop</button>
+        </div>
+        <div className="mt-3 space-y-3">
+          {stops.map((stop, index) => (
+            <div key={index} className="rounded-xl bg-neutral-50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <b>Stop {index + 1}</b>
+                <div className="flex gap-1">
+                  <button type="button" className={secondary} disabled={index === 0} onClick={() => moveStop(index, -1)}>Up</button>
+                  <button type="button" className={secondary} disabled={index === stops.length - 1} onClick={() => moveStop(index, 1)}>Down</button>
+                  <button type="button" className={secondary} disabled={stops.length <= 2} onClick={() => setStops((rows) => rows.filter((_, i) => i !== index))}>Remove</button>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Assoc l="Job (optional)" v={stop.job_id} set={(id) => chooseStopJob(index, id)} rows={jobs.map((job) => [job.id, `${job.job_number} · ${job.client_name || job.property_name || "Client"} · ${job.status}`])} />
+                <Assoc l="Property (optional)" v={stop.property_id} set={(id) => chooseStopProperty(index, id)} rows={properties.map((property) => [property.id, property.property_name || property.address])} />
+                <Field l="Address" v={stop.address} set={(address) => updateStop(index, { address })} />
+                <Field l="Label (optional)" v={stop.label ?? ""} set={(label) => updateStop(index, { label: label || null })} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="mt-4 rounded-xl bg-[#edf4ec] p-4">
         <b>Calculated Miles: {calc?.miles.toFixed(2) ?? "Invalid"}</b>
         <p>
@@ -967,6 +969,17 @@ function blankMileage(vehicle_id: string): MileageInput {
     mileage_rate: null,
     notes: null,
   };
+}
+function propertyAddress(property: PropertyWithClient) {
+  return [property.address, property.address_line_2, property.city, property.state, property.zip].filter(Boolean).join(", ");
+}
+function mileageRoute(entry: MileageWithRelations) {
+  if (entry.stops.length) return entry.stops.map((stop) => stop.address).join(" → ");
+  return `${entry.start_location || "—"} → ${entry.end_location || "—"}`;
+}
+function mileageJobs(entry: MileageWithRelations) {
+  const numbers = [...new Set(entry.stops.map((stop) => stop.job?.job_number).filter(Boolean))];
+  return numbers.length ? numbers.join(", ") : entry.job?.job_number || "—";
 }
 function pickVehicle(x: VehicleWithRelations): VehicleInput {
   return {
