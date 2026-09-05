@@ -658,10 +658,10 @@ function MileageForm({
     ? pickMileage(entry)
     : blankMileage(vehicles[0]?.id ?? "");
   const initialStops: MileageStopInput[] = entry?.stops.length
-    ? entry.stops.map(({ job_id, property_id, address, label }) => ({ job_id, property_id, address, label }))
+    ? entry.stops.map(({ job_id, property_id, address, label, miles_from_previous }) => ({ job_id, property_id, address, label, miles_from_previous }))
     : [
-        { job_id: null, property_id: null, address: entry?.start_location ?? "", label: null },
-        { job_id: entry?.job_id ?? null, property_id: entry?.property_id ?? null, address: entry?.end_location ?? "", label: null },
+        { job_id: null, property_id: null, address: entry?.start_location ?? "", label: null, miles_from_previous: null },
+        { job_id: entry?.job_id ?? null, property_id: entry?.property_id ?? null, address: entry?.end_location ?? "", label: null, miles_from_previous: null },
       ];
   const [v, setV] = useState<MileageInput>(initial),
     [stops, setStops] = useState<MileageStopInput[]>(initialStops),
@@ -692,8 +692,12 @@ function MileageForm({
   function set<K extends keyof MileageInput>(k: K, value: MileageInput[K]) {
     setV((x) => ({ ...x, [k]: value }));
   }
+  const allocatedMiles = stops.some((stop) => stop.miles_from_previous !== null)
+    ? stops.reduce((total, stop) => total + (stop.miles_from_previous ?? 0), 0)
+    : null;
   const calc = useMemo(() => {
     try {
+      if (allocatedMiles !== null) return calculateMileage({ startOdometer: null, endOdometer: null, manualMiles: allocatedMiles, roundTrip: false, mileageRate: v.mileage_rate });
       return calculateMileage({
         startOdometer: v.start_odometer,
         endOdometer: v.end_odometer,
@@ -705,6 +709,7 @@ function MileageForm({
       return null;
     }
   }, [
+    allocatedMiles,
     manualMiles,
     v.end_odometer,
     v.mileage_rate,
@@ -724,7 +729,7 @@ function MileageForm({
     updateStop(index, { property_id: id, address: property ? propertyAddress(property) : stops[index].address });
   }
   function moveStop(index: number, direction: -1 | 1) {
-    setStops((rows) => { const target = index + direction; if (target < 0 || target >= rows.length) return rows; const next = [...rows]; [next[index], next[target]] = [next[target], next[index]]; return next; });
+    setStops((rows) => { const target = index + direction; if (target < 0 || target >= rows.length) return rows; const next = [...rows]; [next[index], next[target]] = [next[target], next[index]]; next[0] = { ...next[0], miles_from_previous: null }; return next; });
   }
   async function submit() {
     if (!v.vehicle_id || !v.trip_purpose.trim())
@@ -738,7 +743,7 @@ function MileageForm({
       const firstLinkedProperty = stops.find((stop) => stop.property_id);
       const linkedJob = jobs.find((job) => job.id === firstLinkedJob?.job_id);
       const linkedProperty = properties.find((property) => property.id === firstLinkedProperty?.property_id);
-      const data = { ...v, start_location: stops[0].address.trim(), end_location: stops[stops.length - 1].address.trim(), job_id: firstLinkedJob?.job_id ?? v.job_id ?? null, property_id: firstLinkedProperty?.property_id ?? v.property_id ?? null, client_id: linkedJob?.client_id ?? linkedProperty?.client_id ?? v.client_id ?? null, crew_id: v.crew_id ?? linkedJob?.assigned_crew_id ?? null, miles: manualMiles };
+      const data = { ...v, start_location: stops[0].address.trim(), end_location: stops[stops.length - 1].address.trim(), job_id: firstLinkedJob?.job_id ?? v.job_id ?? null, property_id: firstLinkedProperty?.property_id ?? v.property_id ?? null, client_id: linkedJob?.client_id ?? linkedProperty?.client_id ?? v.client_id ?? null, crew_id: v.crew_id ?? linkedJob?.assigned_crew_id ?? null, miles: allocatedMiles ?? manualMiles };
       const normalizedStops = stops.map((stop) => ({ ...stop, address: stop.address.trim(), label: stop.label?.trim() || null }));
       if (entry) await updateMileageEntry(entry.id, data, normalizedStops);
       else await createMileageEntry(data, normalizedStops);
@@ -800,7 +805,7 @@ function MileageForm({
           set={(x) => set("end_odometer", x ? Number(x) : null)}
         />
         <Field
-          l="Manual One-Way Miles"
+          l={allocatedMiles === null ? "Manual One-Way Miles" : "Manual One-Way Miles (route legs used)"}
           type="number"
           v={String(manualMiles)}
           set={(x) => setManualMiles(Number(x))}
@@ -834,7 +839,7 @@ function MileageForm({
             <h3 className="font-bold text-[#143d1a]">Route Stops</h3>
             <p className="text-xs text-neutral-500">Link a Job or enter any address manually. Completed Jobs are historical references only.</p>
           </div>
-          <button className={secondary} type="button" onClick={() => setStops((rows) => [...rows, { job_id: null, property_id: null, address: "", label: null }])}>+ Add Stop</button>
+          <button className={secondary} type="button" onClick={() => setStops((rows) => [...rows, { job_id: null, property_id: null, address: "", label: null, miles_from_previous: null }])}>+ Add Stop</button>
         </div>
         <div className="mt-3 space-y-3">
           {stops.map((stop, index) => (
@@ -844,7 +849,7 @@ function MileageForm({
                 <div className="flex gap-1">
                   <button type="button" className={secondary} disabled={index === 0} onClick={() => moveStop(index, -1)}>Up</button>
                   <button type="button" className={secondary} disabled={index === stops.length - 1} onClick={() => moveStop(index, 1)}>Down</button>
-                  <button type="button" className={secondary} disabled={stops.length <= 2} onClick={() => setStops((rows) => rows.filter((_, i) => i !== index))}>Remove</button>
+                  <button type="button" className={secondary} disabled={stops.length <= 2} onClick={() => setStops((rows) => rows.filter((_, i) => i !== index).map((row, i) => i === 0 ? { ...row, miles_from_previous: null } : row))}>Remove</button>
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -852,6 +857,10 @@ function MileageForm({
                 <Assoc l="Property (optional)" v={stop.property_id} set={(id) => chooseStopProperty(index, id)} rows={properties.map((property) => [property.id, property.property_name || property.address])} />
                 <Field l="Address" v={stop.address} set={(address) => updateStop(index, { address })} />
                 <Field l="Label (optional)" v={stop.label ?? ""} set={(label) => updateStop(index, { label: label || null })} />
+                <label className="text-sm font-bold">
+                  Miles From Previous
+                  <input className={input} type="number" min="0" step=".01" disabled={index === 0} value={index === 0 ? "" : stop.miles_from_previous?.toString() ?? ""} placeholder={index === 0 ? "Origin" : "0.00"} onChange={(event) => updateStop(index, { miles_from_previous: event.target.value === "" ? null : Number(event.target.value) })} />
+                </label>
               </div>
             </div>
           ))}
@@ -979,8 +988,14 @@ function mileageRoute(entry: MileageWithRelations) {
   return `${entry.start_location || "—"} → ${entry.end_location || "—"}`;
 }
 function mileageJobs(entry: MileageWithRelations) {
-  const numbers = [...new Set(entry.stops.map((stop) => stop.job?.job_number).filter(Boolean))];
-  return numbers.length ? numbers.join(", ") : entry.job?.job_number || "—";
+  const jobs = new Map<string, { number: string; miles: number; allocated: boolean }>();
+  entry.stops.forEach((stop) => {
+    if (!stop.job_id || !stop.job?.job_number) return;
+    const current = jobs.get(stop.job_id) ?? { number: stop.job.job_number, miles: 0, allocated: false };
+    if (stop.miles_from_previous !== null) { current.miles += stop.miles_from_previous; current.allocated = true; }
+    jobs.set(stop.job_id, current);
+  });
+  return jobs.size ? [...jobs.values()].map((job) => `${job.number}${job.allocated ? ` — ${job.miles.toFixed(1)} mi` : ""}`).join(", ") : entry.job?.job_number || "—";
 }
 function pickVehicle(x: VehicleWithRelations): VehicleInput {
   return {
