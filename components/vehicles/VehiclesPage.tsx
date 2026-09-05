@@ -734,10 +734,11 @@ function MileageForm({
     if (!calc) return setError("Mileage calculation is invalid.");
     setSaving(true);
     try {
-      const firstLinked = stops.find((stop) => stop.job_id || stop.property_id);
-      const linkedJob = jobs.find((job) => job.id === firstLinked?.job_id);
-      const linkedProperty = properties.find((property) => property.id === firstLinked?.property_id);
-      const data = { ...v, start_location: stops[0].address.trim(), end_location: stops[stops.length - 1].address.trim(), job_id: firstLinked?.job_id ?? null, property_id: firstLinked?.property_id ?? null, client_id: linkedJob?.client_id ?? linkedProperty?.client_id ?? null, crew_id: v.crew_id ?? linkedJob?.assigned_crew_id ?? null, miles: manualMiles };
+      const firstLinkedJob = stops.find((stop) => stop.job_id);
+      const firstLinkedProperty = stops.find((stop) => stop.property_id);
+      const linkedJob = jobs.find((job) => job.id === firstLinkedJob?.job_id);
+      const linkedProperty = properties.find((property) => property.id === firstLinkedProperty?.property_id);
+      const data = { ...v, start_location: stops[0].address.trim(), end_location: stops[stops.length - 1].address.trim(), job_id: firstLinkedJob?.job_id ?? v.job_id ?? null, property_id: firstLinkedProperty?.property_id ?? v.property_id ?? null, client_id: linkedJob?.client_id ?? linkedProperty?.client_id ?? v.client_id ?? null, crew_id: v.crew_id ?? linkedJob?.assigned_crew_id ?? null, miles: manualMiles };
       const normalizedStops = stops.map((stop) => ({ ...stop, address: stop.address.trim(), label: stop.label?.trim() || null }));
       if (entry) await updateMileageEntry(entry.id, data, normalizedStops);
       else await createMileageEntry(data, normalizedStops);
