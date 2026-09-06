@@ -86,6 +86,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => 
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/field-walkthroughs", "walkthroughs.field"],
+  ["/vendor-packets", "estimates.create"],
   ["/attention", "attention.view"],
   ["/messages", "messages.view"],
   ["/job-performance", "reports.view"],
