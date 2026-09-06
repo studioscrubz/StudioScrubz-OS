@@ -84,6 +84,7 @@ export type Walkthrough = {
   phone: string | null;
   email: string | null;
   assigned_to: string | null;
+  assigned_employee_id?: string | null;
   notes: string | null;
   scope: WalkthroughScopeItem[];
   measurements: WalkthroughMeasurements;

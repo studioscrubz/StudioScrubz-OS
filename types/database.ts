@@ -1,3 +1,4 @@
+import type { FieldMeasurements, FieldWalkthrough } from "@/types/fieldWalkthrough";
 import type { Client, ClientInput } from "@/types/client";
 import type { Property, PropertyInput } from "@/types/property";
 import type { Estimate, EstimateInsert, EstimateUpdate } from "@/types/estimate";
@@ -145,6 +146,8 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
+      submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
       get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
       get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};

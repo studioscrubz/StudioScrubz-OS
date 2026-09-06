@@ -1,6 +1,7 @@
 import type { UserProfile, UserRole } from "@/types/auth";
 
 export const PERMISSIONS = [
+  "walkthroughs.field",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
   "estimates.view", "estimates.create", "estimates.edit",
@@ -39,8 +40,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   Administrator: new Set(operationalAdmin),
   Manager: new Set([
     "dashboard.view", "clients.view", "clients.edit", "properties.view", "properties.edit",
-    "estimates.view", "estimates.create", "estimates.edit", "walkthroughs.view",
-    "walkthroughs.create", "walkthroughs.edit", "proposals.view", "proposals.create",
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
     "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "crews.view", "crews.manage",
     "timeClock.view", "timeClock.manageAll", "agreements.view", "agreements.manage",
@@ -55,16 +54,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "agreements.manage", "timeClock.view", "employees.directory_view", "communications.view", "communications.create", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
   "Crew Lead": new Set([
+    "walkthroughs.field",
     "dashboard.view", "jobs.view", "jobs.edit", "jobs.complete", "schedule.view",
     "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
   "Scrub Technician": new Set([
+    "walkthroughs.field",
     "dashboard.view", "jobs.view", "schedule.view", "timeClock.view", "clients.view",
     "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
 };
 
 export function hasPermission(profile: UserProfile | null, permission: Permission): boolean {
+  if (permission === "walkthroughs.field") return profile?.is_active === true && ["Crew Lead", "Scrub Technician"].includes(profile.role);
   return profile?.is_active === true && ROLE_PERMISSIONS[profile.role]?.has(permission) === true;
 }
 
@@ -77,12 +79,13 @@ export const canAccessPayrollPrep = (profile: UserProfile | null) => hasPermissi
 export const canAccessArchives = (profile: UserProfile | null) => hasPermission(profile, "archives.view");
 export const canPermanentlyDelete = (profile: UserProfile | null) => hasPermission(profile, "archives.delete");
 export const canManageSystem = (profile: UserProfile | null) => hasPermission(profile, "dashboard.view");
-export const canManageWalkthroughPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Manager"].includes(profile.role);
-export const canManageProposalPricingPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Manager"].includes(profile.role);
+export const canManageWalkthroughPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Sales"].includes(profile.role);
+export const canManageProposalPricingPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Sales"].includes(profile.role);
 export const canViewInvoiceFinishedPhotos = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator", "Manager"].includes(profile.role);
 export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/field-walkthroughs", "walkthroughs.field"],
   ["/attention", "attention.view"],
   ["/messages", "messages.view"],
   ["/job-performance", "reports.view"],
