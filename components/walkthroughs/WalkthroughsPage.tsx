@@ -32,7 +32,7 @@ export function WalkthroughsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => { let mounted = true; void Promise.all([getWalkthroughs(), getProposals(), getServiceCatalog()]).then(([rows, nextProposals, nextCatalog]) => { if (mounted) { setWalkthroughs(rows); setProposals(nextProposals); setCatalog(nextCatalog); } }).catch((caught: unknown) => { console.error("Walkthrough load failed", caught); if (mounted) setError(message(caught, "Walkthroughs could not be loaded.")); }).finally(() => { if (mounted) setLoading(false); }); return () => { mounted = false; }; }, []);
-  useEffect(() => { const walkthroughId = new URLSearchParams(window.location.search).get("walkthroughId"); if (!walkthroughId) return; const selected = walkthroughs.find((item) => item.id === walkthroughId); if (selected) {
+  useEffect(() => { const walkthroughId = new URLSearchParams(window.location.search).get("walkthroughId"); if (!walkthroughId) return; const selected = walkthroughs.find((item) => item.id === walkthroughId && item.estimate?.status !== "Declined"); if (selected) {
     // Open the existing walkthrough requested by another workflow.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActive(selected);
@@ -46,7 +46,7 @@ export function WalkthroughsPage() {
       const retired = proposalRetiresWalkthrough(proposal?.status);
       const displayStatus = item.status === "Completed" || item.status === "Proposal Ready" ? "Completed" : "New";
       const haystack = [displayClient(item.client), item.property?.address, item.property?.property_name, item.estimate?.estimate_number, item.measurements.serviceType, item.estimate?.service_name, item.assigned_to].filter(Boolean).join(" ").toLocaleLowerCase();
-      return !item.archived_at && item.status !== "Archived" && !retired && (!term || haystack.includes(term)) && (division === "All" || item.division === division) && (workflow === "All" || workflow === displayStatus);
+      return item.estimate?.status !== "Declined" && !item.archived_at && item.status !== "Archived" && !retired && (!term || haystack.includes(term)) && (division === "All" || item.division === division) && (workflow === "All" || workflow === displayStatus);
     });
   }, [activeProposalByWalkthrough, division, search, walkthroughs, workflow]);
   const qualifying = useMemo(() => visible.filter((item) => (item.status === "New" || item.status === "Scheduled") && !item.walkthrough_date).sort((a,b)=>b.updated_at.localeCompare(a.updated_at)),[visible]);
