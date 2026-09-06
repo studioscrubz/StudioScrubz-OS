@@ -41,6 +41,12 @@ export async function archiveEstimate(id: string): Promise<Estimate> {
   return data;
 }
 
+export async function declineEstimate(id: string, reason?: string | null): Promise<Estimate> {
+  const { data, error } = await getSupabaseClient().from("estimates").update({ status: "Declined", declined_at: new Date().toISOString(), decline_reason: reason?.trim() || null }).eq("id", id).eq("status", "Open").is("archived_at", null).select().single();
+  if (error) throw error;
+  return data;
+}
+
 export async function markEstimateSent(id: string, input: { recipient: string; sender: string; token: string; expiresAt: string; snapshot: Record<string, unknown> }): Promise<{ sent_at: string }> {
   const { data, error } = await getSupabaseClient().rpc("mark_estimate_sent_for_delivery", { p_estimate_id:id, p_recipient:input.recipient.trim(), p_sender:input.sender, p_token:input.token, p_token_expires_at:input.expiresAt, p_snapshot:input.snapshot });
   if (error) throw error;

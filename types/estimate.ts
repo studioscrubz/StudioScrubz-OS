@@ -4,7 +4,7 @@ import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
-export type EstimateStatus = "Open" | "Archived";
+export type EstimateStatus = "Open" | "Declined" | "Archived";
 export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Custom";
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionSeverity = "Light" | "Average" | "Heavy" | "Extreme";
@@ -164,6 +164,8 @@ export type Estimate = {
   frequency: Frequency;
   service_name: string | null;
   status: EstimateStatus;
+  declined_at: string | null;
+  decline_reason: string | null;
   result: EstimateResult;
   notes: string | null;
   terms: string | null;
@@ -178,6 +180,6 @@ export type Estimate = {
   archived_at: string | null;
 };
 
-export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at" | "sent_at" | "sent_to" | "sent_by" | "client_access_token" | "client_access_token_expires_at" | "client_delivery_snapshot"> & { archived_at?: string | null; sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; client_delivery_snapshot?: Record<string, unknown> | null };
+export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at" | "declined_at" | "decline_reason" | "sent_at" | "sent_to" | "sent_by" | "client_access_token" | "client_access_token_expires_at" | "client_delivery_snapshot"> & { archived_at?: string | null; declined_at?: string | null; decline_reason?: string | null; sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; client_delivery_snapshot?: Record<string, unknown> | null };
 export type EstimateUpdate = Partial<Omit<Estimate, "id" | "created_at" | "updated_at">>;
 export type EstimateWithRelations = Estimate & { client: Client | null; property: Property | null };
