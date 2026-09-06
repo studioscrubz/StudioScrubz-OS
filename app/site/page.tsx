@@ -30,18 +30,18 @@ const process = [
   ],
   [
     "02",
-    "We Review the Space",
-    "For services requiring a walkthrough, we review the size, condition, priorities, access, and service frequency so the scope is clear before work begins.",
+    "We Confirm the Scope",
+    "We review your property and service needs, using a walkthrough when appropriate to confirm the condition, priorities, access, and cleaning scope.",
   ],
   [
     "03",
-    "Schedule Your SCRUBZ",
-    "Once the service and scope are confirmed, choose your cleaning date and let StudioScrubz handle the rest.",
+    "Review & Schedule",
+    "Review the estimate or proposal for your service. Once the scope and details are confirmed, we schedule your cleaning.",
   ],
   [
     "04",
     "We Clean. You Review.",
-    "Your SCRUBZ team completes the confirmed cleaning scope and performs a final review so the space is ready for what comes next.",
+    "StudioScrubz completes the confirmed cleaning scope and performs a final service review so the space is ready for what comes next.",
   ],
 ] as const;
 
@@ -97,22 +97,22 @@ export default function MarketingHome() {
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[.24em] text-[#9a7a17]">
-              Residential · Commercial · Property Cleaning
+              PROFESSIONAL CLEANING · LOS ANGELES
             </p>
 
             <h1 className="mt-6 max-w-4xl text-5xl font-extrabold tracking-[-.06em] text-[#143d1a] sm:text-7xl lg:text-[5.2rem] lg:leading-[.98]">
-              Professional Cleaning.{" "}
-              <span className="text-[#9a7a17]">Zero Stress.</span>
+              Cleaning Built Around{" "}
+              <span className="text-[#9a7a17]">Your Space.</span>
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-neutral-600 sm:text-xl">
-              Residential, Commercial & Property Cleaning Across Los Angeles
-              and the San Fernando Valley.
+              Professional cleaning for homes, businesses, managed properties,
+              and construction projects across Los Angeles and the San Fernando Valley.
             </p>
 
             <p className="mt-5 max-w-2xl text-sm font-bold leading-7 text-[#143d1a]/70 sm:text-base">
-              Homes · Apartment Communities · Offices · Post-Construction ·
-              Pressure Washing
+              Commercial Cleaning · Property Management · Post-Construction ·
+              Residential · Pressure Washing
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -127,7 +127,7 @@ export default function MarketingHome() {
             </div>
 
             <p className="mt-8 text-sm font-extrabold uppercase tracking-[.2em] text-[#143d1a]/55">
-              No mess. No stress.
+              No Mess. No Stress.
             </p>
           </div>
 
@@ -159,8 +159,8 @@ export default function MarketingHome() {
         <div className="mx-auto max-w-7xl">
           <SectionHeading
             eyebrow="What we clean"
-            title="Cleaning support for every kind of space."
-            copy="From recurring home upkeep to commercial care and detailed project cleanup, every service starts with a clear understanding of your space."
+            title="Professional cleaning for the spaces that keep life and business moving."
+            copy="From homes and businesses to managed properties and construction projects, we plan each service around the space, its use, and the cleaning it needs."
           />
           <ServiceGrid />
         </div>
@@ -176,14 +176,15 @@ export default function MarketingHome() {
             </p>
 
             <h2 className="mt-4 text-4xl font-extrabold tracking-[-.045em]">
-              A reliable partner for properties and workplaces.
+              Professional cleaning for workplaces, properties, and projects.
             </h2>
 
             <p className="mt-5 flex-1 leading-7 text-white/70">
-              Recurring janitorial service, office cleaning, apartment common
-              areas, unit turns, studios, salons, gyms, commercial facilities,
-              and post-construction projects—all scoped around the real
-              property.
+              Cleaning for offices, apartment communities, managed properties,
+              common areas, unit turns, commercial facilities, recording and
+              production facilities, and post-construction projects. From recurring
+              janitorial care to project cleanup, we confirm the scope around your
+              property and operating needs.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-5">
@@ -275,14 +276,14 @@ export default function MarketingHome() {
 
             <FeatureList
               items={[
-                "Detailed walkthrough process",
-                "Clear scope before service",
-                "Professional digital estimates and proposals",
+                "Clear service scope",
+                "Professional estimates and proposals",
+                "Walkthrough-based project planning",
                 "Residential and commercial capability",
-                "One-time and recurring options",
+                "One-time and recurring service options",
                 "Professional customer communication",
                 "Secure online payment",
-                "Final review after cleaning",
+                "Final service review",
                 "Customizable add-on services",
               ]}
             />
