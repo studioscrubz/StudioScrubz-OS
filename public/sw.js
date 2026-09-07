@@ -42,6 +42,13 @@ self.addEventListener("push", (event) => {
   const body = typeof payload.body === "string" ? payload.body : "";
   const url = typeof payload.url === "string" && payload.url.trim() ? payload.url : "/attention";
   const tag = typeof payload.tag === "string" && payload.tag.trim() ? payload.tag : undefined;
+  if (Number.isSafeInteger(payload.badgeCount) && payload.badgeCount >= 0) {
+    event.waitUntil(Promise.resolve().then(() => {
+      if (payload.badgeCount > 0) {
+        if ("setAppBadge" in self.navigator) return self.navigator.setAppBadge(payload.badgeCount);
+      } else if ("clearAppBadge" in self.navigator) return self.navigator.clearAppBadge();
+    }).catch(() => { /* Preserve notification delivery if badging is unavailable. */ }));
+  }
   event.waitUntil(self.registration.showNotification(title, {
     body,
     tag,

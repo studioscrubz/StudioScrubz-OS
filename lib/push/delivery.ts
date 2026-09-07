@@ -1,7 +1,7 @@
 import type { AttentionItem } from "@/types/attention";
 import type { BrowserPushSubscription } from "@/types/pushNotification";
 
-export type PushPayload = { title: string; body: string; url: string; tag: string };
+export type PushPayload = { title: string; body: string; url: string; tag: string; badgeCount?: number };
 export type DeliveryClaim = { id: string } | null;
 export type DeliveryRepository = {
   claim(userId: string, attentionKey: string, subscriptionId: string): Promise<DeliveryClaim>;
@@ -13,6 +13,7 @@ export type PushTransport = (subscription: BrowserPushSubscription, payload: Pus
 
 export async function deliverAttentionPushes(input: {
   userId: string;
+  badgeCount?: number;
   items: AttentionItem[];
   subscriptions: BrowserPushSubscription[];
   repository: DeliveryRepository;
@@ -23,6 +24,7 @@ export async function deliverAttentionPushes(input: {
   const result = { candidates: items.length, devices: subscriptions.length, sent: 0, failed: 0, duplicates: 0, revoked: 0 };
   for (const item of items) {
     const payload = attentionPushPayload(item);
+    if (input.badgeCount !== undefined) payload.badgeCount = input.badgeCount;
     for (const subscription of subscriptions) {
       let claim: DeliveryClaim;
       try { claim = await input.repository.claim(input.userId, item.id, subscription.id); }

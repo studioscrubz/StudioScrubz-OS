@@ -5,6 +5,7 @@ import { attentionItemsForProfile, loadAttentionServerSnapshot } from "@/lib/att
 import { deliverAttentionPushes, isPushActionable, type DeliveryRepository, type PushPayload } from "@/lib/push/delivery";
 import type { UserProfile } from "@/types/auth";
 import type { BrowserPushSubscription } from "@/types/pushNotification";
+import { actionableAttentionCount } from "@/lib/attention/appBadge";
 
 export async function processAttentionPushes() {
   const db = createSupabaseAdminClient();
@@ -27,12 +28,14 @@ export async function processAttentionPushes() {
     totals.users += 1;
     try {
       const disabled = disabledByUser.get(profile.id);
-      const items = attentionItemsForProfile(profile, snapshot).filter((item) => !disabled?.has(item.category));
+      const activeItems = attentionItemsForProfile(profile, snapshot);
+      const badgeCount = actionableAttentionCount(activeItems);
+      const items = activeItems.filter((item) => !disabled?.has(item.category));
       const newDevices = allDevices.filter((subscription) => !initialized.has(subscription.id));
       if (newDevices.length) await initializeDevices(db, profile.id, items, newDevices);
       const devices = allDevices.filter((subscription) => initialized.has(subscription.id));
       if (!devices.length) continue;
-      const result = await deliverAttentionPushes({ userId: profile.id, items, subscriptions: devices, repository, send: sendWebPush });
+      const result = await deliverAttentionPushes({ userId: profile.id, badgeCount, items, subscriptions: devices, repository, send: sendWebPush });
       for (const key of ["candidates", "sent", "failed", "duplicates", "revoked"] as const) totals[key] += result[key];
     } catch (cause) { totals.failed += 1; console.error("Attention push user processing failed", safeServerError(cause)); }
   }

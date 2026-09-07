@@ -16,6 +16,7 @@ import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import type { CommunicationComposerContext } from "@/types/clientCommunication";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 import { withImmediateAttentionPush } from "@/lib/push/client";
+import { actionableAttentionCount, beginAppBadgeSync, setAppNotificationBadge } from "@/lib/attention/appBadge";
 import { canReviewFieldDiscovery } from "@/lib/services/fieldDiscoveries";
 import type { FieldDiscovery } from "@/types/fieldDiscovery";
 import type { ChangeRequest } from "@/types/changeRequest";
@@ -37,6 +38,7 @@ export const ATTENTION_REALTIME_TABLES = [
 ] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
+  const badgeRequest = beginAppBadgeSync();
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
   const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings] = await Promise.all([
@@ -84,6 +86,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
+  void setAppNotificationBadge(actionableAttentionCount(view === "Active" || view === "All" ? result.items : buildAttentionItems(input, "Active").items), badgeRequest);
   return result.items;
 }
 

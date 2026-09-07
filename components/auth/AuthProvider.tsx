@@ -8,6 +8,7 @@ import type { AuthState, UserProfile } from "@/types/auth";
 import type { Session } from "@supabase/supabase-js";
 import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
 import { AccessDenied } from "@/components/auth/AccessDenied";
+import { clearAppNotificationBadge } from "@/lib/attention/appBadge";
 
 type AuthContextValue = AuthState & { refreshProfile: () => Promise<void>; signOut: () => Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileRef = useRef<UserProfile | null>(null);
   const resolutionRef = useRef(0);
   const commitProfile = useCallback((nextProfile: UserProfile | null) => {
+    if (!nextProfile || nextProfile.id !== profileRef.current?.id) void clearAppNotificationBadge();
     profileRef.current = nextProfile;
     setProfile(nextProfile);
   }, []);
