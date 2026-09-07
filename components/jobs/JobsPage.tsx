@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import {
@@ -59,6 +60,7 @@ const activeStatuses: JobStatus[] = [
 const terminalStatuses: JobStatus[] = ["Completed", "Cancelled", "Archived"];
 const jobPhotoCategories: readonly JobPhotoCategory[] = ["After", "Before", "Damage / Issue", "Other"];
 export function JobsPage() {
+  const communication = useJobCommunication();
   const { profile } = useAuth();
   const [rows, setRows] = useState<JobWithRelations[]>([]);
   const [archivedRows, setArchivedRows] = useState<JobWithRelations[]>([]);
@@ -132,6 +134,15 @@ export function JobsPage() {
     setError(null);
     try {
       const result = await fn();
+      if (isJobCompletionResult(result)) {
+        void communication.expose({ ...result.job, client: job.client, property: job.property }, "service_completed");
+      } else if (result && typeof result === "object" && "communicationEvent" in result && "job" in result && result.communicationEvent === "team_arrived") {
+        if (job.status !== "In Progress") void communication.expose({ ...(result.job as JobWithRelations), client: job.client, property: job.property }, "team_arrived");
+      } else if (result && typeof result === "object" && "status" in result && "id" in result) {
+        const saved = result as JobWithRelations;
+        const withRelations = { ...saved, client: saved.client ?? job.client, property: saved.property ?? job.property };
+        if (saved.scheduled_date && (text === "Schedule saved." || saved.scheduled_date !== job.scheduled_date || saved.start_time !== job.start_time)) void communication.expose(withRelations, "service_scheduled");
+      }
       const next = await load();
       setSelected((current) => current?.id === job.id
         ? next.find((row) => row.id === job.id) ?? null
@@ -250,6 +261,7 @@ export function JobsPage() {
   );
   return (
     <>
+      {communication.composer}
       <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
@@ -319,7 +331,7 @@ export function JobsPage() {
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
-      {creating && <DirectJobModal close={() => setCreating(false)} created={async () => { setCreating(false); await load(); setNotice("Job created successfully."); }} />}
+      {creating && <DirectJobModal close={() => setCreating(false)} created={async (job) => { void communication.expose(job, "service_scheduled"); setCreating(false); await load(); setNotice("Job created successfully."); }} />}
       {confirmingDelete && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-[#07190a]/70 p-5">
           <section role="alertdialog" aria-modal="true" aria-labelledby="delete-cancelled-job-title" className="w-full max-w-lg rounded-2xl bg-white p-6">
@@ -372,7 +384,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, canComplete, canDel
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
     <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
-      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(() => startOperationalJob(job.id), "Job started. Join the Job separately to begin your payroll time.")} className={`${primary} w-full`}>START JOB</button>}
+      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJob(job.id) }), "Job started. Join the Job separately to begin your payroll time.")} className={`${primary} w-full`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
@@ -618,7 +630,7 @@ function JobModal({
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
           {clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}
-          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => lifecycleAct(() => startOperationalJob(job.id), "Job started. Join the Job separately to begin your payroll time.")}>START JOB</button>}
+          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => lifecycleAct(async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJob(job.id) }), "Job started. Join the Job separately to begin your payroll time.")}>START JOB</button>}
           {canClock && eligibility.canJoin && !clockError && (
             <>
               <button

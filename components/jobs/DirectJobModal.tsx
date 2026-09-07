@@ -1,4 +1,5 @@
 "use client";
+import type { JobWithRelations } from "@/types/job";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -18,7 +19,7 @@ import type { PropertyWithClient } from "@/types/property";
 import type { CrewWithRelations } from "@/types/crew";
 import type { CatalogAddonSnapshot, ServiceCatalogBundle } from "@/types/serviceCatalog";
 
-export function DirectJobModal({ close, created }: { close: () => void; created: () => Promise<void> }) {
+export function DirectJobModal({ close, created }: { close: () => void; created: (job: JobWithRelations) => Promise<void> }) {
   const { profile } = useAuth();
   const canOverridePrice = isMasterAdmin(profile);
   const [clients, setClients] = useState<Client[]>([]), [properties, setProperties] = useState<PropertyWithClient[]>([]);
@@ -55,7 +56,7 @@ export function DirectJobModal({ close, created }: { close: () => void; created:
     if (overrideEnabled && (overridePrice.trim() === "" || !Number.isFinite(override) || override < 0)) return setError("Override Job Price must be a number greater than or equal to zero.");
     if (total == null && !overrideEnabled) return setError(canOverridePrice ? "Enter an Override Job Price for this custom-priced Service." : "The selected Service does not have usable catalog pricing for a direct Job.");
     setSaving(true); setError(null);
-    try { await createDirectJob({ client_id: clientId, property_id: propertyId, service_id: serviceId, addon_ids: selectedAddonIds, addon_quantities: addonSelections.filter((item) => item.pricingType === "Per Unit").map((item) => ({ addonId: item.catalogAddonId, quantity: item.quantity ?? 0 })), scheduled_date: date || null, start_time: date && time ? time : null, estimated_duration: duration > 0 ? duration : null, assigned_crew_id: crewId || null, labor_hours: Math.max(0, laborHours), access_instructions: access.trim() || null, internal_notes: notes.trim() || null, price_override: overrideEnabled ? override : null }); await created(); }
+    try { const job = await createDirectJob({ client_id: clientId, property_id: propertyId, service_id: serviceId, addon_ids: selectedAddonIds, addon_quantities: addonSelections.filter((item) => item.pricingType === "Per Unit").map((item) => ({ addonId: item.catalogAddonId, quantity: item.quantity ?? 0 })), scheduled_date: date || null, start_time: date && time ? time : null, estimated_duration: duration > 0 ? duration : null, assigned_crew_id: crewId || null, labor_hours: Math.max(0, laborHours), access_instructions: access.trim() || null, internal_notes: notes.trim() || null, price_override: overrideEnabled ? override : null }); await created({ ...job, client: clients.find(row => row.id === clientId) ?? null, property }); }
     catch (cause) { setError(message(cause, "Job could not be created.")); setSaving(false); }
   }
   return <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#07190a]/65 p-4 backdrop-blur-[2px]"><section role="dialog" aria-modal="true" aria-labelledby="direct-job-title" className="mx-auto my-4 w-full max-w-4xl rounded-2xl bg-white shadow-2xl"><header className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-5"><div><p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#9a7a17]">Direct workflow</p><h2 id="direct-job-title" className="mt-1 text-xl font-extrabold text-[#143d1a]">Create Job</h2></div><button type="button" onClick={close} aria-label="Close Create Job" className="grid size-9 place-items-center rounded-lg border text-xl text-neutral-500">×</button></header>
