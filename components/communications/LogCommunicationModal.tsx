@@ -203,11 +203,11 @@ export function useJobCommunication() {
       let subject: string;
       let body: string;
       if (event === "service_scheduled") {
-        subject = `StudioScrubz Service Scheduled${job.property_name || job.client_name ? ` — ${job.property_name || job.client_name}` : ""}`;
+        subject = `StudioScrubz Service Scheduled${job.property_name || job.client_name ? ` â€” ${job.property_name || job.client_name}` : ""}`;
         body = [hello, "", "Your StudioScrubz service has been scheduled.", "", ...(job.service_name ? [`Service: ${job.service_name}`] : []), `Date: ${friendlyDate(job.scheduled_date!)}`, ...(job.start_time ? [`Time: ${friendlyTime(job.start_time)}`] : []), ...(location ? ["", "Property:", location] : []), "", "Please make sure our team will have the necessary access to the service areas at the scheduled time.", "", "If anything changes or you have questions before your appointment, please contact us.", "", "Thank you for choosing StudioScrubz.", "", "No mess. No stress.", "", "StudioScrubz"].join("\n");
       } else if (event === "team_arrived") {
         subject = "StudioScrubz Team Has Arrived";
-        body = `${hello}\n\nYour StudioScrubz team has arrived and service is beginning.\n\nOur team will work according to the confirmed service scope for your property or project.\n\nIf anything requiring your attention comes up during service, we’ll communicate with you.\n\nNo mess. No stress.\n\nStudioScrubz`;
+        body = `${hello}\n\nYour StudioScrubz team has arrived and service is beginning.\n\nOur team will work according to the confirmed service scope for your property or project.\n\nIf anything requiring your attention comes up during service, weâ€™ll communicate with you.\n\nNo mess. No stress.\n\nStudioScrubz`;
       } else {
         subject = "StudioScrubz Service Completed";
         body = `${hello}\n\nYour StudioScrubz service has been completed.\n\nThank you for trusting us with your property or project.\n\nIf you have any questions about the completed service or anything that needs our attention, please contact us.\n\nAny applicable invoice or payment information will be provided separately.\n\nWe appreciate your business and look forward to working with you again.\n\nNo mess. No stress.\n\nStudioScrubz`;
