@@ -7,6 +7,7 @@ import { getFinanciallyResolvedJobIds, getInvoices } from "@/lib/services/invoic
 import { getAllClientCommunications } from "@/lib/services/clientCommunications";
 import { getOpenTimeEntries } from "@/lib/services/timeEntries";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
+import { getAssignedFieldWalkthroughs } from "@/lib/services/fieldWalkthroughs";
 import { getWalkthroughs } from "@/lib/services/walkthroughs";
 import { getEstimates } from "@/lib/services/estimates";
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -60,14 +61,22 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
   const contractJobIds=new Set((contractOccurrences??[]).filter(row=>{const type=(row.agreement as {billing_type:string}|null)?.billing_type;return Boolean(type&&type!=="Per Visit")}).map(row=>row.job_id).filter((id): id is string => Boolean(id)));
-  const input: AttentionRuleInput = { profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const fieldRows = hasPermission(profile, "walkthroughs.field") && profile.employee_id ? await getAssignedFieldWalkthroughs() : [];
+  const assignedWalkthroughs: AssignedWalkthroughAttention[] = Array.isArray(fieldRows) ? fieldRows.flatMap(row => {
+    if (!row || typeof row !== "object" || Array.isArray(row) || typeof row.id !== "string" || typeof row.walkthrough_date !== "string") return [];
+    return [{ id: row.id, employeeId: profile.employee_id!, date: row.walkthrough_date, time: typeof row.walkthrough_time === "string" ? row.walkthrough_time : null }];
+  }) : [];
+  const input: AttentionRuleInput = { assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
   return result.items;
 }
 
+export type AssignedWalkthroughAttention = { id: string; employeeId: string; date: string; time: string | null };
+
 export type AttentionRuleInput = {
+  assignedWalkthroughs?: AssignedWalkthroughAttention[];
   profile: NonNullable<Awaited<ReturnType<typeof getCurrentProfile>>>;
   estimates: Awaited<ReturnType<typeof getEstimates>>;
   jobs: Awaited<ReturnType<typeof getJobs>>;
@@ -93,6 +102,20 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  if (hasPermission(profile, "walkthroughs.field") && profile.employee_id) {
+    for (const walkthrough of input.assignedWalkthroughs ?? []) {
+      if (walkthrough.employeeId !== profile.employee_id || !walkthrough.date) continue;
+      const date = friendlyDate(walkthrough.date);
+      const time = walkthrough.time ? friendlyTime(walkthrough.time) : null;
+      const description = `You have a StudioScrubz walkthrough scheduled for ${date}${time ? ` at ${time}` : ""}.`;
+      const key = `walkthrough:${walkthrough.id}:assigned:${profile.employee_id}`;
+      items.push(item(key, "Walkthrough Assigned", "Info", "Walkthroughs", "Walkthrough Assigned", description, "Walkthrough", walkthrough.id, null, null, null, walkthrough.date, walkthrough.date, "/field-walkthroughs", "View Walkthrough"));
+      if (withinReminderWindow(walkthrough.date, walkthrough.time, clock.now)) {
+        items.push(item(`walkthrough:${walkthrough.id}:reminder:${profile.employee_id}:${walkthrough.date}:${walkthrough.time || "09:00"}`, "Upcoming Walkthrough", "Attention", "Walkthroughs", "Upcoming Walkthrough", `Reminder: ${description}`, "Walkthrough", walkthrough.id, null, null, null, walkthrough.date, walkthrough.date, "/field-walkthroughs", "View Walkthrough"));
+      }
+    }
+  }
 
   for (const estimate of estimates.filter((row) => !row.archived_at && row.result.submission?.source === "Customer Self-Service")) {
     const submission = estimate.result.submission!;

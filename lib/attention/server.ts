@@ -50,6 +50,10 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
   const visibleTimeEntries = hasPermission(profile, "timeClock.view") ? snapshot.timeEntries.filter((entry) => management || entry.employee_id === profile.employee_id || Boolean(entry.crew_id && crewIds.has(entry.crew_id))) : [];
   const input: AttentionRuleInput = {
     profile,
+    assignedWalkthroughs: hasPermission(profile, "walkthroughs.field") && profile.employee_id
+      ? snapshot.walkthroughs.filter(row => row.status === "Scheduled" && !row.archived_at && row.assigned_employee_id === profile.employee_id && row.walkthrough_date && row.walkthrough_time)
+        .map(row => ({ id: row.id, employeeId: profile.employee_id!, date: row.walkthrough_date!, time: row.walkthrough_time }))
+      : [],
     estimates: hasPermission(profile, "estimates.view") ? snapshot.estimates : [],
     jobs: visibleJobs,
     walkthroughs: hasPermission(profile, "walkthroughs.view") ? snapshot.walkthroughs : [],
