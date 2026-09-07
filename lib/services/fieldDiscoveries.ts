@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/services/auth";
+import { requestImmediateAttentionPush } from "@/lib/push/client";
 import { operationalPhotoExtension, prepareOperationalPhoto, validateOperationalPhoto } from "@/lib/services/photoStorage";
 import { OPERATIONAL_PHOTO_BUCKET } from "@/types/photo";
 import type { CreateFieldDiscoveryInput, FieldDiscoveryMedia, FieldDiscoveryMediaWithUrl, FieldDiscoveryStatus, OperationalFieldDiscovery } from "@/types/fieldDiscovery";
@@ -25,6 +26,7 @@ export async function createFieldDiscovery(input: CreateFieldDiscoveryInput): Pr
     p_estimated_extra_amount: input.estimatedExtraAmount,
   });
   if (error) throw error;
+  await requestImmediateAttentionPush();
   return data;
 }
 

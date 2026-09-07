@@ -16,6 +16,9 @@ import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import type { CommunicationComposerContext } from "@/types/clientCommunication";
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 import { withImmediateAttentionPush } from "@/lib/push/client";
+import { canReviewFieldDiscovery } from "@/lib/services/fieldDiscoveries";
+import type { FieldDiscovery } from "@/types/fieldDiscovery";
+import type { ChangeRequest } from "@/types/changeRequest";
 
 const GOOGLE_REVIEW_URL = "https://g.page/r/CT2X4ZAN1E8oEAI/review";
 
@@ -66,7 +69,18 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     if (!row || typeof row !== "object" || Array.isArray(row) || typeof row.id !== "string" || typeof row.walkthrough_date !== "string") return [];
     return [{ id: row.id, employeeId: profile.employee_id!, date: row.walkthrough_date, time: typeof row.walkthrough_time === "string" ? row.walkthrough_time : null }];
   }) : [];
-  const input: AttentionRuleInput = { assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const operationalEmployee = Boolean(profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role));
+  const [discoveries, decisions] = await Promise.all([
+    jobs.length && canReviewFieldDiscovery(profile.role)
+      ? getSupabaseClient().from("field_discoveries_operational").select("id,job_id,status,created_at").eq("status", "Open").in("job_id", jobs.map(job => job.id))
+      : Promise.resolve({ data: [], error: null }),
+    jobs.length && operationalEmployee
+      ? getSupabaseClient().from("change_requests_operational").select("id,job_id,status,decided_at").in("status", ["Approved", "Declined"]).not("decided_at", "is", null).in("job_id", jobs.map(job => job.id))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (discoveries.error) throw discoveries.error;
+  if (decisions.error) throw decisions.error;
+  const input: AttentionRuleInput = { fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -76,6 +90,8 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 export type AssignedWalkthroughAttention = { id: string; employeeId: string; date: string; time: string | null };
 
 export type AttentionRuleInput = {
+  fieldDiscoveries?: Pick<FieldDiscovery, "id" | "job_id" | "status" | "created_at">[];
+  changeRequestDecisions?: Pick<ChangeRequest, "id" | "job_id" | "status" | "decided_at">[];
   assignedWalkthroughs?: AssignedWalkthroughAttention[];
   profile: NonNullable<Awaited<ReturnType<typeof getCurrentProfile>>>;
   estimates: Awaited<ReturnType<typeof getEstimates>>;
@@ -102,6 +118,25 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  if (profile.is_active && hasPermission(profile, "jobs.view")) {
+    const activeJobs = new Map(jobs.filter(job => !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status)).map(job => [job.id, job]));
+    if (canReviewFieldDiscovery(profile.role)) {
+      for (const discovery of input.fieldDiscoveries ?? []) {
+        const job = activeJobs.get(discovery.job_id);
+        if (!job || discovery.status !== "Open") continue;
+        items.push(item(`field-discovery:${discovery.id}:submitted`, "Field Discovery Submitted", "Attention", "Jobs", "Field Discovery Submitted", "A field discovery requires review. Open the Job Discoveries tab.", "Job", job.id, null, job.job_number || "Job", null, null, discovery.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
+      }
+    }
+    if (profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
+      for (const decision of input.changeRequestDecisions ?? []) {
+        const job = activeJobs.get(decision.job_id);
+        if (!job?.assigned_crew_id || !decision.decided_at || (decision.status !== "Approved" && decision.status !== "Declined")) continue;
+        const title = decision.status === "Approved" ? "Change Request Approved" : "Change Request Declined";
+        items.push(item(`change-request:${decision.id}:${decision.status}:${profile.employee_id}`, title, "Attention", "Jobs", title, `${title}. Open the Job to review Scope and Changes.`, "Job", job.id, null, job.job_number || "Job", null, null, decision.decided_at, `/jobs?jobId=${job.id}`, "Open Job"));
+      }
+    }
+  }
 
   // Both loaders restrict operational employees' jobs to their assigned crews.
   if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
