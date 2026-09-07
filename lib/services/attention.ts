@@ -120,6 +120,16 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     items.push(item(`walkthrough:${walkthrough.id}:requested`, "Walkthrough Requested", "Attention", "Walkthroughs", "Walkthrough requested", `${client} · ${property} · ${service} · ${estimateNumber} · Prefers ${contact} · Requested ${friendlyDate(requestedAt.slice(0, 10))}`, "Walkthrough", walkthrough.id, walkthrough.client_id, estimateNumber, null, null, requestedAt, `/walkthroughs?walkthroughId=${walkthrough.id}`, "Open Walkthrough"));
   }
 
+  if (["Sales", "Administrator", "Master Admin"].includes(profile.role) && hasPermission(profile, "walkthroughs.view") && hasPermission(profile, "proposals.create")) {
+    const proposedWalkthroughIds = new Set(proposals.filter((proposal) => !proposal.archived_at).map((proposal) => proposal.walkthrough_id));
+    const proposedEstimateIds = new Set(proposals.filter((proposal) => !proposal.archived_at).map((proposal) => proposal.estimate_id).filter(Boolean));
+    for (const walkthrough of walkthroughs) {
+      if (walkthrough.archived_at || walkthrough.status !== "Completed" || walkthrough.pricing_review || walkthrough.pricing_reviewed_at) continue;
+      if (proposedWalkthroughIds.has(walkthrough.id) || (walkthrough.estimate_id && proposedEstimateIds.has(walkthrough.estimate_id))) continue;
+      items.push(item(`walkthrough:${walkthrough.id}:pricing-review`, "Pricing Review Needed", "Attention", "Walkthroughs", "Pricing Review Needed", "A completed sales assessment is ready for pricing review.", "Walkthrough", walkthrough.id, walkthrough.client_id, null, null, null, walkthrough.updated_at, `/walkthroughs?walkthroughId=${walkthrough.id}`, "Review Pricing"));
+    }
+  }
+
   for (const job of jobs) {
     const label = job.job_number;
     if (job.status === "Completed" && job.financials_available !== false && job.price > 0 && !financiallyResolvedJobs.has(job.id) && !contractJobIds.has(job.id)) items.push(item(`job:${job.id}:invoice`, "Completed Job Needs Invoice", "Urgent", "Invoices", "Completed job needs an invoice", `${label} - ${job.service_name || "Service"} - ${job.client_name || "Deleted Client"}`, "Job", job.id, job.client_id, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Create Invoice"));
