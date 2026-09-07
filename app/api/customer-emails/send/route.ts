@@ -1,4 +1,5 @@
 import "server-only";
+import { sendWithResend } from "@/lib/email/resend";
 import { randomInt } from "node:crypto";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
@@ -13,7 +14,7 @@ type DocumentContext = {
   token: string | null; tokenExpiresAt: string | null; publicPath: string;
 };
 
-const FROM = "StudioScrubz <notifications@studioscrubz.com>";
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
@@ -121,17 +122,3 @@ function documentTypeValue(value: unknown): DocumentType { if (["Estimate", "Pro
 function requiredText(value: unknown, label: string, max = 100) { if (typeof value !== "string" || !value.trim() || value.trim().length > max) throw new Error(`${label} is required.`); return value.trim(); }
 function communicationNumber() { const date = new Date().toISOString().slice(0, 10).replaceAll("-", ""); return `COMM-${date}-${String(randomInt(10000)).padStart(4, "0")}`; }
 function errorMessage(value: unknown) { return value instanceof Error ? value.message : "Unknown transactional email failure."; }
-function escapeHtml(value: string) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
-async function sendWithResend(input: { recipientEmail: string; subject: string; messageBody: string; publicUrl: string; documentType: DocumentType; idempotencyKey: string; replyTo: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
-  const label = input.documentType === "Service Agreement" ? "Review & Sign Agreement" : `View ${input.documentType}`;
-  const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": input.idempotencyKey, "User-Agent": "StudioScrubz-OS/1.0" }, body: JSON.stringify({
-    from: FROM, to: [input.recipientEmail], reply_to: input.replyTo, subject: input.subject,
-    text: `${input.messageBody}\n\n${label}:\n${input.publicUrl}`,
-    html: `<div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;max-width:640px;margin:auto"><div style="border-bottom:3px solid #143d1a;padding:20px 0"><strong style="font-size:24px;color:#143d1a">StudioScrubz</strong><div style="color:#9a7a17">No mess. No stress.</div></div><div style="padding:28px 0;white-space:pre-line">${escapeHtml(input.messageBody)}</div><a href="${escapeHtml(input.publicUrl)}" style="display:inline-block;background:#143d1a;color:white;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold">${escapeHtml(label)}</a><p style="margin-top:24px;font-size:12px;color:#6b7280;word-break:break-all">${escapeHtml(input.publicUrl)}</p></div>`,
-  }) });
-  const result = await response.json().catch(() => null) as { id?: string; message?: string } | null;
-  if (!response.ok || !result?.id) throw new Error(result?.message || `Resend returned HTTP ${response.status}.`);
-  return { id: result.id };
-}
