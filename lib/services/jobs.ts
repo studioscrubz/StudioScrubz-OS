@@ -395,6 +395,7 @@ export const startOrClockInToJob = joinJob;
 export async function startOperationalJob(id: string): Promise<JobWithRelations> {
   const { data, error } = await getSupabaseClient().rpc("start_operational_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be started."));
+  await requestImmediateAttentionPush();
   return operationalJob(data);
 }
 export async function completeInProgressJob(id: string): Promise<JobCompletionResult> {

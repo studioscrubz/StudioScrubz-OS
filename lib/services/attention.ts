@@ -138,6 +138,20 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     }
   }
 
+  // Global lifecycle timestamps are separate from employee Join/payroll entries.
+  if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
+    for (const job of jobs) {
+      if (!job.assigned_crew_id || job.archived_at || ["Cancelled", "Archived"].includes(job.status)) continue;
+      const label = job.job_number || "Job";
+      if (job.status === "In Progress" && job.operational_started_at) {
+        items.push(item(`job:${job.id}:started:${profile.employee_id}`, "Job Started", "Attention", "Jobs", "Job Started", "The Job has started.", "Job", job.id, null, label, null, null, job.operational_started_at, `/jobs?jobId=${job.id}`, "Open Job"));
+      }
+      if (job.status === "Completed" && job.completed_at) {
+        items.push(item(`job:${job.id}:completed:${profile.employee_id}`, "Job Completed", "Info", "Jobs", "Job Completed", "The Job has been completed.", "Job", job.id, null, label, null, null, job.completed_at, `/jobs?jobId=${job.id}`, "Open Job"));
+      }
+    }
+  }
+
   // Both loaders restrict operational employees' jobs to their assigned crews.
   if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
     for (const job of jobs) {
