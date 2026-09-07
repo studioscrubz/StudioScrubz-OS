@@ -161,8 +161,8 @@ export function AgreementsPage() {
 function SendAgreementModal({ agreement, settings, sender, close, sent }: { agreement: AgreementWithRelations; settings: BusinessSettings | null; sender: string; close: () => void; sent: (notice: string) => Promise<void> }) {
   const email = agreement.sent_to?.includes("@") ? agreement.sent_to : agreement.client?.email || "";
   const phone = agreement.client?.phone || "";
-  const [subject, setSubject] = useState(`StudioScrubz Service Agreement ${agreement.agreement_number}`);
-  const [body, setBody] = useState(`Hello ${clientName(agreement)},\n\nYour StudioScrubz Service Agreement is ready for review.\n\nPlease use the secure link below to review and sign your agreement.\n\nIf you have questions, please contact StudioScrubz.\n\nThank you,\nStudioScrubz`);
+  const [subject, setSubject] = useState(`StudioScrubz Service Agreement Ready ? ${clientName(agreement)}`);
+  const [body, setBody] = useState(`Hello ${clientName(agreement)},\n\nThank you for choosing StudioScrubz.\n\nYour service agreement is ready for review. Please use the secure link below to review the agreement and complete the required acceptance.\n\nThe agreement reflects the approved service arrangement and helps ensure the service expectations are clearly documented before scheduling and service begin.\n\nIf you have any questions before completing it, please contact us.\n\nNo mess. No stress.\n\nStudioScrubz`);
   const [token] = useState(() => {
     const validExistingToken = Boolean(agreement.client_access_token && (!agreement.client_access_token_expires_at || new Date(agreement.client_access_token_expires_at).getTime() > Date.now()));
     return validExistingToken ? agreement.client_access_token || "" : generateSecureToken();
