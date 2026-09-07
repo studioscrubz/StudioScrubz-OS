@@ -119,6 +119,13 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
 
+  if (profile.is_active && hasPermission(profile, "proposals.view") && ["Sales", "Administrator", "Master Admin"].includes(profile.role)) {
+    for (const proposal of proposals) {
+      if (proposal.status !== "Declined" || proposal.archived_at) continue;
+      items.push(item(`proposal:${proposal.id}:declined`, "Proposal Declined", "Attention", "Proposals", "Proposal Declined", "A proposal was declined and is ready for review.", "Proposal", proposal.id, null, proposal.proposal_number, null, null, proposal.declined_at ?? proposal.updated_at, `/open-proposals?proposalId=${proposal.id}`, "Open Proposal"));
+    }
+  }
+
   if (profile.is_active && hasPermission(profile, "jobs.view")) {
     const activeJobs = new Map(jobs.filter(job => !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status)).map(job => [job.id, job]));
     if (canReviewFieldDiscovery(profile.role)) {
