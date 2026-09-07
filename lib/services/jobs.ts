@@ -456,6 +456,7 @@ export async function restoreArchivedJob(id: string): Promise<JobWithRelations> 
 async function master(){ return isMasterAdmin(await getCurrentProfile()); }
 async function requestJobAttentionPush(job: JobWithRelations) {
   if ((job.status === "Ready to Schedule" && !job.scheduled_date)
+    || (Boolean(job.assigned_crew_id) && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status))
     || (["Scheduled", "Ready to Schedule"].includes(job.status) && Boolean(job.scheduled_date) && !job.assigned_crew_id)) {
     await requestImmediateAttentionPush();
   }

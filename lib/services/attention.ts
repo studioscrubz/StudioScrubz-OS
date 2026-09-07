@@ -103,6 +103,16 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
 
+  // Both loaders restrict operational employees' jobs to their assigned crews.
+  if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
+    for (const job of jobs) {
+      if (!job.assigned_crew_id || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status)) continue;
+      const label = job.job_number || "Job";
+      const description = `${label}${job.service_name ? ` - ${job.service_name}` : ""}${job.scheduled_date ? ` - ${friendlyDate(job.scheduled_date)}${job.start_time ? ` at ${friendlyTime(job.start_time)}` : ""}` : ""}`;
+      items.push(item(`job:${job.id}:assigned:${profile.employee_id}:${job.assigned_crew_id}`, "Job Assigned", "Attention", "Jobs", "Job Assigned", description, "Job", job.id, null, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
+    }
+  }
+
   if (hasPermission(profile, "walkthroughs.field") && profile.employee_id) {
     for (const walkthrough of input.assignedWalkthroughs ?? []) {
       if (walkthrough.employeeId !== profile.employee_id || !walkthrough.date) continue;
