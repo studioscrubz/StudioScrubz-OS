@@ -1025,12 +1025,16 @@ function money(v: number) {
 function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
 function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; employeeId: string | null; role: string | null }) {
   const [error, setError] = useState<string | null>(null);
-  const phone = job.client_phone ? normalizeSmsPhoneNumber(job.client_phone) : null;
-  // Contact fields are returned only by the assignment-authorized operational RPC.
-  if (!employeeId || !["Crew Lead", "Scrub Technician"].includes(role ?? "") || !job.assigned_crew_id || !job.scheduled_date || !job.start_time || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || !phone) return null;
+  const management = ["Master Admin", "Administrator", "Manager"].includes(role ?? "");
+  const assignedFieldEmployee = ["Crew Lead", "Scrub Technician"].includes(role ?? "") && Boolean(employeeId && job.assigned_crew_id);
+  // Field roles use only contact fields from the assignment-authorized RPC.
+  const clientPhone = management ? job.client?.phone : job.client_phone;
+  const firstName = management ? job.client?.first_name : job.client_first_name;
+  const phone = clientPhone ? normalizeSmsPhoneNumber(clientPhone) : null;
+  if ((!management && !assignedFieldEmployee) || !job.scheduled_date || !job.start_time || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || !phone) return null;
   function openMessage() {
     setError(null);
-    const greeting = job.client_first_name?.trim() || "there";
+    const greeting = firstName?.trim() || "there";
     const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
     try { openDeviceSmsApp(phone!, body); }
     catch { setError("The SMS composer could not be opened. Please try again."); }
