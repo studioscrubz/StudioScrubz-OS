@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getActiveCrews } from "@/lib/services/crews";
-import { getJobProposalIds } from "@/lib/services/jobs";
+import { getJobProposalIds, getJobsForDateRange } from "@/lib/services/jobs";
 import { getInvoicedJobIds } from "@/lib/services/invoices";
 import type {
   DashboardAttentionItem,
@@ -116,14 +116,11 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   };
 }
 export async function getTodaysJobs() {
-  const { data, error } = await getSupabaseClient()
-    .from("jobs")
-    .select(jobSelect)
-    .eq("scheduled_date", localDate())
-    .not("status", "in", "(Completed,Cancelled,Archived)")
-    .order("start_time");
-  if (error) throw error;
-  return data as JobWithRelations[];
+  const today = localDate();
+  const jobs = await getJobsForDateRange(today, today);
+  return jobs
+    .filter((job) => !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status))
+    .sort((a, b) => (a.start_time ?? "\uffff").localeCompare(b.start_time ?? "\uffff"));
 }
 export async function getUpcomingWalkthroughs() {
   const { data, error } = await getSupabaseClient()
