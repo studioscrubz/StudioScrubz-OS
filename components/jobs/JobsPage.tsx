@@ -1,4 +1,5 @@
 "use client";
+import { normalizeSmsPhoneNumber, openDeviceSmsApp } from "@/lib/deviceSms";
 import { useEffect, useMemo, useState } from "react";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -384,6 +385,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, canComplete, canDel
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
     <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
+      <OnMyWayButton job={job} employeeId={employeeId} role={role} />
       {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJob(job.id) }), "Job started. Join the Job separately to begin your payroll time.")} className={`${primary} w-full`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
@@ -626,6 +628,7 @@ function JobModal({
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
+      <OnMyWayButton job={job} employeeId={employeeId} role={role} />
       {showLifecycle && (
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
@@ -1020,6 +1023,21 @@ function money(v: number) {
   }).format(v);
 }
 function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
+function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; employeeId: string | null; role: string | null }) {
+  const [error, setError] = useState<string | null>(null);
+  const phone = job.client_phone ? normalizeSmsPhoneNumber(job.client_phone) : null;
+  // Contact fields are returned only by the assignment-authorized operational RPC.
+  if (!employeeId || !["Crew Lead", "Scrub Technician"].includes(role ?? "") || !job.assigned_crew_id || !job.scheduled_date || !job.start_time || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || !phone) return null;
+  function openMessage() {
+    setError(null);
+    const greeting = job.client_first_name?.trim() || "there";
+    const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
+    try { openDeviceSmsApp(phone!, body); }
+    catch { setError("The SMS composer could not be opened. Please try again."); }
+  }
+  return <><button type="button" className={primary} onClick={openMessage}>On My Way</button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</>;
+}
+
 function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | null, role: string | null) {
   const canStartByRole = Boolean(role && ["Master Admin", "Administrator", "Manager", "Crew Lead"].includes(role));
   const canParticipate = Boolean(role && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(role));

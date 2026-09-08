@@ -34,6 +34,8 @@ export type Job = {
   property_id: string | null;
   division: EstimateDivision;
   client_name: string | null;
+  client_phone?: string | null;
+  client_first_name?: string | null;
   property_name: string | null;
   service_name: string | null;
   frequency: Frequency | AgreementFrequency;
