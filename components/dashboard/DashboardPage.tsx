@@ -42,7 +42,7 @@ export function DashboardPage() {
       setDismissingAttention(null);
     }
   }
-  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees"]);
+  useAttentionRefresh(load, ["estimates", "clients", "properties", "crews", "employees", "invoice_job_lines"]);
   useEffect(() => {
     let active = true;
     void getDashboardData()
