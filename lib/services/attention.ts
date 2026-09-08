@@ -63,7 +63,8 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (agreementRoutes.error) throw agreementRoutes.error;
-  const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
+  const canReadContractBilling = hasPermission(profile, "agreements.view") && hasPermission(profile, "invoices.view");
+  const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length&&canReadContractBilling?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
   const contractJobIds=new Set((contractOccurrences??[]).filter(row=>{const type=(row.agreement as {billing_type:string}|null)?.billing_type;return Boolean(type&&type!=="Per Visit")}).map(row=>row.job_id).filter((id): id is string => Boolean(id)));
   const fieldRows = hasPermission(profile, "walkthroughs.field") && profile.employee_id ? await getAssignedFieldWalkthroughs() : [];

@@ -20,18 +20,18 @@ export async function getDashboardData(): Promise<DashboardData> {
   const canEstimates = hasPermission(profile, "estimates.view");
   const canProposals = hasPermission(profile, "proposals.view");
   const [estimates, estimateLinks, walkthroughs, proposals, jobProposalIds, agreements, jobRows, todaysJobs, previewRows, invoices, crews, attention] = await Promise.all([
-    canEstimates ? getEstimates() : Promise.resolve([]),
-    canEstimates ? getWalkthroughsForEstimates() : Promise.resolve([]),
-    hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
-    canProposals ? getProposals() : Promise.resolve([]),
-    canProposals ? getJobProposalIds() : Promise.resolve([]),
-    canProposals && hasPermission(profile, "agreements.view") ? getAgreements() : Promise.resolve([]),
-    canJobs ? getJobs() : Promise.resolve([]),
-    canJobs ? getTodaysJobs(today) : Promise.resolve([]),
-    canJobs ? getJobsForDateRange(today, tomorrow) : Promise.resolve([]),
-    hasPermission(profile, "invoices.view") ? getInvoices() : Promise.resolve([]),
-    hasPermission(profile, "crews.view") ? getActiveCrews() : Promise.resolve([]),
-    hasPermission(profile, "attention.view") ? getOperationalAttentionItems() : Promise.resolve([]),
+    canEstimates ? readSection("Estimates", getEstimates) : Promise.resolve([]),
+    canEstimates ? readSection("Estimate routing", getWalkthroughsForEstimates) : Promise.resolve([]),
+    hasPermission(profile, "walkthroughs.view") ? readSection("Walkthroughs", getWalkthroughs) : Promise.resolve([]),
+    canProposals ? readSection("Proposals", getProposals) : Promise.resolve([]),
+    canProposals ? readSection("Proposal Job routing", getJobProposalIds) : Promise.resolve([]),
+    canProposals && hasPermission(profile, "agreements.view") ? readSection("Agreements", getAgreements) : Promise.resolve([]),
+    canJobs ? readSection("Jobs", getJobs) : Promise.resolve([]),
+    canJobs ? readSection("Today?s Operations", () => getTodaysJobs(today)) : Promise.resolve([]),
+    canJobs ? readSection("Schedule Preview", () => getJobsForDateRange(today, tomorrow)) : Promise.resolve([]),
+    hasPermission(profile, "invoices.view") ? readSection("Invoices", getInvoices) : Promise.resolve([]),
+    hasPermission(profile, "crews.view") ? readSection("Crews", getActiveCrews) : Promise.resolve([]),
+    hasPermission(profile, "attention.view") ? readSection("Attention", getOperationalAttentionItems) : Promise.resolve([]),
   ]);
 
   // Open Estimates retires only links with both a scheduled date and time.
@@ -103,4 +103,15 @@ function localDate(d = new Date()) {
 }
 function addDays(date: string, n: number) {
   const d = new Date(`${date}T12:00:00`); d.setDate(d.getDate() + n); return localDate(d);
+}
+
+// Preserve real failures, including plain Supabase errors, with the failing source.
+async function readSection<T>(section: string, read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (cause) {
+    const message = cause && typeof cause === "object" && "message" in cause
+      ? String(cause.message) : "Unknown data loading error";
+    throw new Error(`Dashboard ${section}: ${message}`, { cause });
+  }
 }
