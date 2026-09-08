@@ -391,6 +391,11 @@ export async function joinJob(id: string): Promise<JobClockInResult> {
   await requestImmediateAttentionPush();
   return data as JobClockInResult;
 }
+export async function initiateJobOnMyWay(id: string) {
+  const { data, error } = await getSupabaseClient().rpc("initiate_job_on_my_way", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "On My Way could not be initiated."));
+  return data;
+}
 export const startOrClockInToJob = joinJob;
 export async function startOperationalJob(id: string): Promise<JobWithRelations> {
   const { data, error } = await getSupabaseClient().rpc("start_operational_job", { p_job_id: id });

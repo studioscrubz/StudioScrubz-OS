@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import {
   archiveJob,
+  initiateJobOnMyWay,
   assignJobCrew,
   cancelJob,
   completeInProgressJob,
@@ -88,6 +89,10 @@ export function JobsPage() {
       canViewArchived ? getArchivedJobs() : Promise.resolve([]),
     ]);
     setRows(next);
+    setSelected(current => {
+      const refreshed = current && [...next, ...nextArchived].find(job => job.id === current.id);
+      return current && refreshed ? { ...current, on_my_way_initiated_at: refreshed.on_my_way_initiated_at } : current;
+    });
     setArchivedRows(nextArchived);
     setTimeEntries(entries);
     setActiveCrews(crews);
@@ -1025,6 +1030,9 @@ function money(v: number) {
 function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
 function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; employeeId: string | null; role: string | null }) {
   const [error, setError] = useState<string | null>(null);
+  const [initiatedJobId, setInitiatedJobId] = useState<string | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const initiated = Boolean(job.on_my_way_initiated_at || initiatedJobId === job.id);
   const management = ["Master Admin", "Administrator", "Manager"].includes(role ?? "");
   const assignedFieldEmployee = ["Crew Lead", "Scrub Technician"].includes(role ?? "") && Boolean(employeeId && job.assigned_crew_id);
   // Field roles use only contact fields from the assignment-authorized RPC.
@@ -1032,14 +1040,23 @@ function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; emplo
   const firstName = management ? job.client?.first_name : job.client_first_name;
   const phone = clientPhone ? normalizeSmsPhoneNumber(clientPhone) : null;
   if ((!management && !assignedFieldEmployee) || !job.scheduled_date || !job.start_time || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || !phone) return null;
-  function openMessage() {
+  async function openMessage() {
+    if (claiming || initiated) return;
+    setClaiming(true);
     setError(null);
     const greeting = firstName?.trim() || "there";
     const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
-    try { openDeviceSmsApp(phone!, body); }
-    catch { setError("The SMS composer could not be opened. Please try again."); }
+    try {
+      const result = await initiateJobOnMyWay(job.id);
+      setInitiatedJobId(job.id);
+      if (result.initiated) {
+        try { openDeviceSmsApp(phone!, body); }
+        catch { setError("On My Way was initiated, but the SMS composer could not be opened."); }
+      }
+    } catch (cause) { setError(message(cause, "On My Way could not be initiated.")); }
+    finally { setClaiming(false); }
   }
-  return <><button type="button" className={primary} onClick={openMessage}>On My Way</button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</>;
+  return <><button type="button" disabled={claiming || initiated} title={initiated ? "On My Way message already initiated" : undefined} className={initiated ? joined : primary} onClick={() => void openMessage()}>On My Way</button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</>;
 }
 
 function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | null, role: string | null) {

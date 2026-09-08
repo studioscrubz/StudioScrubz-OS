@@ -35,6 +35,7 @@ export type Job = {
   division: EstimateDivision;
   client_name: string | null;
   client_phone?: string | null;
+  on_my_way_initiated_at?: string | null;
   client_first_name?: string | null;
   property_name: string | null;
   service_name: string | null;

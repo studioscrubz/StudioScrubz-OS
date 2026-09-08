@@ -146,6 +146,7 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
       get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
       submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
