@@ -5,6 +5,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 export const OPERATIONAL_TABLES = [
+  "property_service_routes", "property_service_route_stops",
   "property_service_visits", "property_service_visit_photos", "property_service_visit_issues",
   "estimates", "walkthroughs", "proposals", "service_agreements", "jobs",
   "invoices", "attention_item_states", "client_communications", "service_occurrences",

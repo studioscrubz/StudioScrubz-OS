@@ -34,6 +34,15 @@ export function PorterVisitsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
   const [date, setDate] = useState("");
+  useEffect(() => {
+    if (!allowed) return;
+    const id = new URLSearchParams(window.location.search).get("visit");
+    if (!id) return;
+    let active = true;
+    getPorterVisit(id).then(visit => { if (active) setSelected(visit); })
+      .catch(error => { if (active) setError(errorText(error)); });
+    return () => { active = false; };
+  }, [allowed]);
   useOperationalRealtime(["property_service_visits", "property_service_visit_photos", "property_service_visit_issues"], async () => {
     if (!allowed) return;
     const rows = await listPorterVisits(); setVisits(rows);
