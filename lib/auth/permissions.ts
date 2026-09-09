@@ -93,6 +93,7 @@ export const canViewInvoiceFinishedPhotos = (profile: UserProfile | null) => pro
 export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/properties/service-reports", "porterVisits.manage"],
   ["/properties/porter-visits", "porterVisits.view"],
   ["/properties/service-plans", "propertyServicePlans.manage"],
   ["/field-walkthroughs", "walkthroughs.field"],
