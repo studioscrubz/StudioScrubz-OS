@@ -1,3 +1,4 @@
+import type { PropertyServicePlan, PropertyServicePlanInput, PropertyServicePlanArea, PropertyServicePlanAreaInput, PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { FieldMeasurements, FieldWalkthrough } from "@/types/fieldWalkthrough";
 import type { Client, ClientInput } from "@/types/client";
 import type { Property, PropertyInput } from "@/types/property";
@@ -36,6 +37,8 @@ import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 export interface Database {
   public: {
     Tables: {
+      property_service_plans: { Row: PropertyServicePlan; Insert: PropertyServicePlanInput; Update: Partial<PropertyServicePlanInput>; Relationships: [] };
+      property_service_plan_areas: { Row: PropertyServicePlanArea; Insert: PropertyServicePlanAreaInput & { service_plan_id: string }; Update: Partial<PropertyServicePlanAreaInput>; Relationships: [] };
       user_profiles:{Row:UserProfile;Insert:UserProfile;Update:Partial<Pick<UserProfile,"display_name"|"role"|"is_active"|"employee_id">>;Relationships:[{foreignKeyName:"user_profiles_employee_id_fkey";columns:["employee_id"];isOneToOne:true;referencedRelation:"employees";referencedColumns:["id"]}]};
       notification_preferences:{Row:NotificationPreferences;Insert:Omit<NotificationPreferences,"created_at"|"updated_at">&{created_at?:string;updated_at?:string};Update:Partial<Pick<NotificationPreferences,"disabled_attention_categories"|"direct_messages_enabled"|"announcements_enabled"|"updated_at">>;Relationships:[{foreignKeyName:"notification_preferences_user_id_fkey";columns:["user_id"];isOneToOne:true;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       conversations:{Row:Conversation;Insert:Omit<Conversation,"id"|"created_at"|"updated_at"|"last_message_at"> & {id?:string;created_at?:string;updated_at?:string;last_message_at?:string};Update:Partial<Conversation>;Relationships:[]};
@@ -146,6 +149,7 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      save_property_service_plan: { Args: { p_id: string | null; p_plan: PropertyServicePlanInput; p_areas: PropertyServicePlanAreaInput[]; p_expected_updated_at: string | null; p_archive: boolean }; Returns: PropertyServicePlanWithAreas };
       initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
       get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
       submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };

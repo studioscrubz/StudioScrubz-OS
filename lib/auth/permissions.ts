@@ -1,6 +1,7 @@
 import type { UserProfile, UserRole } from "@/types/auth";
 
 export const PERMISSIONS = [
+  "propertyServicePlans.manage",
   "walkthroughs.field",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
@@ -22,6 +23,7 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 const operationalAdmin: Permission[] = [
+  "propertyServicePlans.manage",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
   "estimates.view", "estimates.create", "estimates.edit", "walkthroughs.view",
@@ -39,6 +41,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   "Master Admin": new Set(PERMISSIONS),
   Administrator: new Set(operationalAdmin),
   Manager: new Set([
+    "propertyServicePlans.manage",
     "dashboard.view", "clients.view", "clients.edit", "properties.view", "properties.edit",
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
     "schedule.view", "schedule.edit", "employees.directory_view", "employees.view", "crews.view", "crews.manage",
@@ -85,6 +88,7 @@ export const canViewInvoiceFinishedPhotos = (profile: UserProfile | null) => pro
 export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/properties/service-plans", "propertyServicePlans.manage"],
   ["/field-walkthroughs", "walkthroughs.field"],
   ["/vendor-packets", "estimates.create"],
   ["/attention", "attention.view"],

@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import { useEffect, useMemo, useState } from "react";
 import { PropertyFormModal, clientDisplayName } from "./PropertyFormModal";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
@@ -11,6 +14,7 @@ type TypeFilter = "All" | PropertyType;
 type ArchiveFilter = "Active Records" | "Archived Records" | "All Records";
 
 export function PropertiesPage() {
+  const { profile } = useAuth();
   const [properties, setProperties] = useState<PropertyWithClient[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +78,7 @@ export function PropertiesPage() {
   async function refresh(message: string) { setProperties(await getProperties()); setNotice(message); }
 
   return <>
+    {hasPermission(profile, "propertyServicePlans.manage") && <Link href="/properties/service-plans" className="mb-5 inline-flex rounded-lg border border-[#143d1a]/20 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] hover:bg-[#f4f7f1]">Property Service Plans</Link>}
     <div className="flex flex-col gap-5 border-b border-[#143d1a]/10 pb-7 sm:flex-row sm:items-end sm:justify-between sm:pb-8"><Header /><button type="button" onClick={() => { setNotice(null); setFormProperty(null); }} disabled={!loading && clients.length === 0} className="shrink-0 rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)] hover:bg-[#0d2b12] disabled:cursor-not-allowed disabled:opacity-50">Add Property</button></div>
     {notice && <Message kind="success" text={notice} dismiss={() => setNotice(null)} />}
     {error && <Message kind="error" text={error} />}
