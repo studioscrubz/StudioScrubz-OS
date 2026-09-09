@@ -11,9 +11,9 @@ const comparisons = [
   },
   {
     title: "Living room reset",
-    before: "/images/projects/living-room-before.webp",
+    before: "/images/projects/studio-scrubz-before-cleaning-living-room.jpg",
     after: "/images/projects/living-room-after.webp",
-    beforeAlt: "Living room before StudioScrubz cleaning",
+    beforeAlt: "Living room before StudioScrubz cleaning service",
     afterAlt: "Living room after StudioScrubz cleaning",
   },
 ] as const;
