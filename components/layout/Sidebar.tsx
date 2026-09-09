@@ -29,9 +29,14 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Open Estimates", href: "/open-estimates", marker: "", permission: "estimates.view" },
     ],
   },
-  { label: "Sales Assessments", href: "/walkthroughs", marker: "S", permission: "walkthroughs.view" },
-  { label: "Assigned Walkthroughs", href: "/field-walkthroughs", marker: "W", permission: "walkthroughs.field" },
-  { label: "Vendor Packets", href: "/vendor-packets", marker: "V", permission: "estimates.create" },
+  {
+    label: "Sales Assessments",
+    marker: "S",
+    children: [
+      { label: "Sales Assessments", href: "/walkthroughs", marker: "S", permission: "walkthroughs.view" },
+      { label: "Assigned Walkthroughs", href: "/field-walkthroughs", marker: "W", permission: "walkthroughs.field" },
+    ],
+  },
   {
     label: "Proposals",
     marker: "P",
@@ -40,12 +45,14 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Open Proposals", href: "/open-proposals", marker: "", permission: "proposals.view" },
     ],
   },
-  { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
-  { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
-  { label: "Job Performance", href: "/job-performance", marker: "R", permission: "reports.view" },
-  { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
-  { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
-  { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
+  {
+    label: "Jobs",
+    marker: "J",
+    children: [
+      { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
+      { label: "Job Performance", href: "/job-performance", marker: "R", permission: "reports.view" },
+    ],
+  },
   {
     label: "Porter Hub",
     marker: "P",
@@ -56,6 +63,17 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Property Service Reports", href: "/properties/service-reports", marker: "", permission: "porterVisits.manage" },
     ],
   },
+  { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
+  {
+    label: "Accounts",
+    marker: "A",
+    children: [
+      { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
+      { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
+      { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
+    ],
+  },
+  { label: "Vendor Packets", href: "/vendor-packets", marker: "V", permission: "estimates.create" },
   {
     label: "Employees",
     marker: "E",
