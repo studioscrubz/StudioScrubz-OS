@@ -47,6 +47,14 @@ const navItems: Array<NavLink | NavGroup> = [
   { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
   { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
   {
+    label: "Porter Hub",
+    marker: "P",
+    children: [
+      { label: "Property Service Plans", href: "/properties/service-plans", marker: "", permission: "propertyServicePlans.manage" },
+      { label: "Porter Visits", href: "/properties/porter-visits", marker: "", permission: "porterVisits.view" },
+    ],
+  },
+  {
     label: "Employees",
     marker: "E",
     children: [
