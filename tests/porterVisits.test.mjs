@@ -13,7 +13,7 @@ function load(path, dependencies = {}) {
   }, Date, Set, Error });
   return target.exports;
 }
-const models = load("types/porterVisit.ts");
+const models = load("types/porterVisit.ts", { "@/types/porterReporting": load("types/porterReporting.ts") });
 const permissions = load("lib/auth/permissions.ts");
 const visit = { id: "visit", status: "Scheduled", updated_at: "version-1", areas: [{ id: "area", is_required: true, status: "Pending" }] };
 const input = { plan_id: "plan", scheduled_date: "2026-09-09", assigned_crew_id: null, visit_notes: null };

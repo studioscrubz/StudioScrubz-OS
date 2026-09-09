@@ -1,5 +1,8 @@
 "use client";
 import Link from "next/link";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { PorterEvidenceGroup, PorterIssuesSection } from "@/components/properties/PorterReporting";
+import { missingPorterPhotoRequirements } from "@/types/porterReporting";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -31,6 +34,17 @@ export function PorterVisitsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
   const [date, setDate] = useState("");
+  useOperationalRealtime(["property_service_visits", "property_service_visit_photos", "property_service_visit_issues"], async () => {
+    if (!allowed) return;
+    const rows = await listPorterVisits(); setVisits(rows);
+    setSelected(current => {
+      if (!current) return current;
+      const latest = rows.find(row => row.id === current.id);
+      // Show live documentation without silently advancing an open editor's version.
+      return latest ? { ...current, photos: latest.photos, issues: latest.issues } : null;
+    });
+    setNotice("Visit data changed. Refresh to load the latest visit status before editing.");
+  });
   useEffect(() => {
     if (!allowed) return;
     let active = true;
@@ -83,10 +97,10 @@ export function PorterVisitsPage() {
     {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-800">{error}</p>}
     {notice && <p role="status" className="mt-5 rounded-lg bg-green-50 p-4 text-sm text-[#143d1a]">{notice}</p>}
     {creating && management && <CreateVisit plans={plans} crews={crews} busy={busy} submit={create} close={() => setCreating(false)}/>}
-    {selected && <VisitDetail key={`${selected.id}:${selected.updated_at}`} visit={selected} crews={crews} management={management} busy={busy} mutate={mutate} close={() => setSelected(null)}/>}
+    {selected && <VisitDetail key={`${selected.id}:${selected.updated_at}`} visit={selected} crews={crews} management={management} busy={busy} mutate={mutate} reload={() => open(selected.id)} close={() => setSelected(null)}/>}
     <section className="mt-6 rounded-2xl border border-[#143d1a]/10 bg-white p-5">
       <div className="grid gap-4 md:grid-cols-[1fr_180px_180px_auto]"><label className="text-sm font-bold">Search<input type="search" className={field} value={search} onChange={e => setSearch(e.target.value)} placeholder="Property, plan, or crew"/></label><label className="text-sm font-bold">Status<select className={field} value={status} onChange={e => setStatus(e.target.value)}>{["All", ...VISIT_STATUSES].map(value => <option key={value}>{value}</option>)}</select></label><label className="text-sm font-bold">Scheduled date<input className={field} type="date" value={date} onChange={e => setDate(e.target.value)}/></label><button className={`${button} self-end`} disabled={busy || loading} onClick={() => void refresh()}>Refresh</button></div>
-      {loading ? <p className="py-8">Loading Porter Visits…</p> : filtered.length === 0 ? <p className="py-8 text-neutral-600">No Porter Visits match this view.</p> : <div className="mt-5 grid gap-4 lg:grid-cols-2">{filtered.map(visit => <article key={visit.id} className="rounded-xl border border-neutral-200 p-5"><p className="text-xs font-bold text-[#9a7a17]">{visit.status} · {visit.scheduled_date}</p><h2 className="mt-2 text-xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2 text-sm">{visit.plan_name}</p><p className="mt-2 text-sm text-neutral-600">{visit.crew_name ?? "Unassigned crew"}</p><button className={`${button} mt-4`} disabled={busy} onClick={() => void open(visit.id)}>Open Visit</button></article>)}</div>}
+      {loading ? <p className="py-8">Loading Porter Visits…</p> : filtered.length === 0 ? <p className="py-8 text-neutral-600">No Porter Visits match this view.</p> : <div className="mt-5 grid gap-4 lg:grid-cols-2">{filtered.map(visit => <article key={visit.id} className="rounded-xl border border-neutral-200 p-5"><p className="text-xs font-bold text-[#9a7a17]">{visit.status} · {visit.scheduled_date}</p><h2 className="mt-2 text-xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2 text-sm">{visit.plan_name}</p><p className="mt-2 text-sm text-neutral-600">{visit.crew_name ?? "Unassigned crew"}</p><p className="mt-2 text-sm font-bold text-[#9a7a17]">{visit.issues?.filter(issue => issue.status !== "Resolved").length ?? 0} open / acknowledged issues{visit.issues?.some(issue => issue.severity === "Urgent" && issue.status !== "Resolved") ? " ? Urgent observation" : ""}</p><button className={`${button} mt-4`} disabled={busy} onClick={() => void open(visit.id)}>Open Visit</button></article>)}</div>}
     </section>
   </>;
 }
@@ -108,13 +122,23 @@ function CreateVisit({ plans, crews, busy, submit, close }: { plans: PropertySer
   </fieldset></form>;
 }
 
-function VisitDetail({ visit, crews, management, busy, mutate, close }: { visit: PorterVisitWithAreas; crews: CrewWithRelations[]; management: boolean; busy: boolean; mutate: (mutation: PorterVisitMutation) => Promise<void>; close: () => void }) {
+function VisitDetail({ visit, crews, management, busy: parentBusy, mutate, reload, close }: { visit: PorterVisitWithAreas; crews: CrewWithRelations[]; management: boolean; busy: boolean; mutate: (mutation: PorterVisitMutation) => Promise<void>; reload: () => Promise<void>; close: () => void }) {
+  const [reportingBusy, setReportingBusy] = useState(false);
+  const [reportingError, setReportingError] = useState("");
+  const busy = parentBusy || reportingBusy;
+  async function runReporting(task: () => Promise<unknown>) {
+    setReportingBusy(true); setReportingError("");
+    try { await task(); await reload(); return true; }
+    catch (error) { setReportingError(errorText(error)); return false; }
+    finally { setReportingBusy(false); }
+  }
   const [notes, setNotes] = useState(visit.visit_notes ?? "");
   const [date, setDate] = useState(visit.scheduled_date);
   const [crew, setCrew] = useState(visit.assigned_crew_id ?? "");
   const terminal = visit.status === "Completed" || visit.status === "Cancelled";
   const canEditSchedule = management && visit.status === "Scheduled";
-  const blocked = visit.areas.some(area => area.is_required && area.status === "Pending");
+  const missingPhotos = missingPorterPhotoRequirements(visit.areas, visit.photos ?? []);
+  const blocked = visit.areas.some(area => area.is_required && area.status === "Pending") || missingPhotos;
   return <section className="mt-6 rounded-2xl border border-[#143d1a]/20 bg-white p-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#9a7a17]">{visit.status} · {visit.scheduled_date}</p><h2 className="mt-2 text-2xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2">{visit.plan_name} · {visit.crew_name ?? "Unassigned crew"}</p></div><button className={button} disabled={busy} onClick={close}>Close</button></div>
     <fieldset disabled={busy || terminal} className="mt-5 space-y-4">
@@ -122,17 +146,21 @@ function VisitDetail({ visit, crews, management, busy, mutate, close }: { visit:
       <label className="block text-sm font-bold">Visit notes<textarea rows={3} className={field} value={notes} onChange={e => setNotes(e.target.value)}/></label>
       {!terminal && <button className={button} onClick={() => void mutate(canEditSchedule ? { action: "edit", data: { scheduled_date: date, assigned_crew_id: crew || null, visit_notes: notes || null } } : { action: "notes", data: { visit_notes: notes || null } })}>Save {canEditSchedule ? "Visit Details" : "Notes"}</button>}
     </fieldset>
+    {reportingError && <p role="alert" className="mt-4 text-sm text-red-700">{reportingError}</p>}
     <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Service Areas</h3>
-    <p className="mt-2 text-sm text-neutral-500">Saved from the plan at creation. Photo requirements are shown for reference; V1 does not collect photos. Save each area before moving to another action.</p>
+    <p className="mt-2 text-sm text-neutral-500">Saved from the plan at creation. Required areas marked Photo Required need evidence even when marked Unable to Complete. Optional photo-requested areas do not block completion. Save each area before moving to another action.</p>
     {!visit.areas.length && <p className="mt-4 text-sm">This visit has no snapshotted service areas.</p>}
-    <div className="mt-4 space-y-4">{visit.areas.map(area => <AreaEditor key={area.id} area={area} disabled={busy || visit.status !== "In Progress"} editable={visit.status === "In Progress"} save={(status, notes) => mutate({ action: "area", data: { area_id: area.id, status, notes } })}/>)}</div>
+    <div className="mt-4 space-y-4">{visit.areas.map(area => <div key={area.id}><AreaEditor area={area} disabled={busy || visit.status !== "In Progress"} editable={visit.status === "In Progress"} save={(status, notes) => mutate({ action: "area", data: { area_id: area.id, status, notes } })}/><PorterEvidenceGroup visit={visit} areaId={area.id} busy={busy} run={runReporting}/></div>)}</div>
+    <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Visit-Level Evidence</h3>
+    <PorterEvidenceGroup visit={visit} areaId={null} busy={busy} run={runReporting}/>
+    <PorterIssuesSection visit={visit} management={management} busy={busy} run={runReporting}/>
     {!terminal && <div className="mt-6 flex flex-wrap gap-3">{visit.status === "Scheduled" && <button className={primary} disabled={busy} onClick={() => void mutate({ action: "start" })}>Start Visit</button>}{visit.status === "In Progress" && <button className={primary} disabled={busy || blocked} onClick={() => void mutate({ action: "complete" })}>Complete Visit</button>}{management && <button className={button} disabled={busy} onClick={() => void mutate({ action: "cancel" })}>Cancel Visit</button>}</div>}
-    {visit.status === "In Progress" && blocked && <p className="mt-3 text-sm text-neutral-600">Required Pending areas must be marked Completed or Unable to Complete before completing the visit.</p>}
-    {terminal && <p className="mt-5 text-sm text-neutral-500">This visit is historical and read-only.</p>}
+    {visit.status === "In Progress" && blocked && <p className="mt-3 text-sm text-neutral-600">Resolve required Pending areas and add evidence to every required area marked Photo Required before completing the visit. Open issues do not block completion.</p>}
+    {terminal && <p className="mt-5 text-sm text-neutral-500">Visit operations are historical and read-only. Management may still acknowledge or resolve documented issues.</p>}
   </section>;
 }
 function AreaEditor({ area, disabled, editable, save }: { area: PorterVisitArea; disabled: boolean; editable: boolean; save: (status: PorterVisitArea["status"], notes: string | null) => Promise<void> }) {
   const [status, setStatus] = useState(area.status);
   const [notes, setNotes] = useState(area.notes ?? "");
-  return <fieldset disabled={disabled} className="rounded-xl border border-neutral-200 p-4"><legend className="px-1 font-bold text-[#143d1a]">{area.name}</legend>{area.description && <p className="text-sm text-neutral-600">{area.description}</p>}<p className="mt-2 text-xs font-bold text-[#9a7a17]">{area.is_required ? "Required" : "Optional"}{area.requires_photo ? " · Photo required (future phase)" : ""}</p><div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-bold">Status<select className={field} value={status} onChange={e => setStatus(e.target.value as PorterVisitArea["status"])}>{VISIT_AREA_STATUSES.map(value => <option key={value}>{value}</option>)}</select></label><label className="text-sm font-bold">Area notes<textarea className={field} value={notes} onChange={e => setNotes(e.target.value)}/></label></div>{editable && <button className={`${button} mt-3`} onClick={() => void save(status, notes || null)}>Save Area</button>}</fieldset>;
+  return <fieldset disabled={disabled} className="rounded-xl border border-neutral-200 p-4"><legend className="px-1 font-bold text-[#143d1a]">{area.name}</legend>{area.description && <p className="text-sm text-neutral-600">{area.description}</p>}<p className="mt-2 text-xs font-bold text-[#9a7a17]">{area.is_required ? "Required" : "Optional"}{area.requires_photo ? area.is_required ? " \u00b7 Photo Required" : " \u00b7 Photo Requested" : ""}</p><div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-bold">Status<select className={field} value={status} onChange={e => setStatus(e.target.value as PorterVisitArea["status"])}>{VISIT_AREA_STATUSES.map(value => <option key={value}>{value}</option>)}</select></label><label className="text-sm font-bold">Area notes<textarea className={field} value={notes} onChange={e => setNotes(e.target.value)}/></label></div>{editable && <button className={`${button} mt-3`} onClick={() => void save(status, notes || null)}>Save Area</button>}</fieldset>;
 }

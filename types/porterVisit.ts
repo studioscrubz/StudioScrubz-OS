@@ -1,3 +1,4 @@
+import { missingPorterPhotoRequirements, PORTER_PHOTO_ERROR, type PorterPhoto, type PorterIssue } from "@/types/porterReporting";
 export const VISIT_STATUSES = ["Scheduled", "In Progress", "Completed", "Cancelled"] as const;
 export const VISIT_AREA_STATUSES = ["Pending", "Completed", "Unable to Complete"] as const;
 export type PorterVisitStatus = (typeof VISIT_STATUSES)[number];
@@ -13,7 +14,7 @@ export type PorterVisitArea = {
   sort_order: number; is_required: boolean; requires_photo: boolean; status: PorterVisitAreaStatus;
   notes: string | null; completed_at: string | null; created_at: string; updated_at: string;
 };
-export type PorterVisitWithAreas = PorterVisit & { crew_name: string | null; areas: PorterVisitArea[] };
+export type PorterVisitWithAreas = PorterVisit & { crew_name: string | null; areas: PorterVisitArea[]; photos?: PorterPhoto[]; issues?: PorterIssue[] };
 export type CreatePorterVisitInput = { plan_id: string; scheduled_date: string; assigned_crew_id: string | null; visit_notes: string | null };
 export type PorterVisitEdit = Pick<PorterVisit, "scheduled_date" | "assigned_crew_id" | "visit_notes">;
 export type PorterVisitMutation =
@@ -32,5 +33,6 @@ export function validateVisitMutation(visit: PorterVisitWithAreas, mutation: Por
   if ((mutation.action === "area" || mutation.action === "complete") && visit.status !== "In Progress") throw new Error("Start the visit first.");
   if (mutation.action === "edit") validateVisitDate(mutation.data.scheduled_date);
   if (mutation.action === "area" && (!visit.areas.some(area => area.id === mutation.data.area_id) || !VISIT_AREA_STATUSES.includes(mutation.data.status))) throw new Error("Invalid service area update.");
+  if (mutation.action === "complete" && missingPorterPhotoRequirements(visit.areas, visit.photos ?? [])) throw new Error(PORTER_PHOTO_ERROR);
   if (mutation.action === "complete" && visit.areas.some(area => area.is_required && area.status === "Pending")) throw new Error("Resolve all required Pending service areas before completing.");
 }

@@ -1,3 +1,4 @@
+import type { PorterPhoto, PorterIssue } from "@/types/porterReporting";
 import type { PorterVisit, PorterVisitArea, PorterVisitWithAreas } from "@/types/porterVisit";
 import type { PropertyServicePlan, PropertyServicePlanInput, PropertyServicePlanArea, PropertyServicePlanAreaInput, PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { FieldMeasurements, FieldWalkthrough } from "@/types/fieldWalkthrough";
@@ -38,6 +39,8 @@ import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 export interface Database {
   public: {
     Tables: {
+      property_service_visit_photos: { Row: PorterPhoto; Insert: never; Update: never; Relationships: [] };
+      property_service_visit_issues: { Row: PorterIssue; Insert: never; Update: never; Relationships: [] };
       property_service_visits: { Row: PorterVisit; Insert: never; Update: never; Relationships: [] };
       property_service_visit_areas: { Row: PorterVisitArea; Insert: never; Update: never; Relationships: [] };
       property_service_plans: { Row: PropertyServicePlan; Insert: PropertyServicePlanInput; Update: Partial<PropertyServicePlanInput>; Relationships: [] };
@@ -152,6 +155,8 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      add_porter_visit_photo: { Args: { p_visit_id: string; p_visit_area_id: string | null; p_issue_id: string | null; p_storage_path: string; p_file_name: string; p_caption: string | null }; Returns: string };
+      save_porter_visit_issue: { Args: { p_visit_id: string; p_issue_id: string | null; p_expected_updated_at: string | null; p_action: string; p_data: Record<string, string | null> }; Returns: string };
       get_porter_visits: { Args: { p_id?: string }; Returns: PorterVisitWithAreas[] };
       create_porter_visit: { Args: { p_plan_id: string; p_scheduled_date: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
       mutate_porter_visit: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: Record<string, string | null> }; Returns: string };
