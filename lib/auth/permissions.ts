@@ -1,6 +1,7 @@
 import type { UserProfile, UserRole } from "@/types/auth";
 
 export const PERMISSIONS = [
+  "porterVisits.view", "porterVisits.manage",
   "propertyServicePlans.manage",
   "walkthroughs.field",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
@@ -23,6 +24,7 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 const operationalAdmin: Permission[] = [
+  "porterVisits.view", "porterVisits.manage",
   "propertyServicePlans.manage",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
@@ -41,6 +43,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   "Master Admin": new Set(PERMISSIONS),
   Administrator: new Set(operationalAdmin),
   Manager: new Set([
+    "porterVisits.view", "porterVisits.manage",
     "propertyServicePlans.manage",
     "dashboard.view", "clients.view", "clients.edit", "properties.view", "properties.edit",
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
@@ -57,11 +60,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "agreements.manage", "timeClock.view", "employees.directory_view", "communications.view", "communications.create", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
   "Crew Lead": new Set([
+    "porterVisits.view",
     "walkthroughs.field",
     "dashboard.view", "jobs.view", "jobs.edit", "jobs.complete", "schedule.view",
     "timeClock.view", "crews.view", "clients.view", "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send", "appearance.view",
   ]),
   "Scrub Technician": new Set([
+    "porterVisits.view",
     "walkthroughs.field",
     "dashboard.view", "jobs.view", "schedule.view", "timeClock.view", "clients.view",
     "properties.view", "vehicles.view", "attention.view", "messages.view", "messages.send", "appearance.view",
@@ -88,6 +93,7 @@ export const canViewInvoiceFinishedPhotos = (profile: UserProfile | null) => pro
 export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) => profile?.is_active === true && ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/properties/porter-visits", "porterVisits.view"],
   ["/properties/service-plans", "propertyServicePlans.manage"],
   ["/field-walkthroughs", "walkthroughs.field"],
   ["/vendor-packets", "estimates.create"],

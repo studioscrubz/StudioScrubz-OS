@@ -1,3 +1,4 @@
+import type { PorterVisit, PorterVisitArea, PorterVisitWithAreas } from "@/types/porterVisit";
 import type { PropertyServicePlan, PropertyServicePlanInput, PropertyServicePlanArea, PropertyServicePlanAreaInput, PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { FieldMeasurements, FieldWalkthrough } from "@/types/fieldWalkthrough";
 import type { Client, ClientInput } from "@/types/client";
@@ -37,6 +38,8 @@ import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 export interface Database {
   public: {
     Tables: {
+      property_service_visits: { Row: PorterVisit; Insert: never; Update: never; Relationships: [] };
+      property_service_visit_areas: { Row: PorterVisitArea; Insert: never; Update: never; Relationships: [] };
       property_service_plans: { Row: PropertyServicePlan; Insert: PropertyServicePlanInput; Update: Partial<PropertyServicePlanInput>; Relationships: [] };
       property_service_plan_areas: { Row: PropertyServicePlanArea; Insert: PropertyServicePlanAreaInput & { service_plan_id: string }; Update: Partial<PropertyServicePlanAreaInput>; Relationships: [] };
       user_profiles:{Row:UserProfile;Insert:UserProfile;Update:Partial<Pick<UserProfile,"display_name"|"role"|"is_active"|"employee_id">>;Relationships:[{foreignKeyName:"user_profiles_employee_id_fkey";columns:["employee_id"];isOneToOne:true;referencedRelation:"employees";referencedColumns:["id"]}]};
@@ -149,6 +152,9 @@ export interface Database {
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
     Functions: {
+      get_porter_visits: { Args: { p_id?: string }; Returns: PorterVisitWithAreas[] };
+      create_porter_visit: { Args: { p_plan_id: string; p_scheduled_date: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
+      mutate_porter_visit: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: Record<string, string | null> }; Returns: string };
       save_property_service_plan: { Args: { p_id: string | null; p_plan: PropertyServicePlanInput; p_areas: PropertyServicePlanAreaInput[]; p_expected_updated_at: string | null; p_archive: boolean }; Returns: PropertyServicePlanWithAreas };
       initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
       get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
