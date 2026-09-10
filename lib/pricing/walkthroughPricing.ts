@@ -1,7 +1,7 @@
 import type { CalculatorInput, CommercialCalculatorInput, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
-import type { PostConstructionEstimateInput } from "@/lib/pricing/estimates";
+import { isPostConstructionV2Estimate, type PostConstructionEstimateInput } from "@/lib/pricing/estimates";
 import { findCatalogService, isPostConstructionCatalogService } from "@/lib/services/serviceCatalog";
 
 export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRelations, catalog: ServiceCatalogBundle): CalculatorInput {
@@ -19,7 +19,14 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
   if (isPostConstructionCatalogService(service) || /post[- ]construction/i.test(serviceName)) {
     // Preserve explicit historical calculator versions; never infer V2 from legacy inputs.
     const previous = saved ?? fallback;
-    if (previous && "calculatorType" in previous && previous.calculatorType === "Post-Construction") return previous;
+    if (previous && "calculatorType" in previous && previous.calculatorType === "Post-Construction") {
+      if (saved || !isPostConstructionV2Estimate(previous)) return previous;
+      return { ...previous, rooms: measurements.bedrooms ?? previous.rooms, bathrooms: measurements.bathrooms ?? previous.bathrooms,
+        floors: measurements.floors ?? previous.floors, kitchens: measurements.kitchenAreas ?? previous.kitchens,
+        squareFeet: measurements.squareFeet ?? previous.squareFeet,
+        projectCosting: { ...previous.projectCosting, totalSquareFeet: measurements.squareFeet ?? previous.projectCosting.totalSquareFeet },
+      } as PostConstructionEstimateInput;
+    }
     const projectCosting = {
       version: 2 as const, calculatorType: "Post-Construction" as const,
       totalSquareFeet: measurements.squareFeet ?? 0, scope: walkthrough.scope.map(item => item.label),
@@ -31,7 +38,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
     const input: PostConstructionEstimateInput = {
       version: 2, projectCosting, calculatorType: "Post-Construction", division: walkthrough.division,
       serviceType: "Post-Construction Cleaning", serviceCode: service?.service_code, frequency: "One-Time", condition,
-      squareFeet: projectCosting.totalSquareFeet, floors: measurements.floors ?? 1, rooms: 0, bathrooms: measurements.bathrooms ?? 0,
+      squareFeet: projectCosting.totalSquareFeet, floors: measurements.floors ?? 1, rooms: measurements.bedrooms ?? 0, bathrooms: measurements.bathrooms ?? 0,
       kitchens: measurements.kitchenAreas ?? 0, dustSeverity: "Average", debrisSeverity: "Average", detailLevel: "Detailed",
       windowsOrGlassCount: 0, cabinetOrDrawerCount: 0, applianceInteriorCount: 0, stairFlights: 0,
       targetProjectDays: projectCosting.plannedProjectDays, workdayHours: projectCosting.workdayHours,

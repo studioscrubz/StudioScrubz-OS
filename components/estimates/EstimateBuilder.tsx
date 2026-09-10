@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { residentialPostConstructionScopeError } from "@/lib/walkthroughWorkflow";
 import { useRouter } from "next/navigation";
 import { isPostConstructionV2Estimate, type PostConstructionEstimateInput, calculatePostConstructionCatalogEstimate, calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
@@ -165,6 +166,10 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   }
 
   async function save() {
+    if (postConstructionMode && division === "Residential") {
+      const scopeError = residentialPostConstructionScopeError({ division, measurements: { serviceType: "Post-Construction Cleaning", bedrooms: postConstruction.rooms, bathrooms: postConstruction.bathrooms, floors: postConstruction.floors, kitchenAreas: postConstruction.kitchens, squareFeet: isPostConstructionV2Estimate(postConstruction) ? postConstruction.projectCosting.totalSquareFeet : postConstruction.squareFeet } });
+      if (scopeError) return setError(scopeError);
+    }
     if(!result){setError(calculation.error??"Pricing is not ready.");return}
     const validation = validateCustomer(customer);
     if (validation) { setError(validation); return; }

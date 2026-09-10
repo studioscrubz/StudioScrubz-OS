@@ -7,7 +7,7 @@ import type { PostConstructionEstimateInput } from "@/lib/pricing/estimates";
 import type { PostConstructionV2Input } from "@/types/estimate";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 import { getAvailableServiceAddons, findCatalogService, isPostConstructionCatalogService } from "@/lib/services/serviceCatalog";
-import { assessmentReadyForPricing } from "@/lib/walkthroughWorkflow";
+import { assessmentReadyForPricing, residentialPostConstructionScopeError } from "@/lib/walkthroughWorkflow";
 import type { CalculatorInput, CommercialCalculatorInput, PostConstructionCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import type { UserProfile } from "@/types/auth";
@@ -82,6 +82,9 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+
+    const scopeError = residentialPostConstructionScopeError(walkthrough);
+    if (scopeError) return Response.json({ error: scopeError }, { status: 400 });
 
     if (!assessmentReadyForPricing(walkthrough)) {
       return Response.json(
@@ -248,7 +251,7 @@ function normalizeInput(
     if (raw.version !== 2 || raw.calculatorType !== "Post-Construction") throw new Error("Mismatched V2 project costing version or type.");
     const projectCosting: PostConstructionV2Input = {
       version: 2, calculatorType: "Post-Construction",
-      totalSquareFeet: number(raw.totalSquareFeet, "square feet"),
+      totalSquareFeet: division === "Residential" ? positive(raw.totalSquareFeet, "Total square feet") : number(raw.totalSquareFeet, "square feet"),
       estimatedPersonHours: number(raw.estimatedPersonHours, "person-hours"), crewSize: number(raw.crewSize, "crew size"),
       workerHourlyPay: number(raw.workerHourlyPay, "worker hourly pay"), plannedProjectDays: number(raw.plannedProjectDays, "project days"),
       workdayHours: workday(raw.workdayHours) ?? (() => { throw new Error("Workday hours are required."); })(),
@@ -264,7 +267,10 @@ function normalizeInput(
     const input: PostConstructionEstimateInput = {
       version: 2, projectCosting, calculatorType: "Post-Construction", division, serviceType: "Post-Construction Cleaning",
       frequency: "One-Time", condition: oneOf(row.condition, ["Light", "Average", "Heavy", "Extreme"] as const, "condition"),
-      squareFeet: projectCosting.totalSquareFeet, floors: 1, rooms: 0, bathrooms: 0, kitchens: 0,
+      squareFeet: projectCosting.totalSquareFeet, floors: division === "Residential" ? positive(row.floors, "Floors") : 1,
+      rooms: division === "Residential" ? nonnegative(row.rooms, "Bedrooms") : 0,
+      bathrooms: division === "Residential" ? nonnegative(row.bathrooms, "Bathrooms") : 0,
+      kitchens: division === "Residential" ? nonnegative(row.kitchens, "Kitchens") : 0,
       dustSeverity: "Average", debrisSeverity: "Average", detailLevel: "Detailed", windowsOrGlassCount: 0,
       cabinetOrDrawerCount: 0, applianceInteriorCount: 0, stairFlights: 0,
       targetProjectDays: projectCosting.plannedProjectDays, workdayHours: projectCosting.workdayHours,
