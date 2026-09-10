@@ -32,6 +32,23 @@ function NumberField({label,value,set,step="1"}:{label:string;value:number;set:(
 function SelectField({label,value,options,set,labels}:{label:string;value:string;options:readonly string[];set:(value:string)=>void;labels?:ReadonlyMap<string,string>}){return <label><Label text={label}/><select className={inputClass} value={value} onChange={event=>set(event.target.value)}>{options.map(option=><option key={option} value={option}>{labels?.get(option)??option}</option>)}</select></label>}
 const inputClass="w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
 
+export function projectCostingIncompleteMessage(value: PostConstructionV2Input | undefined): string | null {
+  if (!value) return null;
+  if (value.estimatedPersonHours === 0) return "Enter estimated total person-hours to calculate project pricing.";
+  if (value.crewSize === 0 || value.plannedProjectDays === 0 || Number(value.workdayHours) === 0) return "Enter crew size, planned project days, and workday hours to calculate project pricing.";
+  return null;
+}
+
+export function projectCostingErrorMessage(message: string): string {
+  const labels: Record<string, string> = {
+    estimatedPersonHours: "Estimated total person-hours", crewSize: "Crew size", plannedProjectDays: "Planned project days",
+    workdayHours: "Workday hours", totalSquareFeet: "Total square feet", workerHourlyPay: "Worker hourly pay",
+    suppliesCost: "Supplies cost", equipmentRentalCost: "Equipment / rental cost", travelLogisticsCost: "Travel / logistics cost",
+    disposalDebrisCost: "Disposal / debris cost", supervisionAdminCost: "Supervision / admin cost", contingencyCost: "Contingency cost",
+  };
+  return message.replace(/^[a-zA-Z]+/, key => labels[key] ?? key);
+}
+
 function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input; onChange: (value: PostConstructionV2Input) => void }) {
   if (!value) return <p role="alert">Version 2 project inputs are missing.</p>;
   const fields = [
@@ -43,7 +60,8 @@ function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input
   ] as const;
   let result;
   let error = "";
-  try { result = calculatePostConstructionV2(value); } catch (cause) { error = cause instanceof Error ? cause.message : "Check project inputs."; }
+  const incomplete = projectCostingIncompleteMessage(value);
+  if (!incomplete) { try { result = calculatePostConstructionV2(value); } catch (cause) { error = projectCostingErrorMessage(cause instanceof Error ? cause.message : "Check project inputs."); } }
   const money = (amount: number) => amount.toLocaleString("en-US", { style: "currency", currency: "USD" });
   const rows = result ? [
     ["Labor cost", money(result.laborCost)], ["Non-labor costs", money(result.nonLaborProjectCosts)],
@@ -58,6 +76,7 @@ function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input
       <label><Label text="Manual project price override (optional)"/><input className={inputClass} type="number" min="0.01" step="0.01" value={value.manualProjectPriceOverride ?? ""} onChange={event => { const next = { ...value }; if (event.target.value === "") delete next.manualProjectPriceOverride; else next.manualProjectPriceOverride = Number(event.target.value); onChange(next); }}/></label>
     </Group>
     <label className="block"><Label text="Scope / areas (one per line)"/><textarea className={inputClass} rows={3} value={(value.scope ?? []).join("\n")} onChange={event => onChange({ ...value, scope: event.target.value.split("\n") })}/></label>
+    {incomplete && <p className="text-sm text-neutral-600">{incomplete}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {result && <dl className="grid gap-3 rounded-xl bg-[#f7f9f6] p-4 sm:grid-cols-2 xl:grid-cols-3">{rows.map(([label,display]) => <div key={label}><dt className="text-xs text-neutral-600">{label}</dt><dd className="mt-1 font-bold text-[#143d1a]">{display}</dd></div>)}</dl>}
   </div>;
