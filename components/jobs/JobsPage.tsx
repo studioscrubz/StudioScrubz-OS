@@ -391,7 +391,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, canComplete, canDel
     </div>
     <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
-      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJob(job.id) }), "Job started. Join the Job separately to begin your payroll time.")} className={`${primary} w-full`}>START JOB</button>}
+      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job.")} className={`${primary} w-full`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
@@ -638,7 +638,7 @@ function JobModal({
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
           {clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}
-          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => lifecycleAct(async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJob(job.id) }), "Job started. Join the Job separately to begin your payroll time.")}>START JOB</button>}
+          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job.")}>START JOB</button>}
           {canClock && eligibility.canJoin && !clockError && (
             <>
               <button
@@ -1084,3 +1084,4 @@ const secondary =
   "rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] disabled:opacity-50";
 const danger =
   "rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50";
+
