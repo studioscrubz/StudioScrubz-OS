@@ -9,7 +9,7 @@ import { getProperties } from "@/lib/services/properties";
 import { getAgreements } from "@/lib/services/agreements";
 import { getActiveCrews } from "@/lib/services/crews";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
-import { archivePropertyServicePlan, createPropertyServicePlan, listPropertyServicePlans, updatePropertyServicePlan } from "@/lib/services/propertyServicePlans";
+import { archivePropertyServicePlan, createPropertyServicePlan, deletePropertyServicePlan, listPropertyServicePlans, updatePropertyServicePlan } from "@/lib/services/propertyServicePlans";
 import { PLAN_DAYS, PLAN_FREQUENCIES, PLAN_STATUSES, type PropertyServicePlanInput, type PropertyServicePlanAreaInput, type PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { PropertyWithClient } from "@/types/property";
 import type { AgreementWithRelations } from "@/types/agreement";
@@ -68,6 +68,17 @@ export function PropertyServicePlansPage() {
     } catch (error) { setError(message(error)); }
     finally { setBusy(false); }
   }
+  async function removePlan(plan: PropertyServicePlanWithAreas) {
+    if (!window.confirm(`Permanently delete ${plan.name}? This cannot be undone.`)) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await deletePropertyServicePlan(plan);
+      setPlans(rows => rows.filter(row => row.id !== plan.id));
+      if (editing?.id === plan.id) setEditing(undefined);
+      setNotice("Property Service Plan permanently deleted.");
+    } catch (error) { setError(message(error)); }
+    finally { setBusy(false); }
+  }
   if (!allowed) return <p>Property Service Plan access is restricted to management.</p>;
   const visible = plans.filter(plan => {
     const property = options.properties.find(p => p.id === plan.property_id);
@@ -92,7 +103,11 @@ export function PropertyServicePlansPage() {
           <p className="mt-2 text-sm">{property ? propertyLabel(property) : "Property unavailable"} · {clientLabel(property)}</p>
           <p className="mt-2 text-sm text-neutral-600">{plan.frequency}{plan.service_days.length ? ` · ${plan.service_days.map(day => PLAN_DAYS[day - 1]).join(", ")}` : ""}</p>
           <p className="mt-2 text-sm text-neutral-600">{plan.start_date}{plan.end_date ? ` through ${plan.end_date}` : " · No end date"} · {plan.areas.filter(area => area.active).length} active areas</p>
-          {!plan.archived_at && <div className="mt-4 flex gap-3"><button type="button" className={button} disabled={busy} onClick={() => { setEditing(plan); setError(""); setNotice(""); }}>Edit Plan</button><button type="button" className={button} disabled={busy} onClick={() => void archive(plan)}>End &amp; Archive</button></div>}
+          <div className="mt-4 flex flex-wrap gap-3">
+            {!plan.archived_at && <button type="button" className={button} disabled={busy} onClick={() => { setEditing(plan); setError(""); setNotice(""); }}>Edit Plan</button>}
+            {!plan.archived_at && <button type="button" className={button} disabled={busy} onClick={() => void archive(plan)}>End &amp; Archive</button>}
+            <button type="button" className={button} disabled={busy} onClick={() => void removePlan(plan)}>Delete Plan</button>
+          </div>
         </article>;
       })}</div>}
     </section>

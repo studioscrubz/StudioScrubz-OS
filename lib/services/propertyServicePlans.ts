@@ -45,3 +45,9 @@ export const updatePropertyServicePlan = (plan: PropertyServicePlanWithAreas, in
 export const setPropertyServicePlanStatus = (plan: PropertyServicePlanWithAreas, status: PropertyServicePlanInput["status"]) => save(plan.id, { ...plan, status }, plan.areas, plan.updated_at);
 export const archivePropertyServicePlan = (plan: PropertyServicePlanWithAreas) => save(plan.id, { ...plan, status: "Ended" }, plan.areas, plan.updated_at, true);
 export const savePropertyServicePlanAreas = (plan: PropertyServicePlanWithAreas, areas: PropertyServicePlanAreaInput[]) => save(plan.id, plan, areas, plan.updated_at);
+
+export async function deletePropertyServicePlan(plan: PropertyServicePlanWithAreas): Promise<void> {
+  await authorize();
+  const { error } = await getSupabaseClient().rpc("delete_property_service_plan", { p_id: plan.id });
+  if (error) throw new Error(`Property Service Plan could not be deleted: ${error.message}`);
+}

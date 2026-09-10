@@ -87,3 +87,39 @@ test("database rejection is surfaced and invalid input never invokes the write",
   await assert.rejects(api.createPropertyServicePlan(input, areas), /This plan changed/);
   assert.equal(calls, 1);
 });
+
+test("permanent deletion invokes RPC for management roles and surfaces foreign key rejections", async () => {
+  const plan = { ...input, id: "plan-to-delete", updated_at: "2026-09-09T01:00:00Z", areas: [{ ...areas[0], id: "area" }] };
+  const calls = [];
+  const api = service("Manager", async (name, args) => {
+    calls.push({ name, args });
+    if (args.p_id === "plan-with-visits") return { data: null, error: { message: "This Property Service Plan cannot be permanently deleted because it has 2 associated Porter Visit(s). Archive the plan instead." } };
+    return { data: null, error: null };
+  });
+
+  // Non-management role rejection
+  const nonMgmtApi = service("Sales", async () => ({ data: null, error: null }));
+  await assert.rejects(nonMgmtApi.deletePropertyServicePlan(plan), /access denied/);
+
+  // Management role success
+  await api.deletePropertyServicePlan(plan);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, "delete_property_service_plan");
+  assert.equal(calls[0].args.p_id, "plan-to-delete");
+
+  // Rejection when plan has associated visits
+  const planWithVisits = { ...plan, id: "plan-with-visits" };
+  await assert.rejects(api.deletePropertyServicePlan(planWithVisits), /associated Porter Visit/);
+});
+
+test("delete migration defines secure RPC with role authorization and visit protection", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20260910000000_delete_property_service_plan.sql", import.meta.url), "utf8");
+  assert.match(sql, /create or replace function public\.delete_property_service_plan/);
+  assert.match(sql, /security definer set search_path = ''/);
+  assert.match(sql, /auth\.uid\(\) is null or not public\.has_any_role\(array\['Master Admin','Administrator','Manager'\]\)/);
+  assert.match(sql, /select count\(\*\) into v_visits_count from public\.property_service_visits where service_plan_id = p_id/);
+  assert.match(sql, /delete from public\.property_service_plan_areas where service_plan_id = p_id/);
+  assert.match(sql, /delete from public\.property_service_plans where id = p_id/);
+  assert.match(sql, /revoke all on function public\.delete_property_service_plan\(uuid\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.delete_property_service_plan\(uuid\) to authenticated/);
+});
