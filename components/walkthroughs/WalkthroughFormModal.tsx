@@ -114,7 +114,62 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
       {walkthrough&&clientId&&<SalesContactAttempts clientId={clientId} propertyId={propertyId||null} estimateId={estimateId||null}/>}
       <Qualification value={measurements} set={setMeasurements} customerNotes={customerNotes} setCustomerNotes={setCustomerNotes} division={division}/>
       {selectedEstimate&&<Panel title="Inherited Estimate Pricing"><div className="grid gap-4 text-sm sm:grid-cols-3"><Info label="Base Service Price" value={currency(selectedEstimate.result.basePrice)}/><Info label="Subtotal" value={currency(selectedEstimate.result.oneTimePrice)}/><Info label="Frequency" value={selectedEstimate.frequency}/><Info label="Recurring Discount" value={`${selectedEstimate.result.recurringDiscountPercent}% · -${currency(selectedEstimate.result.recurringDiscount)}`}/><Info label="Manual Discount" value={`-${currency(selectedEstimate.result.manualDiscount)}`}/>{selectedEstimate.result.taxes>0&&<Info label="Taxes" value={currency(selectedEstimate.result.taxes)}/>}<Info label="Final Per Visit" value={currency(selectedEstimate.result.finalPrice)}/><Info label="Estimated Monthly" value={selectedEstimate.result.monthlyPrice===null?"Not applicable":currency(selectedEstimate.result.monthlyPrice)}/></div><p className="mt-3 text-xs text-neutral-500">Saved Estimate pricing is carried forward for reference and is not recalculated by the Walkthrough.</p></Panel>}
-      <Panel title="Assessment Method"><Select label="How will this property be assessed?" value={measurements.assessmentMethod??""} set={value=>setMeasurements(current=>({...current,assessmentMethod:value as WalkthroughMeasurements["assessmentMethod"]}))} options={["In-Person Walkthrough","Customer Photo Submission"].map(value=>({value,label:value}))} placeholder="Select assessment method"/></Panel>
+      <Panel title="Assessment Method">
+        <p className="mb-3 text-sm text-neutral-600">Select how this property will be evaluated for pricing and proposal generation.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setMeasurements(current => ({ ...current, assessmentMethod: "In-Person Walkthrough" }))}
+            className={`rounded-xl border p-4 text-left transition ${
+              measurements.assessmentMethod === "In-Person Walkthrough"
+                ? "border-2 border-[#143d1a] bg-[#edf4ec]/60 shadow-sm"
+                : "border-neutral-200 bg-white hover:border-[#143d1a]/30 hover:bg-[#f8faf7]"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-[#143d1a]">In-Person Walkthrough</span>
+              <span className={`flex size-4 items-center justify-center rounded-full border ${
+                measurements.assessmentMethod === "In-Person Walkthrough"
+                  ? "border-[#143d1a] bg-[#143d1a]"
+                  : "border-neutral-300 bg-white"
+              }`}>
+                {measurements.assessmentMethod === "In-Person Walkthrough" && (
+                  <span className="size-1.5 rounded-full bg-white" />
+                )}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-neutral-600">
+              Schedule an on-site visit to inspect the property, record measurements, and verify service scope with the customer.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMeasurements(current => ({ ...current, assessmentMethod: "Customer Photo Submission" }))}
+            className={`rounded-xl border p-4 text-left transition ${
+              measurements.assessmentMethod === "Customer Photo Submission"
+                ? "border-2 border-[#143d1a] bg-[#edf4ec]/60 shadow-sm"
+                : "border-neutral-200 bg-white hover:border-[#143d1a]/30 hover:bg-[#f8faf7]"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-[#143d1a]">Customer Photo Submission</span>
+              <span className={`flex size-4 items-center justify-center rounded-full border ${
+                measurements.assessmentMethod === "Customer Photo Submission"
+                  ? "border-[#143d1a] bg-[#143d1a]"
+                  : "border-neutral-300 bg-white"
+              }`}>
+                {measurements.assessmentMethod === "Customer Photo Submission" && (
+                  <span className="size-1.5 rounded-full bg-white" />
+                )}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-neutral-600">
+              Send a secure digital submission link allowing the customer to upload photos and notes of their service areas.
+            </p>
+          </button>
+        </div>
+      </Panel>
       {(measurements.assessmentMethod??"In-Person Walkthrough")==="In-Person Walkthrough"&&<Panel title="Walkthrough Schedule"><div className="grid gap-4 sm:grid-cols-3"><Text label="Date" type="date" value={date} set={setDate} required /><Text label="Time" type="time" value={time} set={setTime} required /><Select label="Assigned Employee" value={assignedEmployeeId} set={id => { setAssignedEmployeeId(id); setAssignedTo(employeeName(employees.find(item => item.id === id) ?? null)); if (!id) setAssignedTo(""); }} options={employees.map(item => ({value:item.id,label:employeeName(item)}))} placeholder="Unassigned" />{assignedEmployeeId && !employees.some(item => item.id === assignedEmployeeId) && <p className="text-sm text-amber-700">The assigned employee is unavailable. Select an active employee or clear the assignment.</p>}{!assignedEmployeeId && assignedTo && <p className="text-sm text-neutral-500">Legacy label: {assignedTo}. Select an employee to grant field access.</p>}</div><div className="mt-4 rounded-lg bg-[#f5f7f4] px-3 py-2 text-xs font-bold text-[#143d1a]">Workflow: {status === "Completed" || status === "Proposal Ready" ? "COMPLETED — PRICING REVIEW" : date&&time?"SCHEDULED":"QUALIFICATION"}</div><label className="mt-4 block"><Label text="Internal Assessment Notes" /><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputClass} /></label></Panel>}
       {walkthrough&&measurements.assessmentMethod==="Customer Photo Submission"&&<PhotoSubmissionAccessCard walkthroughId={walkthrough.id} phone={selectedEstimate?.customer_phone??selectedClient?.phone??walkthrough.phone??null} status={measurements.photoSubmissionStatus} submittedAt={measurements.photoSubmittedAt}/>}
       <Panel title="Service"><div className="grid gap-4 sm:grid-cols-2"><Select label="Service Type" value={services.find(item=>item.service_name===measurements.serviceType)?.id??""} set={chooseService} options={services.filter(item=>item.division===division||item.division==="Both").map(item=>({value:item.id,label:item.service_name}))} placeholder={measurements.serviceType||"Select service"}/><div><Label text="Service Description"/><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{measurements.serviceDescription||"No service description available."}</div></div></div></Panel>
