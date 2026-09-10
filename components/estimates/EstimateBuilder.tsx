@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
-import { calculatePostConstructionCatalogEstimate, calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
+import { isPostConstructionV2Estimate, type PostConstructionEstimateInput, calculatePostConstructionCatalogEstimate, calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 import { matchingRecurringRules } from "@/lib/pricing/pricingEngine";
 import { createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
@@ -29,6 +29,7 @@ const blankCustomer: CustomerInformation = { firstName: "", lastName: "", compan
 const defaultResidential: ResidentialCalculatorInput = { division: "Residential", serviceType: "Standard", frequency: "One-Time", condition: "Average", squareFeet: 1000, bedrooms: 2, bathrooms: 1, occupied: true, pets: false, additionalDiscountPercent: 0, taxRatePercent: 0, addOns: [] };
 const defaultCommercial: CommercialCalculatorInput = { division: "Commercial", commercialType: "Office", frequency: "One-Time", squareFeet: 2500, floors: 1, restrooms: 2, kitchens: 1, stations: 0, units: 0, condition: "Average", targetCompletionHours: 4, workerHourlyPay: 22, targetProfitMarginPercent: 35, additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [] };
 const defaultPostConstruction: PostConstructionCalculatorInput = { calculatorType: "Post-Construction", division: "Residential", serviceType: "Post-Construction Cleaning", frequency: "One-Time", squareFeet: 2500, floors: 1, rooms: 0, bathrooms: 0, kitchens: 0, condition: "Average", dustSeverity: "Average", debrisSeverity: "Average", detailLevel: "Detailed", windowsOrGlassCount: 0, cabinetOrDrawerCount: 0, applianceInteriorCount: 0, stairFlights: 0, targetProjectDays: 1, workdayHours: 8, workerHourlyPay: 40, targetProfitMarginPercent: 35, additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [] };
+const defaultPostConstructionV2: PostConstructionEstimateInput = { ...defaultPostConstruction, version: 2, projectCosting: { version: 2, calculatorType: "Post-Construction", totalSquareFeet: 2500, scope: [], estimatedPersonHours: 0, crewSize: 1, workerHourlyPay: 40, plannedProjectDays: 1, workdayHours: 8, suppliesCost: 0, equipmentRentalCost: 0, travelLogisticsCost: 0, disposalDebrisCost: 0, supervisionAdminCost: 0, contingencyCost: 0, desiredMarginPercent: 35 } };
 const estimateDraftKey = "studioscrubz:estimate-draft";
 
 type EstimateDraft = {
@@ -53,7 +54,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [division, setDivision] = useState<EstimateDivision>(estimate?.division ?? "Residential");
   const [residential, setResidential] = useState<ResidentialCalculatorInput>(initialInput?.division === "Residential" && !isPostConstructionInput(initialInput) ? initialInput : isPostConstructionInput(initialInput)&&estimate?.division==="Residential"?{...defaultResidential,serviceType:"Post-Construction"}:defaultResidential);
   const [commercial, setCommercial] = useState<CommercialCalculatorInput>(initialInput?.division === "Commercial" && !isPostConstructionInput(initialInput) ? initialInput : isPostConstructionInput(initialInput)&&estimate?.division==="Commercial"?{...defaultCommercial,commercialType:"Post-Construction"}:defaultCommercial);
-  const [postConstruction, setPostConstruction] = useState<PostConstructionCalculatorInput>(isPostConstructionInput(initialInput) ? initialInput : defaultPostConstruction);
+  const [postConstruction, setPostConstruction] = useState<PostConstructionCalculatorInput>(isPostConstructionInput(initialInput) ? initialInput : defaultPostConstructionV2);
   const [serviceDescription, setServiceDescription] = useState(estimate?.result.serviceDescription ?? "");
   const [notes, setNotes] = useState(estimate?.notes ?? "");
   const [terms, setTerms] = useState(estimate?.terms ?? "");
@@ -78,7 +79,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const historicalPostConstructionFallback=isPostConstructionInput(initialInput);
   const postConstructionMode=isPostConstructionCatalogService(selectedService)||historicalPostConstructionFallback;
   const calculatorInput: CalculatorInput = postConstructionMode ? {...postConstruction,division,serviceCode:selectedService?.service_code??postConstruction.serviceCode??null} : division === "Residential" ? residential : commercial;
-  const draftDefaults=useMemo<EstimateDraftDefaults>(()=>({residential:{...defaultResidential,taxRatePercent:0,addOns:[]},commercial:{...defaultCommercial,taxRatePercent:0,additionalServices:[]},postConstruction:{...defaultPostConstruction,taxRatePercent:0,additionalServices:[]},serviceDescription:catalog?selectedCatalogService(catalog,"Residential",defaultResidential.serviceType)?.description?.trim()??"":"",notes:defaults?.default_estimate_notes??"",terms:defaults?.default_estimate_terms??""}),[catalog,defaults]);
+  const draftDefaults=useMemo<EstimateDraftDefaults>(()=>({residential:{...defaultResidential,taxRatePercent:0,addOns:[]},commercial:{...defaultCommercial,taxRatePercent:0,additionalServices:[]},postConstruction:{...defaultPostConstructionV2,taxRatePercent:0,additionalServices:[]},serviceDescription:catalog?selectedCatalogService(catalog,"Residential",defaultResidential.serviceType)?.description?.trim()??"":"",notes:defaults?.default_estimate_notes??"",terms:defaults?.default_estimate_terms??""}),[catalog,defaults]);
   useOperationalRealtime(["services", "service_addons", "service_addon_links", "service_price_tiers", "recurring_pricing_rules"], async () => {
     setCatalog(await getServiceCatalog());
   });
@@ -99,7 +100,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           setDivision(parsed.division);
           setResidential(parsed.residential);
           setCommercial(parsed.commercial);
-          setPostConstruction(parsed.postConstruction ?? defaultPostConstruction);
+          setPostConstruction(parsed.postConstruction ?? defaultPostConstructionV2);
           setServiceDescription(parsed.serviceDescription ?? "");
           setNotes(parsed.notes);
           setTerms(parsed.terms??"");
@@ -134,8 +135,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       console.warn("Estimate draft could not be saved", caught);
     }
   }, [commercial, customer, division, draftDefaults, draftReady, estimate, manualPrice, notes, postConstruction, residential, serviceDescription, terms]);
-  const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:postConstructionMode?calculatePostConstructionCatalogEstimate({...postConstruction,division},catalog,selectedService):division === "Residential" ? calculateResidentialEstimate(residential,catalog,defaults?.upkeep_adjustment_percent ?? 30) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, defaults?.upkeep_adjustment_percent, division, postConstruction, postConstructionMode, residential, selectedService]);
-  const result=calculation.result?withAuthoritativeEstimatePrice({...calculation.result,serviceDescription:serviceDescription.trim()||null},manualPrice):null;
+  const calculation = useMemo(() => {if(!catalog)return{result:null,error:null};try{return{result:postConstructionMode?calculatePostConstructionCatalogEstimate({...postConstruction,division},catalog,selectedService):division === "Residential" ? calculateResidentialEstimate(residential,catalog,defaults?.upkeep_adjustment_percent ?? 30) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?x.message:"Pricing could not be calculated."}}}, [catalog,commercial, defaults, division, postConstruction, postConstructionMode, residential, selectedService]);
+  const v2Mode = postConstructionMode && isPostConstructionV2Estimate(postConstruction);
+  const result=calculation.result ? v2Mode ? {...calculation.result,serviceDescription:serviceDescription.trim()||null} : withAuthoritativeEstimatePrice({...calculation.result,serviceDescription:serviceDescription.trim()||null},manualPrice) : null;
 
   function selectCatalogService(nextDivision:EstimateDivision, selection:string) { if (!catalog) { pendingCatalogSelection.current={division:nextDivision,selection}; return; } const service=selectedCatalogService(catalog,nextDivision,selection); setServiceDescription(service?.description?.trim()??""); }
 
@@ -250,7 +252,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
         <Section title="Estimate Terms & Conditions"><textarea value={terms} onChange={(event) => setTerms(event.target.value)} rows={6} className={inputClass} placeholder="Terms shown on the client Estimate" /></Section>
       </div>
-      {result?(postConstructionMode?<PostConstructionBidSummary result={result} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)}/>:<EstimateSummary result={result} frequency={calculatorInput.frequency} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)} />):<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
+      {result?(v2Mode?<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Post-Construction V2 Project</h2><p className="mt-3 text-3xl font-bold text-[#d4af37]">{currency(result.finalPrice)}</p><p className="mt-2 text-sm">One-time project price. Use the project calculator to change or clear the override.</p><button type="button" disabled={saving} onClick={()=>void save()} className="mt-5 rounded-lg bg-[#d4af37] px-5 py-3 font-bold text-[#143d1a]">{saving ? "Saving..." : estimate ? "Update Estimate" : "Save Estimate"}</button></aside>:postConstructionMode?<PostConstructionBidSummary result={result} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)}/>:<EstimateSummary result={result} frequency={calculatorInput.frequency} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)} />):<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Pricing unavailable</h2><p className="mt-2 text-sm text-white/70">A valid catalog price is required before this estimate can be saved.</p></aside>}
     </div>
   </div>;
 }

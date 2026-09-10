@@ -102,6 +102,42 @@ export type PostConstructionCalculatorInput = {
   addonSelections?: CatalogAddonSnapshot[];
 };
 
+// Separate from legacy CalculatorInput until the V2 workflow integration is implemented.
+export type PostConstructionV2Input = {
+  version: 2;
+  calculatorType: "Post-Construction";
+  totalSquareFeet: number;
+  scope?: string[];
+  estimatedPersonHours: number;
+  crewSize: number;
+  workerHourlyPay: number;
+  plannedProjectDays: number;
+  workdayHours: 8 | 10;
+  suppliesCost: number;
+  equipmentRentalCost: number;
+  travelLogisticsCost: number;
+  disposalDebrisCost: number;
+  supervisionAdminCost: number;
+  contingencyCost: number;
+  desiredMarginPercent: number;
+  manualProjectPriceOverride?: number;
+};
+export type PostConstructionV2Result = {
+  version: 2;
+  calculatorInput: PostConstructionV2Input;
+  totalLaborHours: number;
+  laborCost: number;
+  nonLaborProjectCosts: number;
+  totalEstimatedProjectCost: number;
+  recommendedProjectPrice: number;
+  approvedProjectPrice: number;
+  projectedGrossProfit: number;
+  projectedGrossMarginPercent: number;
+  estimatedCompletionDays: number;
+  plannedCrewCapacity: number;
+  crewUtilizationPercent: number;
+};
+
 export type CalculatorInput = ResidentialCalculatorInput | CommercialCalculatorInput | PostConstructionCalculatorInput;
 
 export type EstimateResult = {

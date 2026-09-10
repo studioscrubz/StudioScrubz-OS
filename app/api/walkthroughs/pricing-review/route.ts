@@ -2,8 +2,11 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/auth/permissions";
 import { calculateCommercialEstimate, calculatePostConstructionCatalogEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
+import { calculatePostConstructionV2 } from "@/lib/pricing/postConstruction";
+import type { PostConstructionEstimateInput } from "@/lib/pricing/estimates";
+import type { PostConstructionV2Input } from "@/types/estimate";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
-import { getAvailableServiceAddons, findCatalogService } from "@/lib/services/serviceCatalog";
+import { getAvailableServiceAddons, findCatalogService, isPostConstructionCatalogService } from "@/lib/services/serviceCatalog";
 import { assessmentReadyForPricing } from "@/lib/walkthroughWorkflow";
 import type { CalculatorInput, CommercialCalculatorInput, PostConstructionCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
@@ -91,7 +94,18 @@ export async function POST(request: Request) {
     }
 
     const catalog = await loadCatalog(admin);
-    const calculatorInput = normalizeInput(body.calculatorInput, walkthrough.division);
+    let calculatorInput: CalculatorInput;
+    try { calculatorInput = normalizeInput(body.calculatorInput, walkthrough.division); }
+    catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid calculator input." }, { status: 400 }); }
+    const assessmentServiceName = walkthrough.measurements.serviceType || walkthrough.estimate?.service_name || walkthrough.estimate?.result.serviceName || "";
+    const assessmentService = findCatalogService(catalog.services, walkthrough.division, assessmentServiceName);
+    const assessmentIsPostConstruction = isPostConstructionCatalogService(assessmentService) || /post[- ]construction/i.test(assessmentServiceName);
+    if (assessmentIsPostConstruction !== isPostConstructionInput(calculatorInput)) {
+      return Response.json({ error: "Calculator type must match the assessment service." }, { status: 400 });
+    }
+    if (isPostConstructionInput(calculatorInput) && body.manualPrice !== undefined) {
+      return Response.json({ error: "Use projectCosting.manualProjectPriceOverride for V2 approved pricing." }, { status: 400 });
+    }
 
     const service = findCatalogService(
       catalog.services,
@@ -110,6 +124,9 @@ export async function POST(request: Request) {
       );
     }
 
+    if (isPostConstructionInput(calculatorInput) && !isPostConstructionCatalogService(service)) {
+      return Response.json({ error: "Select an active Post-Construction catalog service." }, { status: 400 });
+    }
     validateAddons(calculatorInput, catalog, service.id);
 
     const calculatedResult = isPostConstructionInput(calculatorInput)
@@ -123,7 +140,7 @@ export async function POST(request: Request) {
         ? null
         : nonnegative(body.manualPrice, "approved Walkthrough price");
 
-    const estimateResult = withAuthoritativeEstimatePrice(
+    const estimateResult = isPostConstructionInput(calculatorInput) ? calculatedResult : withAuthoritativeEstimatePrice(
       calculatedResult,
       manualPrice
     );
@@ -137,7 +154,7 @@ export async function POST(request: Request) {
 
     const review: WalkthroughPricingReview = {
       version: 1,
-      calculatorInput,
+      calculatorInput: estimateResult.calculatorInput,
       estimateResult,
       serviceId: service.id,
       serviceName: estimateResult.serviceName,
@@ -221,9 +238,40 @@ function normalizeInput(
   const row = value as Record<string, unknown>;
 
   if (row.calculatorType === "Post-Construction") {
-    throw new Error(
-      "Post-Construction pricing review is not available in Walkthroughs yet."
-    );
+    if (row.version !== 2 || !row.projectCosting || typeof row.projectCosting !== "object" || Array.isArray(row.projectCosting)) {
+      throw new Error("Explicit Post-Construction V2 project costing is required; legacy snapshots cannot be approved here.");
+    }
+    if (row.division !== division || row.serviceType !== "Post-Construction Cleaning" || row.frequency !== "One-Time") {
+      throw new Error("Post-Construction V2 service, division, and one-time frequency must match the assessment.");
+    }
+    const raw = row.projectCosting as Record<string, unknown>;
+    if (raw.version !== 2 || raw.calculatorType !== "Post-Construction") throw new Error("Mismatched V2 project costing version or type.");
+    const projectCosting: PostConstructionV2Input = {
+      version: 2, calculatorType: "Post-Construction",
+      totalSquareFeet: number(raw.totalSquareFeet, "square feet"),
+      estimatedPersonHours: number(raw.estimatedPersonHours, "person-hours"), crewSize: number(raw.crewSize, "crew size"),
+      workerHourlyPay: number(raw.workerHourlyPay, "worker hourly pay"), plannedProjectDays: number(raw.plannedProjectDays, "project days"),
+      workdayHours: workday(raw.workdayHours) ?? (() => { throw new Error("Workday hours are required."); })(),
+      suppliesCost: number(raw.suppliesCost, "supplies"), equipmentRentalCost: number(raw.equipmentRentalCost, "equipment rental"),
+      travelLogisticsCost: number(raw.travelLogisticsCost, "travel"), disposalDebrisCost: number(raw.disposalDebrisCost, "disposal"),
+      supervisionAdminCost: number(raw.supervisionAdminCost, "supervision"), contingencyCost: number(raw.contingencyCost, "contingency"),
+      desiredMarginPercent: number(raw.desiredMarginPercent, "margin"),
+      ...(raw.scope === undefined ? {} : { scope: strings(raw.scope) }),
+      ...(raw.manualProjectPriceOverride === undefined ? {} : { manualProjectPriceOverride: number(raw.manualProjectPriceOverride, "manual project price") }),
+    };
+    calculatePostConstructionV2(projectCosting);
+    if (strings(row.additionalServices).length) throw new Error("V2 project costing does not include catalog add-ons.");
+    const input: PostConstructionEstimateInput = {
+      version: 2, projectCosting, calculatorType: "Post-Construction", division, serviceType: "Post-Construction Cleaning",
+      frequency: "One-Time", condition: oneOf(row.condition, ["Light", "Average", "Heavy", "Extreme"] as const, "condition"),
+      squareFeet: projectCosting.totalSquareFeet, floors: 1, rooms: 0, bathrooms: 0, kitchens: 0,
+      dustSeverity: "Average", debrisSeverity: "Average", detailLevel: "Detailed", windowsOrGlassCount: 0,
+      cabinetOrDrawerCount: 0, applianceInteriorCount: 0, stairFlights: 0,
+      targetProjectDays: projectCosting.plannedProjectDays, workdayHours: projectCosting.workdayHours,
+      workerHourlyPay: projectCosting.workerHourlyPay, targetProfitMarginPercent: projectCosting.desiredMarginPercent,
+      additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [],
+    };
+    return input;
   }
 
   const frequency = oneOf(

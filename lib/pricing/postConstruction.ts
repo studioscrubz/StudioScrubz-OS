@@ -1,7 +1,44 @@
 import type { Condition, EstimateResult, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
+import type { PostConstructionV2Input, PostConstructionV2Result } from "@/types/estimate";
 
 export const POST_CONSTRUCTION_BASE_HOURS_PER_1K_SQUARE_FEET = 19;
 export const POST_CONSTRUCTION_MAX_MARGIN_PERCENT = 70;
+
+export function calculatePostConstructionV2(input: PostConstructionV2Input): PostConstructionV2Result {
+  if (input.version !== 2 || input.calculatorType !== "Post-Construction") throw new Error("Explicit Post-Construction version 2 input is required.");
+  for (const key of ["estimatedPersonHours", "crewSize", "plannedProjectDays", "workdayHours"] as const) {
+    if (!Number.isFinite(input[key]) || input[key] <= 0) throw new Error(`${key} must be greater than zero.`);
+  }
+  if (!Number.isInteger(input.crewSize)) throw new Error("crewSize must be a whole integer.");
+  if (input.workdayHours !== 8 && input.workdayHours !== 10) throw new Error("Workday hours must be 8 or 10.");
+  const costs = ["suppliesCost", "equipmentRentalCost", "travelLogisticsCost", "disposalDebrisCost", "supervisionAdminCost", "contingencyCost"] as const;
+  for (const key of ["totalSquareFeet", "workerHourlyPay", ...costs] as const) {
+    if (!Number.isFinite(input[key]) || input[key] < 0) throw new Error(`${key} must be zero or greater.`);
+  }
+  if (!Number.isFinite(input.desiredMarginPercent) || input.desiredMarginPercent < 0 || input.desiredMarginPercent > POST_CONSTRUCTION_MAX_MARGIN_PERCENT) throw new Error("Desired margin must be between 0 and 70 percent.");
+  if (input.manualProjectPriceOverride !== undefined && (!Number.isFinite(input.manualProjectPriceOverride) || input.manualProjectPriceOverride <= 0)) throw new Error("Manual project price must be greater than zero.");
+  if (input.scope !== undefined && (!Array.isArray(input.scope) || input.scope.some(area => typeof area !== "string"))) throw new Error("Scope must be a list of area descriptions.");
+  // Reject overflow instead of using the legacy helper's nonfinite-to-zero fallback.
+  const roundCurrency = (value: number) => {
+    const rounded = Math.round(value * 100) / 100;
+    if (!Number.isFinite(rounded)) throw new Error("Project costs exceed the supported numeric range.");
+    return rounded;
+  };
+  const laborCost = roundCurrency(input.estimatedPersonHours * input.workerHourlyPay);
+  const nonLaborProjectCosts = roundCurrency(costs.reduce((sum, key) => sum + input[key], 0));
+  const totalEstimatedProjectCost = roundCurrency(laborCost + nonLaborProjectCosts);
+  const recommendedProjectPrice = roundCurrency(totalEstimatedProjectCost / (1 - input.desiredMarginPercent / 100));
+  const approvedProjectPrice = roundCurrency(input.manualProjectPriceOverride ?? recommendedProjectPrice);
+  if (approvedProjectPrice <= 0) throw new Error("Approved project price must round to at least one cent to calculate margin.");
+  const projectedGrossProfit = roundCurrency(approvedProjectPrice - totalEstimatedProjectCost);
+  const projectedGrossMarginPercent = projectedGrossProfit / approvedProjectPrice * 100;
+  const estimatedCompletionDays = input.estimatedPersonHours / input.crewSize / input.workdayHours;
+  const plannedCrewCapacity = input.crewSize * input.workdayHours * input.plannedProjectDays;
+  const crewUtilizationPercent = input.estimatedPersonHours / plannedCrewCapacity * 100;
+  const totals = { totalLaborHours: input.estimatedPersonHours, laborCost, nonLaborProjectCosts, totalEstimatedProjectCost, recommendedProjectPrice, approvedProjectPrice, projectedGrossProfit, projectedGrossMarginPercent, estimatedCompletionDays, plannedCrewCapacity, crewUtilizationPercent };
+  if (Object.values(totals).some(value => !Number.isFinite(value))) throw new Error("Calculated project outputs must be finite.");
+  return { version: 2, calculatorInput: { ...input, ...(input.scope ? { scope: [...input.scope] } : {}) }, ...totals };
+}
 
 export const POST_CONSTRUCTION_LABOR_FACTORS = {
   condition: { Light: 0, Average: 0, Heavy: 0.06, Extreme: 0.12 } satisfies Record<Condition, number>,

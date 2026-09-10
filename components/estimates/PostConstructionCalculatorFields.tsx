@@ -2,6 +2,9 @@
 
 import { matchingRecurringRules } from "@/lib/pricing/pricingEngine";
 import { serviceFrequencyLabel } from "@/lib/scheduling/frequency";
+import { isPostConstructionV2Estimate, type PostConstructionEstimateInput } from "@/lib/pricing/estimates";
+import { calculatePostConstructionV2 } from "@/lib/pricing/postConstruction";
+import type { PostConstructionV2Input } from "@/types/estimate";
 import type { Condition, Frequency, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
 import type { CatalogService, ServiceCatalogBundle } from "@/types/serviceCatalog";
 
@@ -10,7 +13,8 @@ const conditions:Condition[]=["Light","Average","Heavy","Extreme"];
 const severities:PostConstructionSeverity[]=["Light","Average","Heavy","Extreme"];
 const details:PostConstructionDetailLevel[]=["Standard","Detailed","High Detail"];
 
-export function PostConstructionCalculatorFields({value,onChange,service,catalog}:{value:PostConstructionCalculatorInput;onChange:(value:PostConstructionCalculatorInput)=>void;service:CatalogService|undefined;catalog:ServiceCatalogBundle}){
+export function PostConstructionCalculatorFields({value,onChange,service,catalog}:{value:PostConstructionEstimateInput;onChange:(value:PostConstructionEstimateInput)=>void;service:CatalogService|undefined;catalog:ServiceCatalogBundle}){
+  if (isPostConstructionV2Estimate(value)) return <ProjectCostFields value={value.projectCosting} onChange={projectCosting => onChange({ ...value, projectCosting })}/>;
   const set=<K extends keyof PostConstructionCalculatorInput>(key:K,next:PostConstructionCalculatorInput[K])=>onChange({...value,[key]:next});
   return <div className="space-y-5">
     <Group title="Project Scope"><NumberField label="Square Feet" value={value.squareFeet} set={next=>set("squareFeet",next)}/><NumberField label="Floors" value={value.floors} set={next=>set("floors",next)}/><NumberField label="Rooms / Bedrooms" value={value.rooms} set={next=>set("rooms",next)}/><NumberField label="Bathrooms / Restrooms" value={value.bathrooms} set={next=>set("bathrooms",next)}/><NumberField label="Kitchens / Breakrooms" value={value.kitchens} set={next=>set("kitchens",next)}/></Group>
@@ -27,3 +31,34 @@ function Label({text}:{text:string}){return <span className="mb-2 block text-xs 
 function NumberField({label,value,set,step="1"}:{label:string;value:number;set:(value:number)=>void;step?:string}){return <label><Label text={label}/><input className={inputClass} type="number" min="0" step={step} value={value} onChange={event=>set(Number(event.target.value))}/></label>}
 function SelectField({label,value,options,set,labels}:{label:string;value:string;options:readonly string[];set:(value:string)=>void;labels?:ReadonlyMap<string,string>}){return <label><Label text={label}/><select className={inputClass} value={value} onChange={event=>set(event.target.value)}>{options.map(option=><option key={option} value={option}>{labels?.get(option)??option}</option>)}</select></label>}
 const inputClass="w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
+
+function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input; onChange: (value: PostConstructionV2Input) => void }) {
+  if (!value) return <p role="alert">Version 2 project inputs are missing.</p>;
+  const fields = [
+    ["totalSquareFeet", "Total square feet"], ["estimatedPersonHours", "Estimated total person-hours"],
+    ["crewSize", "Crew size"], ["workerHourlyPay", "Worker hourly pay"], ["plannedProjectDays", "Planned project days"],
+    ["suppliesCost", "Supplies"], ["equipmentRentalCost", "Equipment / rental"], ["travelLogisticsCost", "Travel / logistics"],
+    ["disposalDebrisCost", "Disposal / debris"], ["supervisionAdminCost", "Supervision / admin"], ["contingencyCost", "Contingency"],
+    ["desiredMarginPercent", "Desired margin % (0–70)"],
+  ] as const;
+  let result;
+  let error = "";
+  try { result = calculatePostConstructionV2(value); } catch (cause) { error = cause instanceof Error ? cause.message : "Check project inputs."; }
+  const money = (amount: number) => amount.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  const rows = result ? [
+    ["Labor cost", money(result.laborCost)], ["Non-labor costs", money(result.nonLaborProjectCosts)],
+    ["Total estimated project cost", money(result.totalEstimatedProjectCost)], ["Recommended project price", money(result.recommendedProjectPrice)],
+    ["Approved project price", money(result.approvedProjectPrice)], ["Projected gross profit", money(result.projectedGrossProfit)],
+    ["Projected gross margin", `${result.projectedGrossMarginPercent.toFixed(2)}%`],
+    ["Estimated completion days", result.estimatedCompletionDays.toFixed(2)], ["Crew utilization", `${result.crewUtilizationPercent.toFixed(2)}%`],
+  ] : [];
+  return <div className="space-y-4"><p className="text-sm text-neutral-600">Post-Construction V2: one-time project costing. Enter total person-hours across all workers, not hours per worker.</p>
+    <Group title="Project Costing">{fields.map(([key,label]) => <NumberField key={key} label={label} value={value[key]} step={key === "crewSize" ? "1" : "any"} set={next => onChange({ ...value, [key]: next })}/>)}
+      <SelectField label="Workday hours" value={String(value.workdayHours)} options={["8","10"]} set={next => onChange({ ...value, workdayHours: Number(next) as 8 | 10 })}/>
+      <label><Label text="Manual project price override (optional)"/><input className={inputClass} type="number" min="0.01" step="0.01" value={value.manualProjectPriceOverride ?? ""} onChange={event => { const next = { ...value }; if (event.target.value === "") delete next.manualProjectPriceOverride; else next.manualProjectPriceOverride = Number(event.target.value); onChange(next); }}/></label>
+    </Group>
+    <label className="block"><Label text="Scope / areas (one per line)"/><textarea className={inputClass} rows={3} value={(value.scope ?? []).join("\n")} onChange={event => onChange({ ...value, scope: event.target.value.split("\n") })}/></label>
+    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {result && <dl className="grid gap-3 rounded-xl bg-[#f7f9f6] p-4 sm:grid-cols-2 xl:grid-cols-3">{rows.map(([label,display]) => <div key={label}><dt className="text-xs text-neutral-600">{label}</dt><dd className="mt-1 font-bold text-[#143d1a]">{display}</dd></div>)}</dl>}
+  </div>;
+}

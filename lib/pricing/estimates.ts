@@ -4,7 +4,14 @@ import { calculateRecurringTotals, catalogConfigNumber, commercialCatalogContext
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
 import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling/frequency";
 import { calculateUpkeepPlan } from "@/lib/pricing/upkeepPlan";
-import { calculatePostConstructionEstimate } from "@/lib/pricing/postConstruction";
+import { calculatePostConstructionEstimate, calculatePostConstructionV2 } from "@/lib/pricing/postConstruction";
+import type { PostConstructionV2Input, PostConstructionV2Result } from "@/types/estimate";
+
+export type PostConstructionEstimateInput = PostConstructionCalculatorInput & { version?: 2; projectCosting?: PostConstructionV2Input };
+export type PostConstructionV2EstimateResult = EstimateResult & { version: 2; postConstructionV2: PostConstructionV2Result };
+export function isPostConstructionV2Estimate(input: PostConstructionCalculatorInput): input is PostConstructionEstimateInput & { version: 2; projectCosting: PostConstructionV2Input } {
+  return "version" in input && input.version === 2;
+}
 
 const conditionMultiplier: Record<Condition, number> = { Light: 0.92, Average: 1, Heavy: 1.22, Extreme: 1.48 };
 
@@ -16,6 +23,25 @@ export function calculateEstimate(input: CalculatorInput, catalog: ServiceCatalo
 export function calculatePostConstructionCatalogEstimate(input:PostConstructionCalculatorInput,catalog:ServiceCatalogBundle,service?:ServiceCatalogBundle["services"][number]):EstimateResult{
   const resolved=service??catalog.services.find(item=>(item.division===input.division||item.division==="Both")&&(item.service_code.toUpperCase()==="BOTH-POST-CONSTRUCTION"||item.service_code.toUpperCase()==="COM-POST-CONSTRUCTION"));
   if(!resolved)throw new Error("No active Post-Construction catalog service is configured for this division.");
+  if (isPostConstructionV2Estimate(input)) {
+    if (!input.projectCosting || input.projectCosting.version !== 2) throw new Error("Version 2 project inputs are required.");
+    const project = calculatePostConstructionV2(input.projectCosting);
+    const calculatorInput: PostConstructionEstimateInput = { ...input, projectCosting: project.calculatorInput, squareFeet: project.calculatorInput.totalSquareFeet, workerHourlyPay: project.calculatorInput.workerHourlyPay, targetProjectDays: project.calculatorInput.plannedProjectDays, workdayHours: project.calculatorInput.workdayHours, frequency: "One-Time", customIntervalDays: null, recurringPricingRuleId: null, additionalDiscountPercent: 0, taxRatePercent: 0, serviceCode: resolved.service_code };
+    const result: PostConstructionV2EstimateResult = {
+      version: 2, postConstructionV2: project, calculatorInput,
+      serviceName: resolved.service_name, serviceDescription: resolved.description,
+      basePrice: project.recommendedProjectPrice, oneTimePrice: project.recommendedProjectPrice,
+      calculatedFinalPrice: project.recommendedProjectPrice, finalPrice: project.approvedProjectPrice,
+      manualPrice: project.calculatorInput.manualProjectPriceOverride ?? null,
+      adjustments: [], recurringDiscount: 0, recurringDiscountPercent: 0, recurringPricingRuleId: null, recurringPricingRuleName: null,
+      manualDiscount: 0, totalDiscount: 0, taxes: 0, monthlyPrice: null, visitsPerMonth: 1,
+      laborHours: project.totalLaborHours, crewSize: project.calculatorInput.crewSize,
+      estimatedDuration: project.totalLaborHours / project.calculatorInput.crewSize,
+      laborCost: project.laborCost, supplyCost: project.calculatorInput.suppliesCost,
+      estimatedProfit: project.projectedGrossProfit, scope: project.calculatorInput.scope ?? [],
+    };
+    return result;
+  }
   const core=calculatePostConstructionEstimate({...input,additionalDiscountPercent:0,taxRatePercent:0,recurringPricingRuleId:null,frequency:"One-Time",customIntervalDays:null});
   const oneTimePrice=core.basePrice;
   const pricing=calculateRecurringTotals({subtotal:oneTimePrice,frequency:input.frequency,customIntervalDays:input.customIntervalDays,rules:catalog.recurringRules,serviceId:resolved.id,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountPercent:input.additionalDiscountPercent,taxRatePercent:input.taxRatePercent});
