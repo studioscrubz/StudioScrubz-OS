@@ -26,6 +26,34 @@ export type PorterServicePricingSnapshot = {
 export const PLAN_STATUSES = ["Active", "Paused", "Ended"] as const;
 export const PLAN_FREQUENCIES = ["Daily", "Multiple Days Per Week", "Weekly", "Custom"] as const;
 export const PLAN_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+export const COMMON_SERVICE_AREA_OPTIONS = [
+  "Lobby / Entrance",
+  "Hallways / Corridors",
+  "Stairwells",
+  "Elevators",
+  "Laundry Room",
+  "Mailroom / Package Room",
+  "Leasing Office",
+  "Management Office",
+  "Community Room",
+  "Fitness Center / Gym",
+  "Pool Area",
+  "Pool Restroom",
+  "Courtyard",
+  "Walkways / Sidewalks",
+  "Parking Garage",
+  "Parking Lot",
+  "Trash / Refuse Area",
+  "Dumpster Area",
+  "Recycling Area",
+  "Pet Area / Dog Run",
+  "Restrooms",
+  "Storage / Common Storage",
+  "Utility / Common Area",
+  "Exterior Entry",
+  "Gates / Entry Systems",
+  "Other / Custom Area",
+] as const;
 export type PropertyServicePlanInput = {
   client_id: string;
   property_id: string;

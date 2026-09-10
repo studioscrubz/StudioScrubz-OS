@@ -123,3 +123,11 @@ test("delete migration defines secure RPC with role authorization and visit prot
   assert.match(sql, /revoke all on function public\.delete_property_service_plan\(uuid\) from public, anon, authenticated/);
   assert.match(sql, /grant execute on function public\.delete_property_service_plan\(uuid\) to authenticated/);
 });
+
+test("common service area options constant is exported and includes standard options plus custom area", () => {
+  assert.ok(Array.isArray(models.COMMON_SERVICE_AREA_OPTIONS));
+  assert.ok(models.COMMON_SERVICE_AREA_OPTIONS.includes("Lobby / Entrance"));
+  assert.ok(models.COMMON_SERVICE_AREA_OPTIONS.includes("Trash / Refuse Area"));
+  assert.ok(models.COMMON_SERVICE_AREA_OPTIONS.includes("Other / Custom Area"));
+  assert.equal(models.COMMON_SERVICE_AREA_OPTIONS.length, 26);
+});

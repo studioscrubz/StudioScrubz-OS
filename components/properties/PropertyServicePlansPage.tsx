@@ -10,7 +10,7 @@ import { getAgreements } from "@/lib/services/agreements";
 import { getActiveCrews } from "@/lib/services/crews";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
 import { archivePropertyServicePlan, createPropertyServicePlan, deletePropertyServicePlan, listPropertyServicePlans, updatePropertyServicePlan } from "@/lib/services/propertyServicePlans";
-import { PLAN_DAYS, PLAN_FREQUENCIES, PLAN_STATUSES, type PropertyServicePlanInput, type PropertyServicePlanAreaInput, type PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
+import { COMMON_SERVICE_AREA_OPTIONS, PLAN_DAYS, PLAN_FREQUENCIES, PLAN_STATUSES, type PropertyServicePlanInput, type PropertyServicePlanAreaInput, type PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { PropertyWithClient } from "@/types/property";
 import type { AgreementWithRelations } from "@/types/agreement";
 import type { CrewWithRelations } from "@/types/crew";
@@ -120,9 +120,52 @@ function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServic
     frequency: "Weekly", service_days: [], assigned_crew_id: null, notes: null,
   });
   const [areas, setAreas] = useState<PropertyServicePlanAreaInput[]>(() => plan?.areas ?? []);
+  const [selectedAreaOption, setSelectedAreaOption] = useState("");
+  const [customAreaName, setCustomAreaName] = useState("");
+  const [areaError, setAreaError] = useState("");
+
   const change = <K extends keyof PropertyServicePlanInput>(key: K, value: PropertyServicePlanInput[K]) => setInput(current => ({ ...current, [key]: value }));
   function changeArea(index: number, update: Partial<PropertyServicePlanAreaInput>) { setAreas(current => current.map((area, i) => i === index ? { ...area, ...update } : area)); }
   function move(index: number, direction: number) { setAreas(current => { const next = [...current]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next; }); }
+
+  function addAreaByName(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setAreaError("Enter a service area name.");
+      return;
+    }
+    const duplicate = areas.some(a => a.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if (duplicate) {
+      setAreaError(`"${trimmed}" is already in this service plan.`);
+      return;
+    }
+    setAreas(current => [
+      ...current,
+      {
+        name: trimmed,
+        description: null,
+        sort_order: current.length,
+        is_required: true,
+        requires_photo: false,
+        active: true,
+      }
+    ]);
+    setSelectedAreaOption("");
+    setCustomAreaName("");
+    setAreaError("");
+  }
+
+  function handleSelectAreaOption(value: string) {
+    setAreaError("");
+    setSelectedAreaOption(value);
+    if (value && value !== "Other / Custom Area") {
+      addAreaByName(value);
+    }
+  }
+
+  function handleAddCustomArea() {
+    addAreaByName(customAreaName);
+  }
   const pricingDaysMismatch = Boolean(input.pricing_snapshot && input.pricing_snapshot.inputs.visitsPerWeek !== input.service_days.length);
   function submit(event: FormEvent) { event.preventDefault(); if (pricingDaysMismatch) return; void save(input, areas.map((area, index) => ({ ...area, sort_order: index }))); }
   const property = options.properties.find(p => p.id === input.property_id);
@@ -146,12 +189,26 @@ function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServic
       <PorterServiceCalculator snapshot={input.pricing_snapshot} visitsPerWeek={input.service_days.length} onUse={snapshot => change("pricing_snapshot", snapshot)}/>
       {pricingDaysMismatch && <p role="alert" className="text-sm text-amber-800">Service days changed. Review the calculator and select Use Pricing before saving the plan.</p>}
       <label className="block text-sm font-bold">Notes<textarea rows={3} className={field} value={input.notes ?? ""} onChange={e => change("notes", e.target.value || null)}/></label>
-      <div><h3 className="text-lg font-extrabold text-[#143d1a]">Service areas</h3><p className="mt-1 text-sm text-neutral-600">Add property-specific areas such as Entryways &amp; Walkways, Trash Area, or Laundry / Mail Areas. Required and photo flags define future service requirements; they do not collect photos in V1.</p>
+      <div><h3 className="text-lg font-extrabold text-[#143d1a]">Service areas</h3><p className="mt-1 text-sm text-neutral-600">Select property-specific service areas from the common catalog or enter a custom area name. Required and photo flags define future service requirements; they do not collect photos in V1.</p>
         <div className="mt-4 space-y-4">{areas.map((area, index) => <div key={area.id ?? `new-${index}`} className="rounded-xl border border-neutral-200 p-4">
           <div className="grid gap-3 md:grid-cols-2"><label className="text-sm font-bold">Area name<input required className={field} value={area.name} onChange={e => changeArea(index, { name: e.target.value })}/></label><label className="text-sm font-bold">Description<input className={field} value={area.description ?? ""} onChange={e => changeArea(index, { description: e.target.value || null })}/></label></div>
           <div className="mt-4 flex flex-wrap items-center gap-4">{([['is_required','Required'],['requires_photo','Photo required'],['active','Active']] as const).map(([key,label]) => <label key={key} className="text-sm"><input type="checkbox" checked={area[key]} onChange={e => changeArea(index, { [key]: e.target.checked })}/> {label}</label>)}<button type="button" className={button} aria-label={`Move ${area.name || "area"} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</button><button type="button" className={button} aria-label={`Move ${area.name || "area"} down`} disabled={index === areas.length - 1} onClick={() => move(index, 1)}>Down</button>{!area.id && <button type="button" className={button} onClick={() => setAreas(current => current.filter((_, i) => i !== index))}>Remove</button>}</div>
         </div>)}</div>
-        <button type="button" className={`${button} mt-4`} onClick={() => setAreas(current => [...current, { name: "", description: null, sort_order: current.length, is_required: true, requires_photo: false, active: true }])}>Add Service Area</button>
+        <div className="mt-4 rounded-xl border border-[#143d1a]/20 bg-[#f4f7f1] p-4 sm:p-5">
+          <label className="block text-sm font-bold text-[#143d1a]">Add Service Area
+            <select className={field} value={selectedAreaOption} onChange={e => handleSelectAreaOption(e.target.value)}>
+              <option value="">Select a common service area...</option>
+              {COMMON_SERVICE_AREA_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          {selectedAreaOption === "Other / Custom Area" && <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="flex-1 text-sm font-bold text-[#143d1a]">Custom Service Area Name
+              <input type="text" className={field} value={customAreaName} onChange={e => { setCustomAreaName(e.target.value); setAreaError(""); }} placeholder="Enter custom service area name..." onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomArea(); } }}/>
+            </label>
+            <button type="button" className={button} onClick={handleAddCustomArea}>Add Area</button>
+          </div>}
+          {areaError && <p role="alert" className="mt-2 text-sm font-semibold text-amber-800">{areaError}</p>}
+        </div>
       </div>
       <div className="flex gap-3"><button type="submit" className={primary}>{busy ? "Saving…" : "Save Plan"}</button><button type="button" className={button} onClick={close}>Cancel</button></div>
     </fieldset>
