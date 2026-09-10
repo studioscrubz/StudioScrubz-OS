@@ -17,11 +17,36 @@ const models = load("types/porterVisit.ts", { "@/types/porterReporting": load("t
 const permissions = load("lib/auth/permissions.ts");
 const visit = { id: "visit", status: "Scheduled", updated_at: "version-1", areas: [{ id: "area", is_required: true, status: "Pending" }] };
 const input = { plan_id: "plan", scheduled_date: "2026-09-09", assigned_crew_id: null, visit_notes: null };
-function api(role, rpc, active = true) {
+function api(role, options = {}, active = true) {
+  const rpc = typeof options === "function" ? options : options.rpc;
+  const storageRemoveCalls = options.storageRemoveCalls ?? [];
+  const photos = options.photos ?? [];
+  const storageError = options.storageError ?? null;
   return load("lib/services/porterVisits.ts", {
     "@/lib/auth/permissions": permissions, "@/types/porterVisit": models,
     "@/lib/services/auth": { getCurrentProfile: async () => ({ role, is_active: active }) },
-    "@/lib/supabase/client": { getSupabaseClient: () => ({ rpc }) },
+    "@/lib/supabase/client": {
+      getSupabaseClient: () => ({
+        rpc: rpc ?? (async () => ({ data: [], error: null })),
+        from: (table) => ({
+          select: () => ({
+            eq: (col, val) => Promise.resolve({
+              data: table === "property_service_visit_photos" ? photos.map(path => ({ storage_path: path })) : [],
+              error: null,
+            }),
+          }),
+        }),
+        storage: {
+          from: (bucket) => ({
+            remove: async (paths) => {
+              storageRemoveCalls.push({ bucket, paths });
+              if (storageError) return { data: null, error: storageError };
+              return { data: paths, error: null };
+            },
+          }),
+        },
+      }),
+    },
   });
 }
 test("six-role read/create permissions and no broad field permissions", async () => {
@@ -76,29 +101,67 @@ test("every write sends expected version and propagates relationship/stale/provi
   await assert.rejects(api("Manager", async () => ({ data: null, error: { message: "Connection unavailable" } })).listPorterVisits(), /Connection unavailable/);
 });
 
-test("permanent visit deletion invokes RPC for management roles and rejects non-management roles", async () => {
-  const calls = [];
-  const managerService = api("Manager", async (name, args) => { calls.push({ name, args }); return { data: null, error: null }; });
-  await managerService.deletePorterVisit("v1");
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, "delete_porter_visit");
-  assert.equal(calls[0].args.p_id, "v1");
+test("permanent visit deletion calls Storage API remove for photo paths before running RPC", async () => {
+  const rpcCalls = [];
+  const storageCalls = [];
+  const service = api("Manager", {
+    rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: null, error: null }; },
+    photos: ["porter-visits/v1/p1.jpg", "porter-visits/v1/p2.jpg"],
+    storageRemoveCalls: storageCalls,
+  });
+
+  await service.deletePorterVisit("v1");
+
+  assert.equal(storageCalls.length, 1);
+  assert.equal(storageCalls[0].bucket, "operational-photos");
+  assert.deepEqual(JSON.parse(JSON.stringify(storageCalls[0].paths)), ["porter-visits/v1/p1.jpg", "porter-visits/v1/p2.jpg"]);
+
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, "delete_porter_visit");
+  assert.equal(rpcCalls[0].args.p_id, "v1");
 
   const techService = api("Scrub Technician", async () => ({ data: null, error: null }));
   await assert.rejects(techService.deletePorterVisit("v1"), /access denied/);
 });
 
-test("delete_porter_visit migration defines secure RPC with role authorization and cascade cleanup", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/20260910000001_delete_porter_visit.sql", import.meta.url), "utf8");
+test("permanent visit deletion aborts and does NOT call RPC if storage deletion fails", async () => {
+  const rpcCalls = [];
+  const service = api("Manager", {
+    rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: null, error: null }; },
+    photos: ["porter-visits/v1/p1.jpg"],
+    storageError: { message: "Storage permission error" },
+  });
+
+  await assert.rejects(service.deletePorterVisit("v1"), /Storage permission error/);
+  assert.equal(rpcCalls.length, 0, "RPC must not be called when storage deletion fails");
+});
+
+test("permanent visit deletion with no photos skips Storage remove and calls RPC", async () => {
+  const rpcCalls = [];
+  const storageCalls = [];
+  const service = api("Manager", {
+    rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: null, error: null }; },
+    photos: [],
+    storageRemoveCalls: storageCalls,
+  });
+
+  await service.deletePorterVisit("v1");
+  assert.equal(storageCalls.length, 0);
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, "delete_porter_visit");
+});
+
+test("delete_porter_visit migration 20260910000002 replaces RPC without direct storage.objects DELETE", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20260910000002_delete_porter_visit.sql", import.meta.url), "utf8");
   assert.match(sql, /create or replace function public\.delete_porter_visit/);
   assert.match(sql, /security definer set search_path = ''/);
   assert.match(sql, /auth\.uid\(\) is null or not public\.has_any_role\(array\['Master Admin','Administrator','Manager'\]\)/);
   assert.match(sql, /delete from public\.property_service_route_stops where visit_id = p_id/);
   assert.match(sql, /delete from public\.property_service_visit_photos where visit_id = p_id/);
-  assert.match(sql, /delete from storage\.objects where bucket_id = 'operational-photos'/);
   assert.match(sql, /delete from public\.property_service_visit_issues where visit_id = p_id/);
   assert.match(sql, /delete from public\.property_service_visit_areas where visit_id = p_id/);
   assert.match(sql, /delete from public\.property_service_visits where id = p_id/);
+  assert.doesNotMatch(sql, /delete from storage\.objects/i, "Must not contain direct SQL deletes against storage.objects");
   assert.match(sql, /revoke all on function public\.delete_porter_visit\(uuid\) from public, anon, authenticated/);
   assert.match(sql, /grant execute on function public\.delete_porter_visit\(uuid\) to authenticated/);
 });

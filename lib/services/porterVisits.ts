@@ -43,6 +43,16 @@ export async function mutatePorterVisit(visit: PorterVisitWithAreas, mutation: P
 export async function deletePorterVisit(visitOrId: PorterVisitWithAreas | string): Promise<void> {
   await authorize(true);
   const id = typeof visitOrId === "string" ? visitOrId : visitOrId.id;
-  const { error } = await getSupabaseClient().rpc("delete_porter_visit", { p_id: id });
-  if (error) throw new Error(`Porter Visit could not be deleted: ${error.message}`);
+  const db = getSupabaseClient();
+  const { data: photoRows, error: photosError } = await db.from("property_service_visit_photos").select("storage_path").eq("visit_id", id);
+  if (photosError) throw new Error(`Porter Visit photo paths could not be retrieved: ${photosError.message}`);
+  const providedPaths = typeof visitOrId === "object" && Array.isArray(visitOrId.photos) ? visitOrId.photos.map(p => p.storage_path) : [];
+  const dbPaths = (photoRows ?? []).map(p => p.storage_path);
+  const paths = Array.from(new Set([...providedPaths, ...dbPaths].filter(Boolean)));
+  if (paths.length > 0) {
+    const { error: storageError } = await db.storage.from("operational-photos").remove(paths);
+    if (storageError) throw new Error(`Porter Visit photo storage cleanup failed: ${storageError.message}`);
+  }
+  const { error: rpcError } = await db.rpc("delete_porter_visit", { p_id: id });
+  if (rpcError) throw new Error(`Porter Visit could not be deleted: ${rpcError.message}`);
 }
