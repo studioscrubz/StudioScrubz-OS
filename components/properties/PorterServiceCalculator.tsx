@@ -32,8 +32,16 @@ export function PorterServiceCalculator({ snapshot, visitsPerWeek, onUse }: {
   }
   let result: PorterServicePricingSnapshot | null = null;
   let error = "";
-  try { result = calculatePorterService(inputs, snapshot?.calculatedAt ?? "2000-01-01T00:00:00.000Z"); }
-  catch (cause) { error = visitsPerWeek === 0 ? "Select service days above to calculate pricing." : cause instanceof Error ? cause.message : "Check calculator inputs."; }
+  try {
+    if (visitsPerWeek === 0) {
+      error = "Select service days above to calculate pricing.";
+    } else if (!Number.isFinite(inputs.laborHoursPerVisit) || inputs.laborHoursPerVisit <= 0) {
+      error = "Enter labor hours per visit to calculate porter pricing.";
+    } else {
+      result = calculatePorterService(inputs, snapshot?.calculatedAt ?? "2000-01-01T00:00:00.000Z");
+    }
+  }
+  catch (cause) { error = cause instanceof Error ? cause.message : "Check calculator inputs."; }
   const applied = Boolean(result && snapshot && snapshot.inputs.visitsPerWeek === visitsPerWeek && fields.every(([key]) => snapshot.inputs[key] === inputs[key]));
   const rows = result ? [
     ["Monthly porter hours", result.monthlyHours.toLocaleString("en-US", { maximumFractionDigits: 2 })],

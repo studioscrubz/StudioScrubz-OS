@@ -68,6 +68,11 @@ test("migration preserves RPC security/version checks and supports omitted/null 
   assert.ok(sql.indexOf(matchCheck) > sql.indexOf("into v_days from"));
   assert.ok(sql.includes("Porter pricing visits per week must match the selected service days."));
 });
+test("component initial state displays friendly incomplete helper message instead of validation error", () => {
+  const componentCode = readFileSync(new URL("../components/properties/PorterServiceCalculator.tsx", import.meta.url), "utf8");
+  assert.ok(componentCode.includes("Enter labor hours per visit to calculate porter pricing."));
+  assert.ok(componentCode.includes("!Number.isFinite(inputs.laborHoursPerVisit) || inputs.laborHoursPerVisit <= 0"));
+});
 test("visits per week accepts only whole service-day counts from 1 through 7", () => {
   for (let days = 1; days <= 7; days++) assert.doesNotThrow(() => calculate({ ...input, visitsPerWeek: days }, at));
   for (const days of [0, 0.5, 1.5, 5.5, 7.1, 8]) assert.throws(() => calculate({ ...input, visitsPerWeek: days }, at));
