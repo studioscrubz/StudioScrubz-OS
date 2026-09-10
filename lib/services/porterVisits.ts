@@ -40,3 +40,9 @@ export async function mutatePorterVisit(visit: PorterVisitWithAreas, mutation: P
   if (error) throw new Error(`Porter Visit could not be updated: ${error.message}`);
   return data;
 }
+export async function deletePorterVisit(visitOrId: PorterVisitWithAreas | string): Promise<void> {
+  await authorize(true);
+  const id = typeof visitOrId === "string" ? visitOrId : visitOrId.id;
+  const { error } = await getSupabaseClient().rpc("delete_porter_visit", { p_id: id });
+  if (error) throw new Error(`Porter Visit could not be deleted: ${error.message}`);
+}

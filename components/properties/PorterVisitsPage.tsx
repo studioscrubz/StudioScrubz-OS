@@ -8,7 +8,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getActiveCrews } from "@/lib/services/crews";
 import { listPropertyServicePlans } from "@/lib/services/propertyServicePlans";
-import { createPorterVisit, getPorterVisit, listPorterVisits, mutatePorterVisit } from "@/lib/services/porterVisits";
+import { createPorterVisit, deletePorterVisit, getPorterVisit, listPorterVisits, mutatePorterVisit } from "@/lib/services/porterVisits";
 import { VISIT_AREA_STATUSES, VISIT_STATUSES, type CreatePorterVisitInput, type PorterVisitArea, type PorterVisitMutation, type PorterVisitWithAreas } from "@/types/porterVisit";
 import type { PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { CrewWithRelations } from "@/types/crew";
@@ -97,6 +97,17 @@ export function PorterVisitsPage() {
     } catch (error) { setError(errorText(error)); }
     finally { setBusy(false); }
   }
+  async function removeVisit(visit: PorterVisitWithAreas) {
+    if (!window.confirm("Permanently delete this Porter Visit? This cannot be undone.")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await deletePorterVisit(visit);
+      setVisits(rows => rows.filter(row => row.id !== visit.id));
+      if (selected?.id === visit.id) setSelected(null);
+      setNotice("Porter Visit permanently deleted.");
+    } catch (error) { setError(errorText(error)); }
+    finally { setBusy(false); }
+  }
   if (!allowed) return <p>Porter Visit access denied.</p>;
   const filtered = visits.filter(visit => (status === "All" || visit.status === status) && (!date || visit.scheduled_date === date)
     && [visit.plan_name, visit.property_label, visit.crew_name, visit.scheduled_date].join(" ").toLowerCase().includes(search.toLowerCase()));
@@ -106,10 +117,10 @@ export function PorterVisitsPage() {
     {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-800">{error}</p>}
     {notice && <p role="status" className="mt-5 rounded-lg bg-green-50 p-4 text-sm text-[#143d1a]">{notice}</p>}
     {creating && management && <CreateVisit plans={plans} crews={crews} busy={busy} submit={create} close={() => setCreating(false)}/>}
-    {selected && <VisitDetail key={`${selected.id}:${selected.updated_at}`} visit={selected} crews={crews} management={management} busy={busy} mutate={mutate} reload={() => open(selected.id)} close={() => setSelected(null)}/>}
+    {selected && <VisitDetail key={`${selected.id}:${selected.updated_at}`} visit={selected} crews={crews} management={management} busy={busy} mutate={mutate} remove={() => removeVisit(selected)} reload={() => open(selected.id)} close={() => setSelected(null)}/>}
     <section className="mt-6 rounded-2xl border border-[#143d1a]/10 bg-white p-5">
       <div className="grid gap-4 md:grid-cols-[1fr_180px_180px_auto]"><label className="text-sm font-bold">Search<input type="search" className={field} value={search} onChange={e => setSearch(e.target.value)} placeholder="Property, plan, or crew"/></label><label className="text-sm font-bold">Status<select className={field} value={status} onChange={e => setStatus(e.target.value)}>{["All", ...VISIT_STATUSES].map(value => <option key={value}>{value}</option>)}</select></label><label className="text-sm font-bold">Scheduled date<input className={field} type="date" value={date} onChange={e => setDate(e.target.value)}/></label><button className={`${button} self-end`} disabled={busy || loading} onClick={() => void refresh()}>Refresh</button></div>
-      {loading ? <p className="py-8">Loading Porter Visits…</p> : filtered.length === 0 ? <p className="py-8 text-neutral-600">No Porter Visits match this view.</p> : <div className="mt-5 grid gap-4 lg:grid-cols-2">{filtered.map(visit => <article key={visit.id} className="rounded-xl border border-neutral-200 p-5"><p className="text-xs font-bold text-[#9a7a17]">{visit.status} · {visit.scheduled_date}</p><h2 className="mt-2 text-xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2 text-sm">{visit.plan_name}</p><p className="mt-2 text-sm text-neutral-600">{visit.crew_name ?? "Unassigned crew"}</p><p className="mt-2 text-sm font-bold text-[#9a7a17]">{visit.issues?.filter(issue => issue.status !== "Resolved").length ?? 0} open / acknowledged issues{visit.issues?.some(issue => issue.severity === "Urgent" && issue.status !== "Resolved") ? " ? Urgent observation" : ""}</p><button className={`${button} mt-4`} disabled={busy} onClick={() => void open(visit.id)}>Open Visit</button></article>)}</div>}
+      {loading ? <p className="py-8">Loading Porter Visits…</p> : filtered.length === 0 ? <p className="py-8 text-neutral-600">No Porter Visits match this view.</p> : <div className="mt-5 grid gap-4 lg:grid-cols-2">{filtered.map(visit => <article key={visit.id} className="rounded-xl border border-neutral-200 p-5"><p className="text-xs font-bold text-[#9a7a17]">{visit.status} · {visit.scheduled_date}</p><h2 className="mt-2 text-xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2 text-sm">{visit.plan_name}</p><p className="mt-2 text-sm text-neutral-600">{visit.crew_name ?? "Unassigned crew"}</p><p className="mt-2 text-sm font-bold text-[#9a7a17]">{visit.issues?.filter(issue => issue.status !== "Resolved").length ?? 0} open / acknowledged issues{visit.issues?.some(issue => issue.severity === "Urgent" && issue.status !== "Resolved") ? " ? Urgent observation" : ""}</p><div className="mt-4 flex flex-wrap gap-3"><button className={button} disabled={busy} onClick={() => void open(visit.id)}>Open Visit</button>{management && <button className={button} disabled={busy} onClick={() => void removeVisit(visit)}>Delete Visit</button>}</div></article>)}</div>}
     </section>
   </>;
 }
@@ -131,7 +142,7 @@ function CreateVisit({ plans, crews, busy, submit, close }: { plans: PropertySer
   </fieldset></form>;
 }
 
-function VisitDetail({ visit, crews, management, busy: parentBusy, mutate, reload, close }: { visit: PorterVisitWithAreas; crews: CrewWithRelations[]; management: boolean; busy: boolean; mutate: (mutation: PorterVisitMutation) => Promise<void>; reload: () => Promise<void>; close: () => void }) {
+function VisitDetail({ visit, crews, management, busy: parentBusy, mutate, remove, reload, close }: { visit: PorterVisitWithAreas; crews: CrewWithRelations[]; management: boolean; busy: boolean; mutate: (mutation: PorterVisitMutation) => Promise<void>; remove?: () => Promise<void>; reload: () => Promise<void>; close: () => void }) {
   const [reportingBusy, setReportingBusy] = useState(false);
   const [reportingError, setReportingError] = useState("");
   const busy = parentBusy || reportingBusy;
@@ -163,7 +174,12 @@ function VisitDetail({ visit, crews, management, busy: parentBusy, mutate, reloa
     <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Visit-Level Evidence</h3>
     <PorterEvidenceGroup visit={visit} areaId={null} busy={busy} run={runReporting}/>
     <PorterIssuesSection visit={visit} management={management} busy={busy} run={runReporting}/>
-    {!terminal && <div className="mt-6 flex flex-wrap gap-3">{visit.status === "Scheduled" && <button className={primary} disabled={busy} onClick={() => void mutate({ action: "start" })}>Start Visit</button>}{visit.status === "In Progress" && <button className={primary} disabled={busy || blocked} onClick={() => void mutate({ action: "complete" })}>Complete Visit</button>}{management && <button className={button} disabled={busy} onClick={() => void mutate({ action: "cancel" })}>Cancel Visit</button>}</div>}
+    <div className="mt-6 flex flex-wrap gap-3">
+      {!terminal && visit.status === "Scheduled" && <button className={primary} disabled={busy} onClick={() => void mutate({ action: "start" })}>Start Visit</button>}
+      {!terminal && visit.status === "In Progress" && <button className={primary} disabled={busy || blocked} onClick={() => void mutate({ action: "complete" })}>Complete Visit</button>}
+      {!terminal && management && <button className={button} disabled={busy} onClick={() => void mutate({ action: "cancel" })}>Cancel Visit</button>}
+      {management && remove && <button className={button} disabled={busy} onClick={() => void remove()}>Delete Visit</button>}
+    </div>
     {visit.status === "In Progress" && blocked && <p className="mt-3 text-sm text-neutral-600">Resolve required Pending areas and add evidence to every required area marked Photo Required before completing the visit. Open issues do not block completion.</p>}
     {terminal && <p className="mt-5 text-sm text-neutral-500">Visit operations are historical and read-only. Management may still acknowledge or resolve documented issues.</p>}
   </section>;

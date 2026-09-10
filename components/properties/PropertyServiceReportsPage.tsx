@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
-import { getPropertyServiceReport, listPropertyServiceReports } from "@/lib/services/propertyServiceReports";
+import { deletePropertyServiceReport, getPropertyServiceReport, listPropertyServiceReports } from "@/lib/services/propertyServiceReports";
 import { PorterEvidenceGroup } from "@/components/properties/PorterReporting";
 import { PROPERTY_REPORT_STATUSES, summarizePropertyServiceReport } from "@/types/propertyServiceReport";
 import type { PorterVisitWithAreas } from "@/types/porterVisit";
@@ -47,6 +47,16 @@ export function PropertyServiceReportsPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Reports could not be loaded."); }
     finally { setBusy(false); }
   }
+  async function removeReport(id: string) {
+    if (!window.confirm("Permanently delete this Property Service Report? This cannot be undone.")) return;
+    setBusy(true); setError("");
+    try {
+      await deletePropertyServiceReport(id);
+      if (detail?.visit.id === id) setDetail(null);
+      setRows(rows => rows.filter(row => row.id !== id));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Report could not be deleted."); }
+    finally { setBusy(false); }
+  }
   if (!allowed) return <p className="p-6">Property Service Reports require management access.</p>;
   const properties = Array.from(new Map(rows.map(row => [row.property_id, row.property_label])).entries());
   const filtered = rows.filter(row => {
@@ -69,10 +79,10 @@ export function PropertyServiceReportsPage() {
       {!filtered.length && <p>No completed visits match these filters.</p>}
       <div className="grid gap-4 lg:grid-cols-2">{filtered.map(visit => {
         const { metrics, status } = summarizePropertyServiceReport(visit);
-        return <article key={visit.id} className="rounded-xl border border-neutral-200 bg-white p-5"><h2 className="font-bold text-[#143d1a]">{visit.property_label}</h2><p>{visit.plan_name}</p><p className="mt-2 text-sm font-bold">{status}</p><p className="mt-2 text-sm">Completed {timestamp(visit.completed_at)} | {visit.crew_name || "Unassigned crew"}</p><p className="mt-2 text-sm">{metrics.evidence} photos | {metrics.issues} issues | {metrics.openIssues} Open | {metrics.acknowledgedIssues} Acknowledged | {metrics.resolvedIssues} Resolved | {metrics.highUrgentIssues} High/Urgent</p><button className={`${button} mt-4`} disabled={busy} onClick={() => void load(visit.id)}>View Report</button></article>;
+        return <article key={visit.id} className="rounded-xl border border-neutral-200 bg-white p-5"><h2 className="font-bold text-[#143d1a]">{visit.property_label}</h2><p>{visit.plan_name}</p><p className="mt-2 text-sm font-bold">{status}</p><p className="mt-2 text-sm">Completed {timestamp(visit.completed_at)} | {visit.crew_name || "Unassigned crew"}</p><p className="mt-2 text-sm">{metrics.evidence} photos | {metrics.issues} issues | {metrics.openIssues} Open | {metrics.acknowledgedIssues} Acknowledged | {metrics.resolvedIssues} Resolved | {metrics.highUrgentIssues} High/Urgent</p><div className="mt-4 flex flex-wrap gap-3"><button className={button} disabled={busy} onClick={() => void load(visit.id)}>View Report</button><button className={button} disabled={busy} onClick={() => void removeReport(visit.id)}>Delete Report</button></div></article>;
       })}</div>
     </> : <>
-      <div className="flex gap-3"><button className={button} onClick={() => setDetail(null)}>Back to Reports</button><button className={button} onClick={() => window.print()}>Print Report</button></div>
+      <div className="flex gap-3"><button className={button} onClick={() => setDetail(null)}>Back to Reports</button><button className={button} onClick={() => window.print()}>Print Report</button><button className={button} disabled={busy} onClick={() => void removeReport(detail.visit.id)}>Delete Report</button></div>
       <ReportDetail detail={detail}/>
     </>}
   </div>;

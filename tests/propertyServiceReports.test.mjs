@@ -69,3 +69,13 @@ test("authoritative errors propagate; optional context failure is explicit", asy
   const result = await api("Manager", {}, { plan: { getPropertyServicePlan: fail } }).getPropertyServiceReport("v");
   assert.equal(result.contextUnavailable, true); assert.equal(result.currentFrequency, null); assert.equal(result.visit.id, "v");
 });
+
+test("report deletion invokes deletePorterVisit for management roles and rejects non-management roles", async () => {
+  let deletedId = null;
+  const managerService = api("Manager", { deletePorterVisit: async (id) => { deletedId = id; } });
+  await managerService.deletePropertyServiceReport("report-v1");
+  assert.equal(deletedId, "report-v1");
+
+  const techService = api("Scrub Technician", { deletePorterVisit: async () => {} });
+  await assert.rejects(techService.deletePropertyServiceReport("report-v1"), /access denied/);
+});

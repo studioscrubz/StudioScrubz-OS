@@ -1,6 +1,6 @@
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/services/auth";
-import { getPorterVisit, listPorterVisits } from "@/lib/services/porterVisits";
+import { deletePorterVisit, getPorterVisit, listPorterVisits } from "@/lib/services/porterVisits";
 import { getPropertyServicePlan } from "@/lib/services/propertyServicePlans";
 import { getClientById } from "@/lib/services/clients";
 
@@ -24,4 +24,8 @@ export async function getPropertyServiceReport(id: string) {
     currentClientName: client.status === "fulfilled" ? client.value.company_name || [client.value.first_name, client.value.last_name].filter(Boolean).join(" ") || null : null,
     contextUnavailable: plan.status === "rejected" || client.status === "rejected",
   };
+}
+export async function deletePropertyServiceReport(id: string): Promise<void> {
+  await authorize();
+  await deletePorterVisit(id);
 }

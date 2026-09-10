@@ -75,3 +75,30 @@ test("every write sends expected version and propagates relationship/stale/provi
   await assert.rejects(api("Manager", async () => ({ data: null, error: { message: "Plan property/client relationship is no longer valid." } })).createPorterVisit(input), /relationship/);
   await assert.rejects(api("Manager", async () => ({ data: null, error: { message: "Connection unavailable" } })).listPorterVisits(), /Connection unavailable/);
 });
+
+test("permanent visit deletion invokes RPC for management roles and rejects non-management roles", async () => {
+  const calls = [];
+  const managerService = api("Manager", async (name, args) => { calls.push({ name, args }); return { data: null, error: null }; });
+  await managerService.deletePorterVisit("v1");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, "delete_porter_visit");
+  assert.equal(calls[0].args.p_id, "v1");
+
+  const techService = api("Scrub Technician", async () => ({ data: null, error: null }));
+  await assert.rejects(techService.deletePorterVisit("v1"), /access denied/);
+});
+
+test("delete_porter_visit migration defines secure RPC with role authorization and cascade cleanup", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20260910000001_delete_porter_visit.sql", import.meta.url), "utf8");
+  assert.match(sql, /create or replace function public\.delete_porter_visit/);
+  assert.match(sql, /security definer set search_path = ''/);
+  assert.match(sql, /auth\.uid\(\) is null or not public\.has_any_role\(array\['Master Admin','Administrator','Manager'\]\)/);
+  assert.match(sql, /delete from public\.property_service_route_stops where visit_id = p_id/);
+  assert.match(sql, /delete from public\.property_service_visit_photos where visit_id = p_id/);
+  assert.match(sql, /delete from storage\.objects where bucket_id = 'operational-photos'/);
+  assert.match(sql, /delete from public\.property_service_visit_issues where visit_id = p_id/);
+  assert.match(sql, /delete from public\.property_service_visit_areas where visit_id = p_id/);
+  assert.match(sql, /delete from public\.property_service_visits where id = p_id/);
+  assert.match(sql, /revoke all on function public\.delete_porter_visit\(uuid\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.delete_porter_visit\(uuid\) to authenticated/);
+});

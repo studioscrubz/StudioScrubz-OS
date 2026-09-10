@@ -166,6 +166,7 @@ export interface Database {
       get_porter_visits: { Args: { p_id?: string }; Returns: PorterVisitWithAreas[] };
       create_porter_visit: { Args: { p_plan_id: string; p_scheduled_date: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
       mutate_porter_visit: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: Record<string, string | null> }; Returns: string };
+      delete_porter_visit: { Args: { p_id: string }; Returns: void };
       save_property_service_plan: { Args: { p_id: string | null; p_plan: PropertyServicePlanInput; p_areas: PropertyServicePlanAreaInput[]; p_expected_updated_at: string | null; p_archive: boolean }; Returns: PropertyServicePlanWithAreas };
       delete_property_service_plan: { Args: { p_id: string }; Returns: void };
       initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
