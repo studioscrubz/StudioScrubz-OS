@@ -27,6 +27,10 @@ export function TimeClockPage() {
   const { profile } = useAuth();
   const canReviewPayroll = hasPermission(profile, "payrollPrep.view");
   const canCorrectTime = hasPermission(profile, "employees.manage");
+  const canViewCrews = hasPermission(profile, "crews.view");
+  const canListEmployees = hasPermission(profile, "timeClock.manageAll") && hasPermission(profile, "employees.directory_view");
+  const canViewTime = hasPermission(profile, "timeClock.view");
+  const profileId = profile?.id;
   const [rows, setRows] = useState<TimeEntryWithRelations[]>([]),
     [employees, setEmployees] = useState<Employee[]>([]),
     [crews, setCrews] = useState<CrewWithRelations[]>([]),
@@ -61,6 +65,7 @@ export function TimeClockPage() {
     void Promise.all([getTimeEntries(), getEmployees(), getCrews(), getTimeEntryCorrectionJobs()])
       .then(([t, e, c, j]) => {
         if (active) {
+          setError(null);
           setRows(t);
           setEmployees(e.filter((x) => !x.archived_at));
           setCrews(c.filter((x) => !x.archived_at));
@@ -72,7 +77,7 @@ export function TimeClockPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [profileId, canViewTime, canListEmployees, canViewCrews, canCorrectTime]);
   const open = rows.filter(
       (x) => Boolean(x.job_id) && x.status === "Open" && !x.clock_out && !x.archived_at,
     ),
