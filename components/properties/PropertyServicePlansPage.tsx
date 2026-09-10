@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PorterServiceCalculator } from "@/components/properties/PorterServiceCalculator";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -107,7 +108,8 @@ function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServic
   const change = <K extends keyof PropertyServicePlanInput>(key: K, value: PropertyServicePlanInput[K]) => setInput(current => ({ ...current, [key]: value }));
   function changeArea(index: number, update: Partial<PropertyServicePlanAreaInput>) { setAreas(current => current.map((area, i) => i === index ? { ...area, ...update } : area)); }
   function move(index: number, direction: number) { setAreas(current => { const next = [...current]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next; }); }
-  function submit(event: FormEvent) { event.preventDefault(); void save(input, areas.map((area, index) => ({ ...area, sort_order: index }))); }
+  const pricingDaysMismatch = Boolean(input.pricing_snapshot && input.pricing_snapshot.inputs.visitsPerWeek !== input.service_days.length);
+  function submit(event: FormEvent) { event.preventDefault(); if (pricingDaysMismatch) return; void save(input, areas.map((area, index) => ({ ...area, sort_order: index }))); }
   const property = options.properties.find(p => p.id === input.property_id);
   const agreements = options.agreements.filter(a => a.property_id === input.property_id && a.client_id === input.client_id);
   return <form onSubmit={submit} className="mt-6 rounded-2xl border border-[#143d1a]/20 bg-white p-5 sm:p-7">
@@ -126,6 +128,8 @@ function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServic
         <label className="text-sm font-bold">Assigned crew (optional)<select className={field} value={input.assigned_crew_id ?? ""} onChange={e => change("assigned_crew_id", e.target.value || null)}><option value="">Unassigned</option>{input.assigned_crew_id && !options.crews.some(c => c.id === input.assigned_crew_id) && <option value={input.assigned_crew_id}>Existing crew (inactive)</option>}{options.crews.map(c => <option key={c.id} value={c.id}>{c.crew_name}</option>)}</select></label>
       </div>
       <fieldset><legend className="text-sm font-bold">Service days</legend><div className="mt-3 flex flex-wrap gap-4">{PLAN_DAYS.map((day, index) => <label key={day} className="text-sm"><input type="checkbox" disabled={input.frequency === "Daily"} checked={input.service_days.includes(index + 1)} onChange={e => change("service_days", e.target.checked ? input.frequency === "Weekly" ? [index + 1] : [...input.service_days, index + 1].sort((a,b) => a-b) : input.service_days.filter(value => value !== index + 1))}/> {day}</label>)}</div><p className="mt-2 text-sm text-neutral-500">Custom schedules may omit weekdays; describe the recurring requirements in notes. These settings do not schedule jobs.</p></fieldset>
+      <PorterServiceCalculator snapshot={input.pricing_snapshot} visitsPerWeek={input.service_days.length} onUse={snapshot => change("pricing_snapshot", snapshot)}/>
+      {pricingDaysMismatch && <p role="alert" className="text-sm text-amber-800">Service days changed. Review the calculator and select Use Pricing before saving the plan.</p>}
       <label className="block text-sm font-bold">Notes<textarea rows={3} className={field} value={input.notes ?? ""} onChange={e => change("notes", e.target.value || null)}/></label>
       <div><h3 className="text-lg font-extrabold text-[#143d1a]">Service areas</h3><p className="mt-1 text-sm text-neutral-600">Add property-specific areas such as Entryways &amp; Walkways, Trash Area, or Laundry / Mail Areas. Required and photo flags define future service requirements; they do not collect photos in V1.</p>
         <div className="mt-4 space-y-4">{areas.map((area, index) => <div key={area.id ?? `new-${index}`} className="rounded-xl border border-neutral-200 p-4">

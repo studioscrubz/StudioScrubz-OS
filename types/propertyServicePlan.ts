@@ -1,3 +1,28 @@
+export type PorterServicePricingInput = {
+  laborHoursPerVisit: number;
+  visitsPerWeek: number;
+  porterHourlyPay: number;
+  billedHourlyRate: number;
+  suppliesMonthly: number;
+  travelMonthly: number;
+  supervisionAdminMonthly: number;
+  complexityAdjustmentMonthly: number;
+  manualMonthlyPriceOverride?: number;
+};
+export type PorterServicePricingSnapshot = {
+  version: 1;
+  inputs: PorterServicePricingInput;
+  monthlyHours: number;
+  baseMonthlyPrice: number;
+  recommendedMonthlyPrice: number;
+  approvedMonthlyPrice: number;
+  monthlyLaborCost: number;
+  monthlyOperatingCosts: number;
+  projectedGrossProfit: number;
+  projectedGrossMarginPercent: number;
+  calculatedAt: string;
+};
+
 export const PLAN_STATUSES = ["Active", "Paused", "Ended"] as const;
 export const PLAN_FREQUENCIES = ["Daily", "Multiple Days Per Week", "Weekly", "Custom"] as const;
 export const PLAN_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
@@ -14,6 +39,7 @@ export type PropertyServicePlanInput = {
   service_days: number[];
   assigned_crew_id: string | null;
   notes: string | null;
+  pricing_snapshot?: PorterServicePricingSnapshot | null;
 };
 export type PropertyServicePlan = PropertyServicePlanInput & {
   id: string; created_at: string; updated_at: string; archived_at: string | null;
