@@ -49,11 +49,12 @@ export function TimeClockPage() {
     [sort, setSort] = useState("Newest"),
     [search, setSearch] = useState("");
   async function load() {
+    if (!profileId || !canViewTime) return;
     const [t, e, c, j] = await Promise.all([
       getTimeEntries(),
-      getEmployees(),
-      getCrews(),
-      getTimeEntryCorrectionJobs(),
+      canListEmployees ? getEmployees() : Promise.resolve([]),
+      canViewCrews ? getCrews() : Promise.resolve([]),
+      canCorrectTime ? getTimeEntryCorrectionJobs() : Promise.resolve([]),
     ]);
     setRows(t);
     setEmployees(e.filter((x) => !x.archived_at));
@@ -61,8 +62,14 @@ export function TimeClockPage() {
     setJobs(j);
   }
   useEffect(() => {
+    if (!profileId || !canViewTime) return;
     let active = true;
-    void Promise.all([getTimeEntries(), getEmployees(), getCrews(), getTimeEntryCorrectionJobs()])
+    void Promise.all([
+      getTimeEntries(),
+      canListEmployees ? getEmployees() : Promise.resolve([]),
+      canViewCrews ? getCrews() : Promise.resolve([]),
+      canCorrectTime ? getTimeEntryCorrectionJobs() : Promise.resolve([]),
+    ])
       .then(([t, e, c, j]) => {
         if (active) {
           setError(null);
