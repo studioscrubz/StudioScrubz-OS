@@ -21,9 +21,8 @@ export const MESSAGING_REALTIME_TABLES = [
 
 export async function getMessagingUsers(): Promise<MessagingUser[]> {
   const { data, error } = await getSupabaseClient()
-    .from("user_profiles")
+    .from("messaging_user_directory_safe")
     .select("id,employee_id,display_name,email,role")
-    .eq("is_active", true)
     .order("display_name", { ascending: true });
 
   if (error) {
@@ -79,9 +78,8 @@ export async function getDirectConversations(
       .select("*")
       .eq("user_id", userId),
     client
-      .from("user_profiles")
-      .select("id,employee_id,display_name,email,role")
-      .eq("is_active", true),
+      .from("messaging_user_directory_safe")
+      .select("id,employee_id,display_name,email,role"),
   ]);
 
   if (memberError) {
@@ -278,9 +276,8 @@ export async function getCompanyAnnouncements(
       .select("*")
       .eq("user_id", userId),
     client
-      .from("user_profiles")
-      .select("id,employee_id,display_name,email,role")
-      .eq("is_active", true),
+      .from("messaging_user_directory_safe")
+      .select("id,employee_id,display_name,email,role"),
   ]);
 
   if (messageError) {
