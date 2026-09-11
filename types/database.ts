@@ -187,6 +187,7 @@ export interface Database {
       admin_create_user_profile:{Args:{p_auth_user_id:string;p_email:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
       admin_update_user_profile:{Args:{p_profile_id:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
       admin_set_user_active:{Args:{p_profile_id:string;p_is_active:boolean};Returns:UserProfile};
+      get_sales_job_proposal_ids:{Args:Record<string,never>;Returns:Array<{proposal_id:string}>};
       get_operational_jobs:{Args:{p_start?:string|null;p_end?:string|null};Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
       get_operational_job_ids:{Args:{p_start?:string|null;p_end?:string|null};Returns:string[]};
       save_mileage_entry_with_stops:{Args:{p_entry_id:string|null;p_entry:Record<string,unknown>;p_stops:MileageStopInput[]};Returns:MileageEntry};

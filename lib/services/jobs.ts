@@ -120,7 +120,13 @@ export async function getJobForProposal(
   return data as JobWithRelations | null;
 }
 export async function getJobProposalIds(): Promise<string[]> {
-  if (!(await master())) {
+  const profile = await getCurrentProfile();
+  if (profile?.role === "Sales") {
+    const { data, error } = await getSupabaseClient().rpc("get_sales_job_proposal_ids");
+    if (error) throw error;
+    return (data ?? []).map((row: { proposal_id: string }) => row.proposal_id);
+  }
+  if (!isMasterAdmin(profile)) {
     const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
     if (error) throw error;
     return [...new Set(data.map((job) => job.proposal_id).filter((id): id is string => Boolean(id)))];
