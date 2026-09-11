@@ -115,6 +115,7 @@ export function PropertyServicePlansPage() {
 }
 
 function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServicePlanWithAreas | null; options: Options; busy: boolean; save: (input: PropertyServicePlanInput, areas: PropertyServicePlanAreaInput[]) => Promise<void>; close: () => void }) {
+  const [serviceMode, setServiceMode] = useState<"Property Porter Services" | "Luxury Property Care">("Property Porter Services");
   const [input, setInput] = useState<PropertyServicePlanInput>(() => plan ?? {
     name: "", client_id: "", property_id: "", agreement_id: null, service_id: null, status: "Active", start_date: "", end_date: null,
     frequency: "Weekly", service_days: [], assigned_crew_id: null, notes: null,
@@ -173,6 +174,7 @@ function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServic
   return <form onSubmit={submit} className="mt-6 rounded-2xl border border-[#143d1a]/20 bg-white p-5 sm:p-7">
     <h2 className="text-xl font-extrabold text-[#143d1a]">{plan ? "Edit" : "Create"} Property Service Plan</h2>
     <fieldset disabled={busy} className="mt-5 space-y-6">
+      <label className="block text-sm font-bold">Calculator service mode<select className={field} value={serviceMode} onChange={e => setServiceMode(e.target.value as typeof serviceMode)}><option>Property Porter Services</option><option>Luxury Property Care</option></select><span className="mt-2 block text-xs font-normal text-neutral-500">Changes calculator wording only for this form session. Use the plan name and service areas to describe the saved service.</span></label>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="text-sm font-bold">Plan name<input required className={field} value={input.name} onChange={e => change("name", e.target.value)}/></label>
         <label className="text-sm font-bold">Status<select className={field} value={input.status} onChange={e => change("status", e.target.value as PropertyServicePlanInput["status"])}>{PLAN_STATUSES.map(status => <option key={status}>{status}</option>)}</select></label>
@@ -186,7 +188,7 @@ function PlanEditor({ plan, options, busy, save, close }: { plan: PropertyServic
         <label className="text-sm font-bold">Assigned crew (optional)<select className={field} value={input.assigned_crew_id ?? ""} onChange={e => change("assigned_crew_id", e.target.value || null)}><option value="">Unassigned</option>{input.assigned_crew_id && !options.crews.some(c => c.id === input.assigned_crew_id) && <option value={input.assigned_crew_id}>Existing crew (inactive)</option>}{options.crews.map(c => <option key={c.id} value={c.id}>{c.crew_name}</option>)}</select></label>
       </div>
       <fieldset><legend className="text-sm font-bold">Service days</legend><div className="mt-3 flex flex-wrap gap-4">{PLAN_DAYS.map((day, index) => <label key={day} className="text-sm"><input type="checkbox" disabled={input.frequency === "Daily"} checked={input.service_days.includes(index + 1)} onChange={e => change("service_days", e.target.checked ? input.frequency === "Weekly" ? [index + 1] : [...input.service_days, index + 1].sort((a,b) => a-b) : input.service_days.filter(value => value !== index + 1))}/> {day}</label>)}</div><p className="mt-2 text-sm text-neutral-500">Custom schedules may omit weekdays; describe the recurring requirements in notes. These settings do not schedule jobs.</p></fieldset>
-      <PorterServiceCalculator snapshot={input.pricing_snapshot} visitsPerWeek={input.service_days.length} onUse={snapshot => change("pricing_snapshot", snapshot)}/>
+      <PorterServiceCalculator serviceMode={serviceMode} snapshot={input.pricing_snapshot} visitsPerWeek={input.service_days.length} onUse={snapshot => change("pricing_snapshot", snapshot)}/>
       {pricingDaysMismatch && <p role="alert" className="text-sm text-amber-800">Service days changed. Review the calculator and select Use Pricing before saving the plan.</p>}
       <label className="block text-sm font-bold">Notes<textarea rows={3} className={field} value={input.notes ?? ""} onChange={e => change("notes", e.target.value || null)}/></label>
       <div><h3 className="text-lg font-extrabold text-[#143d1a]">Service areas</h3><p className="mt-1 text-sm text-neutral-600">Select property-specific service areas from the common catalog or enter a custom area name. Required and photo flags define future service requirements; they do not collect photos in V1.</p>
