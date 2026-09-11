@@ -10,14 +10,18 @@ import {
 import { ProjectResults } from "@/components/site/ProjectResults";
 
 export const metadata: Metadata = {
-  title: { absolute: "StudioScrubz | Cleaning Services in Greater Los Angeles" },
+  title: {
+    absolute: "StudioScrubz | Cleaning Services in Greater Los Angeles",
+  },
   description:
-    "Professional residential, commercial, property, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
-  alternates: { canonical: "https://studioscrubz.com/" },
+    "Professional residential, commercial, property, luxury property care, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
+  alternates: {
+    canonical: "https://studioscrubz.com/",
+  },
   openGraph: {
     title: "StudioScrubz | Residential & Commercial Cleaning",
     description:
-      "Professional cleaning for homes, businesses, properties, and projects across the Los Angeles area.",
+      "Professional cleaning and property care for homes, businesses, managed properties, private residences, and projects across the Los Angeles area.",
     url: "https://studioscrubz.com/",
   },
 };
@@ -71,6 +75,10 @@ const faqItems = [
     "Yes. StudioScrubz supports appropriate apartment communities and managed properties with services that may include common areas, leasing offices, amenity areas, unit turns, and recurring janitorial service based on the confirmed property scope.",
   ],
   [
+    "Do you offer luxury property care and private porter services?",
+    "Yes. StudioScrubz offers discreet recurring property care for luxury residences, estates, condos, second homes, and private clients. Services may include light upkeep, property observations, restocking, vendor coordination, pre-arrival preparation, and documented visit reporting based on the confirmed property-care plan.",
+  ],
+  [
     "Do you offer post-construction cleaning?",
     "Yes. Post-construction cleaning can include detailed dust removal, surface cleaning, floor care, fixture detailing, light debris or residue removal, and final-readiness cleaning based on project condition and scope.",
   ],
@@ -106,13 +114,14 @@ export default function MarketingHome() {
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-neutral-600 sm:text-xl">
-              Professional cleaning for homes, businesses, managed properties,
-              and construction projects across Los Angeles and the San Fernando Valley.
+              Professional cleaning and property care for homes, businesses,
+              managed properties, private residences, and construction projects
+              across Los Angeles and the San Fernando Valley.
             </p>
 
             <p className="mt-5 max-w-2xl text-sm font-bold leading-7 text-[#143d1a]/70 sm:text-base">
-              Commercial Cleaning · Property Management · Post-Construction ·
-              Residential · Pressure Washing
+              Commercial Cleaning · Property Management · Luxury Property Care ·
+              Post-Construction · Residential · Pressure Washing
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -144,6 +153,7 @@ export default function MarketingHome() {
               <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#9a7a17]">
                 Real StudioScrubz Work
               </p>
+
               <p className="mt-1 font-extrabold text-[#143d1a]">
                 Professional results from a space we actually cleaned.
               </p>
@@ -159,9 +169,10 @@ export default function MarketingHome() {
         <div className="mx-auto max-w-7xl">
           <SectionHeading
             eyebrow="What we clean"
-            title="Professional cleaning for the spaces that keep life and business moving."
-            copy="From homes and businesses to managed properties and construction projects, we plan each service around the space, its use, and the cleaning it needs."
+            title="Professional cleaning and property care for the spaces that keep life and business moving."
+            copy="From homes and businesses to managed properties, luxury residences, and construction projects, we plan each service around the space, its use, and the care it needs."
           />
+
           <ServiceGrid />
         </div>
       </section>
@@ -182,9 +193,9 @@ export default function MarketingHome() {
             <p className="mt-5 flex-1 leading-7 text-white/70">
               Cleaning for offices, apartment communities, managed properties,
               common areas, unit turns, commercial facilities, recording and
-              production facilities, and post-construction projects. From recurring
-              janitorial care to project cleanup, we confirm the scope around your
-              property and operating needs.
+              production facilities, and post-construction projects. From
+              recurring janitorial care to project cleanup, we confirm the scope
+              around your property and operating needs.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-5">
@@ -249,9 +260,11 @@ export default function MarketingHome() {
                 <span className="text-sm font-black text-[#9a7a17]">
                   {number}
                 </span>
+
                 <h3 className="mt-4 text-xl font-extrabold text-[#143d1a]">
                   {title}
                 </h3>
+
                 <p className="mt-3 text-sm leading-6 text-neutral-600">
                   {copy}
                 </p>
@@ -280,6 +293,7 @@ export default function MarketingHome() {
                 "Professional estimates and proposals",
                 "Walkthrough-based project planning",
                 "Residential and commercial capability",
+                "Luxury property care and porter support",
                 "One-time and recurring service options",
                 "Professional customer communication",
                 "Secure online payment",
@@ -299,7 +313,7 @@ export default function MarketingHome() {
             <p className="mt-5 leading-7 text-neutral-600">
               StudioScrubz combines a clearly confirmed scope with approachable
               communication, whether the work is a home refresh, recurring
-              facility care, or a detailed turnover.
+              facility care, private property support, or a detailed turnover.
             </p>
 
             <Link
@@ -317,7 +331,7 @@ export default function MarketingHome() {
           <SectionHeading
             eyebrow="Frequently asked questions"
             title="Helpful answers before your first clean."
-            copy="Learn how estimates, walkthroughs, service scope, and scheduling work with StudioScrubz."
+            copy="Learn how estimates, walkthroughs, service scope, scheduling, and property-care services work with StudioScrubz."
             centered
           />
 
@@ -329,6 +343,7 @@ export default function MarketingHome() {
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-5 font-extrabold text-[#143d1a] marker:content-none">
                   <span>{question}</span>
+
                   <span
                     aria-hidden="true"
                     className="text-xl text-[#9a7a17] transition-transform group-open:rotate-45"

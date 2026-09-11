@@ -8,43 +8,150 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://studioscrubz.com"),
   applicationName: "StudioScrubz",
   manifest: null,
-  title: { default: "StudioScrubz | Cleaning Services in Greater Los Angeles", template: "%s | StudioScrubz" },
-  description: "Residential, commercial, property, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
-  keywords: ["residential cleaning", "commercial cleaning", "property management cleaning", "post-construction cleaning", "San Fernando Valley cleaning", "Los Angeles cleaning"],
+  title: {
+    default: "StudioScrubz | Cleaning Services in Greater Los Angeles",
+    template: "%s | StudioScrubz",
+  },
+  description:
+    "Residential, commercial, property, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
+  keywords: [
+    "residential cleaning",
+    "commercial cleaning",
+    "property management cleaning",
+    "luxury property care",
+    "private porter services",
+    "post-construction cleaning",
+    "San Fernando Valley cleaning",
+    "Los Angeles cleaning",
+  ],
   alternates: { canonical: "https://studioscrubz.com" },
   icons: {
-    icon: [{ url: "/branding/site-icon-192.png", type: "image/png", sizes: "192x192" }],
-    apple: [{ url: "/branding/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+    icon: [
+      {
+        url: "/branding/site-icon-192.png",
+        type: "image/png",
+        sizes: "192x192",
+      },
+    ],
+    apple: [
+      {
+        url: "/branding/apple-touch-icon.png",
+        type: "image/png",
+        sizes: "180x180",
+      },
+    ],
   },
   robots: { index: true, follow: true },
-  openGraph: { type: "website", siteName: "StudioScrubz", title: "StudioScrubz | Residential & Commercial Cleaning", description: "Professional residential and commercial cleaning across the Los Angeles area.", url: "https://studioscrubz.com", images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }] },
-  twitter: { card: "summary_large_image", title: "StudioScrubz | Residential & Commercial Cleaning", description: "Professional residential and commercial cleaning across the Los Angeles area.", images: ["/branding/studioscrubz-logo.png"] },
+  openGraph: {
+    type: "website",
+    siteName: "StudioScrubz",
+    title: "StudioScrubz | Residential & Commercial Cleaning",
+    description:
+      "Professional residential and commercial cleaning across the Los Angeles area.",
+    url: "https://studioscrubz.com",
+    images: [
+      {
+        url: "/branding/studioscrubz-logo.png",
+        width: 500,
+        height: 500,
+        alt: "StudioScrubz",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "StudioScrubz | Residential & Commercial Cleaning",
+    description:
+      "Professional residential and commercial cleaning across the Los Angeles area.",
+    images: ["/branding/studioscrubz-logo.png"],
+  },
 };
 
-export default async function SiteLayout({ children }: { children: React.ReactNode }) {
+export default async function SiteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const contact = await getPublicBusinessContact();
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CleaningService",
     name: contact.businessName,
     url: "https://studioscrubz.com",
     logo: "https://studioscrubz.com/branding/studioscrubz-logo.png",
-    description: "Residential, commercial, post-construction, and pressure-washing services for properties across Los Angeles County and surrounding service areas.",
-    areaServed: ["Los Angeles County", "Greater Los Angeles", "San Fernando Valley", "Winnetka", "Canoga Park", "Woodland Hills", "Reseda", "Chatsworth", "Northridge", "Van Nuys", "Encino", "Tarzana", "High Desert"],
+    description:
+      "Residential, commercial, property management, luxury property care, post-construction, porter, and pressure-washing services across Los Angeles County and surrounding service areas.",
+    areaServed: [
+      "Los Angeles County",
+      "Greater Los Angeles",
+      "San Fernando Valley",
+      "Winnetka",
+      "Canoga Park",
+      "Woodland Hills",
+      "Reseda",
+      "Chatsworth",
+      "Northridge",
+      "Van Nuys",
+      "Encino",
+      "Tarzana",
+      "High Desert",
+    ],
     hasOfferCatalog: {
       "@type": "OfferCatalog",
-      name: "Cleaning services",
+      name: "Cleaning and Property Care Services",
       itemListElement: [
         ["Residential Cleaning", "https://studioscrubz.com/residential"],
         ["Commercial Cleaning", "https://studioscrubz.com/commercial"],
-        ["Property Management Cleaning", "https://studioscrubz.com/property-management"],
-        ["Airbnb / Short-Term Rental Cleaning", "https://studioscrubz.com/airbnb-cleaning"],
-        ["Post-Construction Cleaning", "https://studioscrubz.com/post-construction"],
+        [
+          "Property Management Cleaning",
+          "https://studioscrubz.com/property-management",
+        ],
+        [
+          "Luxury Property Care",
+          "https://studioscrubz.com/luxury-property-care",
+        ],
+        [
+          "Property Porter Services",
+          "https://studioscrubz.com/property-porter-services",
+        ],
+        [
+          "Airbnb / Short-Term Rental Cleaning",
+          "https://studioscrubz.com/airbnb-cleaning",
+        ],
+        [
+          "Post-Construction Cleaning",
+          "https://studioscrubz.com/post-construction",
+        ],
         ["Pressure Washing", "https://studioscrubz.com/pressure-washing"],
-      ].map(([name, url]) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name, url } })),
+      ].map(([name, url]) => ({
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name,
+          url,
+        },
+      })),
     },
     ...(contact.phone ? { telephone: contact.phone } : {}),
     ...(contact.email ? { email: contact.email } : {}),
   };
-  return <div className="min-h-screen bg-[#fbfcf9] text-[#18201a]"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}/><SiteHeader phone={contact.phone}/><main>{children}</main><SiteFooter businessName={contact.businessName} phone={contact.phone} email={contact.email}/></div>;
+
+  return (
+    <div className="min-h-screen bg-[#fbfcf9] text-[#18201a]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
+      <SiteHeader phone={contact.phone} />
+      <main>{children}</main>
+      <SiteFooter
+        businessName={contact.businessName}
+        phone={contact.phone}
+        email={contact.email}
+      />
+    </div>
+  );
 }
