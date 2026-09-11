@@ -44,6 +44,7 @@ export type AnnouncementAcknowledgment = {
 
 export type MessagingUser = {
   id: string;
+  employee_id: string | null;
   display_name: string | null;
   email: string | null;
   role: string;

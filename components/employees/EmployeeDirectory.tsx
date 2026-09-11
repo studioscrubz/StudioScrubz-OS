@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -9,6 +10,10 @@ import {
   updateEmployee,
 } from "@/lib/services/employees";
 import { getCrews } from "@/lib/services/crews";
+import {
+  getMessagingUsers,
+  startDirectConversation,
+} from "@/lib/services/messaging";
 import { CrewManager } from "./CrewManager";
 import { EmployeeTimeSummary } from "@/components/time/EmployeeTimeSummary";
 import {
@@ -23,6 +28,8 @@ import {
   type EmploymentType,
 } from "@/types/employee";
 import type { CrewWithRelations } from "@/types/crew";
+import type { MessagingUser } from "@/types/messaging";
+
 export function EmployeeDirectory({
   departments,
   title = "Employee Directory",
@@ -35,12 +42,16 @@ export function EmployeeDirectory({
   directory?: boolean;
 }) {
   const { profile } = useAuth();
+
   const canManage = hasPermission(profile, "employees.manage");
   const canManageCrews = hasPermission(profile, "crews.manage");
   const canViewCrews = hasPermission(profile, "crews.view");
   const canViewTime = hasPermission(profile, "timeClock.manageAll");
+  const canMessage = hasPermission(profile, "messages.send");
+
   const [rows, setRows] = useState<Employee[]>([]);
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
+  const [messagingUsers, setMessagingUsers] = useState<MessagingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,18 +62,32 @@ export function EmployeeDirectory({
   const [editing, setEditing] = useState<Employee | null | "new">(null);
   const [detail, setDetail] = useState<Employee | null>(null);
   const [manageCrews, setManageCrews] = useState(false);
+
   async function load() {
-    const [e, c] = await Promise.all([getEmployees(), canViewCrews ? getCrews() : Promise.resolve([])]);
+    const [e, c, users] = await Promise.all([
+      getEmployees(),
+      canViewCrews ? getCrews() : Promise.resolve([]),
+      canMessage ? getMessagingUsers() : Promise.resolve([]),
+    ]);
+
     setRows(e);
     setCrews(c);
+    setMessagingUsers(users);
   }
+
   useEffect(() => {
     let active = true;
-    void Promise.all([getEmployees(), canViewCrews ? getCrews() : Promise.resolve([])])
-      .then(([e, c]) => {
+
+    void Promise.all([
+      getEmployees(),
+      canViewCrews ? getCrews() : Promise.resolve([]),
+      canMessage ? getMessagingUsers() : Promise.resolve([]),
+    ])
+      .then(([e, c, users]) => {
         if (active) {
           setRows(e);
           setCrews(c);
+          setMessagingUsers(users);
         }
       })
       .catch((x: unknown) => {
@@ -72,10 +97,12 @@ export function EmployeeDirectory({
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
-  }, [canViewCrews]);
+  }, [canMessage, canViewCrews]);
+
   const visible = useMemo(
     () =>
       rows.filter(
@@ -101,7 +128,9 @@ export function EmployeeDirectory({
       ),
     [department, departments, rows, search, status, type],
   );
+
   const active = rows.filter((e) => !e.archived_at);
+
   const metrics = [
     ["Total Employees", active.length],
     [
@@ -113,7 +142,8 @@ export function EmployeeDirectory({
       "Administration / Management",
       active.filter(
         (e) =>
-          e.department === "Administration" || e.department === "Management",
+          e.department === "Administration" ||
+          e.department === "Management",
       ).length,
     ],
     [
@@ -121,6 +151,11 @@ export function EmployeeDirectory({
       crews.filter((c) => c.status === "Active" && !c.archived_at).length,
     ],
   ];
+
+  const detailMessagingUser = detail
+    ? messagingUsers.find((user) => user.employee_id === detail.id) ?? null
+    : null;
+
   return (
     <>
       <Header
@@ -129,28 +164,43 @@ export function EmployeeDirectory({
         actions={
           directory && (canManage || canManageCrews) ? (
             <>
-              {canManage && <button className={primary} onClick={() => setEditing("new")}>
-                Add Employee
-              </button>}
-              {canManageCrews && <button
-                className={secondary}
-                onClick={() => setManageCrews(true)}
-              >
-                Manage Crews
-              </button>}
+              {canManage && (
+                <button
+                  className={primary}
+                  onClick={() => setEditing("new")}
+                >
+                  Add Employee
+                </button>
+              )}
+
+              {canManageCrews && (
+                <button
+                  className={secondary}
+                  onClick={() => setManageCrews(true)}
+                >
+                  Manage Crews
+                </button>
+              )}
             </>
           ) : null
         }
       />
+
       {notice && <Alert text={notice} good />}
       {error && <Alert text={error} />}{" "}
+
       {directory && (
         <section className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-5">
           {metrics.map(([l, v]) => (
-            <Metric key={String(l)} l={String(l)} v={loading ? "—" : v} />
+            <Metric
+              key={String(l)}
+              l={String(l)}
+              v={loading ? "—" : v}
+            />
           ))}
         </section>
       )}
+
       <section className="mt-6 rounded-2xl border bg-white p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
@@ -159,6 +209,7 @@ export function EmployeeDirectory({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+
           {directory && (
             <Select
               value={department}
@@ -166,11 +217,13 @@ export function EmployeeDirectory({
               values={["All", ...EMPLOYEE_DEPARTMENTS]}
             />
           )}
+
           <Select
             value={status}
             set={setStatus}
             values={["All", ...EMPLOYMENT_STATUSES]}
           />
+
           <Select
             value={type}
             set={setType}
@@ -178,6 +231,7 @@ export function EmployeeDirectory({
           />
         </div>
       </section>
+
       {loading ? (
         <div className="mt-6 h-60 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
@@ -192,16 +246,22 @@ export function EmployeeDirectory({
                 <p className="font-extrabold text-[#143d1a]">
                   {employeeName(e)}
                 </p>
+
                 <span className="text-xs font-bold text-[#9a7a17]">
                   {e.employee_number}
                 </span>
               </div>
-              <p className="mt-2 text-sm">{e.job_title || e.department}</p>
+
+              <p className="mt-2 text-sm">
+                {e.job_title || e.department}
+              </p>
+
               <p className="text-xs text-neutral-500">
                 {e.department} · {e.employment_status}
               </p>
             </button>
           ))}
+
           {!visible.length && (
             <p className="col-span-full rounded-2xl border border-dashed p-10 text-center text-neutral-500">
               No employees found.
@@ -209,6 +269,7 @@ export function EmployeeDirectory({
           )}
         </section>
       )}
+
       {editing && (
         <EmployeeForm
           employee={editing === "new" ? null : editing}
@@ -220,10 +281,14 @@ export function EmployeeDirectory({
           }}
         />
       )}
+
       {detail && (
         <EmployeeDetail
           employee={detail}
           crews={crews}
+          messagingUser={detailMessagingUser}
+          currentUserId={profile?.id ?? null}
+          canMessage={canMessage}
           close={() => setDetail(null)}
           edit={() => {
             setEditing(detail);
@@ -239,6 +304,7 @@ export function EmployeeDirectory({
           canViewTime={canViewTime}
         />
       )}
+
       {manageCrews && (
         <CrewManager
           employees={rows}
@@ -249,6 +315,7 @@ export function EmployeeDirectory({
     </>
   );
 }
+
 function EmployeeForm({
   employee,
   close,
@@ -278,15 +345,24 @@ function EmployeeForm({
           notes: null,
         },
   );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   async function submit() {
-    if (!f.first_name.trim() || !f.last_name.trim())
+    if (!f.first_name.trim() || !f.last_name.trim()) {
       return setError("First and last name are required.");
+    }
+
     setSaving(true);
+
     try {
-      if (employee) await updateEmployee(employee.id, f);
-      else await createEmployee(f);
+      if (employee) {
+        await updateEmployee(employee.id, f);
+      } else {
+        await createEmployee(f);
+      }
+
       await saved();
     } catch (x) {
       console.error("Employee save failed", x);
@@ -294,92 +370,171 @@ function EmployeeForm({
       setSaving(false);
     }
   }
+
   return (
-    <Modal title={employee ? "Edit Employee" : "Add Employee"} close={close}>
+    <Modal
+      title={employee ? "Edit Employee" : "Add Employee"}
+      close={close}
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           l="First Name"
           v={f.first_name}
           set={(v) => setF({ ...f, first_name: v })}
         />
+
         <Field
           l="Last Name"
           v={f.last_name}
           set={(v) => setF({ ...f, last_name: v })}
         />
+
         <Field
           l="Preferred Name"
           v={f.preferred_name ?? ""}
-          set={(v) => setF({ ...f, preferred_name: v || null })}
+          set={(v) =>
+            setF({
+              ...f,
+              preferred_name: v || null,
+            })
+          }
         />
+
         <Field
           l="Email"
           type="email"
           v={f.email ?? ""}
-          set={(v) => setF({ ...f, email: v || null })}
+          set={(v) =>
+            setF({
+              ...f,
+              email: v || null,
+            })
+          }
         />
+
         <Field
           l="Phone"
           v={f.phone ?? ""}
-          set={(v) => setF({ ...f, phone: v || null })}
+          set={(v) =>
+            setF({
+              ...f,
+              phone: v || null,
+            })
+          }
         />
+
         <SelectField
           l="Department"
           v={f.department}
           values={EMPLOYEE_DEPARTMENTS}
-          set={(v) => setF({ ...f, department: v as EmployeeDepartment })}
+          set={(v) =>
+            setF({
+              ...f,
+              department: v as EmployeeDepartment,
+            })
+          }
         />
+
         <Field
           l="Job Title"
           v={f.job_title ?? ""}
-          set={(v) => setF({ ...f, job_title: v || null })}
+          set={(v) =>
+            setF({
+              ...f,
+              job_title: v || null,
+            })
+          }
         />
+
         <SelectField
           l="Employment Status"
           v={f.employment_status}
           values={EMPLOYMENT_STATUSES}
-          set={(v) => setF({ ...f, employment_status: v as EmploymentStatus })}
+          set={(v) =>
+            setF({
+              ...f,
+              employment_status: v as EmploymentStatus,
+            })
+          }
         />
+
         <SelectField
           l="Employment Type"
           v={f.employment_type ?? ""}
           values={EMPLOYMENT_TYPES}
-          set={(v) => setF({ ...f, employment_type: v as EmploymentType })}
+          set={(v) =>
+            setF({
+              ...f,
+              employment_type: v as EmploymentType,
+            })
+          }
         />
+
         <Field
           l="Hourly Rate"
           type="number"
           v={String(f.hourly_rate)}
-          set={(v) => setF({ ...f, hourly_rate: Number(v) })}
+          set={(v) =>
+            setF({
+              ...f,
+              hourly_rate: Number(v),
+            })
+          }
         />
+
         <Field
           l="Overtime Rate"
           type="number"
           v={String(f.overtime_rate ?? 0)}
-          set={(v) => setF({ ...f, overtime_rate: Number(v) })}
+          set={(v) =>
+            setF({
+              ...f,
+              overtime_rate: Number(v),
+            })
+          }
         />
+
         <Field
           l="Commission Rate"
           type="number"
           v={String(f.commission_rate)}
-          set={(v) => setF({ ...f, commission_rate: Number(v) })}
+          set={(v) =>
+            setF({
+              ...f,
+              commission_rate: Number(v),
+            })
+          }
         />
+
         <Field
           l="Hire Date"
           type="date"
           v={f.hire_date ?? ""}
-          set={(v) => setF({ ...f, hire_date: v || null })}
+          set={(v) =>
+            setF({
+              ...f,
+              hire_date: v || null,
+            })
+          }
         />
+
         <label className="sm:col-span-2 text-sm font-bold">
           Notes
           <textarea
             className={`${input} mt-2 h-24 py-3`}
             value={f.notes ?? ""}
-            onChange={(e) => setF({ ...f, notes: e.target.value || null })}
+            onChange={(e) =>
+              setF({
+                ...f,
+                notes: e.target.value || null,
+              })
+            }
           />
         </label>
       </div>
+
       {error && <Alert text={error} />}
+
       <button
         disabled={saving}
         onClick={() => void submit()}
@@ -390,30 +545,79 @@ function EmployeeForm({
     </Modal>
   );
 }
+
 function EmployeeDetail({
   employee,
   crews,
+  messagingUser,
+  currentUserId,
   close,
   edit,
   archived,
   canManage,
   canViewTime,
+  canMessage,
 }: {
   employee: Employee;
   crews: CrewWithRelations[];
+  messagingUser: MessagingUser | null;
+  currentUserId: string | null;
   close: () => void;
   edit: () => void;
   archived: () => Promise<void>;
   canManage: boolean;
   canViewTime: boolean;
+  canMessage: boolean;
 }) {
+  const [startingMessage, setStartingMessage] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+
   const current =
     crews
-      .filter((c) => c.members.some((m) => m.employee_id === employee.id))
+      .filter((c) =>
+        c.members.some(
+          (m) => m.employee_id === employee.id,
+        ),
+      )
       .map((c) => c.crew_name)
       .join(", ") || "Unassigned";
+
+  const canMessageEmployee =
+    canMessage &&
+    Boolean(messagingUser) &&
+    messagingUser?.id !== currentUserId &&
+    !employee.archived_at;
+
+  async function openMessage() {
+    if (!messagingUser || !canMessageEmployee) return;
+
+    setStartingMessage(true);
+    setMessageError(null);
+
+    try {
+      const conversation = await startDirectConversation(
+        messagingUser.id,
+      );
+
+      window.location.assign(
+        `/messages?conversation=${encodeURIComponent(conversation.id)}`,
+      );
+    } catch (x) {
+      console.error(
+        "Direct conversation could not be started",
+        x,
+      );
+
+      setMessageError(message(x));
+      setStartingMessage(false);
+    }
+  }
+
   return (
-    <Modal title={employeeName(employee)} close={close}>
+    <Modal
+      title={employeeName(employee)}
+      close={close}
+    >
       <Details
         rows={[
           ["Employee Number", employee.employee_number],
@@ -424,29 +628,89 @@ function EmployeeDetail({
           ["Status", employee.employment_status],
           ["Type", employee.employment_type || "—"],
           ["Hourly Rate", money(employee.hourly_rate)],
-          ["Overtime Rate", money(employee.overtime_rate || employee.hourly_rate * 1.5)],
+          [
+            "Overtime Rate",
+            money(
+              employee.overtime_rate ||
+                employee.hourly_rate * 1.5,
+            ),
+          ],
           ["Commission", `${employee.commission_rate}%`],
           ["Hire Date", employee.hire_date || "—"],
           ["Current Crew", current],
           ["Notes", employee.notes || "—"],
-          ["Created", new Date(employee.created_at).toLocaleDateString()],
-          ["Updated", new Date(employee.updated_at).toLocaleDateString()],
-        ].filter(([label]) => canManage || !["Hourly Rate", "Overtime Rate", "Commission", "Hire Date", "Notes"].includes(label))}
+          [
+            "Created",
+            new Date(
+              employee.created_at,
+            ).toLocaleDateString(),
+          ],
+          [
+            "Updated",
+            new Date(
+              employee.updated_at,
+            ).toLocaleDateString(),
+          ],
+        ].filter(
+          ([label]) =>
+            canManage ||
+            ![
+              "Hourly Rate",
+              "Overtime Rate",
+              "Commission",
+              "Hire Date",
+              "Notes",
+            ].includes(label),
+        )}
       />
-      {canViewTime && <EmployeeTimeSummary employeeId={employee.id} />}
-      {canManage && <div className="mt-5 flex gap-2">
-        <button className={primary} onClick={edit}>
-          Edit
-        </button>
-        {!employee.archived_at && (
-          <button className={secondary} onClick={() => void archived()}>
-            Archive
+
+      {canViewTime && (
+        <EmployeeTimeSummary
+          employeeId={employee.id}
+        />
+      )}
+
+      {messageError && (
+        <Alert text={messageError} />
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {canMessageEmployee && (
+          <button
+            className={primary}
+            disabled={startingMessage}
+            onClick={() => void openMessage()}
+          >
+            {startingMessage
+              ? "Opening Message…"
+              : "Message"}
           </button>
         )}
-      </div>}
+
+        {canManage && (
+          <>
+            <button
+              className={primary}
+              onClick={edit}
+            >
+              Edit
+            </button>
+
+            {!employee.archived_at && (
+              <button
+                className={secondary}
+                onClick={() => void archived()}
+              >
+                Archive
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </Modal>
   );
 }
+
 function pick(e: Employee): EmployeeInput {
   const {
     id: _,
@@ -456,13 +720,16 @@ function pick(e: Employee): EmployeeInput {
     archived_at: _____,
     ...input
   } = e;
+
   void _;
   void __;
   void ___;
   void ____;
   void _____;
+
   return input;
 }
+
 function Header({
   title,
   description,
@@ -475,21 +742,42 @@ function Header({
   return (
     <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-7">
       <div>
-        <h1 className="text-3xl font-extrabold text-[#143d1a]">{title}</h1>
-        <p className="mt-3 text-neutral-600">{description}</p>
+        <h1 className="text-3xl font-extrabold text-[#143d1a]">
+          {title}
+        </h1>
+
+        <p className="mt-3 text-neutral-600">
+          {description}
+        </p>
       </div>
-      <div className="flex gap-2">{actions}</div>
+
+      <div className="flex gap-2">
+        {actions}
+      </div>
     </header>
   );
 }
-function Metric({ l, v }: { l: string; v: string | number }) {
+
+function Metric({
+  l,
+  v,
+}: {
+  l: string;
+  v: string | number;
+}) {
   return (
     <article className="rounded-2xl border bg-white p-5">
-      <p className="text-xs font-bold uppercase text-neutral-500">{l}</p>
-      <p className="mt-3 text-3xl font-extrabold text-[#143d1a]">{v}</p>
+      <p className="text-xs font-bold uppercase text-neutral-500">
+        {l}
+      </p>
+
+      <p className="mt-3 text-3xl font-extrabold text-[#143d1a]">
+        {v}
+      </p>
     </article>
   );
 }
+
 function Modal({
   title,
   close,
@@ -502,15 +790,23 @@ function Modal({
   return (
     <div className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-[#07190a]/70 p-5">
       <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6">
-        <button onClick={close} className="float-right text-xl">
+        <button
+          onClick={close}
+          className="float-right text-xl"
+        >
           ×
         </button>
-        <h2 className="mb-5 text-xl font-extrabold text-[#143d1a]">{title}</h2>
+
+        <h2 className="mb-5 text-xl font-extrabold text-[#143d1a]">
+          {title}
+        </h2>
+
         {children}
       </section>
     </div>
   );
 }
+
 function Field({
   l,
   v,
@@ -525,15 +821,19 @@ function Field({
   return (
     <label className="text-sm font-bold">
       {l}
+
       <input
         className={`${input} mt-2`}
         type={type}
         value={v}
-        onChange={(e) => set(e.target.value)}
+        onChange={(e) =>
+          set(e.target.value)
+        }
       />
     </label>
   );
 }
+
 function SelectField({
   l,
   v,
@@ -548,18 +848,24 @@ function SelectField({
   return (
     <label className="text-sm font-bold">
       {l}
+
       <select
         className={`${input} mt-2`}
         value={v}
-        onChange={(e) => set(e.target.value)}
+        onChange={(e) =>
+          set(e.target.value)
+        }
       >
         {values.map((x) => (
-          <option key={x}>{x}</option>
+          <option key={x}>
+            {x}
+          </option>
         ))}
       </select>
     </label>
   );
 }
+
 function Select({
   value,
   set,
@@ -573,15 +879,24 @@ function Select({
     <select
       className={input}
       value={value}
-      onChange={(e) => set(e.target.value)}
+      onChange={(e) =>
+        set(e.target.value)
+      }
     >
       {values.map((x) => (
-        <option key={x}>{x}</option>
+        <option key={x}>
+          {x}
+        </option>
       ))}
     </select>
   );
 }
-function Details({ rows }: { rows: string[][] }) {
+
+function Details({
+  rows,
+}: {
+  rows: string[][];
+}) {
   return (
     <div>
       {rows.map(([a, b]) => (
@@ -589,34 +904,60 @@ function Details({ rows }: { rows: string[][] }) {
           key={a}
           className="flex justify-between gap-4 border-b py-2 text-sm"
         >
-          <span className="text-neutral-500">{a}</span>
-          <b className="text-right">{b}</b>
+          <span className="text-neutral-500">
+            {a}
+          </span>
+
+          <b className="text-right">
+            {b}
+          </b>
         </div>
       ))}
     </div>
   );
 }
-function Alert({ text, good }: { text: string; good?: boolean }) {
+
+function Alert({
+  text,
+  good,
+}: {
+  text: string;
+  good?: boolean;
+}) {
   return (
     <p
-      className={`mt-4 rounded-xl p-3 text-sm font-bold ${good ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+      className={`mt-4 rounded-xl p-3 text-sm font-bold ${
+        good
+          ? "bg-green-50 text-green-700"
+          : "bg-red-50 text-red-700"
+      }`}
     >
       {text}
     </p>
   );
 }
+
 function message(x: unknown) {
-  return x instanceof Error ? x.message : "Operation failed.";
+  return x instanceof Error
+    ? x.message
+    : "Operation failed.";
 }
+
 function money(v: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(v);
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      style: "currency",
+      currency: "USD",
+    },
+  ).format(v);
 }
+
 const input =
   "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm";
+
 const primary =
   "rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
+
 const secondary =
   "rounded-lg border px-4 py-2.5 text-sm font-bold text-[#143d1a]";

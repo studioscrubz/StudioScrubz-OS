@@ -141,6 +141,7 @@ export interface Database {
       attention_push_deliveries:{Row:AttentionPushDelivery;Insert:Omit<AttentionPushDelivery,"id"|"created_at"|"updated_at"|"sent_at"|"failure_code"|"failure_message">&{id?:string;created_at?:string;updated_at?:string;sent_at?:string|null;failure_code?:string|null;failure_message?:string|null};Update:Partial<Pick<AttentionPushDelivery,"delivery_status"|"last_attempt_at"|"sent_at"|"failure_code"|"failure_message"|"updated_at">>;Relationships:[]};
       attention_push_checkpoints:{Row:AttentionPushCheckpoint;Insert:Omit<AttentionPushCheckpoint,"initialized_at">&{initialized_at?:string};Update:never;Relationships:[]};
     };
+
     Views: {
       job_scope_operational_items:{Row:{id:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description:string|null;quantity:number|null;unit:string|null;sort_order:number;created_at:string};Relationships:[]};
       field_discoveries_operational:{Row:OperationalFieldDiscovery;Relationships:[]};
@@ -150,6 +151,7 @@ export interface Database {
       jobs_operational_safe:{Row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">;Relationships:[]};
       employee_directory_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">;Relationships:[]};
       employee_directory_sales_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate"|"hire_date"|"notes">;Relationships:[]};
+      employee_directory_company_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate"|"hire_date"|"notes">;Relationships:[]};
       authorized_vehicles_safe:{Row:AuthorizedVehicle;Relationships:[]};
       time_entries_operational_safe:{Row:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null};Relationships:[]};
       crew_directory_safe:{Row:Crew;Relationships:[]};
@@ -157,6 +159,7 @@ export interface Database {
       business_settings_public:{Row:BusinessIdentitySettings;Relationships:[]};
       business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
     };
+
     Functions: {
       add_porter_visit_photo: { Args: { p_visit_id: string; p_visit_area_id: string | null; p_issue_id: string | null; p_storage_path: string; p_file_name: string; p_caption: string | null }; Returns: string };
       save_porter_visit_issue: { Args: { p_visit_id: string; p_issue_id: string | null; p_expected_updated_at: string | null; p_action: string; p_data: Record<string, string | null> }; Returns: string };
@@ -254,6 +257,7 @@ export interface Database {
       send_company_announcement:{Args:{p_title:string;p_body:string;p_priority?:string};Returns:Message};
       acknowledge_required_announcement:{Args:{p_message_id:string};Returns:AnnouncementAcknowledgment};
     };
+
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
