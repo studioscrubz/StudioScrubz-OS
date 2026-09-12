@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getBusinessSettings, updateBusinessSettings } from "@/lib/services/businessSettings";
+import { getBusinessSettings, updateBusinessSettings, getCompanyMileageRate, setCompanyMileageRate } from "@/lib/services/businessSettings";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { BusinessSettings, BusinessSettingsUpdate } from "@/types/businessSettings";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
@@ -26,11 +27,36 @@ export function BusinessSettingsPage(){
   return <><header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Business Settings</h1><p className="mt-3 text-neutral-600">Manage StudioScrubz business information and default document settings.</p></header>{error&&<Alert text={error}/>} {notice&&<Alert text={notice} good/>}
     <Section title="Company Information"><Grid>{textFields.map(([key,label])=><Field key={key} label={label} value={String(value[key]??"")} set={next=>setValue(current=>current?{...current,[key]:next||null}:current)}/>)}<label className="text-sm font-bold">State<UsStateSelect className={input} value={value.state??""} onChange={next=>set("state",next||null)}/></label><label className="text-sm font-bold">Timezone<select className={input} value={value.timezone??""} onChange={event=>set("timezone",event.target.value||null)}><option value="">Use server default (UTC)</option>{timeZones.map(([zone,label])=><option key={zone} value={zone}>{label}</option>)}</select></label></Grid></Section>
     <Section title="Estimate Defaults"><Grid><NumberField label="Default estimate expiration days" value={value.default_estimate_expiration_days} set={x=>set("default_estimate_expiration_days",x)}/><Area label="Default estimate notes" value={value.default_estimate_notes??""} set={x=>set("default_estimate_notes",x||null)}/><Area label="Default Estimate Terms & Conditions" value={value.default_estimate_terms??""} set={x=>set("default_estimate_terms",x||null)}/></Grid></Section>
+    <CompanyMileageRate/>
     <Section title="Upkeep Plan Pricing"><Grid><NumberField label="Upkeep Adjustment %" value={value.upkeep_adjustment_percent} min="0" max="40" set={x=>set("upkeep_adjustment_percent",x)}/></Grid></Section>
     <Section title="Proposal Defaults"><Grid><NumberField label="Default proposal expiration days" value={value.default_proposal_expiration_days} set={x=>set("default_proposal_expiration_days",x)}/><Area label="Default proposal terms" value={value.default_proposal_terms??""} set={x=>set("default_proposal_terms",x||null)}/></Grid></Section>
     <Section title="Service Agreement Defaults"><Grid><Area label="Default Service Agreement Terms" value={value.default_service_agreement_terms??""} set={x=>set("default_service_agreement_terms",x||null)} large/><Area label="Default Cancellation Terms" value={value.default_cancellation_terms??""} set={x=>set("default_cancellation_terms",x||null)} large/></Grid></Section>
     <Section title="Invoice Defaults"><Grid><NumberField label="Default invoice due days" value={value.default_invoice_due_days} set={x=>set("default_invoice_due_days",x)}/><Area label="Default payment terms" value={value.default_payment_terms??""} set={x=>set("default_payment_terms",x||null)}/><Area label="Default invoice terms" value={value.default_invoice_terms??""} set={x=>set("default_invoice_terms",x||null)}/></Grid></Section>
     <GoogleCalendarSettings/><button disabled={saving} className="mt-6 rounded-lg bg-[#143d1a] px-5 py-3 font-bold text-white" onClick={()=>void save()}>{saving?"Saving…":"Save Business Settings"}</button></>;
+}
+function CompanyMileageRate() {
+  const { profile } = useAuth();
+  const allowed = ["Master Admin", "Administrator", "Manager"].includes(profile?.role ?? "");
+  const [rate, setRate] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!allowed) return;
+    let disposed = false;
+    void getCompanyMileageRate().then(value => { if (!disposed) { setRate(value === null ? "" : String(value)); setLoaded(true); } }).catch(error => { if (!disposed) setMessage(msg(error)); });
+    return () => { disposed = true; };
+  }, [allowed]);
+  if (!allowed) return null;
+  async function saveRate() {
+    const value = rate.trim() === "" ? null : Number(rate);
+    if (value !== null && (!Number.isFinite(value) || value < 0)) { setMessage("Mileage rate must be a nonnegative number."); return; }
+    setBusy(true);
+    try { await setCompanyMileageRate(value); setMessage("Mileage rate saved. Existing mileage records are unchanged."); }
+    catch (error) { setMessage(msg(error)); }
+    finally { setBusy(false); }
+  }
+  return <Section title="Automatic GPS Mileage"><label className="text-sm font-bold">Mileage Rate ($ / mile)<input className={input} type="number" min="0" step="0.001" value={rate} disabled={!loaded || busy} onChange={event => setRate(event.target.value)}/></label><p className="mt-2 text-sm text-neutral-600">Leave blank to save GPS miles with no deduction amount. The rate is captured when ARRIVED completes each trip.</p><button type="button" disabled={!loaded || busy} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-50" onClick={() => void saveRate()}>Save Mileage Rate</button>{message && <p role="status" className="mt-2 text-sm">{message}</p>}</Section>;
 }
 function Section({title,children}:{title:string;children:React.ReactNode}){return <section className="mt-6 rounded-xl border bg-white p-6"><h2 className="text-lg font-extrabold text-[#143d1a]">{title}</h2><div className="mt-4">{children}</div></section>}
 function Grid({children}:{children:React.ReactNode}){return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</div>}

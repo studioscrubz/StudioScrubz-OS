@@ -1,4 +1,5 @@
 import type { PorterPhoto, PorterIssue } from "@/types/porterReporting";
+import type { GpsMileageTrip, GpsMileageSummary, GpsPosition } from "@/types/gpsMileage";
 import type { PorterRoute, PorterRouteStop, PorterRouteWithStops, RouteStopInput, RouteEdit } from "@/types/porterRoute";
 import type { PorterVisit, PorterVisitArea, PorterVisitWithAreas } from "@/types/porterVisit";
 import type { PropertyServicePlan, PropertyServicePlanInput, PropertyServicePlanArea, PropertyServicePlanAreaInput, PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
@@ -40,6 +41,7 @@ import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 export interface Database {
   public: {
     Tables: {
+      job_mileage_trips: { Row: GpsMileageTrip; Insert: never; Update: never; Relationships: [] };
       property_service_routes: { Row: PorterRoute; Insert: never; Update: never; Relationships: [] };
       property_service_route_stops: { Row: PorterRouteStop; Insert: never; Update: never; Relationships: [] };
       property_service_visit_photos: { Row: PorterPhoto; Insert: never; Update: never; Relationships: [] };
@@ -162,6 +164,13 @@ export interface Database {
     };
 
     Functions: {
+      get_company_mileage_rate: { Args: Record<string, never>; Returns: number | null };
+      set_company_mileage_rate: { Args: { p_rate: number | null }; Returns: undefined };
+      get_job_gps_trips: { Args: { p_job_id: string }; Returns: GpsMileageTrip[] };
+      start_job_gps_trip: { Args: { p_job_id: string; p_vehicle_id: string; p_position: GpsPosition }; Returns: { trip: GpsMileageTrip; initiated: boolean } };
+      finish_job_gps_trip: { Args: { p_id: string; p_position: GpsPosition }; Returns: GpsMileageTrip };
+      cancel_job_gps_trip: { Args: { p_id: string }; Returns: GpsMileageTrip };
+      get_job_gps_mileage: { Args: { p_job_id: string }; Returns: GpsMileageSummary[] };
       add_porter_visit_photo: { Args: { p_visit_id: string; p_visit_area_id: string | null; p_issue_id: string | null; p_storage_path: string; p_file_name: string; p_caption: string | null }; Returns: string };
       save_porter_visit_issue: { Args: { p_visit_id: string; p_issue_id: string | null; p_expected_updated_at: string | null; p_action: string; p_data: Record<string, string | null> }; Returns: string };
       get_porter_routes: { Args: { p_id?: string }; Returns: PorterRouteWithStops[] };

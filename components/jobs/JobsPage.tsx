@@ -24,6 +24,11 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
+import { getAuthorizedVehicles } from "@/lib/services/vehicles";
+import { getCurrentPosition } from "@/lib/geo/currentPosition";
+import { getGpsTrips, startGpsTrip, finishGpsTrip, cancelGpsTrip, GPS_TRIP_CHANGED_EVENT } from "@/lib/services/gpsMileage";
+import { GPS_DISTANCE_NOTICE, type GpsMileageTrip } from "@/types/gpsMileage";
+import { vehicleLabel, type AuthorizedVehicle } from "@/types/vehicle";
 import { JobLaborSummary } from "@/components/time/JobLaborSummary";
 import type { CrewWithRelations } from "@/types/crew";
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
@@ -1039,6 +1044,7 @@ function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; emplo
   const clientPhone = management ? job.client?.phone : job.client_phone;
   const firstName = management ? job.client?.first_name : job.client_first_name;
   const phone = clientPhone ? normalizeSmsPhoneNumber(clientPhone) : null;
+  if (assignedFieldEmployee && employeeId) return <GpsOnMyWay key={`${job.id}:${employeeId}`} job={job} employeeId={employeeId} phone={phone} firstName={firstName}/>;
   if ((!management && !assignedFieldEmployee) || !job.scheduled_date || !job.start_time || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || !phone) return null;
   async function openMessage() {
     if (claiming || initiated) return;
@@ -1057,6 +1063,75 @@ function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; emplo
     finally { setClaiming(false); }
   }
   return <><button type="button" disabled={claiming || initiated} title={initiated ? "On My Way message already initiated" : undefined} className={initiated ? joined : primary} onClick={() => void openMessage()}>On My Way</button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</>;
+}
+
+function GpsOnMyWay({ job, employeeId, phone, firstName }: { job: JobWithRelations; employeeId: string; phone: string | null; firstName: string | null | undefined }) {
+  const [trip, setTrip] = useState<GpsMileageTrip | null>(null);
+  const [vehicles, setVehicles] = useState<AuthorizedVehicle[]>([]);
+  const [vehicleId, setVehicleId] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    let disposed = false;
+    let revision = 0;
+    const load = () => {
+      const request = ++revision;
+      void getGpsTrips(job.id).then(rows => {
+        if (disposed || request !== revision) return;
+        setTrip(rows.find(row => row.employee_id === employeeId && row.status !== "Cancelled") ?? null);
+        setLoaded(true);
+      }).catch(cause => { if (!disposed && request === revision) setError(message(cause, "GPS trip could not be loaded. Reopen this Job to retry.")); });
+    };
+    load();
+    void getAuthorizedVehicles().then(rows => {
+      if (disposed) return;
+      const eligible = rows.filter(row => row.status === "Active");
+      setVehicles(eligible);
+      if (eligible.length === 1) setVehicleId(eligible[0].id);
+    }).catch(cause => { if (!disposed) setError(message(cause, "Assigned vehicles could not be loaded.")); });
+    window.addEventListener(GPS_TRIP_CHANGED_EVENT, load);
+    window.addEventListener("focus", load);
+    return () => { disposed = true; window.removeEventListener(GPS_TRIP_CHANGED_EVENT, load); window.removeEventListener("focus", load); };
+  }, [job.id, employeeId]);
+  const active = trip?.status === "Active";
+  const completed = trip?.status === "Completed";
+  const eligible = Boolean(phone && job.scheduled_date && job.start_time && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status));
+  async function act(cancel = false) {
+    if (busy) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      if (cancel && trip) { await cancelGpsTrip(trip.id); setTrip(null); setNotice("GPS trip cancelled. No mileage was created."); }
+      else if (active && trip) {
+        const result = await finishGpsTrip(trip.id, await getCurrentPosition());
+        setTrip(result); setNotice("GPS mileage saved to this Job.");
+      } else {
+        const result = await startGpsTrip(job.id, vehicleId, await getCurrentPosition());
+        setTrip(result.trip);
+        if (result.initiated && phone) {
+          const greeting = firstName?.trim() || "there";
+          const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
+          try { openDeviceSmsApp(phone, body); }
+          catch { setError("Mileage tracking started, but the SMS composer could not be opened."); }
+        }
+      }
+    } catch (cause) { setError(message(cause, "GPS mileage could not be saved. Retry safely or use manual mileage later.")); }
+    finally { setBusy(false); }
+  }
+  return <div className="space-y-2">
+    <p className="text-sm font-bold text-[#143d1a]">{active ? "Mileage Tracking Active" : completed ? "GPS mileage saved" : "Automatic GPS mileage"}</p>
+    <p className="text-xs text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>
+    {!active && !completed && <>
+      {vehicles.length > 0 ? <label className="block text-sm">Vehicle<select className={input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">Select assigned vehicle</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">No eligible active assigned vehicle. Contact management; manual mileage remains available separately.</p>}
+      {!eligible && <p className="text-sm">On My Way requires an eligible scheduled Job and a valid client phone number.</p>}
+    </>}
+    {!completed && <button type="button" disabled={busy || !loaded || (!active && (!eligible || !vehicleId))} className={primary} onClick={() => void act()}>{busy ? "Saving / locating…" : active ? "ARRIVED" : "ON MY WAY"}</button>}
+    {active && <button type="button" disabled={busy} className={`${secondary} ml-2`} onClick={() => { if (window.confirm("Cancel this GPS trip without creating mileage?")) void act(true); }}>Cancel GPS Trip</button>}
+    {completed && <p className="text-sm">{trip.estimated_miles?.toFixed(2)} GPS-estimated miles</p>}
+    {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
+    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+  </div>;
 }
 
 function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | null, role: string | null) {
