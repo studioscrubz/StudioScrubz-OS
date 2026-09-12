@@ -1,4 +1,5 @@
-export const EMPLOYEE_DEPARTMENTS=["Scrub Technicians","Sales","Administration","Management"] as const;
+export const EMPLOYEE_DEPARTMENTS=["Scrub Technicians","Sales","Lead Representative","Administration","Management"] as const;
+export type LeadRepresentativeOption = { id: string; display_name: string; is_active: boolean };
 export const EMPLOYMENT_STATUSES=["Active","Inactive","On Leave","Terminated","Archived"] as const;
 export const EMPLOYMENT_TYPES=["Full-Time","Part-Time","On-Call","1099","Temporary"] as const;
 export type EmployeeDepartment=(typeof EMPLOYEE_DEPARTMENTS)[number];

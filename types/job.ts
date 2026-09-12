@@ -24,6 +24,7 @@ export type JobChecklistItem = {
 export type JobPhoto = OperationalPhoto;
 
 export type Job = {
+  lead_representative_id?: string | null;
   id: string;
   job_number: string;
   proposal_id: string | null;

@@ -6,7 +6,14 @@ import type {
   EmployeeDepartment,
   EmployeeInput,
   EmployeeUpdate,
+  LeadRepresentativeOption,
 } from "@/types/employee";
+
+export async function getLeadRepresentatives(estimateId: string | null = null): Promise<LeadRepresentativeOption[]> {
+  const { data, error } = await getSupabaseClient().rpc("get_lead_representatives", { p_estimate_id: estimateId });
+  if (error) throw new Error(error.message);
+  return data;
+}
 
 export async function getEmployees(): Promise<Employee[]> {
   const profile = await getCurrentProfile();

@@ -9,6 +9,8 @@ import { matchingRecurringRules } from "@/lib/pricing/pricingEngine";
 import { createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
 import { getAvailableServiceAddons, getServiceCatalog, isPostConstructionCatalogService } from "@/lib/services/serviceCatalog";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
+import { getLeadRepresentatives } from "@/lib/services/employees";
+import type { LeadRepresentativeOption } from "@/types/employee";
 import type { CalculatorInput, CommercialCalculatorInput, Condition, CustomerInformation, EstimateDivision, EstimateResult, EstimateStatus, EstimateWithRelations, Frequency, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity, ResidentialCalculatorInput } from "@/types/estimate";
 import type { RecurringPricingRule, ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
@@ -34,6 +36,7 @@ const defaultPostConstructionV2: PostConstructionEstimateInput = { ...defaultPos
 const estimateDraftKey = "studioscrubz:estimate-draft";
 
 type EstimateDraft = {
+  leadRepresentativeId?: string | null;
   version: 1;
   customer: CustomerInformation;
   division: EstimateDivision;
@@ -52,6 +55,15 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const initialCustomer = estimate ? customerFromEstimate(estimate) : blankCustomer;
   const initialInput = estimate?.result.calculatorInput;
   const [customer, setCustomer] = useState(initialCustomer);
+  const [leadRepresentativeId, setLeadRepresentativeId] = useState<string | null>(estimate?.lead_representative_id ?? null);
+  const [leadRepresentatives, setLeadRepresentatives] = useState<LeadRepresentativeOption[]>([]);
+  const [leadLookupError, setLeadLookupError] = useState<string | null>(null);
+  const savedEstimateId = estimate?.id ?? null;
+  useEffect(() => {
+    let active = true;
+    void getLeadRepresentatives(savedEstimateId).then(rows => { if (active) { setLeadRepresentatives(rows); setLeadLookupError(null); } }).catch(error => { if (active) setLeadLookupError(error instanceof Error ? error.message : "Lead Representatives could not be loaded."); });
+    return () => { active = false; };
+  }, [savedEstimateId]);
   const [division, setDivision] = useState<EstimateDivision>(estimate?.division ?? "Residential");
   const [residential, setResidential] = useState<ResidentialCalculatorInput>(initialInput?.division === "Residential" && !isPostConstructionInput(initialInput) ? initialInput : isPostConstructionInput(initialInput)&&estimate?.division==="Residential"?{...defaultResidential,serviceType:"Post-Construction"}:defaultResidential);
   const [commercial, setCommercial] = useState<CommercialCalculatorInput>(initialInput?.division === "Commercial" && !isPostConstructionInput(initialInput) ? initialInput : isPostConstructionInput(initialInput)&&estimate?.division==="Commercial"?{...defaultCommercial,commercialType:"Post-Construction"}:defaultCommercial);
@@ -98,6 +110,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           // Restore the external session snapshot once after client hydration.
           // eslint-disable-next-line react-hooks/set-state-in-effect
           setCustomer(parsed.customer);
+          setLeadRepresentativeId(typeof parsed.leadRepresentativeId === "string" ? parsed.leadRepresentativeId : null);
           setDivision(parsed.division);
           setResidential(parsed.residential);
           setCommercial(parsed.commercial);
@@ -125,17 +138,17 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    if (!hasMeaningfulDraft(customer, division, residential, commercial, postConstruction, serviceDescription, notes, terms, draftDefaults)) {
+    if (!leadRepresentativeId && !hasMeaningfulDraft(customer, division, residential, commercial, postConstruction, serviceDescription, notes, terms, draftDefaults)) {
       window.sessionStorage.removeItem(estimateDraftKey);
       return;
     }
-    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, postConstruction, serviceDescription, notes, terms, manualPrice };
+    const draft: EstimateDraft = { version: 1, customer, division, residential, commercial, postConstruction, serviceDescription, notes, terms, manualPrice, leadRepresentativeId };
     try {
       window.sessionStorage.setItem(estimateDraftKey, JSON.stringify(draft));
     } catch (caught) {
       console.warn("Estimate draft could not be saved", caught);
     }
-  }, [commercial, customer, division, draftDefaults, draftReady, estimate, manualPrice, notes, postConstruction, residential, serviceDescription, terms]);
+  }, [commercial, customer, division, draftDefaults, draftReady, estimate, manualPrice, notes, postConstruction, residential, serviceDescription, terms, leadRepresentativeId]);
   const v2Mode = postConstructionMode && isPostConstructionV2Estimate(postConstruction);
   const incompleteProject = v2Mode && isPostConstructionV2Estimate(postConstruction) ? projectCostingIncompleteMessage(postConstruction.projectCosting) : null;
   const calculation = useMemo(() => {if(!catalog || incompleteProject)return{result:null,error:null};try{return{result:postConstructionMode?calculatePostConstructionCatalogEstimate({...postConstruction,division},catalog,selectedService):division === "Residential" ? calculateResidentialEstimate(residential,catalog,defaults?.upkeep_adjustment_percent ?? 30) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?(v2Mode ? projectCostingErrorMessage(x.message) : x.message):"Pricing could not be calculated."}}}, [catalog,commercial, defaults, division, postConstruction, postConstructionMode, residential, selectedService, incompleteProject, v2Mode]);
@@ -179,7 +192,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       if (estimate) {
         await updateEstimateRelationships(estimate, customer, division);
         if (!estimate.client_id || !estimate.property_id) throw new Error("This historical Estimate is no longer linked to a Client and Property.");
-        await updateEstimate(estimate.id, estimatePayload(estimate.client_id, estimate.property_id, customer, division, result, notes, terms, estimate.status));
+        await updateEstimate(estimate.id, { ...estimatePayload(estimate.client_id, estimate.property_id, customer, division, result, notes, terms, estimate.status), lead_representative_id: leadRepresentativeId });
         await getEstimates();
         setSuccess("Estimate updated successfully.");
       } else {
@@ -194,7 +207,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         if (selectedProperty && selectedProperty.client_id!==client.id) throw new Error("The selected property does not belong to the selected client.");
         if (selectedProperty && selectedProperty.property_type!==division) throw new Error(`The selected property must be a ${division} property.`);
         const property = selectedProperty ?? await findOrCreateEstimateProperty(client.id, customer, division);
-        await createEstimate(estimatePayload(client.id, property.id, customer, division, result, notes, terms, "Open"));
+        await createEstimate({ ...estimatePayload(client.id, property.id, customer, division, result, notes, terms, "Open"), lead_representative_id: leadRepresentativeId });
         await getEstimates();
         setSuccess("Estimate saved successfully and is available in Open Estimates.");
         clearNewEstimateDraft();
@@ -210,6 +223,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     restoredDraft.current = false;
     window.sessionStorage.removeItem(estimateDraftKey);
     setCustomer({ ...blankCustomer });
+    setLeadRepresentativeId(null);
     setDivision("Residential");
     setResidential({ ...draftDefaults.residential, addOns: [] });
     setCommercial({ ...draftDefaults.commercial, additionalServices: [] });
@@ -223,7 +237,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   }
 
   function requestClearDraft() {
-    if (hasMeaningfulDraft(customer, division, residential, commercial, postConstruction, serviceDescription, notes, terms, draftDefaults) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
+    if ((leadRepresentativeId || hasMeaningfulDraft(customer, division, residential, commercial, postConstruction, serviceDescription, notes, terms, draftDefaults)) && !window.confirm("Clear this unfinished estimate? This action cannot be undone.")) return;
     clearNewEstimateDraft();
     setSuccess("Estimate draft cleared.");
     setError(null);
@@ -238,6 +252,11 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         {selectedClientId && <SelectField label="Existing Property" value={selectedPropertyId} options={["",...properties.filter(entry=>entry.client_id===selectedClientId&&!entry.archived_at&&entry.property_type===division).map(entry=>entry.id)]} labels={new Map(properties.map(entry=>[entry.id,propertyOptionLabel(entry)]))} placeholder="New property / enter location below" set={selectExistingProperty} />}
       </div>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <label className="block"><Label text="Lead Representative (Optional)" /><select className={inputClass} value={leadRepresentativeId ?? ""} onChange={event => setLeadRepresentativeId(event.target.value || null)}>
+          <option value="">None / Direct Lead</option>
+          {leadRepresentativeId && !leadRepresentatives.some(rep => rep.id === leadRepresentativeId) && <option value={leadRepresentativeId} disabled>Saved representative (unavailable)</option>}
+          {leadRepresentatives.map(rep => <option key={rep.id} value={rep.id} disabled={!rep.is_active}>{rep.display_name}{rep.is_active ? "" : " (Inactive / historical)"}</option>)}
+        </select>{leadLookupError && <p role="alert" className="mt-1 text-sm text-red-700">{leadLookupError} Existing attribution is retained.</p>}</label>
         <TextField label="First Name" value={customer.firstName} set={(value) => setCustomer({ ...customer, firstName: value })} />
         <TextField label="Last Name" value={customer.lastName} set={(value) => setCustomer({ ...customer, lastName: value })} />
         {division === "Commercial" && <TextField label="Company Name" value={customer.companyName} set={(value) => setCustomer({ ...customer, companyName: value })} />}

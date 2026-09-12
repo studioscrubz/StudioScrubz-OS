@@ -164,6 +164,7 @@ export interface Database {
     };
 
     Functions: {
+      get_lead_representatives: { Args: { p_estimate_id?: string | null }; Returns: import("@/types/employee").LeadRepresentativeOption[] };
       get_company_mileage_rate: { Args: Record<string, never>; Returns: number | null };
       set_company_mileage_rate: { Args: { p_rate: number | null }; Returns: undefined };
       get_job_gps_trips: { Args: { p_job_id: string }; Returns: GpsMileageTrip[] };

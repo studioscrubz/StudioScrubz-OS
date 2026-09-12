@@ -187,6 +187,7 @@ export type EstimateResult = {
 };
 
 export type Estimate = {
+  lead_representative_id?: string | null;
   id: string;
   estimate_number: string;
   client_id: string | null;
