@@ -938,9 +938,11 @@ function Alert({
 }
 
 function message(x: unknown) {
-  return x instanceof Error
-    ? x.message
-    : "Operation failed.";
+  if (x instanceof Error) return x.message;
+  if (x && typeof x === "object" && "message" in x && typeof x.message === "string" && x.message.trim()) {
+    return x.message;
+  }
+  return "Operation failed.";
 }
 
 function money(v: number) {
