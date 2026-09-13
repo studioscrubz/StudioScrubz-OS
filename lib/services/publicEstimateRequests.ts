@@ -41,6 +41,7 @@ export type PublicCatalog = {
 };
 
 export type PublicRequest = {
+  leadRepresentativeId?: string | null;
   division: EstimateDivision;
   customer: CustomerInformation;
   preferredContactMethod: PreferredContactMethod;
@@ -65,6 +66,26 @@ export type PublicRequest = {
 };
 
 export class PublicEstimateRequestError extends Error {}
+
+export async function getPublicLeadRepresentatives() {
+  const { data, error } = await createSupabaseAdminClient().from("employees")
+    .select("id,preferred_name,first_name,last_name")
+    .eq("department", "Lead Representative").eq("employment_status", "Active").is("archived_at", null);
+  if (error) throw new Error("Representatives could not be loaded.");
+  return (data ?? []).map(row => ({ id: row.id as string, displayName: row.preferred_name?.trim() || `${row.first_name} ${row.last_name}`.trim() }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+async function validatePublicLeadRepresentative(value: unknown): Promise<string | null> {
+  if (value == null || (typeof value === "string" && !value.trim())) return null;
+  if (typeof value !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())) {
+    throw new PublicEstimateRequestError("Select a valid StudioScrubz representative or None.");
+  }
+  const { data, error } = await createSupabaseAdminClient().from("employees").select("id")
+    .eq("id", value.trim()).eq("department", "Lead Representative").eq("employment_status", "Active").is("archived_at", null).maybeSingle();
+  if (error || !data) throw new PublicEstimateRequestError("The selected representative is unavailable. Select another representative or None.");
+  return data.id;
+}
 
 export async function loadAuthoritativeCatalog(): Promise<ServiceCatalogBundle> {
   const db = createSupabaseAdminClient();
@@ -249,6 +270,7 @@ export async function submitPublicRequest(
   result: EstimateResult
 ) {
   validateSubmission(input);
+  const leadRepresentativeId = await validatePublicLeadRepresentative(input.leadRepresentativeId);
 
   if (PUBLIC_EXCLUDED_SERVICES.has(result.serviceName)) {
     throw new PublicEstimateRequestError(
@@ -380,6 +402,7 @@ export async function submitPublicRequest(
       .from("estimates")
       .insert({
         estimate_number: estimateNumber,
+        lead_representative_id: leadRepresentativeId,
         client_id: client.id,
         property_id: property.id,
         division: input.division,
