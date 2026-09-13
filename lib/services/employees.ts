@@ -83,7 +83,7 @@ export async function createEmployee(
       const { data, error } = await getSupabaseClient()
         .from("employees")
         .insert({
-          ...input,
+          ...employeeWritePayload(input),
           employee_number: number(),
         })
         .select()
@@ -115,7 +115,7 @@ export async function updateEmployee(
   if (isMasterAdmin(await getCurrentProfile())) {
     const { data, error } = await getSupabaseClient()
       .from("employees")
-      .update(input)
+      .update(employeeWritePayload(input))
       .eq("id", id)
       .select()
       .single();
@@ -161,6 +161,13 @@ export async function archiveEmployee(id: string) {
 
   if (error) throw error;
   return safeEmployee(data);
+}
+
+// Legacy UI/types may carry this field, but it is no longer a database column.
+function employeeWritePayload<T extends EmployeeInput | EmployeeUpdate>(input: T): Omit<T, "overtime_rate"> {
+  const payload = { ...input };
+  delete payload.overtime_rate;
+  return payload;
 }
 
 function operationalArgs(input: EmployeeInput | Employee) {
