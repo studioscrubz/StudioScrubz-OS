@@ -41,7 +41,7 @@ export function CommunicationTimeline(props: CommunicationTimelineProps) {
         ? await getClientCommunications(props.clientId, showArchived)
         : await getCommunicationsForRecord({ estimateId: props.estimateId, proposalId: props.proposalId, agreementId: props.agreementId, invoiceId: props.invoiceId }, showArchived);
       setRecords(data);
-    } catch (caught) { console.error("Failed to load communication history", caught); setError("Communication history could not be loaded."); }
+    } catch (caught) { console.error("Failed to load communication history", caught); setError(errorMessage(caught, "Communication history could not be loaded.")); }
     finally { setLoading(false); }
   }, [canView, props.agreementId, props.clientId, props.estimateId, props.invoiceId, props.proposalId, showArchived]);
 
@@ -121,3 +121,4 @@ export function CommunicationTimeline(props: CommunicationTimelineProps) {
 function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function statusStyle(status: CommunicationStatus) { if (status === "Failed") return "bg-red-500 ring-red-100"; if (status === "Sent" || status === "Delivered" || status === "Opened") return "bg-emerald-500 ring-emerald-100"; if (status === "Cancelled" || status === "Archived") return "bg-neutral-400 ring-neutral-100"; return "bg-amber-500 ring-amber-100"; }
 const filterClass = "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3.5 text-sm text-neutral-700 outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
+function errorMessage(caught: unknown, fallback: string) { return caught instanceof Error && caught.message.trim() ? caught.message : typeof caught === "string" && caught.trim() ? caught : fallback; }

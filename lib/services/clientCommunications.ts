@@ -1,39 +1,22 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { withImmediateAttentionPush } from "@/lib/push/client";
-import { getJobs } from "@/lib/services/jobs";
-import { getUpcomingOccurrences } from "@/lib/services/serviceOccurrences";
-import { getProperties } from "@/lib/services/properties";
 import type { ClientCommunication, ClientCommunicationInput, CommunicationRecordFilter, UpcomingClientService } from "@/types/clientCommunication";
 
 export async function getUpcomingServicesForClient(clientId: string): Promise<UpcomingClientService[]> {
-  const start = localDate();
-  const end = addDays(start, 365);
-  const [jobsResult, occurrencesResult, propertiesResult] = await Promise.allSettled([
-    getJobs(), getUpcomingOccurrences(start, end), getProperties(),
-  ]);
-  if (jobsResult.status === "rejected" && occurrencesResult.status === "rejected")
-    throw new Error("Upcoming services could not be loaded for the current user.");
-  const properties = propertiesResult.status === "fulfilled" ? propertiesResult.value : [];
-  const propertyMap = new Map(properties.map((property) => [property.id, formatPropertyAddress(property)]));
-  const jobs = jobsResult.status === "fulfilled" ? jobsResult.value : [];
-  const upcomingJobs: UpcomingClientService[] = jobs
-    .filter((job) => job.client_id === clientId && job.scheduled_date && job.scheduled_date >= start && !job.archived_at && !["Cancelled", "Completed", "Archived"].includes(job.status))
-    .map((job) => ({
-      source: "Job", sourceId: job.id, clientId, propertyId: job.property_id,
-      serviceName: job.service_name || "Scheduled Service", scheduledDate: job.scheduled_date!, startTime: job.start_time,
-      propertyAddress: job.property?.address ? formatPropertyAddress(job.property) : (job.property_id ? propertyMap.get(job.property_id) ?? null : null),
-    }));
-  const jobOccurrenceIds = new Set(jobs.map((job) => job.service_occurrence_id).filter((id): id is string => Boolean(id)));
-  const occurrences = occurrencesResult.status === "fulfilled" ? occurrencesResult.value : [];
-  const upcomingOccurrences: UpcomingClientService[] = occurrences
-    .filter((occurrence) => occurrence.agreement.client_id === clientId && !jobOccurrenceIds.has(occurrence.id) && !["Cancelled", "Completed", "Skipped"].includes(occurrence.status))
-    .map((occurrence) => ({
-      source: "Service Occurrence", sourceId: occurrence.id, clientId,
-      propertyId: occurrence.agreement.property_id, serviceName: occurrence.agreement.service_name || "Scheduled Service",
-      scheduledDate: occurrence.scheduled_date, startTime: occurrence.scheduled_start_time,
-      propertyAddress: occurrence.agreement.property_id ? propertyMap.get(occurrence.agreement.property_id) ?? null : null,
-    }));
-  return [...upcomingJobs, ...upcomingOccurrences].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.startTime ?? "23:59").localeCompare(b.startTime ?? "23:59"));
+  const { data, error } = await getSupabaseClient().rpc("get_upcoming_client_jobs", {
+    p_client_id: clientId, p_days: 365,
+  });
+  if (error) throw new Error(`Scheduled Job lookup failed: ${error.message}`);
+  return (data ?? []).map((job) => ({
+    source: "Job",
+    sourceId: job.job_id,
+    clientId: job.client_id,
+    propertyId: job.property_id,
+    serviceName: job.service_name || "Scheduled Service",
+    scheduledDate: job.scheduled_date,
+    startTime: job.start_time,
+    propertyAddress: job.property_address,
+  }));
 }
 
 export async function getClientCommunications(clientId: string, includeArchived = false): Promise<ClientCommunication[]> {
@@ -180,15 +163,4 @@ function communicationNumber() {
   const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
   const suffix = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
   return `COMM-${date}-${suffix}`;
-}
-
-function localDate() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-function addDays(value: string, days: number) { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate() + days); return localDateFor(date); }
-function localDateFor(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function formatPropertyAddress(property: { address: string; address_line_2: string | null; city: string | null; state: string | null; zip: string | null }) {
-  const locality = [property.city, property.state].filter(Boolean).join(", ");
-  return [property.address, property.address_line_2, [locality, property.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
 }

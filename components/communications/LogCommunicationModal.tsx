@@ -48,7 +48,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
         setSelectedServiceId(first?.sourceId ?? "");
         if (first) applyReminder(first);
       })
-      .catch((caught: unknown) => { console.error("Failed to load upcoming client services", caught); if (active) { setUpcoming([]); setUpcomingError("Upcoming services could not be loaded."); } })
+      .catch((caught: unknown) => { console.error("Failed to load upcoming client services", caught); if (active) { setUpcoming([]); setUpcomingError(errorMessage(caught, "Upcoming services could not be loaded.")); } })
       .finally(() => { if (active) setLoadingUpcoming(false); });
     return () => { active = false; };
   }, [context, initialServiceId, links.clientId, type]);
@@ -120,11 +120,12 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
     setSaving(true); setError(null); setNotice(null);
     try {
       const record = (eventKey ? null : preparedSms) ?? await recordCommunication({
-        client_id: context?.clientId ?? links.clientId ?? null, property_id: context?.propertyId ?? links.propertyId ?? null,
+        client_id: context?.clientId ?? links.clientId ?? null, property_id: selectedService?.propertyId ?? context?.propertyId ?? links.propertyId ?? null,
         estimate_id: context?.estimateId ?? links.estimateId ?? null, proposal_id: context?.proposalId ?? links.proposalId ?? null,
         agreement_id: context?.agreementId ?? links.agreementId ?? null, invoice_id: context?.invoiceId ?? links.invoiceId ?? null,
         communication_type: type, channel: "Email", direction, status: "Prepared", provider: "mailto",
-        subject: clean(subject), message_body: clean(message), recipient_email: clean(email), recipient_phone: clean(phone), metadata: context?.metadata ?? {},
+        subject: clean(subject), message_body: clean(message), recipient_email: clean(email), recipient_phone: clean(phone),
+        metadata: selectedService ? { source: selectedService.source, source_id: selectedService.sourceId, scheduled_date: selectedService.scheduledDate, service_name: selectedService.serviceName } : context?.metadata ?? {},
       });
       setPreparedSms(record); onCreated(record); if (eventKey && record.status === "Sent") { setNotice("This Job communication is already recorded as sent by email."); return; } openDeviceEmailApp(email, subject, `${message}${context?.handoffSuffix ?? ""}`);
       setNotice("Email application opened. Confirm the message was sent before marking it as sent.");
@@ -157,7 +158,8 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
         {type === "Service Reminder" && <div className="sm:col-span-2">
           {loadingUpcoming ? <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Loading upcoming services…</p>
             : upcoming.length > 0 ? <Field label="Upcoming Service"><select value={selectedServiceId} onChange={(e) => selectUpcoming(e.target.value)} className={inputClass}>{upcoming.map((service) => <option key={`${service.source}-${service.sourceId}`} value={service.sourceId}>{serviceLabel(service)}</option>)}</select></Field>
-            : <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{upcomingError || "No upcoming scheduled service was found for this client."}</p>}
+            : upcomingError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{upcomingError}</p>
+            : <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">No upcoming scheduled service was found for this client.</p>}
         </div>}
         <Field label="Recipient Email"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} /></Field>
         <Field label="Recipient Phone"><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} /></Field>
@@ -177,6 +179,12 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
       </form>
     </section>
   </div>;
+}
+
+function errorMessage(caught: unknown, fallback: string) {
+  if (caught instanceof Error && caught.message.trim()) return caught.message;
+  if (typeof caught === "string" && caught.trim()) return caught;
+  return fallback;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 block text-xs font-bold text-neutral-700">{label}</span>{children}</label>; }
