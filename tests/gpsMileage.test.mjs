@@ -54,18 +54,59 @@ test("service create, finish and cancel notify mounted summaries only on success
   assert.equal(events.length, 6);
 });
 const sql = readFileSync(new URL("../supabase/migrations/20260912010000_job_gps_mileage_v1.sql", import.meta.url), "utf8");
+const compactSql = sql.replace(/\s+/g, " ");
 test("SQL contract: self/assignment authorization, restricted writes, transaction and idempotency guards", () => {
-  assert.match(sql, /enable row level security/);
-  assert.match(sql, /revoke all on public.job_mileage_trips from public,anon,authenticated/);
-  assert.match(sql, /p_employee_id=public.current_employee_id\(\)/);
-  assert.match(sql, /public.is_assigned_to_crew\(j.assigned_crew_id\)/);
-  assert.match(sql, /where status='Active'/);
-  assert.match(sql, /where status <> 'Cancelled'/);
-  assert.match(sql, /if t.status='Completed' then return t/);
-  assert.match(sql, /where id=p_id for update/);
-  assert.match(sql, /round\(miles\*coalesce\(rate,0\),2\)/);
-  assert.match(sql, /mileage_rate_snapshot=rate,mileage_entry_id=entry_id/);
-  assert.ok(sql.indexOf("insert into public.mileage_entries") < sql.indexOf("set status='Completed'"));
+  assert.match(compactSql, /enable row level security/);
+  assert.match(compactSql, /revoke all on public.job_mileage_trips from public, anon, authenticated/);
+  assert.match(compactSql, /p_employee_id = public.current_employee_id\(\)/);
+  assert.match(compactSql, /public.is_assigned_to_crew\( j.assigned_crew_id \)/);
+  assert.match(compactSql, /where status = 'Active'/);
+  assert.match(compactSql, /where status <> 'Cancelled'/);
+  assert.match(compactSql, /if t.status = 'Completed' then return t;/);
+  assert.match(compactSql, /where id = p_id for update/);
+  assert.match(compactSql, /round\( miles \* coalesce\(rate, 0\), 2 \)/);
+  assert.match(compactSql, /mileage_rate_snapshot = rate, mileage_entry_id = entry_id/);
+  assert.ok(compactSql.indexOf("insert into public.mileage_entries") < compactSql.indexOf("set status = 'Completed'"));
   for (const definition of sql.split(/create function /).slice(1)) if (/security definer/.test(definition)) assert.match(definition, /set search_path = ''/);
   assert.doesNotMatch(sql, /update public.jobs|start_operational_job|start_or_clock_in_to_job|alter.*policy/i);
+});
+test("ARRIVED creates a normal vehicle/job-linked mileage entry and both mileage views refresh", () => {
+  const insert = compactSql.match(/insert into public\.mileage_entries \((.*?)\) values \((.*?)\) returning id into entry_id/s);
+  assert.ok(insert, "finish_job_gps_trip must insert into mileage_entries");
+  for (const field of ["mileage_number", "trip_date", "vehicle_id", "employee_id", "crew_id", "job_id", "client_id", "property_id", "trip_purpose", "start_location", "end_location", "miles", "round_trip", "business_use", "mileage_rate", "deductible_amount", "notes"]) {
+    assert.match(insert[1], new RegExp(`\\b${field}\\b`));
+  }
+  assert.match(insert[2], /t\.vehicle_id, t\.employee_id, j\.assigned_crew_id, j\.id, j\.client_id, j\.property_id/);
+  assert.match(compactSql, /status = 'Completed'.*mileage_entry_id = entry_id/s);
+
+  const vehiclesPage = readFileSync(new URL("../components/vehicles/VehiclesPage.tsx", import.meta.url), "utf8");
+  const jobSummary = readFileSync(new URL("../components/vehicles/JobMileageSummary.tsx", import.meta.url), "utf8");
+  assert.match(vehiclesPage, /addEventListener\(MILEAGE_CHANGED_EVENT, refresh\)/);
+  assert.match(jobSummary, /addEventListener\(MILEAGE_CHANGED_EVENT, refresh\)/);
+});
+test("all operational roles use GPS while management selects vehicles and field access stays assigned", () => {
+  const jobsPage = readFileSync(new URL("../components/jobs/JobsPage.tsx", import.meta.url), "utf8");
+  const expansion = readFileSync(new URL("../supabase/migrations/20260915194754_expand_gps_mileage_to_management.sql", import.meta.url), "utf8").replace(/\s+/g, " ");
+
+  assert.match(jobsPage, /\["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"\]\.includes/);
+  assert.doesNotMatch(jobsPage, /initiateJobOnMyWay/);
+  assert.match(jobsPage, /management \? "Select active vehicle" : "Select assigned vehicle"/);
+  assert.match(jobsPage, /if \(!management && eligible\.length === 1\) setVehicleId/);
+
+  assert.match(expansion, /caller_role not in \('Master Admin', 'Administrator', 'Manager', 'Crew Lead', 'Scrub Technician'\)/);
+  assert.match(expansion, /not management and \( e is null or not exists/);
+  assert.match(expansion, /v\.assigned_employee_id = e or public\.is_assigned_to_crew\(v\.assigned_crew_id\)/);
+  assert.match(expansion, /notification := public\.initiate_job_on_my_way\(p_job_id\)/);
+  assert.match(expansion, /job_id, user_id, employee_id, vehicle_id/);
+  assert.match(expansion, /t\.user_id is distinct from auth\.uid\(\)/);
+  assert.match(expansion, /insert into public\.mileage_entries/);
+  assert.doesNotMatch(expansion, /alter column user_id set not null/);
+  assert.doesNotMatch(expansion, /update public\.job_mileage_trips .* set user_id/s);
+  assert.doesNotMatch(expansion, /drop index public\.job_gps_one_active_employee|drop index public\.job_gps_one_trip_per_job/);
+  assert.match(expansion, /if exists \( select 1 from public\.job_mileage_trips where status = 'Active' \) then raise exception 'Complete or cancel all active GPS trips before applying/);
+  assert.match(expansion, /where user_id = caller_id and job_id = p_job_id/);
+  assert.match(expansion, /p_job_id, caller_id, e, p_vehicle_id/);
+  assert.match(compactSql, /has_any_role\( array\['Master Admin', 'Administrator', 'Manager'\] \) or \( public\.has_any_role/);
+  assert.match(compactSql, /select t\.\* from public\.job_mileage_trips t where t\.job_id = p_job_id and public\.can_read_job_gps\( t\.job_id, t\.employee_id \)/);
+  assert.doesNotMatch(expansion, /start_operational_job|start_or_clock_in_to_job|time_entries|payroll/i);
 });

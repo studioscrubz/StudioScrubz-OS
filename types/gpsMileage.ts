@@ -1,6 +1,6 @@
 export type GpsPosition = { latitude: number; longitude: number; accuracy: number; capturedAt: string };
 export type GpsMileageTrip = {
-  id: string; job_id: string; employee_id: string; vehicle_id: string;
+  id: string; job_id: string; user_id: string; employee_id: string | null; vehicle_id: string;
   status: "Active" | "Completed" | "Cancelled";
   started_at: string; ended_at: string | null;
   start_latitude: number; start_longitude: number; start_accuracy: number;

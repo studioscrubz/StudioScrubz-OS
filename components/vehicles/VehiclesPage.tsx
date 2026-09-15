@@ -15,6 +15,7 @@ import {
   createMileageEntry,
   getMileageEntries,
   getMileageSummary,
+  MILEAGE_CHANGED_EVENT,
   updateMileageEntry,
   voidMileageEntry,
 } from "@/lib/services/mileage";
@@ -106,10 +107,21 @@ function VehicleAdministrationPage() {
     setMileage(m);
   }
   useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void Promise.all([getVehicles(), getMileageEntries()])
+        .then(([v, m]) => { if (active) { setVehicles(v); setMileage(m); setError(null); } })
+        .catch((cause: unknown) => { if (active) setError(msg(cause)); });
+    };
     void Promise.all([getVehicles(), getMileageEntries()])
-      .then(([v, m]) => { setVehicles(v); setMileage(m); })
-      .catch((x) => setError(msg(x)))
-      .finally(() => setLoading(false));
+      .then(([v, m]) => { if (active) { setVehicles(v); setMileage(m); } })
+      .catch((x) => { if (active) setError(msg(x)); })
+      .finally(() => { if (active) setLoading(false); });
+    window.addEventListener(MILEAGE_CHANGED_EVENT, refresh);
+    return () => {
+      active = false;
+      window.removeEventListener(MILEAGE_CHANGED_EVENT, refresh);
+    };
   }, []);
   const activeMileage = mileage.filter(
       (x) => x.status === "Active" && !x.archived_at,

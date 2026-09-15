@@ -6,7 +6,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import {
   archiveJob,
-  initiateJobOnMyWay,
   assignJobCrew,
   cancelJob,
   completeInProgressJob,
@@ -1034,38 +1033,18 @@ function money(v: number) {
 }
 function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
 function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; employeeId: string | null; role: string | null }) {
-  const [error, setError] = useState<string | null>(null);
-  const [initiatedJobId, setInitiatedJobId] = useState<string | null>(null);
-  const [claiming, setClaiming] = useState(false);
-  const initiated = Boolean(job.on_my_way_initiated_at || initiatedJobId === job.id);
+  const { profile } = useAuth();
+  const supported = ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(role ?? "");
   const management = ["Master Admin", "Administrator", "Manager"].includes(role ?? "");
-  const assignedFieldEmployee = ["Crew Lead", "Scrub Technician"].includes(role ?? "") && Boolean(employeeId && job.assigned_crew_id);
   // Field roles use only contact fields from the assignment-authorized RPC.
   const clientPhone = management ? job.client?.phone : job.client_phone;
   const firstName = management ? job.client?.first_name : job.client_first_name;
   const phone = clientPhone ? normalizeSmsPhoneNumber(clientPhone) : null;
-  if (assignedFieldEmployee && employeeId) return <GpsOnMyWay key={`${job.id}:${employeeId}`} job={job} employeeId={employeeId} phone={phone} firstName={firstName}/>;
-  if ((!management && !assignedFieldEmployee) || !job.scheduled_date || !job.start_time || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || !phone) return null;
-  async function openMessage() {
-    if (claiming || initiated) return;
-    setClaiming(true);
-    setError(null);
-    const greeting = firstName?.trim() || "there";
-    const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
-    try {
-      const result = await initiateJobOnMyWay(job.id);
-      setInitiatedJobId(job.id);
-      if (result.initiated) {
-        try { openDeviceSmsApp(phone!, body); }
-        catch { setError("On My Way was initiated, but the SMS composer could not be opened."); }
-      }
-    } catch (cause) { setError(message(cause, "On My Way could not be initiated.")); }
-    finally { setClaiming(false); }
-  }
-  return <><button type="button" disabled={claiming || initiated} title={initiated ? "On My Way message already initiated" : undefined} className={initiated ? joined : primary} onClick={() => void openMessage()}>On My Way</button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</>;
+  if (!supported || !profile) return null;
+  return <GpsOnMyWay key={`${job.id}:${profile.id}`} job={job} userId={profile.id} employeeId={employeeId} management={management} phone={phone} firstName={firstName}/>;
 }
 
-function GpsOnMyWay({ job, employeeId, phone, firstName }: { job: JobWithRelations; employeeId: string; phone: string | null; firstName: string | null | undefined }) {
+function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: { job: JobWithRelations; userId: string; employeeId: string | null; management: boolean; phone: string | null; firstName: string | null | undefined }) {
   const [trip, setTrip] = useState<GpsMileageTrip | null>(null);
   const [vehicles, setVehicles] = useState<AuthorizedVehicle[]>([]);
   const [vehicleId, setVehicleId] = useState("");
@@ -1080,7 +1059,7 @@ function GpsOnMyWay({ job, employeeId, phone, firstName }: { job: JobWithRelatio
       const request = ++revision;
       void getGpsTrips(job.id).then(rows => {
         if (disposed || request !== revision) return;
-        setTrip(rows.find(row => row.employee_id === employeeId && row.status !== "Cancelled") ?? null);
+        setTrip(rows.find(row => (row.user_id === userId || (!row.user_id && employeeId && row.employee_id === employeeId)) && row.status !== "Cancelled") ?? null);
         setLoaded(true);
       }).catch(cause => { if (!disposed && request === revision) setError(message(cause, "GPS trip could not be loaded. Reopen this Job to retry.")); });
     };
@@ -1089,12 +1068,12 @@ function GpsOnMyWay({ job, employeeId, phone, firstName }: { job: JobWithRelatio
       if (disposed) return;
       const eligible = rows.filter(row => row.status === "Active");
       setVehicles(eligible);
-      if (eligible.length === 1) setVehicleId(eligible[0].id);
+      if (!management && eligible.length === 1) setVehicleId(eligible[0].id);
     }).catch(cause => { if (!disposed) setError(message(cause, "Assigned vehicles could not be loaded.")); });
     window.addEventListener(GPS_TRIP_CHANGED_EVENT, load);
     window.addEventListener("focus", load);
     return () => { disposed = true; window.removeEventListener(GPS_TRIP_CHANGED_EVENT, load); window.removeEventListener("focus", load); };
-  }, [job.id, employeeId]);
+  }, [job.id, userId, employeeId, management]);
   const active = trip?.status === "Active";
   const completed = trip?.status === "Completed";
   const eligible = Boolean(phone && job.scheduled_date && job.start_time && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status));
@@ -1123,7 +1102,7 @@ function GpsOnMyWay({ job, employeeId, phone, firstName }: { job: JobWithRelatio
     <p className="text-sm font-bold text-[#143d1a]">{active ? "Mileage Tracking Active" : completed ? "GPS mileage saved" : "Automatic GPS mileage"}</p>
     <p className="text-xs text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>
     {!active && !completed && <>
-      {vehicles.length > 0 ? <label className="block text-sm">Vehicle<select className={input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">Select assigned vehicle</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">No eligible active assigned vehicle. Contact management; manual mileage remains available separately.</p>}
+      {vehicles.length > 0 ? <label className="block text-sm">Vehicle<select className={input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">{management ? "Select active vehicle" : "Select assigned vehicle"}</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">{management ? "No active vehicle is available. Add or reactivate a vehicle before starting GPS mileage." : "No eligible active assigned vehicle. Contact management; manual mileage remains available separately."}</p>}
       {!eligible && <p className="text-sm">On My Way requires an eligible scheduled Job and a valid client phone number.</p>}
     </>}
     {!completed && <button type="button" disabled={busy || !loaded || (!active && (!eligible || !vehicleId))} className={primary} onClick={() => void act()}>{busy ? "Saving / locating…" : active ? "ARRIVED" : "ON MY WAY"}</button>}
