@@ -24,7 +24,6 @@ export const metadata: Metadata = {
     "San Fernando Valley cleaning",
     "Los Angeles cleaning",
   ],
-  alternates: { canonical: "https://studioscrubz.com" },
   icons: {
     icon: [
       {
