@@ -7,8 +7,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://studioscrubz.com/commercial" },
   openGraph: {
     title: "Commercial Cleaning & Janitorial Services in Los Angeles | StudioScrubz",
-    description: "Property-specific commercial cleaning plans for businesses and facilities across Los Angeles County and the San Fernando Valley.",
+    description: "One-time and recurring commercial cleaning and janitorial services for offices, restaurants, studios, and other facilities across Los Angeles County and the San Fernando Valley.",
     url: "https://studioscrubz.com/commercial",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Commercial Cleaning & Janitorial Services in Los Angeles | StudioScrubz",
+    description: "One-time and recurring commercial cleaning and janitorial services for offices, restaurants, studios, and other facilities across Los Angeles County and the San Fernando Valley.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

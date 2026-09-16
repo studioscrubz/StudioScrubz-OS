@@ -7,8 +7,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://studioscrubz.com/pressure-washing" },
   openGraph: {
     title: "Pressure Washing in Los Angeles | StudioScrubz",
-    description: "Exterior cleaning for suitable concrete and hard-surface areas at homes, businesses, and managed properties across Los Angeles County and the San Fernando Valley.",
+    description: "Residential, commercial, and managed-property pressure washing for suitable concrete, driveways, walkways, patios, entries, and common areas across Los Angeles County and the San Fernando Valley.",
     url: "https://studioscrubz.com/pressure-washing",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pressure Washing in Los Angeles | StudioScrubz",
+    description: "Residential, commercial, and managed-property pressure washing for suitable concrete, driveways, walkways, patios, entries, and common areas across Los Angeles County and the San Fernando Valley.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

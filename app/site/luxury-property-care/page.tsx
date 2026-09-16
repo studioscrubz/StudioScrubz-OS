@@ -20,8 +20,25 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Luxury Property Care & Private Porter Services | StudioScrubz",
     description:
-      "Private property care, recurring residence upkeep, property checks, restocking, vendor coordination, and documented service for luxury homes and estates.",
+      "Discreet luxury property care and private porter services for estates, luxury homes, condos, second residences, and high-profile clients across Greater Los Angeles and the San Fernando Valley.",
     url: "https://studioscrubz.com/luxury-property-care",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [
+      {
+        url: "/branding/studioscrubz-logo.png",
+        width: 500,
+        height: 500,
+        alt: "StudioScrubz",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Luxury Property Care & Private Porter Services | StudioScrubz",
+    description:
+      "Discreet luxury property care and private porter services for estates, luxury homes, condos, second residences, and high-profile clients across Greater Los Angeles and the San Fernando Valley.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

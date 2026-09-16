@@ -7,8 +7,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://studioscrubz.com/property-porter-services" },
   openGraph: {
     title: "Property Porter Services Los Angeles | StudioScrubz",
-    description: "Scheduled property support for apartment, multifamily, and other managed properties, with common-area upkeep, visual condition checks, documentation, and property issue reporting.",
+    description: "Recurring property porter services for managed apartment and multifamily communities across Los Angeles County and the San Fernando Valley, with common-area upkeep, visual condition checks, photo documentation, and property issue reporting.",
     url: "https://studioscrubz.com/property-porter-services",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Property Porter Services Los Angeles | StudioScrubz",
+    description: "Recurring property porter services for managed apartment and multifamily communities across Los Angeles County and the San Fernando Valley, with common-area upkeep, visual condition checks, photo documentation, and property issue reporting.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

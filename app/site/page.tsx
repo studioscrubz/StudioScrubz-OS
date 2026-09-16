@@ -22,8 +22,18 @@ export const metadata: Metadata = {
   openGraph: {
     title: "StudioScrubz | Residential & Commercial Cleaning",
     description:
-      "Professional cleaning and property care for homes, businesses, managed properties, private residences, and projects across the Los Angeles area.",
+      "Professional residential, commercial, property, luxury property care, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
     url: "https://studioscrubz.com/",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "StudioScrubz | Cleaning Services in Greater Los Angeles",
+    description:
+      "Professional residential, commercial, property, luxury property care, post-construction, and exterior cleaning across Greater Los Angeles and the San Fernando Valley.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

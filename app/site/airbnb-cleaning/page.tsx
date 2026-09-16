@@ -7,8 +7,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://studioscrubz.com/airbnb-cleaning" },
   openGraph: {
     title: "Airbnb & Short-Term Rental Cleaning Los Angeles | StudioScrubz",
-    description: "Between-guest turnover cleaning for Airbnb, vacation-rental, and short-term-rental properties across Los Angeles County and the San Fernando Valley.",
+    description: "Airbnb, vacation-rental, and short-term-rental turnover cleaning between guest stays across Los Angeles County and the San Fernando Valley, with recurring and deep-clean options.",
     url: "https://studioscrubz.com/airbnb-cleaning",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Airbnb & Short-Term Rental Cleaning Los Angeles | StudioScrubz",
+    description: "Airbnb, vacation-rental, and short-term-rental turnover cleaning between guest stays across Los Angeles County and the San Fernando Valley, with recurring and deep-clean options.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

@@ -8,8 +8,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://studioscrubz.com/property-management" },
   openGraph: {
     title: "Property Management Cleaning in Los Angeles | StudioScrubz",
-    description: "Recurring common-area cleaning and unit-turn support for apartment and multifamily properties across Los Angeles County and the San Fernando Valley.",
+    description: "Property management cleaning for apartment and multifamily communities, common areas, recurring service, and unit turns across Los Angeles County and the San Fernando Valley.",
     url: "https://studioscrubz.com/property-management",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Property Management Cleaning in Los Angeles | StudioScrubz",
+    description: "Property management cleaning for apartment and multifamily communities, common areas, recurring service, and unit turns across Los Angeles County and the San Fernando Valley.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 

@@ -7,8 +7,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://studioscrubz.com/residential" },
   openGraph: {
     title: "Residential & House Cleaning in Los Angeles | StudioScrubz",
-    description: "Standard, deep, move-in, move-out, and recurring cleaning for homes and apartments across Los Angeles County and the San Fernando Valley.",
+    description: "Professional house and apartment cleaning, including standard, deep, move-in, move-out, and recurring home cleaning across Los Angeles County and the San Fernando Valley.",
     url: "https://studioscrubz.com/residential",
+    siteName: "StudioScrubz",
+    type: "website",
+    images: [{ url: "/branding/studioscrubz-logo.png", width: 500, height: 500, alt: "StudioScrubz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Residential & House Cleaning in Los Angeles | StudioScrubz",
+    description: "Professional house and apartment cleaning, including standard, deep, move-in, move-out, and recurring home cleaning across Los Angeles County and the San Fernando Valley.",
+    images: ["/branding/studioscrubz-logo.png"],
   },
 };
 
