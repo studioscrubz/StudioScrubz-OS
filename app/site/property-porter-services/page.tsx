@@ -3,11 +3,11 @@ import { EstimateCta, FeatureList, PageHero, RelatedServices, SectionHeading } f
 
 export const metadata: Metadata = {
   title: { absolute: "Property Porter Services Los Angeles | StudioScrubz" },
-  description: "Recurring property and apartment porter services across the San Fernando Valley and Los Angeles area. Common-area upkeep, condition checks, photo documentation, and issue reporting.",
+  description: "Recurring property porter services for managed apartment and multifamily communities across Los Angeles County and the San Fernando Valley, with common-area upkeep, visual condition checks, photo documentation, and property issue reporting.",
   alternates: { canonical: "https://studioscrubz.com/property-porter-services" },
   openGraph: {
     title: "Property Porter Services Los Angeles | StudioScrubz",
-    description: "Scheduled property upkeep and consistent eyes on your property, with service plans shaped around management’s needs.",
+    description: "Scheduled property support for apartment, multifamily, and other managed properties, with common-area upkeep, visual condition checks, documentation, and property issue reporting.",
     url: "https://studioscrubz.com/property-porter-services",
   },
 };
@@ -16,7 +16,7 @@ const steps = [
   ["Clean", "Complete scheduled upkeep in the agreed common areas, keeping everyday presentation in focus."],
   ["Check", "Make visual observations of property conditions while working through the service areas."],
   ["Document", "Use photo documentation to give management context for observed conditions and issues."],
-  ["Report", "Share maintenance and safety concerns with the designated property contact for review and follow-up."],
+  ["Report", "Share observable property conditions and issues with the designated property contact for review and follow-up."],
 ] as const;
 
 const responsibilities = [
@@ -29,19 +29,18 @@ const responsibilities = [
   "Pool-area tidying — not licensed pool maintenance",
   "Property condition checks through visual observations",
   "Photo documentation",
-  "Maintenance issue reporting",
-  "Safety issue reporting",
+  "Property issue reporting",
   "Pre-tour and pre-inspection presentation checks",
 ] as const;
 
 export default function PropertyPorterServicesPage() {
   return <>
-    <PageHero eyebrow="Property Porter Services" title="Reliable property upkeep. Consistent eyes on your property." copy="We don’t just clean your property. We help you stay on top of it." cta="Request a Porter Service Walkthrough"/>
+    <PageHero eyebrow="Property Porter Services" title="Property Porter Services with Consistent Eyes on Your Property." copy="StudioScrubz provides recurring scheduled property support for property managers, apartment communities, multifamily properties, and other appropriate managed properties across Los Angeles County and the San Fernando Valley. Agreed porter visits can combine common-area upkeep with visual condition checks, photo documentation, and property issue reporting that helps management stay informed." cta="Request a Porter Service Walkthrough"/>
 
     <section className="px-5 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-7xl">
-        <SectionHeading eyebrow="Ongoing property support" title="Everyday upkeep with management in the loop." copy="StudioScrubz Property Porter Services combines scheduled property upkeep with consistent eyes on common areas. For apartment communities and managed commercial properties across the San Fernando Valley and Los Angeles area, our visits pair property management cleaning with visual condition checks, documentation, and issue reporting."/>
-        <p className="mt-6 max-w-3xl leading-7 text-neutral-600">Apartment porter services support the spaces residents, visitors, and onsite teams share. The focus is recurring care between larger cleaning visits, with observations that help management decide what needs attention.</p>
+        <SectionHeading eyebrow="Ongoing property support" title="Scheduled upkeep with management in the loop." copy="StudioScrubz Property Porter Services provide recurring property support and consistent eyes on agreed common areas. For apartment communities, multifamily properties, and other appropriate managed properties, scheduled visits can pair common-area upkeep with visual condition checks, documentation, and property issue reporting."/>
+        <p className="mt-6 max-w-3xl leading-7 text-neutral-600">Apartment and multifamily porter services provide broader property-support visibility than an ordinary cleaning visit. Cleaning may be part of the confirmed scope, while observations and photo documentation help management understand observable conditions and decide what needs attention.</p>
       </div>
     </section>
 
@@ -62,14 +61,14 @@ export default function PropertyPorterServicesPage() {
       <div className="mx-auto max-w-7xl">
         <SectionHeading eyebrow="Service areas and responsibilities" title="Care for the spaces that shape your property’s presentation." copy="Your confirmed scope can include the following responsibilities, based on access, property conditions, and service priorities."/>
         <FeatureList items={responsibilities}/>
-        <p className="mt-6 max-w-3xl text-sm leading-6 text-neutral-500">Condition and presentation checks are visual observations. This service does not include repairs, licensed maintenance, security services, licensed property inspections, or pool maintenance. Pool-area work is limited to tidying surrounding spaces. Reported concerns are referred to management for appropriate follow-up.</p>
+        <p className="mt-6 max-w-3xl text-sm leading-6 text-neutral-500">Condition and presentation checks are limited to visual observations in the agreed service areas and do not guarantee that every issue will be identified. This service does not include formal, code, safety, or regulatory inspections; repairs; licensed maintenance; engineering; security services; or pool maintenance. Pool-area work is limited to tidying surrounding spaces. Reported conditions are referred to management for appropriate review and follow-up.</p>
       </div>
     </section>
 
     <section className="bg-[#eef3ea] px-5 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2">
-        <SectionHeading eyebrow="For property management" title="More consistent presentation. Clearer visibility." copy="Recurring common area cleaning helps keep shared spaces presentable, while regular observations give your team useful context between site visits."/>
-        <FeatureList items={["Consistent property presentation", "Regular eyes on common areas", "Earlier visibility into maintenance and safety concerns", "Photos that give reported issues context", "Presentation support before tours and inspections", "More consistent upkeep between larger cleaning visits"]}/>
+        <SectionHeading eyebrow="For property management" title="More consistent presentation. Clearer visibility." copy="Recurring common-area upkeep helps keep shared spaces presentable, while scheduled visual observations give your team useful context between management site visits."/>
+        <FeatureList items={["Consistent property presentation", "Regular eyes on common areas", "Additional visibility into observable property issues", "Photos that give reported issues context", "Presentation support before tours and inspections", "More consistent upkeep between larger cleaning visits"]}/>
       </div>
     </section>
 
@@ -83,6 +82,12 @@ export default function PropertyPorterServicesPage() {
     <section className="bg-[#eef3ea] px-5 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-7xl">
         <SectionHeading eyebrow="Why StudioScrubz" title="A clear scope. A practical routine. Useful communication." copy="We build the porter plan around your property’s priorities: which areas need care, how often we visit, and how observations reach your team. Cleaning, documentation, and reporting work together to support your management process."/>
+      </div>
+    </section>
+
+    <section className="px-5 py-20 sm:px-8 sm:py-24">
+      <div className="mx-auto max-w-7xl">
+        <SectionHeading eyebrow="Service area" title="Property Porter Services across Los Angeles and the San Fernando Valley." copy="StudioScrubz supports managed properties across Los Angeles County, with a strong focus on the San Fernando Valley, including Winnetka, Canoga Park, Woodland Hills, Reseda, Chatsworth, Northridge, Van Nuys, Encino, and Tarzana. Availability in surrounding areas depends on the property, requested scope, visit frequency, location, and scheduling."/>
       </div>
     </section>
 
