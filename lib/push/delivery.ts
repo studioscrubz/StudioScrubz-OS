@@ -46,7 +46,8 @@ export async function deliverAttentionPushes(input: {
 }
 
 export function isPushActionable(item: AttentionItem) {
-  return !item.attention_state && (item.severity !== "Info" || Boolean(item.communication_context || item.sms_action || item.resolution_label));
+  const isPorter24HourReminder = item.category === "Porter" && item.type === "Porter Visit Reminder" && item.severity === "Info";
+  return !item.attention_state && (item.severity !== "Info" || isPorter24HourReminder || Boolean(item.communication_context || item.sms_action || item.resolution_label));
 }
 
 export function attentionPushPayload(item: AttentionItem): PushPayload {
