@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ContactBand,
@@ -141,11 +142,14 @@ export default function MarketingHome() {
           </div>
 
           <div className="relative mx-auto w-full max-w-xl">
-            <div className="overflow-hidden rounded-[2.25rem] bg-[#143d1a] shadow-[0_30px_90px_rgba(13,43,18,.22)]">
-              <img
+            <div className="relative aspect-[4/3] overflow-hidden rounded-[2.25rem] bg-[#143d1a] shadow-[0_30px_90px_rgba(13,43,18,.22)] sm:aspect-[5/4] lg:aspect-[4/5]">
+              <Image
                 src="/site/home-hero.jpg"
                 alt="Professionally cleaned kitchen by StudioScrubz"
-                className="aspect-[4/3] h-full w-full object-cover sm:aspect-[5/4] lg:aspect-[4/5]"
+                fill
+                priority
+                sizes="(min-width: 1280px) 576px, (min-width: 1024px) 44vw, (min-width: 640px) 576px, calc(100vw - 2.5rem)"
+                className="object-cover"
               />
             </div>
 
