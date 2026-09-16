@@ -17,6 +17,7 @@ const button = "rounded-lg border border-[#143d1a]/20 px-4 py-2 text-sm font-bol
 const primary = `${button} bg-[#143d1a] text-white hover:bg-[#0d2b12]`;
 const field = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900";
 function errorText(error: unknown) { return error instanceof Error ? error.message : "Porter Visit request failed."; }
+function visitSchedule(visit: Pick<PorterVisitWithAreas, "scheduled_date" | "scheduled_start_time">) { return `${visit.scheduled_date}${visit.scheduled_start_time ? ` at ${visit.scheduled_start_time.slice(0, 5)}` : " (start time not set)"}`; }
 
 export function PorterVisitsPage() {
   const { profile } = useAuth();
@@ -129,12 +130,12 @@ function CrewOptions({ crews, value }: { crews: CrewWithRelations[]; value: stri
   return <>{value && !crews.some(crew => crew.id === value) && <option value={value}>Existing assigned crew</option>}{crews.map(crew => <option key={crew.id} value={crew.id}>{crew.crew_name}</option>)}</>;
 }
 function CreateVisit({ plans, crews, busy, submit, close }: { plans: PropertyServicePlanWithAreas[]; crews: CrewWithRelations[]; busy: boolean; submit: (input: CreatePorterVisitInput) => Promise<void>; close: () => void }) {
-  const [input, setInput] = useState<CreatePorterVisitInput>({ plan_id: "", scheduled_date: "", assigned_crew_id: null, visit_notes: null });
+  const [input, setInput] = useState<CreatePorterVisitInput>({ plan_id: "", scheduled_date: "", scheduled_start_time: "", assigned_crew_id: null, visit_notes: null });
   function save(event: FormEvent) { event.preventDefault(); void submit(input); }
   return <form onSubmit={save} className="mt-6 rounded-2xl border bg-white p-6"><h2 className="text-xl font-extrabold text-[#143d1a]">New Porter Visit</h2><fieldset disabled={busy} className="mt-4 space-y-4">
     <label className="block text-sm font-bold">Active Property Service Plan<select required className={field} value={input.plan_id} onChange={e => { const plan = plans.find(plan => plan.id === e.target.value); setInput(current => ({ ...current, plan_id: e.target.value, assigned_crew_id: plan?.assigned_crew_id ?? null })); }}><option value="">Select plan</option>{plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></label>
     {!plans.length && <p className="text-sm text-neutral-600">Create or activate a plan in <Link className="underline" href="/properties/service-plans">Property Service Plans</Link> first.</p>}
-    <label className="block text-sm font-bold">Scheduled date<input required type="date" className={field} value={input.scheduled_date} onChange={e => setInput(current => ({ ...current, scheduled_date: e.target.value }))}/></label>
+    <div className="grid gap-4 md:grid-cols-2"><label className="block text-sm font-bold">Scheduled date<input required type="date" className={field} value={input.scheduled_date} onChange={e => setInput(current => ({ ...current, scheduled_date: e.target.value }))}/></label><label className="block text-sm font-bold">Scheduled start time<input required type="time" className={field} value={input.scheduled_start_time} onChange={e => setInput(current => ({ ...current, scheduled_start_time: e.target.value }))}/></label></div>
     <label className="block text-sm font-bold">Crew<select className={field} value={input.assigned_crew_id ?? ""} onChange={e => setInput(current => ({ ...current, assigned_crew_id: e.target.value || null }))}><option value="">Use plan default (unassigned if none)</option><CrewOptions crews={crews} value={input.assigned_crew_id}/></select></label>
     <label className="block text-sm font-bold">Visit notes<textarea rows={3} className={field} value={input.visit_notes ?? ""} onChange={e => setInput(current => ({ ...current, visit_notes: e.target.value || null }))}/></label>
     <p className="text-sm text-neutral-500">The property, client, and active service areas are copied from the plan when the visit is created. Later plan edits do not change this visit.</p>
@@ -154,17 +155,18 @@ function VisitDetail({ visit, crews, management, busy: parentBusy, mutate, remov
   }
   const [notes, setNotes] = useState(visit.visit_notes ?? "");
   const [date, setDate] = useState(visit.scheduled_date);
+  const [startTime, setStartTime] = useState(visit.scheduled_start_time?.slice(0, 5) ?? "");
   const [crew, setCrew] = useState(visit.assigned_crew_id ?? "");
   const terminal = visit.status === "Completed" || visit.status === "Cancelled";
   const canEditSchedule = management && visit.status === "Scheduled";
   const missingPhotos = missingPorterPhotoRequirements(visit.areas, visit.photos ?? []);
   const blocked = visit.areas.some(area => area.is_required && area.status === "Pending") || missingPhotos;
   return <section className="mt-6 rounded-2xl border border-[#143d1a]/20 bg-white p-6">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#9a7a17]">{visit.status} · {visit.scheduled_date}</p><h2 className="mt-2 text-2xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2">{visit.plan_name} · {visit.crew_name ?? "Unassigned crew"}</p></div><button className={button} disabled={busy} onClick={close}>Close</button></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#9a7a17]">{visit.status} · {visitSchedule(visit)}</p><h2 className="mt-2 text-2xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2">{visit.plan_name} · {visit.crew_name ?? "Unassigned crew"}</p></div><button className={button} disabled={busy} onClick={close}>Close</button></div>
     <fieldset disabled={busy || terminal} className="mt-5 space-y-4">
-      {canEditSchedule && <div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-bold">Scheduled date<input type="date" className={field} value={date} onChange={e => setDate(e.target.value)}/></label><label className="text-sm font-bold">Crew<select className={field} value={crew} onChange={e => setCrew(e.target.value)}><option value="">Unassigned</option><CrewOptions crews={crews} value={crew}/></select></label></div>}
+      {canEditSchedule && <div className="grid gap-4 md:grid-cols-3"><label className="text-sm font-bold">Scheduled date<input required type="date" className={field} value={date} onChange={e => setDate(e.target.value)}/></label><label className="text-sm font-bold">Start time<input required type="time" className={field} value={startTime} onChange={e => setStartTime(e.target.value)}/></label><label className="text-sm font-bold">Crew<select className={field} value={crew} onChange={e => setCrew(e.target.value)}><option value="">Unassigned</option><CrewOptions crews={crews} value={crew}/></select></label></div>}
       <label className="block text-sm font-bold">Visit notes<textarea rows={3} className={field} value={notes} onChange={e => setNotes(e.target.value)}/></label>
-      {!terminal && <button className={button} onClick={() => void mutate(canEditSchedule ? { action: "edit", data: { scheduled_date: date, assigned_crew_id: crew || null, visit_notes: notes || null } } : { action: "notes", data: { visit_notes: notes || null } })}>Save {canEditSchedule ? "Visit Details" : "Notes"}</button>}
+      {!terminal && <button className={button} onClick={() => void mutate(canEditSchedule ? { action: "edit", data: { scheduled_date: date, scheduled_start_time: startTime, assigned_crew_id: crew || null, visit_notes: notes || null } } : { action: "notes", data: { visit_notes: notes || null } })}>Save {canEditSchedule ? "Visit Details" : "Notes"}</button>}
     </fieldset>
     {reportingError && <p role="alert" className="mt-4 text-sm text-red-700">{reportingError}</p>}
     <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Service Areas</h3>

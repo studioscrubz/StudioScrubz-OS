@@ -21,6 +21,7 @@ const input = { route_date: "2026-09-09", assigned_crew_id: "crew", route_name: 
 function api(role, rpc, active = true) {
   return load("lib/services/porterRoutes.ts", { "@/lib/auth/permissions": permissions,
     "@/lib/services/auth": { getCurrentProfile: async () => ({ role, is_active: active }) },
+    "@/lib/push/client": { requestImmediateAttentionPush: async () => {} },
     "@/lib/supabase/client": { getSupabaseClient: () => ({ rpc }) },
     "@/types/porterVisit": visits, "@/types/porterRoute": model });
 }

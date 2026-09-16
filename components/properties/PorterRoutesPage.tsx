@@ -35,6 +35,15 @@ export function PorterRoutesPage() {
   const [crew, setCrew] = useState("");
   useEffect(() => {
     if (!allowed) return;
+    const id = new URLSearchParams(window.location.search).get("route");
+    if (!id) return;
+    let active = true;
+    getPorterRoute(id).then(route => { if (active) setSelected(route); })
+      .catch(error => { if (active) setError(errorText(error)); });
+    return () => { active = false; };
+  }, [allowed]);
+  useEffect(() => {
+    if (!allowed) return;
     let active = true;
     Promise.all([listPorterRoutes(), management ? listPorterVisits() : Promise.resolve([]), management ? getActiveCrews() : Promise.resolve([])])
       .then(([r,v,c]) => { if (active) { setRoutes(r); setVisits(v); setCrews(c); } })

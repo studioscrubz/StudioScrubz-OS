@@ -37,6 +37,7 @@ import type {NotificationPreferences} from "@/types/notificationPreferences";
 import type {FieldDiscovery,FieldDiscoveryMedia,OperationalFieldDiscovery} from "@/types/fieldDiscovery";
 import type {ChangeRequest,ChangeRequestApproval,ChangeRequestItem,OperationalChangeRequest,PublicChangeRequest} from "@/types/changeRequest";
 import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
+import type {PorterNotificationEvent} from "@/types/porterNotification";
 
 export interface Database {
   public: {
@@ -47,6 +48,7 @@ export interface Database {
       property_service_visit_photos: { Row: PorterPhoto; Insert: never; Update: never; Relationships: [] };
       property_service_visit_issues: { Row: PorterIssue; Insert: never; Update: never; Relationships: [] };
       property_service_visits: { Row: PorterVisit; Insert: never; Update: never; Relationships: [] };
+      porter_notification_events: { Row: PorterNotificationEvent; Insert: never; Update: never; Relationships: [] };
       property_service_visit_areas: { Row: PorterVisitArea; Insert: never; Update: never; Relationships: [] };
       property_service_plans: { Row: PropertyServicePlan; Insert: PropertyServicePlanInput; Update: Partial<PropertyServicePlanInput>; Relationships: [] };
       property_service_plan_areas: { Row: PropertyServicePlanArea; Insert: PropertyServicePlanAreaInput & { service_plan_id: string }; Update: Partial<PropertyServicePlanAreaInput>; Relationships: [] };
@@ -179,6 +181,8 @@ export interface Database {
       mutate_porter_route: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: RouteEdit | Record<string, never> }; Returns: string };
       get_porter_visits: { Args: { p_id?: string }; Returns: PorterVisitWithAreas[] };
       create_porter_visit: { Args: { p_plan_id: string; p_scheduled_date: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
+      create_porter_visit_v2: { Args: { p_plan_id: string; p_scheduled_date: string; p_scheduled_start_time: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
+      generate_due_porter_notifications: { Args: { p_now?: string }; Returns: number };
       mutate_porter_visit: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: Record<string, string | null> }; Returns: string };
       delete_porter_visit: { Args: { p_id: string }; Returns: void };
       save_property_service_plan: { Args: { p_id: string | null; p_plan: PropertyServicePlanInput; p_areas: PropertyServicePlanAreaInput[]; p_expected_updated_at: string | null; p_archive: boolean }; Returns: PropertyServicePlanWithAreas };

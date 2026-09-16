@@ -1,7 +1,8 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { hasPermission } from "@/lib/auth/permissions";
-import { validateVisitDate, validateVisitMutation, type CreatePorterVisitInput, type PorterVisitMutation, type PorterVisitWithAreas } from "@/types/porterVisit";
+import { requestImmediateAttentionPush } from "@/lib/push/client";
+import { validateVisitDate, validateVisitTime, validateVisitMutation, type CreatePorterVisitInput, type PorterVisitMutation, type PorterVisitWithAreas } from "@/types/porterVisit";
 
 async function authorize(management = false) {
   const profile = await getCurrentProfile();
@@ -25,10 +26,13 @@ export async function createPorterVisit(input: CreatePorterVisitInput) {
   await authorize(true);
   if (!input.plan_id) throw new Error("Select an active Property Service Plan.");
   validateVisitDate(input.scheduled_date);
-  const { data, error } = await getSupabaseClient().rpc("create_porter_visit", {
-    p_plan_id: input.plan_id, p_scheduled_date: input.scheduled_date, p_assigned_crew_id: input.assigned_crew_id, p_notes: input.visit_notes,
+  validateVisitTime(input.scheduled_start_time);
+  const { data, error } = await getSupabaseClient().rpc("create_porter_visit_v2", {
+    p_plan_id: input.plan_id, p_scheduled_date: input.scheduled_date, p_scheduled_start_time: input.scheduled_start_time,
+    p_assigned_crew_id: input.assigned_crew_id, p_notes: input.visit_notes,
   });
   if (error) throw new Error(`Porter Visit could not be created: ${error.message}`);
+  await requestImmediateAttentionPush();
   return data;
 }
 export async function mutatePorterVisit(visit: PorterVisitWithAreas, mutation: PorterVisitMutation) {
@@ -38,6 +42,7 @@ export async function mutatePorterVisit(visit: PorterVisitWithAreas, mutation: P
     p_id: visit.id, p_expected_updated_at: visit.updated_at, p_action: mutation.action, p_data: mutation.data ?? {},
   });
   if (error) throw new Error(`Porter Visit could not be updated: ${error.message}`);
+  if (["edit", "start", "complete", "cancel"].includes(mutation.action)) await requestImmediateAttentionPush();
   return data;
 }
 export async function deletePorterVisit(visitOrId: PorterVisitWithAreas | string): Promise<void> {

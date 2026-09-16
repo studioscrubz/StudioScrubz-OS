@@ -16,7 +16,7 @@ function load(path, dependencies = {}) {
 const models = load("types/porterVisit.ts", { "@/types/porterReporting": load("types/porterReporting.ts") });
 const permissions = load("lib/auth/permissions.ts");
 const visit = { id: "visit", status: "Scheduled", updated_at: "version-1", areas: [{ id: "area", is_required: true, status: "Pending" }] };
-const input = { plan_id: "plan", scheduled_date: "2026-09-09", assigned_crew_id: null, visit_notes: null };
+const input = { plan_id: "plan", scheduled_date: "2026-09-09", scheduled_start_time: "09:30", assigned_crew_id: null, visit_notes: null };
 function api(role, options = {}, active = true) {
   const rpc = typeof options === "function" ? options : options.rpc;
   const storageRemoveCalls = options.storageRemoveCalls ?? [];
@@ -24,6 +24,7 @@ function api(role, options = {}, active = true) {
   const storageError = options.storageError ?? null;
   return load("lib/services/porterVisits.ts", {
     "@/lib/auth/permissions": permissions, "@/types/porterVisit": models,
+    "@/lib/push/client": { requestImmediateAttentionPush: async () => {} },
     "@/lib/services/auth": { getCurrentProfile: async () => ({ role, is_active: active }) },
     "@/lib/supabase/client": {
       getSupabaseClient: () => ({
@@ -53,13 +54,13 @@ test("six-role read/create permissions and no broad field permissions", async ()
   for (const role of ["Master Admin", "Administrator", "Manager", "Sales", "Crew Lead", "Scrub Technician"]) {
     const manager = ["Master Admin", "Administrator", "Manager"].includes(role);
     const calls = [];
-    const service = api(role, async (name, args) => { calls.push({ name, args }); return { data: name === "create_porter_visit" ? "visit" : [], error: null }; });
+    const service = api(role, async (name, args) => { calls.push({ name, args }); return { data: name === "create_porter_visit_v2" ? "visit" : [], error: null }; });
     assert.equal(permissions.hasPermission({ role, is_active: true }, permissions.permissionForPath("/properties/porter-visits")), role !== "Sales");
     if (role === "Sales") await assert.rejects(service.listPorterVisits(), /access denied/);
     else await service.listPorterVisits();
     if (manager) await service.createPorterVisit(input);
     else await assert.rejects(service.createPorterVisit(input), /access denied/);
-    assert.equal(calls.some(call => call.name === "create_porter_visit"), manager);
+    assert.equal(calls.some(call => call.name === "create_porter_visit_v2"), manager);
     if (["Crew Lead", "Scrub Technician"].includes(role)) for (const permission of ["propertyServicePlans.manage", "agreements.view", "invoices.view", "proposals.view"]) assert.equal(permissions.hasPermission({ role, is_active: true }, permission), false);
   }
   await assert.rejects(api("Manager", () => { throw Error("must not call"); }, false).listPorterVisits(), /access denied/);
@@ -74,8 +75,9 @@ test("reads use scoped RPC without caller-controlled identity; absent record fai
 test("creation only sends plan, schedule, crew and notes, never client/property/snapshots", async () => {
   let payload;
   await api("Manager", async (_, args) => { payload = args; return { data: "visit", error: null }; }).createPorterVisit({ ...input, client_id: "forged", property_id: "forged", areas: [] });
-  assert.deepEqual(Object.keys(payload).sort(), ["p_assigned_crew_id", "p_notes", "p_plan_id", "p_scheduled_date"]);
+  assert.deepEqual(Object.keys(payload).sort(), ["p_assigned_crew_id", "p_notes", "p_plan_id", "p_scheduled_date", "p_scheduled_start_time"]);
   for (const date of ["", "2026-02-30", "2026-13-01"]) assert.throws(() => models.validateVisitDate(date));
+  for (const time of ["", "24:00", "09:75"]) assert.throws(() => models.validateVisitTime(time));
 });
 test("lifecycle rules and required checklist completion", () => {
   const validate = models.validateVisitMutation;

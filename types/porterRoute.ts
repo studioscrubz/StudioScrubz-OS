@@ -12,7 +12,7 @@ export type PorterRouteStop = {
 };
 export type RouteVisit = {
   id: string; property_label: string; plan_name: string; status: PorterVisitStatus;
-  scheduled_date: string; assigned_crew_id: string | null; visit_notes: string | null;
+  scheduled_date: string; scheduled_start_time: string | null; assigned_crew_id: string | null; visit_notes: string | null;
 };
 export type PorterRouteWithStops = PorterRoute & { crew_name: string; business_today: string | null; stops: (PorterRouteStop & { visit: RouteVisit | null })[] };
 export type RouteStopInput = { visit_id: string; stop_notes: string | null };

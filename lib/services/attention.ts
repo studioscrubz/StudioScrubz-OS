@@ -20,6 +20,7 @@ import { actionableAttentionCount, beginAppBadgeSync, setAppNotificationBadge } 
 import { canReviewFieldDiscovery } from "@/lib/services/fieldDiscoveries";
 import type { FieldDiscovery } from "@/types/fieldDiscovery";
 import type { ChangeRequest } from "@/types/changeRequest";
+import type { PorterNotificationEvent, PorterNotificationType } from "@/types/porterNotification";
 
 const GOOGLE_REVIEW_URL = "https://g.page/r/CT2X4ZAN1E8oEAI/review";
 
@@ -35,6 +36,7 @@ export const ATTENTION_REALTIME_TABLES = [
   "attention_item_states",
   "client_communications",
   "time_entries",
+  "porter_notification_events",
 ] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
@@ -63,6 +65,9 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (agreementRoutes.error) throw agreementRoutes.error;
+  const { data: porterRows, error: porterError } = await getSupabaseClient().from("porter_notification_events").select("*").lte("available_at", new Date().toISOString()).is("cancelled_at", null);
+  if (porterError) throw porterError;
+  const porterNotifications = (porterRows as PorterNotificationEvent[]).filter((event) => !event.expires_at || Date.parse(event.expires_at) > Date.now());
   const canReadContractBilling = hasPermission(profile, "agreements.view") && hasPermission(profile, "invoices.view");
   const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length&&canReadContractBilling?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
@@ -83,7 +88,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   if (discoveries.error) throw discoveries.error;
   if (decisions.error) throw decisions.error;
-  const input: AttentionRuleInput = { fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const input: AttentionRuleInput = { porterNotifications, fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -94,6 +99,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 export type AssignedWalkthroughAttention = { id: string; employeeId: string; date: string; time: string | null };
 
 export type AttentionRuleInput = {
+  porterNotifications?: PorterNotificationEvent[];
   fieldDiscoveries?: Pick<FieldDiscovery, "id" | "job_id" | "status" | "created_at">[];
   changeRequestDecisions?: Pick<ChangeRequest, "id" | "job_id" | "status" | "decided_at">[];
   assignedWalkthroughs?: AssignedWalkthroughAttention[];
@@ -122,6 +128,13 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  for (const event of input.porterNotifications ?? []) {
+    if (event.recipient_user_id !== profile.id || event.cancelled_at) continue;
+    items.push(item(event.dedupe_key, porterAttentionType(event.event_type), event.severity, "Porter", event.title, event.description,
+      event.route_id ? "Porter Route" : "Porter Visit", event.route_id ?? event.visit_id!, null, null, null, event.scheduled_date,
+      event.created_at, event.action_url, event.action_label));
+  }
 
   if (profile.is_active && hasPermission(profile, "proposals.view") && ["Sales", "Administrator", "Master Admin"].includes(profile.role)) {
     for (const proposal of proposals) {
@@ -300,4 +313,5 @@ function displayName(client: { first_name: string | null; last_name: string | nu
 function greeting(client: { first_name: string | null; company_name: string | null } | null, fallback: string | null) { return client?.first_name?.trim() || client?.company_name?.trim() || fallback || "Client"; }
 function friendlyDate(value: string) { return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`)); }
 function friendlyTime(value: string) { const [h, m] = value.slice(0, 5).split(":").map(Number); return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(2000, 0, 1, h, m)); }
+function porterAttentionType(type: PorterNotificationType): AttentionItem["type"] { switch (type) { case "visit_assignment": return "Porter Visit Assigned"; case "visit_assignment_removed": return "Porter Visit Assignment Removed"; case "visit_schedule_changed": return "Porter Visit Schedule Changed"; case "visit_missed_start": return "Porter Visit Missed Start"; case "route_changed": return "Porter Route Changed"; default: return "Porter Visit Reminder"; } }
 function lastFollowup(rows: Awaited<ReturnType<typeof getAllClientCommunications>>, field: "proposal_id" | "agreement_id" | "invoice_id", id: string) { const found = rows.find((row) => row[field] === id && row.status === "Sent"); return found ? ` · Last follow-up ${friendlyDate((found.sent_at ?? found.created_at).slice(0, 10))}` : ""; }

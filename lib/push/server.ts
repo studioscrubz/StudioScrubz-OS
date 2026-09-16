@@ -9,6 +9,8 @@ import { actionableAttentionCount } from "@/lib/attention/appBadge";
 
 export async function processAttentionPushes() {
   const db = createSupabaseAdminClient();
+  const { error: porterGenerationError } = await db.rpc("generate_due_porter_notifications", { p_now: new Date().toISOString() });
+  if (porterGenerationError) throw new Error(`Porter notifications could not be generated: ${porterGenerationError.message}`);
   const [{ data: profiles, error: profileError }, { data: subscriptions, error: subscriptionError }, { data: checkpoints, error: checkpointError }, { data: preferences, error: preferenceError }, snapshot] = await Promise.all([
     db.from("user_profiles").select("*").eq("is_active", true),
     db.from("browser_push_subscriptions").select("*").is("revoked_at", null),
