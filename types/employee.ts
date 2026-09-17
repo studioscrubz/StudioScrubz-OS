@@ -1,5 +1,7 @@
 export const EMPLOYEE_DEPARTMENTS=["Scrub Technicians","Sales","Lead Representative","Administration","Management"] as const;
 export type LeadRepresentativeOption = { id: string; display_name: string; is_active: boolean };
+export type PorterServiceRole = "Porter Tech" | "Porter Manager";
+export type PorterAssignmentOption = { employee_id: string; display_name: string; service_role: PorterServiceRole };
 export const EMPLOYMENT_STATUSES=["Active","Inactive","On Leave","Terminated","Archived"] as const;
 export const EMPLOYMENT_TYPES=["Full-Time","Part-Time","On-Call","1099","Temporary"] as const;
 export type EmployeeDepartment=(typeof EMPLOYEE_DEPARTMENTS)[number];

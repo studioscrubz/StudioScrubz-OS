@@ -7,7 +7,14 @@ import type {
   EmployeeInput,
   EmployeeUpdate,
   LeadRepresentativeOption,
+  PorterAssignmentOption,
 } from "@/types/employee";
+
+export async function getPorterAssignmentOptions(): Promise<PorterAssignmentOption[]> {
+  const { data, error } = await getSupabaseClient().rpc("get_porter_assignment_options", {});
+  if (error) throw new Error(`Porter assignment options could not be loaded: ${error.message}`);
+  return data;
+}
 
 export async function getLeadRepresentatives(estimateId: string | null = null): Promise<LeadRepresentativeOption[]> {
   const { data, error } = await getSupabaseClient().rpc("get_lead_representatives", { p_estimate_id: estimateId });

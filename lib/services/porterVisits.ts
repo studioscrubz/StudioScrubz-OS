@@ -2,7 +2,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { requestImmediateAttentionPush } from "@/lib/push/client";
-import { validateVisitDate, validateVisitTime, validateVisitMutation, type CreatePorterVisitInput, type PorterVisitMutation, type PorterVisitWithAreas } from "@/types/porterVisit";
+import { validatePorterAssignment, validateVisitDate, validateVisitTime, validateVisitMutation, type CreatePorterVisitInput, type PorterVisitMutation, type PorterVisitWithAreas } from "@/types/porterVisit";
 
 async function authorize(management = false) {
   const profile = await getCurrentProfile();
@@ -27,9 +27,11 @@ export async function createPorterVisit(input: CreatePorterVisitInput) {
   if (!input.plan_id) throw new Error("Select an active Property Service Plan.");
   validateVisitDate(input.scheduled_date);
   validateVisitTime(input.scheduled_start_time);
-  const { data, error } = await getSupabaseClient().rpc("create_porter_visit_v2", {
+  validatePorterAssignment(input);
+  const { data, error } = await getSupabaseClient().rpc("create_porter_visit_v3", {
     p_plan_id: input.plan_id, p_scheduled_date: input.scheduled_date, p_scheduled_start_time: input.scheduled_start_time,
-    p_assigned_crew_id: input.assigned_crew_id, p_notes: input.visit_notes,
+    p_assigned_worker_employee_id: input.assigned_worker_employee_id, p_assigned_worker_crew_id: input.assigned_worker_crew_id,
+    p_assigned_manager_employee_id: input.assigned_manager_employee_id, p_notes: input.visit_notes,
   });
   if (error) throw new Error(`Porter Visit could not be created: ${error.message}`);
   await requestImmediateAttentionPush();

@@ -10,7 +10,7 @@ import type { Estimate, EstimateInsert, EstimateUpdate } from "@/types/estimate"
 import type { Walkthrough, WalkthroughInput, WalkthroughUpdate } from "@/types/walkthrough";
 import type { Proposal, ProposalHistory, ProposalInsert, ProposalResult, ProposalUpdate } from "@/types/proposal";
 import type { Job, JobInsert, JobUpdate } from "@/types/job";
-import type { Employee, EmployeeInput, EmployeeUpdate } from "@/types/employee";
+import type { Employee, EmployeeInput, EmployeeUpdate, PorterAssignmentOption } from "@/types/employee";
 import type { Crew, CrewInput, CrewMember, CrewUpdate } from "@/types/crew";
 import type { ContractorInvoiceEligibleJob, Invoice, InvoiceJobLine, InvoiceUpdate } from "@/types/invoice";
 import type { Payment, PaymentInsert } from "@/types/payment";
@@ -48,6 +48,7 @@ export interface Database {
       property_service_visit_photos: { Row: PorterPhoto; Insert: never; Update: never; Relationships: [] };
       property_service_visit_issues: { Row: PorterIssue; Insert: never; Update: never; Relationships: [] };
       property_service_visits: { Row: PorterVisit; Insert: never; Update: never; Relationships: [] };
+      employee_service_roles: { Row: { employee_id: string; service_role: "Porter Tech" | "Porter Manager"; created_at: string }; Insert: never; Update: never; Relationships: [] };
       porter_notification_events: { Row: PorterNotificationEvent; Insert: never; Update: never; Relationships: [] };
       property_service_visit_areas: { Row: PorterVisitArea; Insert: never; Update: never; Relationships: [] };
       property_service_plans: { Row: PropertyServicePlan; Insert: PropertyServicePlanInput; Update: Partial<PropertyServicePlanInput>; Relationships: [] };
@@ -182,6 +183,8 @@ export interface Database {
       get_porter_visits: { Args: { p_id?: string }; Returns: PorterVisitWithAreas[] };
       create_porter_visit: { Args: { p_plan_id: string; p_scheduled_date: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
       create_porter_visit_v2: { Args: { p_plan_id: string; p_scheduled_date: string; p_scheduled_start_time: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
+      create_porter_visit_v3: { Args: { p_plan_id: string; p_scheduled_date: string; p_scheduled_start_time: string; p_assigned_worker_employee_id: string | null; p_assigned_worker_crew_id: string | null; p_assigned_manager_employee_id: string | null; p_notes: string | null }; Returns: string };
+      get_porter_assignment_options: { Args: Record<string, never>; Returns: PorterAssignmentOption[] };
       generate_due_porter_notifications: { Args: { p_now?: string }; Returns: number };
       mutate_porter_visit: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: Record<string, string | null> }; Returns: string };
       delete_porter_visit: { Args: { p_id: string }; Returns: void };

@@ -12,7 +12,8 @@ export type PorterRouteStop = {
 };
 export type RouteVisit = {
   id: string; property_label: string; plan_name: string; status: PorterVisitStatus;
-  scheduled_date: string; scheduled_start_time: string | null; assigned_crew_id: string | null; visit_notes: string | null;
+  scheduled_date: string; scheduled_start_time: string | null; assigned_crew_id: string | null; assigned_worker_crew_id: string | null;
+  assigned_worker_employee_id: string | null; assigned_manager_employee_id: string | null; visit_notes: string | null;
 };
 export type PorterRouteWithStops = PorterRoute & { crew_name: string; business_today: string | null; stops: (PorterRouteStop & { visit: RouteVisit | null })[] };
 export type RouteStopInput = { visit_id: string; stop_notes: string | null };
@@ -26,7 +27,7 @@ export function routeProgress(route: PorterRouteWithStops) {
 }
 export function eligibleRouteVisits(visits: PorterVisitWithAreas[], routes: PorterRouteWithStops[], date: string, crew: string, routeId?: string) {
   const reserved = new Set(routes.filter(route => route.id !== routeId && route.status !== "Cancelled").flatMap(route => route.stops.map(stop => stop.visit_id)));
-  return visits.filter(visit => visit.status === "Scheduled" && visit.scheduled_date === date && visit.assigned_crew_id === crew && !reserved.has(visit.id));
+  return visits.filter(visit => visit.status === "Scheduled" && visit.scheduled_date === date && visit.assigned_worker_crew_id === crew && !visit.assigned_worker_employee_id && !reserved.has(visit.id));
 }
 export function validateRouteStops(stops: RouteStopInput[]) {
   if (stops.some(stop => !stop.visit_id) || new Set(stops.map(stop => stop.visit_id)).size !== stops.length) throw new Error("Select each visit only once.");

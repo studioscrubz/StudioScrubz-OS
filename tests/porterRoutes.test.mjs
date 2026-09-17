@@ -55,8 +55,8 @@ test("creation validates date, crew and duplicates before RPC; payload is narrow
   assert.deepEqual(Object.keys(payload).sort(),["p_crew_id","p_name","p_notes","p_route_date","p_stops"]);
 });
 test("eligible visits match Scheduled/date/crew and cancelled routes release eligibility", () => {
-  const base = {id:"v",status:"Scheduled",scheduled_date:input.route_date,assigned_crew_id:"crew"};
-  const rows = [base,{...base,id:"other-date",scheduled_date:"2026-09-10"},{...base,id:"other-crew",assigned_crew_id:"else"},{...base,id:"unassigned",assigned_crew_id:null},{...base,id:"started",status:"In Progress"}];
+  const base = {id:"v",status:"Scheduled",scheduled_date:input.route_date,assigned_crew_id:"crew",assigned_worker_crew_id:"crew",assigned_worker_employee_id:null};
+  const rows = [base,{...base,id:"other-date",scheduled_date:"2026-09-10"},{...base,id:"other-crew",assigned_crew_id:"else",assigned_worker_crew_id:"else"},{...base,id:"unassigned",assigned_crew_id:null,assigned_worker_crew_id:null},{...base,id:"individual",assigned_worker_crew_id:null,assigned_worker_employee_id:"tech"},{...base,id:"started",status:"In Progress"}];
   assert.equal(model.eligibleRouteVisits(rows,[],input.route_date,"crew").length,1);
   for (const status of ["Planned","In Progress","Completed"]) assert.equal(model.eligibleRouteVisits(rows,[{...route,status}],input.route_date,"crew").length,0);
   assert.equal(model.eligibleRouteVisits(rows,[{...route,status:"Cancelled"}],input.route_date,"crew").length,1);
