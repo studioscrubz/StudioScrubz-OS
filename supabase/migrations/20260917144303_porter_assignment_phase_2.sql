@@ -104,7 +104,11 @@ begin
  end loop;
 end $$;
 
-drop policy "Assigned Porter visit read" on public.property_service_visits;
+drop policy if exists "Assigned Porter visit read"
+on public.property_service_visits;
+
+drop policy if exists "Authorized Porter Visit read"
+on public.property_service_visits;
 create policy "Assigned Porter visit read" on public.property_service_visits for select to authenticated
  using(public.can_access_porter_visit(assigned_worker_employee_id,assigned_worker_crew_id,assigned_manager_employee_id));
 
