@@ -49,12 +49,29 @@ create function public.can_access_job_assignment(p_employee_id uuid,p_crew_id uu
 returns boolean language sql stable security definer set search_path = '' as $$
   select auth.uid() is not null and (
     public.has_any_role(array['Master Admin','Administrator','Manager'])
-    or (public.current_employee_id() is not null and p_employee_id=public.current_employee_id() and public.is_eligible_job_tech(p_employee_id))
-    or exists(select 1 from public.crews c where c.id=p_crew_id and c.status='Active' and c.archived_at is null
-      and (c.crew_lead_id=public.current_employee_id() or exists(select 1 from public.crew_members cm where cm.crew_id=c.id and cm.employee_id=public.current_employee_id()))))
+    or (public.is_eligible_job_tech(public.current_employee_id()) and (
+      p_employee_id=public.current_employee_id()
+      or exists(select 1 from public.crews c where c.id=p_crew_id and c.status='Active' and c.archived_at is null
+        and (c.crew_lead_id=public.current_employee_id() or exists(select 1 from public.crew_members cm where cm.crew_id=c.id and cm.employee_id=public.current_employee_id())))
+    ))
 $$;
 revoke all on function public.can_access_job_assignment(uuid,uuid) from public, anon, authenticated;
 grant execute on function public.can_access_job_assignment(uuid,uuid) to authenticated;
+
+create function public.can_control_job_timer(p_employee_id uuid,p_crew_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select auth.uid() is not null and (
+    public.has_any_role(array['Master Admin','Administrator','Manager'])
+    or (public.is_eligible_job_tech(public.current_employee_id()) and (
+      p_employee_id=public.current_employee_id()
+      or (public.has_role('Crew Lead') and exists(select 1 from public.crews c
+        where c.id=p_crew_id and c.status='Active' and c.archived_at is null
+          and c.crew_lead_id=public.current_employee_id()))
+    ))
+  )
+$$;
+revoke all on function public.can_control_job_timer(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.can_control_job_timer(uuid,uuid) to authenticated;
 
 create function public.can_access_job(p_job_id uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -184,9 +201,9 @@ create or replace function public.start_operational_job(p_job_id uuid)
 returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
 declare j public.jobs; safe public.jobs_operational_safe; started timestamptz;
 begin
- if auth.uid() is null or not public.has_any_role(array['Master Admin','Administrator','Manager','Crew Lead']) then raise exception 'Job start permission denied.'; end if;
+ if auth.uid() is null or not public.has_any_role(array['Master Admin','Administrator','Manager','Crew Lead','Scrub Technician']) then raise exception 'Job start permission denied.'; end if;
  select * into j from public.jobs where id=p_job_id for update;
- if not found or not public.can_access_job_assignment(j.assigned_employee_id,j.assigned_crew_id) then raise exception 'Job not found or access denied.'; end if;
+ if not found or not public.can_control_job_timer(j.assigned_employee_id,j.assigned_crew_id) then raise exception 'Job not found or access denied.'; end if;
  if j.archived_at is not null or num_nonnulls(j.assigned_employee_id,j.assigned_crew_id)<>1 then raise exception 'The Job requires an assigned worker before it can be started.'; end if;
  if j.status='In Progress' then null; elsif j.status not in ('Scheduled','Crew Assigned') then raise exception 'Only an Assigned Job can be started.';
  else started:=now(); update public.jobs set status='In Progress',completed_at=null,operational_started_at=coalesce(operational_started_at,started),operational_ended_at=null where id=j.id; end if;
@@ -210,9 +227,9 @@ create or replace function public.complete_in_progress_job(p_job_id uuid)
 returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
 declare j public.jobs; safe public.jobs_operational_safe; ended timestamptz;
 begin
- if auth.uid() is null or not public.has_any_role(array['Master Admin','Administrator','Manager','Crew Lead']) then raise exception 'Job completion permission denied.'; end if;
+ if auth.uid() is null or not public.has_any_role(array['Master Admin','Administrator','Manager','Crew Lead','Scrub Technician']) then raise exception 'Job completion permission denied.'; end if;
  select * into j from public.jobs where id=p_job_id for update;
- if not found or not public.can_access_job_assignment(j.assigned_employee_id,j.assigned_crew_id) then raise exception 'Job not found or access denied.'; end if;
+ if not found or not public.can_control_job_timer(j.assigned_employee_id,j.assigned_crew_id) then raise exception 'Job not found or access denied.'; end if;
  if j.status='Completed' then select * into safe from public.jobs_operational_safe where id=j.id; return safe; end if;
  if j.archived_at is not null or j.status<>'In Progress' then raise exception 'Only an In Progress Job can be completed.'; end if;
  ended:=now(); perform public.close_job_payroll_entries(j.id,ended);
@@ -233,6 +250,95 @@ begin
  if j.on_my_way_initiated_at is not null then return jsonb_build_object('initiated',false,'initiated_at',j.on_my_way_initiated_at); end if;
  update public.jobs set on_my_way_initiated_at=now() where id=j.id and on_my_way_initiated_at is null returning on_my_way_initiated_at into started;
  return jsonb_build_object('initiated',true,'initiated_at',started);
+end $$;
+
+-- GPS finish/cancel call this helper, so keep historical trip reads while
+-- making their Job authorization individual-or-crew aware.
+create or replace function public.can_read_job_gps(p_job_id uuid,p_employee_id uuid)
+returns boolean language sql stable security definer set search_path='' as $$
+  select auth.uid() is not null and (
+    public.has_any_role(array['Master Admin','Administrator','Manager'])
+    or (p_employee_id=public.current_employee_id() and exists(
+      select 1 from public.jobs j where j.id=p_job_id
+        and public.can_access_job_assignment(j.assigned_employee_id,j.assigned_crew_id)
+    ))
+  )
+$$;
+revoke all on function public.can_read_job_gps(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.can_read_job_gps(uuid,uuid) to authenticated;
+
+-- The legacy operational updater delegates timer changes to the dedicated
+-- lifecycle RPCs. Management retains non-lifecycle operational edits.
+create or replace function public.update_operational_job(
+  p_job_id uuid,p_scheduled_date date default null,p_start_time time default null,
+  p_estimated_duration numeric default null,p_assigned_crew_id uuid default null,
+  p_internal_notes text default null,p_status text default null
+) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
+declare j public.jobs; safe public.jobs_operational_safe; crew public.crews; team jsonb;
+begin
+  if p_status in ('In Progress','Completed') then
+    if p_scheduled_date is not null or p_start_time is not null or p_estimated_duration is not null
+      or p_assigned_crew_id is not null or p_internal_notes is not null then
+      raise exception 'Start or complete a Job separately from other operational edits.';
+    end if;
+    if p_status='In Progress' then return public.start_operational_job(p_job_id); end if;
+    return public.complete_in_progress_job(p_job_id);
+  end if;
+  if auth.uid() is null or not public.has_any_role(array['Master Admin','Administrator','Manager']) then
+    raise exception 'Job operation not permitted.' using errcode='42501';
+  end if;
+  select * into j from public.jobs where id=p_job_id for update;
+  if not found then raise exception 'Job not found.'; end if;
+  if j.archived_at is not null or j.status in ('Completed','Cancelled','Archived') then
+    raise exception 'Terminal or archived Jobs cannot be operationally edited.';
+  end if;
+  if p_status is not null and p_status not in ('Ready to Schedule','Scheduled','Crew Assigned','Cancelled') then
+    raise exception 'Invalid operational status.';
+  end if;
+  if p_assigned_crew_id is not null then
+    if j.assigned_employee_id is not null then
+      raise exception 'Use the Job assignment control to change an individual assignment.';
+    end if;
+    select * into crew from public.crews where id=p_assigned_crew_id and status='Active' and archived_at is null;
+    if not found then raise exception 'Active crew not found.'; end if;
+    select coalesce(jsonb_agg(coalesce(nullif(btrim(e.preferred_name),''),nullif(btrim(e.first_name||' '||e.last_name),'')) order by e.last_name,e.first_name),'[]'::jsonb)
+      into team from public.crew_members cm join public.employees e on e.id=cm.employee_id
+      where cm.crew_id=crew.id and e.employment_status='Active' and e.archived_at is null;
+  end if;
+  update public.jobs set scheduled_date=coalesce(p_scheduled_date,scheduled_date),start_time=coalesce(p_start_time,start_time),
+    estimated_duration=coalesce(p_estimated_duration,estimated_duration),internal_notes=coalesce(p_internal_notes,internal_notes),
+    status=coalesce(p_status,status),completed_at=case when p_status is not null then null else completed_at end,
+    assigned_crew_id=coalesce(p_assigned_crew_id,assigned_crew_id),
+    assigned_crew_name=case when p_assigned_crew_id is null then assigned_crew_name else crew.crew_name end,
+    crew_lead_name=case when p_assigned_crew_id is null then crew_lead_name else (select coalesce(nullif(btrim(e.preferred_name),''),btrim(e.first_name||' '||e.last_name)) from public.employees e where e.id=crew.crew_lead_id) end,
+    assigned_team=case when p_assigned_crew_id is null then assigned_team else team end
+  where id=j.id;
+  select * into safe from public.jobs_operational_safe where id=j.id; return safe;
+end $$;
+
+-- Job payroll rows are created only through Join Job. Non-Job clock entries
+-- remain available through the general time-clock RPC.
+create or replace function public.clock_in_operational(p_employee_id uuid,p_job_id uuid,p_crew_id uuid,p_entry_type text,p_clock_in timestamptz,p_notes text)
+returns public.time_entries_operational_safe language plpgsql security definer set search_path='' as $$
+declare r text; target uuid; result public.time_entries; safe public.time_entries_operational_safe; n text; effective_clock_in timestamptz;
+begin
+  r:=public.current_user_role();
+  if p_job_id is not null or p_entry_type='Job' then raise exception 'Use Join Job to create Job payroll time.'; end if;
+  target:=case when r in ('Scrub Technician','Sales') then public.current_employee_id() else p_employee_id end;
+  if target is null then raise exception 'An employee link is required.'; end if;
+  if r not in ('Master Admin','Administrator','Manager','Crew Lead','Scrub Technician','Sales') then raise exception 'Time Clock access denied.'; end if;
+  if r='Crew Lead' and target<>public.current_employee_id() and not exists(select 1 from public.crew_members cm where cm.employee_id=target and public.is_assigned_to_crew(cm.crew_id)) then raise exception 'Employee is not in your crew.'; end if;
+  if r in ('Scrub Technician','Sales') and target<>public.current_employee_id() then raise exception 'Employee identity mismatch.'; end if;
+  if p_crew_id is not null and r in ('Crew Lead','Scrub Technician','Sales') and not public.is_assigned_to_crew(p_crew_id) then raise exception 'Crew is outside your permitted scope.'; end if;
+  effective_clock_in:=case when r in ('Master Admin','Administrator') then p_clock_in else now() end;
+  if effective_clock_in is null then raise exception 'Clock-in time is required.'; end if;
+  if exists(select 1 from public.time_entries t where t.employee_id=target and t.status='Open' and t.clock_out is null and t.archived_at is null) then raise exception 'Employee is already clocked in.'; end if;
+  n:='TIME-'||to_char(effective_clock_in,'YYYYMMDDHH24MISSMS')||'-'||substr(replace(gen_random_uuid()::text,'-',''),1,8);
+  insert into public.time_entries(time_entry_number,employee_id,job_id,crew_id,work_date,clock_in,entry_type,notes,status)
+  values(n,target,null,p_crew_id,(effective_clock_in at time zone 'America/Los_Angeles')::date,effective_clock_in,p_entry_type,p_notes,'Open') returning * into result;
+  select * into safe from public.time_entries_operational_safe where id=result.id;
+  if not found then raise exception 'Created time entry is outside your permitted scope.'; end if;
+  return safe;
 end $$;
 
 create or replace function public.start_job_gps_trip(p_job_id uuid,p_vehicle_id uuid,p_position jsonb)
@@ -270,10 +376,12 @@ after insert or update of scheduled_date,start_time,estimated_duration,service_n
 on public.jobs for each row execute function public.queue_job_calendar_sync();
 
 revoke all on function public.get_operational_job_ids(date,date),public.get_operational_jobs(date,date),
- public.start_operational_job(uuid),public.start_or_clock_in_to_job(uuid),public.complete_in_progress_job(uuid),public.initiate_job_on_my_way(uuid)
+ public.start_operational_job(uuid),public.start_or_clock_in_to_job(uuid),public.complete_in_progress_job(uuid),public.initiate_job_on_my_way(uuid),
+ public.update_operational_job(uuid,date,time,numeric,uuid,text,text),public.clock_in_operational(uuid,uuid,uuid,text,timestamptz,text)
  from public,anon,authenticated;
 grant execute on function public.get_operational_job_ids(date,date),public.get_operational_jobs(date,date),
- public.start_operational_job(uuid),public.start_or_clock_in_to_job(uuid),public.complete_in_progress_job(uuid),public.initiate_job_on_my_way(uuid)
+ public.start_operational_job(uuid),public.start_or_clock_in_to_job(uuid),public.complete_in_progress_job(uuid),public.initiate_job_on_my_way(uuid),
+ public.update_operational_job(uuid,date,time,numeric,uuid,text,text),public.clock_in_operational(uuid,uuid,uuid,text,timestamptz,text)
  to authenticated;
 
 notify pgrst,'reload schema';
