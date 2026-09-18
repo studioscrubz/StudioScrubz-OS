@@ -17,7 +17,15 @@ create index jobs_assigned_employee_active_idx
 
 -- Direct table writes are not an assignment API. Existing controlled privileged
 -- functions retain owner access; authenticated clients use the RPCs below.
-revoke insert, update, delete on public.jobs from anon, authenticated;
+revoke insert, update, delete, truncate, references, trigger
+on public.jobs
+from public, anon, authenticated;
+
+drop policy if exists "Master Admin insert"
+on public.jobs;
+
+drop policy if exists "Master Admin update"
+on public.jobs;
 
 create function public.get_eligible_job_tech_options()
 returns table(employee_id uuid, display_name text, operational_role text)
