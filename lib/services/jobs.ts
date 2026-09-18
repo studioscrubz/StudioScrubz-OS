@@ -8,11 +8,12 @@ import type {
   DirectJobInput,
   JobClockInResult,
   JobClockState,
+  JobWorkerTarget,
+  EligibleJobTech,
 } from "@/types/job";
 import type { CrewWithRelations } from "@/types/crew";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { canPermanentlyDelete, hasPermission, isMasterAdmin } from "@/lib/auth/permissions";
-import { employeeName } from "@/types/employee";
 import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import type { Invoice } from "@/types/invoice";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
@@ -159,7 +160,7 @@ export async function createJobFromProposal(
   return job;
 }
 export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
-  const { data, error } = await getSupabaseClient().rpc("create_direct_operational_job", {
+  const { data, error } = await getSupabaseClient().rpc("create_direct_operational_job_v2", {
     p_client_id: input.client_id,
     p_property_id: input.property_id,
     p_service_id: input.service_id,
@@ -168,7 +169,9 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
     p_scheduled_date: input.scheduled_date,
     p_start_time: input.start_time,
     p_estimated_duration: input.estimated_duration,
-    p_assigned_crew_id: input.assigned_crew_id,
+    p_assignment_kind: input.worker_target.kind,
+    p_assigned_employee_id: input.worker_target.kind === "individual" ? input.worker_target.employeeId : null,
+    p_assigned_crew_id: input.worker_target.kind === "crew" ? input.worker_target.crewId : null,
     p_labor_hours: input.labor_hours,
     p_access_instructions: input.access_instructions,
     p_internal_notes: input.internal_notes,
@@ -182,28 +185,15 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
   return job;
 }
 export async function updateJob(id: string, input: JobUpdate): Promise<JobWithRelations> {
-  if (!(await master())) {
-    const forbidden = ["price","deposit","balance","labor_hours","recommended_crew_size","proposal_id","client_id","property_id"] as const;
-    if (forbidden.some((field) => field in input)) throw new Error("This role cannot change Job financial or relationship fields.");
-    const { data, error } = await getSupabaseClient().rpc("update_operational_job", {
-      p_job_id:id,p_scheduled_date:input.scheduled_date,p_start_time:input.start_time,
-      p_estimated_duration:input.estimated_duration,p_assigned_crew_id:input.assigned_crew_id,
-      p_internal_notes:input.internal_notes,p_status:input.status,
-    });
-    if (error) throw error;
-    const job=operationalJob(data);
-    await requestPendingJobCalendarSync(job.id);
-    if (jobAttentionFieldsChanged(input)) await requestJobAttentionPush(job);
-    return job;
-  }
-  const { data, error } = await getSupabaseClient()
-    .from("jobs")
-    .update(input)
-    .eq("id", id)
-    .select()
-    .single();
+  const forbidden = ["price","deposit","balance","labor_hours","recommended_crew_size","proposal_id","client_id","property_id","assigned_employee_id","assigned_employee_name","assigned_crew_id","assigned_crew_name","crew_lead_name","assigned_team"] as const;
+  if (forbidden.some((field) => field in input)) throw new Error("Use the controlled Job assignment workflow for worker changes.");
+  const { data, error } = await getSupabaseClient().rpc("update_operational_job", {
+    p_job_id:id,p_scheduled_date:input.scheduled_date,p_start_time:input.start_time,
+    p_estimated_duration:input.estimated_duration,p_assigned_crew_id:undefined,
+    p_internal_notes:input.internal_notes,p_status:input.status,
+  });
   if (error) throw error;
-  const job=fullJob(data);
+  const job=operationalJob(data);
   await requestPendingJobCalendarSync(job.id);
   if (jobAttentionFieldsChanged(input)) await requestJobAttentionPush(job);
   return job;
@@ -254,23 +244,25 @@ async function createCompletedJobInvoice(job: JobWithRelations): Promise<JobComp
     };
   }
 }
-export async function assignJobCrew(
-  id: string,
-  crew: CrewWithRelations,
-  hasScheduledDate: boolean,
-) {
-  const current = await getJobById(id);
-  return updateJob(id, {
-    assigned_crew_id: crew.id,
-    assigned_crew_name: crew.crew_name,
-    crew_lead_name: crew.crew_lead ? employeeName(crew.crew_lead) : null,
-    assigned_team: crew.members.map((m) => employeeName(m.employee)),
-    status:
-      hasScheduledDate && Boolean(current.scheduled_date)
-        ? "Crew Assigned"
-        : undefined,
-  });
+export async function getEligibleJobTechs(): Promise<EligibleJobTech[]> {
+  const { data, error } = await getSupabaseClient().rpc("get_eligible_job_tech_options");
+  if (error) throw new Error(safeDatabaseMessage(error, "Eligible Job Techs could not be loaded."));
+  return data;
 }
+export async function assignJobWorker(id: string, target: JobWorkerTarget): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("set_job_worker_assignment", {
+    p_job_id: id,
+    p_assignment_kind: target.kind,
+    p_employee_id: target.kind === "individual" ? target.employeeId : null,
+    p_crew_id: target.kind === "crew" ? target.crewId : null,
+  });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job assignment could not be saved."));
+  const job = await getJobById(id).catch(() => fullJob(data));
+  await requestPendingJobCalendarSync(id);
+  await requestJobAttentionPush(job);
+  return job;
+}
+export const assignJobCrew = (id: string, crew: CrewWithRelations) => assignJobWorker(id, { kind: "crew", crewId: crew.id });
 export async function findCrewConflicts(
   jobId: string,
   crewId: string,
@@ -335,6 +327,14 @@ export const getCrewConflicts = (
   date: string,
   time: string | null,
 ) => findCrewConflicts(jobId, crewId, date, time ?? "", 0.01);
+export async function findIndividualTechConflicts(jobId:string,employeeId:string,date:string,startTime:string,duration:number):Promise<CrewConflict[]> {
+  if (!employeeId || !date || !startTime) return [];
+  const jobs = await getJobsForDateRange(date,date);
+  const start=minutes(startTime),end=start+Math.max(duration,0)*60;
+  return jobs.filter(job=>job.id!==jobId&&job.assigned_employee_id===employeeId&&!job.archived_at&&!['Cancelled','Archived'].includes(job.status)&&Boolean(job.start_time))
+    .filter(job=>{const otherStart=minutes(job.start_time!);const otherEnd=otherStart+Math.max(job.estimated_duration??0,0)*60;return start<otherEnd&&otherStart<end})
+    .map(({id,job_number,client_name,property_name,scheduled_date,start_time,estimated_duration})=>({id,job_number,client_name,property_name,scheduled_date,start_time,estimated_duration}));
+}
 export async function scheduleJob(
   id: string,
   date: string,
@@ -355,33 +355,25 @@ export async function rescheduleJob(
   date: string,
   time: string,
   duration: number | null,
-  crew: CrewWithRelations | null,
+  target: JobWorkerTarget,
   current: JobStatus,
 ) {
   if (!date || !time)
     throw new Error("Scheduled date and start time are required.");
-  const crewFields = crew
-    ? {
-        assigned_crew_id: crew.id,
-        assigned_crew_name: crew.crew_name,
-        crew_lead_name: crew.crew_lead ? employeeName(crew.crew_lead) : null,
-        assigned_team: crew.members.map((m) => employeeName(m.employee)),
-      }
-    : {};
-  const next: JobStatus = crew
+  const next: JobStatus = target.kind !== "unassigned"
     ? "Crew Assigned"
     : current === "Ready to Schedule"
       ? "Scheduled"
       : current === "Crew Assigned"
         ? "Scheduled"
         : current;
-  return updateJob(id, {
+  await updateJob(id, {
     scheduled_date: date,
     start_time: time,
     estimated_duration: duration,
-    ...crewFields,
     status: next,
   });
+  return assignJobWorker(id,target);
 }
 export async function getCurrentJobClockState(jobId: string): Promise<JobClockState> {
   const profile = await getCurrentProfile();
@@ -468,14 +460,17 @@ export async function restoreArchivedJob(id: string): Promise<JobWithRelations> 
 async function master(){ return isMasterAdmin(await getCurrentProfile()); }
 async function requestJobAttentionPush(job: JobWithRelations) {
   if ((job.status === "Ready to Schedule" && !job.scheduled_date)
-    || (Boolean(job.assigned_crew_id) && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status))
-    || (["Scheduled", "Ready to Schedule"].includes(job.status) && Boolean(job.scheduled_date) && !job.assigned_crew_id)) {
+    || (Boolean(job.assigned_crew_id || job.assigned_employee_id) && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status))
+    || (["Scheduled", "Ready to Schedule"].includes(job.status) && Boolean(job.scheduled_date) && !job.assigned_crew_id && !job.assigned_employee_id)) {
     await requestImmediateAttentionPush();
   }
 }
 function jobAttentionFieldsChanged(input: JobUpdate) {
-  return "status" in input || "scheduled_date" in input || "assigned_crew_id" in input;
+  return "status" in input || "scheduled_date" in input || "assigned_crew_id" in input || "assigned_employee_id" in input;
 }
+export function jobWorkerTarget(job:Pick<Job,"assigned_employee_id"|"assigned_crew_id">):JobWorkerTarget{return job.assigned_employee_id?{kind:"individual",employeeId:job.assigned_employee_id}:job.assigned_crew_id?{kind:"crew",crewId:job.assigned_crew_id}:{kind:"unassigned"}}
+export function jobAssignmentLabel(job:Pick<Job,"assigned_employee_name"|"assigned_crew_name">){return job.assigned_employee_name||job.assigned_crew_name||"Unassigned"}
+export function displayJobStatus(status:JobStatus){return status==="Crew Assigned"?"Assigned":status}
 function operationalJob(row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">):JobWithRelations{return{...row,price:null,deposit:null,balance:null,labor_hours:null,recommended_crew_size:null,photos:[],financials_available:false,proposal:null,client:null,property:null}}
 function fullJob(row:Job):JobWithRelations{return{...row,financials_available:true,proposal:null,client:null,property:null}}
 function errorMessage(cause:unknown){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return""}

@@ -6,10 +6,15 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import {
   archiveJob,
-  assignJobCrew,
+  assignJobWorker,
   cancelJob,
   completeInProgressJob,
   getCrewConflicts,
+  findIndividualTechConflicts,
+  getEligibleJobTechs,
+  jobAssignmentLabel,
+  jobWorkerTarget,
+  displayJobStatus,
   getCurrentJobClockState,
   getArchivedJobs,
   getJobs,
@@ -42,6 +47,9 @@ import {
   JOB_STATUSES,
   type JobStatus,
   type JobWithRelations,
+  type EligibleJobTech,
+  type JobAssignmentKind,
+  type JobWorkerTarget,
 } from "@/types/job";
 import type { TimeEntryWithRelations } from "@/types/timeEntry";
 import { getJobScopeV1, type JobScopeItem, type JobScopeV1 } from "@/lib/services/jobScope";
@@ -72,6 +80,7 @@ export function JobsPage() {
   const [archivedRows, setArchivedRows] = useState<JobWithRelations[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntryWithRelations[]>([]);
   const [activeCrews, setActiveCrews] = useState<CrewWithRelations[]>([]);
+  const [activeTechs,setActiveTechs]=useState<EligibleJobTech[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -86,10 +95,11 @@ export function JobsPage() {
   const [confirmingDelete, setConfirmingDelete] = useState<JobWithRelations | null>(null);
   const canViewArchived = Boolean(profile && ["Master Admin", "Administrator"].includes(profile.role));
   async function load() {
-    const [next, entries, crews, nextArchived] = await Promise.all([
+    const [next, entries, crews, techs, nextArchived] = await Promise.all([
       getJobs(),
       getTimeEntries(),
       getActiveCrews(),
+      hasPermission(profile,"jobs.schedule") ? getEligibleJobTechs() : Promise.resolve([]),
       canViewArchived ? getArchivedJobs() : Promise.resolve([]),
     ]);
     setRows(next);
@@ -100,6 +110,7 @@ export function JobsPage() {
     setArchivedRows(nextArchived);
     setTimeEntries(entries);
     setActiveCrews(crews);
+    setActiveTechs(techs);
     return next;
   }
   useOperationalRealtime(["jobs", "time_entries", "crews", "employees", "invoices", "service_occurrences"], async () => { await load(); });
@@ -109,14 +120,16 @@ export function JobsPage() {
       getJobs(),
       getTimeEntries(),
       getActiveCrews(),
+      hasPermission(profile,"jobs.schedule") ? getEligibleJobTechs() : Promise.resolve([]),
       canViewArchived ? getArchivedJobs() : Promise.resolve([]),
     ])
-      .then(([x, entries, crews, archivedJobs]) => {
+      .then(([x, entries, crews, techs, archivedJobs]) => {
         if (active) {
           setRows(x);
           setArchivedRows(archivedJobs);
           setTimeEntries(entries);
           setActiveCrews(crews);
+          setActiveTechs(techs);
           const jobId = new URLSearchParams(window.location.search).get(
             "jobId",
           );
@@ -208,6 +221,7 @@ export function JobsPage() {
             j.client_name,
             j.property_name,
             j.service_name,
+            j.assigned_employee_name,
             j.assigned_crew_name,
             j.crew_lead_name,
             ...j.assigned_team,
@@ -227,7 +241,7 @@ export function JobsPage() {
             (!search || hay.includes(search.toLowerCase())) &&
             (status === "All" || j.status === status) &&
             (division === "All" || j.division === division) &&
-            (crew === "All" || j.assigned_crew_id === crew) &&
+            (crew === "All" || (crew === "Unassigned" && !j.assigned_crew_id && !j.assigned_employee_id) || (crew.startsWith("crew:") && j.assigned_crew_id === crew.slice(5)) || (crew.startsWith("employee:") && j.assigned_employee_id === crew.slice(9))) &&
             scheduleMatch
           );
         })
@@ -301,8 +315,8 @@ export function JobsPage() {
           <Select
             value={crew}
             set={setCrew}
-            options={["All", ...activeCrews.map((candidate) => candidate.id)]}
-            labels={new Map(activeCrews.map((candidate) => [candidate.id, candidate.crew_name]))}
+            options={["All","Unassigned",...activeTechs.map(candidate=>`employee:${candidate.employee_id}`), ...activeCrews.map((candidate) => `crew:${candidate.id}`)]}
+            labels={new Map<string,string>([["All","All workers"],["Unassigned","Unassigned"],...activeTechs.map(candidate=>[`employee:${candidate.employee_id}`,candidate.display_name] as [string,string]),...activeCrews.map(candidate=>[`crew:${candidate.id}`,candidate.crew_name] as [string,string])])}
           />
           <Select
             value={schedule}
@@ -380,13 +394,13 @@ function JobCard({ job, open, timeEntries, employeeId, role, canComplete, canDel
         <p className="mt-2 text-sm font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
       </div>
       <div className="text-sm text-neutral-600">
-        <p><span className="font-bold text-neutral-800">Crew:</span> {job.assigned_crew_name || "Unassigned"}</p>
-        <p className="mt-1"><span className="font-bold text-neutral-800">Lead:</span> {job.crew_lead_name || "Not assigned"}</p>
+        <p><span className="font-bold text-neutral-800">Assigned Worker:</span> {jobAssignmentLabel(job)}</p>
+        {job.assigned_crew_id&&<p className="mt-1"><span className="font-bold text-neutral-800">Lead:</span> {job.crew_lead_name || "Not assigned"}</p>}
         <p className="mt-1 text-xs">{job.financials_available === false ? "Price restricted" : money(job.price)}</p>
       </div>
       <div className="flex flex-wrap gap-2 md:max-w-40 md:justify-end">
         <span className="rounded-full bg-[#edf4ec] px-2.5 py-1 text-[10px] font-bold text-[#143d1a]">{job.division}</span>
-        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-bold text-neutral-700">{job.status}</span>
+        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-bold text-neutral-700">{displayJobStatus(job.status)}</span>
       </div>
     </div>
     <div className="text-left">
@@ -461,7 +475,11 @@ function JobModal({
   const [time, setTime] = useState(job.start_time?.slice(0, 5) ?? "");
   const [duration, setDuration] = useState(job.estimated_duration ?? 0);
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
-  const [crewId, setCrewId] = useState(job.assigned_crew_id ?? "");
+  const initialTarget=jobWorkerTarget(job);
+  const [assignmentKind,setAssignmentKind]=useState<JobAssignmentKind>(initialTarget.kind);
+  const [employeeIdTarget,setEmployeeIdTarget]=useState(initialTarget.kind==="individual"?initialTarget.employeeId:"");
+  const [crewId, setCrewId] = useState(initialTarget.kind==="crew"?initialTarget.crewId:"");
+  const [techs,setTechs]=useState<EligibleJobTech[]>([]);
   const [warning, setWarning] = useState<string | null>(null);
   const [clock, setClock] = useState<Awaited<ReturnType<typeof getCurrentJobClockState>> | null>(null);
   const [clockError, setClockError] = useState<string | null>(null);
@@ -484,8 +502,8 @@ function JobModal({
   }, [job.id, job.status, canClock, canComplete]);
   useOperationalRealtime(["time_entries"], refreshClock);
   useEffect(() => {
-    void getActiveCrews()
-      .then(setCrews)
+    void Promise.all([getActiveCrews(),getEligibleJobTechs()])
+      .then(([nextCrews,nextTechs])=>{setCrews(nextCrews);setTechs(nextTechs)})
       .catch((x: unknown) => {
         console.error("Crew load failed", x);
         setWarning("Active crews could not be loaded.");
@@ -496,20 +514,14 @@ function JobModal({
     mutate(() => updateJobStatus(job.id, next), `Job moved to ${next}.`);
   }
   async function assign() {
-    const crew = crews.find((c) => c.id === crewId);
-    if (!crew) return;
-    const conflicts = await getCrewConflicts(
-      job.id,
-      crew.id,
-      date,
-      time || null,
-    );
+    const target:JobWorkerTarget=assignmentKind==="individual"?{kind:"individual",employeeId:employeeIdTarget}:assignmentKind==="crew"?{kind:"crew",crewId}:{kind:"unassigned"};
+    const conflicts = assignmentKind==="crew"&&crewId?await getCrewConflicts(job.id,crewId,date,time||null):assignmentKind==="individual"&&employeeIdTarget?await findIndividualTechConflicts(job.id,employeeIdTarget,date,time,duration):[];
     setWarning(
       conflicts.length
-        ? "This crew may already be assigned during this time."
+        ? "This worker may already be assigned during this time."
         : null,
     );
-    await assignJobCrew(job.id, crew, Boolean(job.scheduled_date || date));
+    await assignJobWorker(job.id,target);
   }
   const eligibility = jobLifecycleEligibility(job, employeeId, role);
   const canSupervisorComplete = canComplete;
@@ -582,37 +594,39 @@ function JobModal({
         job.status === "Crew Assigned") && (
         <section className="mt-6">
           <label className="text-sm font-bold">
-            Assigned Crew
+            Worker Target
             <select
               className={`${input} mt-2`}
-              value={crewId}
-              onChange={(e) => setCrewId(e.target.value)}
+              value={assignmentKind}
+              onChange={(e) => {setAssignmentKind(e.target.value as JobAssignmentKind);setEmployeeIdTarget("");setCrewId("")}}
             >
-              <option value="">Select active crew</option>
-              {crews.map((c) => (
+              <option value="unassigned">Unassigned</option><option value="individual">Individual Tech</option><option value="crew">Crew</option>
+            </select>
+          </label>
+          {assignmentKind==="individual"&&<label className="mt-3 block text-sm font-bold">Individual Tech<select className={`${input} mt-2`} value={employeeIdTarget} onChange={e=>setEmployeeIdTarget(e.target.value)}><option value="">Select active Tech</option>{techs.map(t=><option key={t.employee_id} value={t.employee_id}>{t.display_name} — {t.operational_role}</option>)}</select></label>}
+          {assignmentKind==="crew"&&<label className="mt-3 block text-sm font-bold">Crew<select className={`${input} mt-2`} value={crewId} onChange={e=>setCrewId(e.target.value)}><option value="">Select active Crew</option>{crews.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.crew_name}
                 </option>
-              ))}
-            </select>
-          </label>
+              ))}</select></label>}
           {warning && (
             <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">
               {warning}
             </p>
           )}
           <button
-            disabled={busy || !crewId}
-            onClick={() => mutate(assign, "Crew assignment saved.")}
+            disabled={busy || (assignmentKind==="crew"&&!crewId) || (assignmentKind==="individual"&&!employeeIdTarget)}
+            onClick={() => mutate(assign, "Worker assignment saved.")}
             className={`${primary} mt-3`}
           >
-            Assign Crew
+            Save Assignment
           </button>
         </section>
       )}
       <Details
-        title="Crew Snapshot"
+        title="Assigned Worker"
         rows={[
+          ["Individual Tech", job.assigned_employee_name || "â€”"],
           ["Assigned Crew", job.assigned_crew_name || "—"],
           ["Crew Lead", job.crew_lead_name || "—"],
           ["Assigned Team", job.assigned_team.join(", ") || "—"],
@@ -670,7 +684,7 @@ function JobModal({
             onClick={() => status(x)}
             className={secondary}
           >
-            {x}
+            {displayJobStatus(x)}
           </button>
         ))}
         {canEdit && !["Cancelled", "Archived"].includes(job.status) && (
@@ -903,7 +917,7 @@ function Select({
       onChange={(e) => set(e.target.value)}
     >
       {options.map((x) => (
-        <option key={x} value={x}>{labels?.get(x) ?? (x === "All" && labels ? "All crews" : x)}</option>
+        <option key={x} value={x}>{labels?.get(x) ?? (x === "All" && labels ? "All crews" : x === "Crew Assigned" ? "Assigned" : x)}</option>
       ))}
     </select>
   );
@@ -1116,10 +1130,11 @@ function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: {
 function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | null, role: string | null) {
   const canStartByRole = Boolean(role && ["Master Admin", "Administrator", "Manager", "Crew Lead"].includes(role));
   const canParticipate = Boolean(role && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(role));
-  const showStart = Boolean(job.assigned_crew_id) && ["Scheduled", "Crew Assigned"].includes(job.status) && canStartByRole;
+  const assigned = Boolean(job.assigned_employee_id || job.assigned_crew_id);
+  const showStart = assigned && ["Scheduled", "Crew Assigned"].includes(job.status) && canStartByRole;
   return {
     showStart,
-    canJoin: job.status === "In Progress" && Boolean(job.assigned_crew_id) && Boolean(employeeId) && canParticipate,
+    canJoin: job.status === "In Progress" && assigned && Boolean(employeeId) && canParticipate,
   };
 }
 function displayTime(value: string) { return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }

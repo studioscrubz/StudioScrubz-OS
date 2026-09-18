@@ -52,5 +52,6 @@ export type DashboardData = {
   estimate: DashboardEstimateMetrics;
   jobs: DashboardJobMetrics;
   crews: DashboardCrewStatus[];
+  individualJobs: JobWithRelations[];
   preview: { today: JobWithRelations[]; tomorrow: JobWithRelations[] };
 };

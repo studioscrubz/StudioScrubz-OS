@@ -44,7 +44,7 @@ const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> 
   Walkthroughs: [["proposals", "walkthrough_id"], ["jobs", "walkthrough_id"]],
   Proposals: [["jobs", "proposal_id"], ["invoices", "proposal_id"], ["proposal_history", "proposal_id"], ["service_agreements", "proposal_id"]],
   Jobs: [["invoices", "job_id"], ["payments", "job_id"], ["expenses", "job_id"], ["mileage_entries", "job_id"], ["time_entries", "job_id"], ["service_occurrences", "job_id"]],
-  Employees: [["crews", "crew_lead_id"], ["crew_members", "employee_id"], ["expenses", "employee_id"], ["vehicles", "assigned_employee_id"], ["mileage_entries", "employee_id"], ["time_entries", "employee_id"]],
+  Employees: [["crews", "crew_lead_id"], ["crew_members", "employee_id"], ["jobs", "assigned_employee_id"], ["expenses", "employee_id"], ["vehicles", "assigned_employee_id"], ["mileage_entries", "employee_id"], ["time_entries", "employee_id"]],
   Crews: [["crew_members", "crew_id"], ["jobs", "assigned_crew_id"], ["vehicles", "assigned_crew_id"], ["mileage_entries", "crew_id"], ["time_entries", "crew_id"], ["service_agreements", "assigned_crew_id"], ["service_occurrences", "assigned_crew_id"]],
   Invoices: [["payments", "invoice_id"]],
   Vehicles: [["mileage_entries", "vehicle_id"]],

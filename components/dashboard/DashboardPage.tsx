@@ -144,6 +144,7 @@ export function DashboardPage() {
             {hasPermission(profile, "estimates.view") && <EstimateActivity data={data} />}
             {hasPermission(profile, "jobs.view") && <JobPipeline data={data} />}
             {hasPermission(profile, "crews.view") && <CrewStatus data={data} />}
+            {hasPermission(profile, "jobs.view") && <IndividualJobStatus data={data} />}
             {hasPermission(profile, "schedule.view") && <SchedulePreview data={data} />}
           </section>
         </>
@@ -311,6 +312,7 @@ function CrewStatus({ data }: { data: DashboardData }) {
     </Panel>
   );
 }
+function IndividualJobStatus({data}:{data:DashboardData}){return <Panel title="Individual Tech Assignments" action="/jobs">{data.individualJobs.length?<div className="space-y-3">{data.individualJobs.map(job=><Link key={job.id} href={`/jobs?jobId=${job.id}`} className="block rounded-xl border p-4"><div className="flex justify-between gap-3"><b className="text-[#143d1a]">{job.assigned_employee_name||"Assigned Tech"}</b><span className="text-xs text-neutral-500">{job.start_time?.slice(0,5)||"Time TBD"}</span></div><p className="mt-1 text-sm">{job.job_number} — {job.service_name||"Service"}</p></Link>)}</div>:<Empty text="No individual Tech Jobs today."/>}</Panel>}
 function SchedulePreview({ data }: { data: DashboardData }) {
   return (
     <Panel title="Schedule Preview" action="/schedule">

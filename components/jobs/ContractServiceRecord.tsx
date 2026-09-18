@@ -45,7 +45,7 @@ function ServiceRecordModal({ job, close }: { job: JobWithRelations; close: () =
           <Details title="Record" rows={[["Service Record / Job Number",job.job_number],["Agreement Number",agreement.agreement_number],["Contract Billing Type",agreement.billing_type],["Status",job.status]]}/>
           <Details title="Client & Site" rows={[["Client / Company",job.client_name||"—"],["Property / Site",job.property_name||"—"],["Service",job.service_name||"—"]]}/>
           <Details title="Service Visit" rows={[["Service Date",formatDate(job.scheduled_date)],["Service Time",formatTime(job.start_time)],["Completion Date",formatDateTime(job.completed_at)]]}/>
-          <Details title="Crew" rows={[["Assigned Crew",job.assigned_crew_name||"—"],["Crew Lead",job.crew_lead_name||"—"],["Team",job.assigned_team.join(", ")||"—"]]}/>
+          <Details title="Assigned Worker" rows={[["Worker",job.assigned_employee_name||job.assigned_crew_name||"—"],["Crew Lead",job.assigned_crew_id?job.crew_lead_name||"—":"—"],["Team",job.assigned_crew_id?job.assigned_team.join(", ")||"—":"—"]]}/>
         </div>
         <RecordList title="Scope of Work" rows={job.scope.map((item) => item.text)}/>
         <RecordList title="Completion Checklist" rows={job.checklist.map((item) => `${item.completed ? "Completed" : "Not completed"}: ${item.label}`)}/>

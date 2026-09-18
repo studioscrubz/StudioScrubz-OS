@@ -1,4 +1,4 @@
-export type CalendarJob = {id:string;job_number:string;service_name:string|null;client_name:string|null;scheduled_date:string|null;start_time:string|null;estimated_duration:number|null;assigned_crew_id:string|null;property?:{property_name?:string|null;address?:string|null;address_line_2?:string|null;city?:string|null;state?:string|null;zip?:string|null}|null};
+export type CalendarJob = {id:string;job_number:string;service_name:string|null;client_name:string|null;scheduled_date:string|null;start_time:string|null;estimated_duration:number|null;assigned_employee_id?:string|null;assigned_employee_name?:string|null;assigned_crew_id:string|null;property?:{property_name?:string|null;address?:string|null;address_line_2?:string|null;city?:string|null;state?:string|null;zip?:string|null}|null};
 export type CalendarAttendee={email:string};
 export function deterministicEventId(jobId:string){return `ssjob${jobId.replaceAll("-","").toLowerCase()}`}
 export function validEmail(value:string|null|undefined){return Boolean(value&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))}

@@ -75,6 +75,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     },
     jobs: { ready: jobCount("Ready to Schedule"), scheduled: jobCount("Scheduled"), crewAssigned: jobCount("Crew Assigned"), inProgress: jobCount("In Progress"), completed: jobCount("Completed") },
     crews: crews.map(crew => ({ crew, todayJobs: todaysJobs.filter(job => job.assigned_crew_id === crew.id).length, inProgress: todaysJobs.some(job => job.assigned_crew_id === crew.id && job.status === "In Progress") })),
+    individualJobs: todaysJobs.filter(job => Boolean(job.assigned_employee_id)),
     attention: attention.slice(0, 12).map(entry => ({ id: entry.id, type: entry.type, record: entry.entity_label ?? entry.record_type, description: entry.title, action: entry.action_label, href: entry.action_url })),
     preview: { today: preview.filter(job => job.scheduled_date === today), tomorrow: preview.filter(job => job.scheduled_date === tomorrow) },
   };

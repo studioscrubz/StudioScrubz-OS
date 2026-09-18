@@ -49,7 +49,7 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
   const management = ["Master Admin", "Administrator", "Manager"].includes(profile.role);
   const crewIds = profile.employee_id ? snapshot.crewIdsByEmployee.get(profile.employee_id) ?? new Set<string>() : new Set<string>();
   const visibleJobs = hasPermission(profile, "jobs.view")
-    ? snapshot.jobs.filter((job) => management || Boolean(job.assigned_crew_id && crewIds.has(job.assigned_crew_id))).map((job) => profile.role === "Master Admin" ? job : operationalJob(job)) : [];
+    ? snapshot.jobs.filter((job) => management || Boolean(profile.employee_id && job.assigned_employee_id === profile.employee_id) || Boolean(job.assigned_crew_id && crewIds.has(job.assigned_crew_id))).map((job) => profile.role === "Master Admin" ? job : operationalJob(job)) : [];
   const visibleTimeEntries = hasPermission(profile, "timeClock.view") ? snapshot.timeEntries.filter((entry) => management || entry.employee_id === profile.employee_id || Boolean(entry.crew_id && crewIds.has(entry.crew_id))) : [];
   const input: AttentionRuleInput = {
     profile,

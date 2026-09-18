@@ -16,6 +16,12 @@ export const JOB_STATUSES = [
 ] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 export type JobAssignedTeam = string[];
+export type JobAssignmentKind = "unassigned" | "individual" | "crew";
+export type JobWorkerTarget =
+  | { kind: "unassigned" }
+  | { kind: "individual"; employeeId: string }
+  | { kind: "crew"; crewId: string };
+export type EligibleJobTech = { employee_id: string; display_name: string; operational_role: "Scrub Technician" | "Crew Lead" };
 export type JobChecklistItem = {
   id: string;
   label: string;
@@ -45,6 +51,8 @@ export type Job = {
   scheduled_date: string | null;
   start_time: string | null;
   estimated_duration: number | null;
+  assigned_employee_id: string | null;
+  assigned_employee_name: string | null;
   assigned_crew_id: string | null;
   assigned_crew_name: string | null;
   crew_lead_name: string | null;
@@ -97,7 +105,7 @@ export type DirectJobInput = {
   scheduled_date: string | null;
   start_time: string | null;
   estimated_duration: number | null;
-  assigned_crew_id: string | null;
+  worker_target: JobWorkerTarget;
   labor_hours: number;
   access_instructions: string | null;
   internal_notes: string | null;
