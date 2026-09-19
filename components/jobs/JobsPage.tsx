@@ -276,6 +276,7 @@ export function JobsPage() {
       timeEntries={timeEntries.filter((entry) => entry.job_id === job.id && !entry.archived_at && entry.entry_type === "Job")}
       employeeId={profile?.employee_id ?? null}
       role={profile?.role ?? null}
+      activeCrewLeadId={activeCrews.find((crew) => crew.id === job.assigned_crew_id)?.crew_lead_id ?? null}
       canComplete={hasPermission(profile, "jobs.complete")}
       canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
@@ -352,6 +353,7 @@ export function JobsPage() {
           canClock={Boolean(profile && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role))}
           employeeId={profile?.employee_id ?? null}
           role={profile?.role ?? null}
+          activeCrewLeadId={activeCrews.find((crew) => crew.id === selected.assigned_crew_id)?.crew_lead_id ?? null}
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
@@ -373,11 +375,11 @@ export function JobsPage() {
   );
 }
 type JobAction = (fn: () => Promise<unknown>, text: string | ((result: unknown) => string), onError?: (detail: string) => void) => void;
-function JobCard({ job, open, timeEntries, employeeId, role, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; role: string | null; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: JobAction }) {
+function JobCard({ job, open, timeEntries, employeeId, role, activeCrewLeadId, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; role: string | null; activeCrewLeadId: string | null; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: JobAction }) {
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const activeEntries = timeEntries.filter((entry) => entry.status === "Open" && !entry.clock_out);
   const currentEntry = employeeId ? activeEntries.find((entry) => entry.employee_id === employeeId) ?? null : null;
-  const eligibility = jobLifecycleEligibility(job, employeeId, role);
+  const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
   const canCardComplete = job.status === "In Progress" && canComplete;
   const canCardEndJob = canComplete;
   const lifecycleAct = (fn: () => Promise<unknown>, text: string) => { setLifecycleError(null); act(fn, text, setLifecycleError); };
@@ -456,6 +458,7 @@ function JobModal({
   canClock,
   employeeId,
   role,
+  activeCrewLeadId,
   canDeletePhotos,
 }: {
   job: JobWithRelations;
@@ -469,6 +472,7 @@ function JobModal({
   canClock: boolean;
   employeeId: string | null;
   role: string | null;
+  activeCrewLeadId: string | null;
   canDeletePhotos: boolean;
 }) {
   const [date, setDate] = useState(job.scheduled_date ?? "");
@@ -523,7 +527,7 @@ function JobModal({
     );
     await assignJobWorker(job.id,target);
   }
-  const eligibility = jobLifecycleEligibility(job, employeeId, role);
+  const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
   const canSupervisorComplete = canComplete;
   const showLifecycle = ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status)
     && (eligibility.showStart || (canClock && eligibility.canJoin) || (job.status === "In Progress" && canSupervisorComplete));
@@ -1127,11 +1131,24 @@ function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: {
   </div>;
 }
 
-function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | null, role: string | null) {
-  const canStartByRole = Boolean(role && ["Master Admin", "Administrator", "Manager", "Crew Lead"].includes(role));
+function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | null, role: string | null, activeCrewLeadId: string | null) {
+  const management = Boolean(role && ["Master Admin", "Administrator", "Manager"].includes(role));
+  const eligibleIndividual = Boolean(
+    employeeId
+      && role
+      && ["Scrub Technician", "Crew Lead"].includes(role)
+      && job.assigned_employee_id === employeeId,
+  );
+  const assignedCrewLead = Boolean(
+    employeeId
+      && role === "Crew Lead"
+      && job.assigned_crew_id
+      && activeCrewLeadId === employeeId,
+  );
   const canParticipate = Boolean(role && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(role));
   const assigned = Boolean(job.assigned_employee_id || job.assigned_crew_id);
-  const showStart = assigned && ["Scheduled", "Crew Assigned"].includes(job.status) && canStartByRole;
+  const showStart = assigned && ["Scheduled", "Crew Assigned"].includes(job.status)
+    && (management || eligibleIndividual || assignedCrewLead);
   return {
     showStart,
     canJoin: job.status === "In Progress" && assigned && Boolean(employeeId) && canParticipate,
