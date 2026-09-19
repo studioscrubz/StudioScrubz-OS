@@ -14,9 +14,9 @@ The scan covers statically named `.rpc(...)`, Data API `.from(...)`, Storage buc
 
 ## RPC inventory (106)
 
-### Tracked migration (71)
+### Tracked migration (74)
 
-`accept_service_agreement_by_token`, `acknowledge_required_announcement`, `add_change_request_item`, `add_field_discovery_media`, `add_job_evidence_media`, `add_porter_visit_photo`, `cancel_job_gps_trip`, `cancel_operational_job`, `complete_in_progress_job`, `correct_completed_job_master_time`, `create_change_request`, `create_completed_job_invoice`, `create_contractor_consolidated_invoice`, `create_direct_operational_job_v2`, `create_field_discovery`, `create_job_evidence`, `create_job_from_accepted_proposal`, `create_job_from_service_occurrence`, `create_porter_route`, `create_porter_visit_v3`, `decide_change_request_by_token`, `delete_porter_visit`, `delete_property_service_plan`, `finish_job_gps_trip`, `generate_due_porter_notifications`, `get_active_employee_work_sessions`, `get_assigned_field_walkthroughs`, `get_change_request_by_token`, `get_company_mileage_rate`, `get_contractor_invoice_eligible_jobs`, `get_eligible_job_tech_options`, `get_financially_handed_off_job_ids`, `get_invoice_by_token`, `get_job_gps_mileage`, `get_job_gps_trips`, `get_job_performance_rows`, `get_lead_representatives`, `get_my_work_session`, `get_operational_job_ids`, `get_operational_jobs`, `get_or_create_service_label`, `get_porter_assignment_options`, `get_porter_routes`, `get_porter_visits`, `get_sales_job_proposal_ids`, `get_service_agreement_by_token`, `get_upcoming_client_jobs`, `initiate_job_on_my_way`, `mark_messages_read`, `master_admin_permanently_delete_cancelled_job`, `mutate_porter_route`, `mutate_porter_visit`, `save_mileage_entry_with_stops`, `save_porter_visit_issue`, `save_property_service_plan`, `send_change_request`, `send_company_announcement`, `send_direct_message`, `set_company_mileage_rate`, `set_job_worker_assignment`, `set_operational_photos`, `start_direct_conversation`, `start_job_gps_trip`, `start_my_work`, `start_operational_job`, `start_or_clock_in_to_job`, `stop_my_work`, `submit_assigned_field_walkthrough`, `update_change_request_draft`, `update_field_discovery_status`, `update_operational_job`.
+`accept_service_agreement_by_token`, `acknowledge_required_announcement`, `add_change_request_item`, `add_field_discovery_media`, `add_job_evidence_media`, `add_porter_visit_photo`, `cancel_job_gps_trip`, `cancel_operational_job`, `complete_in_progress_job`, `correct_completed_job_master_time`, `create_change_request`, `create_completed_job_invoice`, `create_contractor_consolidated_invoice`, `create_direct_operational_job_v2`, `create_field_discovery`, `create_job_evidence`, `create_job_from_accepted_proposal`, `create_job_from_service_occurrence`, `create_porter_route`, `create_porter_visit_v3`, `decide_change_request_by_token`, `delete_porter_visit`, `delete_property_service_plan`, `finish_job_gps_trip`, `generate_due_porter_notifications`, `get_active_employee_work_sessions`, `get_assigned_field_walkthroughs`, `get_change_request_by_token`, `get_company_mileage_rate`, `get_contractor_invoice_eligible_jobs`, `get_eligible_job_tech_options`, `get_financially_handed_off_job_ids`, `get_invoice_by_token`, `get_job_gps_mileage`, `get_job_gps_trips`, `get_job_performance_rows`, `get_lead_representatives`, `get_my_work_session`, `get_operational_job_ids`, `get_operational_jobs`, `get_or_create_service_label`, `get_porter_assignment_options`, `get_proposal_pricing_photos`, `get_porter_routes`, `get_porter_visits`, `get_sales_job_proposal_ids`, `get_service_agreement_by_token`, `get_upcoming_client_jobs`, `initiate_job_on_my_way`, `mark_messages_read`, `master_admin_permanently_delete_cancelled_job`, `mutate_porter_route`, `mutate_porter_visit`, `remove_proposal_pricing_photo`, `save_mileage_entry_with_stops`, `save_porter_visit_issue`, `save_property_service_plan`, `send_change_request`, `send_company_announcement`, `send_direct_message`, `set_company_mileage_rate`, `set_job_worker_assignment`, `set_operational_photos`, `set_proposal_pricing_photo_caption`, `start_direct_conversation`, `start_job_gps_trip`, `start_my_work`, `start_operational_job`, `start_or_clock_in_to_job`, `stop_my_work`, `submit_assigned_field_walkthrough`, `update_change_request_draft`, `update_field_discovery_status`, `update_operational_job`.
 
 Current migration homes are the feature migrations dated `20260827` through `20260918`. Definitions with known later untracked overrides are called out under “Overrides requiring adjudication.”
 
@@ -37,11 +37,10 @@ Current migration homes are the feature migrations dated `20260827` through `202
 | `record_square_invoice_payment_v2` | `supabase/square_invoice_tipping.sql` |
 | `add_proposal_owned_photo` | `supabase/invoice_operational_photo_snapshot_handoff.sql`; newer untracked override noted below |
 
-### Untracked SQL only (4) — Phase 2 migration required
+### Untracked SQL only (1) — Phase 2 migration required
 
 | RPC | Current source |
 | --- | --- |
-| `get_proposal_pricing_photos`, `remove_proposal_pricing_photo`, `set_proposal_pricing_photo_caption` | `supabase/proposal_pricing_photo_snapshot.sql` |
 | `set_invoice_job_photo_visibility` | `supabase/job_finished_photos_invoice_handoff.sql` |
 
 ### Missing RPCs
@@ -97,7 +96,7 @@ Application code does not reference trigger names, policy names, or grant statem
 These files appear to contain current behavior beyond an older tracked definition. Phase 2 must compare signatures and bodies and promote only the intended final definition:
 
 - `job_financial_handoff_alignment.sql` is superseded for the current application contract. Live verification confirmed that `is_job_financially_handed_off`, `create_completed_job_invoice`, `get_operational_job_ids`, and `get_operational_jobs` match later tracked migrations rather than this standalone file. `get_financially_handed_off_job_ids` is promoted by `20260919162436_restore_job_financial_handoff_contract.sql`.
-- `proposal_pricing_photo_snapshot.sql`: proposal-photo read/add/remove/caption RPCs.
+- `proposal_pricing_photo_snapshot.sql` is superseded for the three application-facing read/caption/remove RPCs. Live verification confirmed their signatures, management authorization, Draft-only mutations, JSON response shapes, and Storage cleanup handoff; `20260919163228_restore_proposal_pricing_photo_contract.sql` restores those definitions. The file still contains separate unpromoted upload helpers, triggers, and Storage policies.
 - `job_finished_photos_invoice_handoff.sql`: `invoice_job_photos` and `set_invoice_job_photo_visibility`.
 - `public_invoice_receipt_snapshot.sql`: `get_invoice_by_token` receipt/payment projection.
 - `invoice_financial_invariant.sql` and `normalize_business_timezone.sql` are untracked migration-shaped files and need provenance confirmation; they must not be retroactively inserted into applied history.
@@ -108,7 +107,7 @@ These files appear to contain current behavior beyond an older tracked definitio
 Phase 2 should not edit existing migrations. After a separately authorized read-only live comparison, create forward-only migrations for:
 
 1. The 31 standalone-only RPCs, grouped by authorization domain rather than copied wholesale from historical scripts.
-2. The four remaining untracked-only RPCs and the intended current `invoice_job_photos` definition.
+2. The remaining untracked-only RPC and the intended current `invoice_job_photos` definition.
 3. Baseline definitions for the 29 standalone-only relations, or an explicitly adopted tracked baseline schema strategy.
 4. The `operational-photos` and `agreement-documents` buckets and their final Storage policies.
 5. Final RLS, grants, trigger functions/triggers, and Realtime publication membership for every promoted object.
