@@ -5,8 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:production": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:contracts": "node --test lib/services/jobAssignment.test.mjs tests/database-dependency-manifest.test.mjs",
+    "check:diff": "git diff --check"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.4",
