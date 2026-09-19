@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:contracts": "node --test lib/services/jobAssignment.test.mjs tests/database-dependency-manifest.test.mjs",
+    "test:contracts": "node --test lib/services/jobAssignment.test.mjs supabase/tests/employee_directory_company_safe_static.test.mjs tests/database-dependency-manifest.test.mjs",
     "check:diff": "git diff --check"
   },
   "dependencies": {

@@ -53,9 +53,9 @@ None of the 106 statically referenced RPC names is missing from all repository S
 
 This includes tables and views used through `.from(...)` plus Realtime-only tables.
 
-### Tracked migration (42)
+### Tracked migration (43)
 
-`announcement_acknowledgments`, `assessment_photo_access`, `attention_push_checkpoints`, `attention_push_deliveries`, `authorized_vehicles_safe`, `browser_push_subscriptions`, `change_request_approvals_operational`, `change_request_items`, `change_requests`, `change_requests_operational`, `conversation_members`, `conversations`, `employee_work_sessions`, `field_discoveries`, `field_discoveries_operational`, `field_discovery_media`, `google_calendar_connections`, `invoice_job_lines`, `job_calendar_syncs`, `job_evidence`, `job_evidence_media`, `job_scope_operational_items`, `jobs_operational_safe`, `message_read_states`, `messages`, `messaging_push_deliveries`, `messaging_user_directory_safe`, `mileage_stops`, `notification_preferences`, `porter_notification_events`, `property_service_plan_areas`, `property_service_plans`, `property_service_route_stops`, `property_service_routes`, `property_service_visit_issues`, `property_service_visit_photos`, `property_service_visits`, `scope_snapshot_items`, `scope_snapshots`, `scope_snapshots_operational`, `service_label_assignments`, `service_labels`.
+`announcement_acknowledgments`, `assessment_photo_access`, `attention_push_checkpoints`, `attention_push_deliveries`, `authorized_vehicles_safe`, `browser_push_subscriptions`, `change_request_approvals_operational`, `change_request_items`, `change_requests`, `change_requests_operational`, `conversation_members`, `conversations`, `employee_directory_company_safe`, `employee_work_sessions`, `field_discoveries`, `field_discoveries_operational`, `field_discovery_media`, `google_calendar_connections`, `invoice_job_lines`, `job_calendar_syncs`, `job_evidence`, `job_evidence_media`, `job_scope_operational_items`, `jobs_operational_safe`, `message_read_states`, `messages`, `messaging_push_deliveries`, `messaging_user_directory_safe`, `mileage_stops`, `notification_preferences`, `porter_notification_events`, `property_service_plan_areas`, `property_service_plans`, `property_service_route_stops`, `property_service_routes`, `property_service_visit_issues`, `property_service_visit_photos`, `property_service_visits`, `scope_snapshot_items`, `scope_snapshots`, `scope_snapshots_operational`, `service_label_assignments`, `service_labels`.
 
 ### Tracked standalone only (29) — baseline/forward migration required
 
@@ -69,11 +69,9 @@ These are not necessarily absent from production. They are absent as reproducibl
 | --- | --- | --- |
 | `invoice_job_photos` | Untracked current definition/override | `supabase/job_finished_photos_invoice_handoff.sql`; an older tracked definition also exists in `supabase/invoice_operational_photo_snapshot_handoff.sql` |
 
-### Missing entirely (1)
+### Missing entirely (0)
 
-| Relation | Classification | Evidence |
-| --- | --- | --- |
-| `employee_directory_company_safe` | **Missing entirely** | Queried by `lib/services/employees.ts`; `supabase/migrations/20260911074500_employee_directory_company_safe.sql` is tracked but empty. |
+No statically referenced Data API relation is missing from the forward migration chain. `employee_directory_company_safe` is restored by `20260919161425_restore_employee_directory_company_safe.sql`; the previously applied empty migration remains unchanged.
 
 ## Storage dependencies
 
@@ -110,12 +108,11 @@ These files appear to contain current behavior beyond an older tracked definitio
 
 Phase 2 should not edit existing migrations. After a separately authorized read-only live comparison, create forward-only migrations for:
 
-1. The missing `employee_directory_company_safe` view, with its intended active-profile/role projection, security-invoker behavior, and grants.
-2. The 31 standalone-only RPCs, grouped by authorization domain rather than copied wholesale from historical scripts.
-3. The five untracked-only RPCs and the intended current `invoice_job_photos` definition.
-4. Baseline definitions for the 29 standalone-only relations, or an explicitly adopted tracked baseline schema strategy.
-5. The `operational-photos` and `agreement-documents` buckets and their final Storage policies.
-6. Final RLS, grants, trigger functions/triggers, and Realtime publication membership for every promoted object.
+1. The 31 standalone-only RPCs, grouped by authorization domain rather than copied wholesale from historical scripts.
+2. The five untracked-only RPCs and the intended current `invoice_job_photos` definition.
+3. Baseline definitions for the 29 standalone-only relations, or an explicitly adopted tracked baseline schema strategy.
+4. The `operational-photos` and `agreement-documents` buckets and their final Storage policies.
+5. Final RLS, grants, trigger functions/triggers, and Realtime publication membership for every promoted object.
 
 ## Seed contract
 

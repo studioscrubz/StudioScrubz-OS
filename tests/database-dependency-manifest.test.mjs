@@ -37,8 +37,9 @@ test("manifest inventories every statically named Data API relation", () => {
   }
 });
 
-test("manifest records the known missing view and both Storage buckets", () => {
-  assert.match(manifest, /employee_directory_company_safe[^\n]*Missing entirely/);
+test("manifest records the restored employee directory view and both Storage buckets", () => {
+  assert.match(manifest, /employee_directory_company_safe/);
+  assert.doesNotMatch(manifest, /employee_directory_company_safe[^\n]*Missing entirely/);
   assert.match(manifest, /operational-photos/);
   assert.match(manifest, /agreement-documents/);
 });
