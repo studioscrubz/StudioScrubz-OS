@@ -61,7 +61,7 @@ returns boolean language sql stable security definer set search_path = '' as $$
       p_employee_id=public.current_employee_id()
       or exists(select 1 from public.crews c where c.id=p_crew_id and c.status='Active' and c.archived_at is null
         and (c.crew_lead_id=public.current_employee_id() or exists(select 1 from public.crew_members cm where cm.crew_id=c.id and cm.employee_id=public.current_employee_id())))
-    ))
+    )))
 $$;
 revoke all on function public.can_access_job_assignment(uuid,uuid) from public, anon, authenticated;
 grant execute on function public.can_access_job_assignment(uuid,uuid) to authenticated;
@@ -394,3 +394,4 @@ grant execute on function public.get_operational_job_ids(date,date),public.get_o
 
 notify pgrst,'reload schema';
 commit;
+
