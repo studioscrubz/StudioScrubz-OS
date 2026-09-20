@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { SiteFooter, SiteHeader } from "@/components/site/SiteChrome";
 import { getPublicBusinessContact } from "@/lib/services/publicBusinessSettings";
 
@@ -152,6 +153,7 @@ export default async function SiteLayout({
         phone={contact.phone}
         email={contact.email}
       />
+      <Analytics />
     </div>
   );
 }
