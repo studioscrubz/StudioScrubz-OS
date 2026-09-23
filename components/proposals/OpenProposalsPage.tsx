@@ -9,7 +9,10 @@ import { ProposalAgreementAction } from "@/components/agreements/ProposalAgreeme
 import { isRecurringFrequency } from "@/lib/scheduling/frequency";
 import { getJobProposalIds } from "@/lib/services/jobs";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { canManageProposalPricingPhotos, hasPermission } from "@/lib/auth/permissions";
+import {
+  canManageProposalPricingPhotos,
+  hasPermission,
+} from "@/lib/auth/permissions";
 import {
   ACCEPTANCE_METHODS,
   APPROVAL_STATUSES,
@@ -36,9 +39,17 @@ import {
 } from "@/lib/services/proposals";
 import { deliverDocument } from "@/lib/services/unifiedDocumentDelivery";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
-import { clientTokenExpiration, generateSecureClientToken, validClientToken } from "@/lib/secureClientToken";
+import {
+  clientTokenExpiration,
+  generateSecureClientToken,
+  validClientToken,
+} from "@/lib/secureClientToken";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
-import { ProposalDocument, proposalDeliverySnapshot, proposalDocumentFromRecord } from "./ProposalDocument";
+import {
+  ProposalDocument,
+  proposalDeliverySnapshot,
+  proposalDocumentFromRecord,
+} from "./ProposalDocument";
 import { ProposalPricingPhotos } from "./ProposalPricingPhotos";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 type Sort =
@@ -59,13 +70,42 @@ const OPEN_PROPOSAL_STATUSES: ProposalStatus[] = [
   "Declined",
   "Expired",
 ];
-const workflowGroups: Array<{ title: string; description: string; statuses: ProposalStatus[] }> = [
-  { title: "Needs Work", description: "Draft proposals being prepared or revised.", statuses: ["Draft"] },
-  { title: "Waiting for Approval", description: "Submitted proposals awaiting an approval decision.", statuses: ["Ready for Approval"] },
-  { title: "Ready to Send", description: "Approved proposals ready for client delivery.", statuses: ["Approved"] },
-  { title: "Awaiting Client Action", description: "Delivered proposals awaiting acceptance or decline.", statuses: ["Sent", "Viewed"] },
-  { title: "Accepted — Handoff", description: "Accepted proposals awaiting Job or Service Agreement creation.", statuses: ["Accepted"] },
-  { title: "Attention Needed", description: "Declined or expired proposals requiring follow-up.", statuses: ["Declined", "Expired"] },
+const workflowGroups: Array<{
+  title: string;
+  description: string;
+  statuses: ProposalStatus[];
+}> = [
+  {
+    title: "Needs Work",
+    description: "Draft proposals being prepared or revised.",
+    statuses: ["Draft"],
+  },
+  {
+    title: "Waiting for Approval",
+    description: "Submitted proposals awaiting an approval decision.",
+    statuses: ["Ready for Approval"],
+  },
+  {
+    title: "Ready to Send",
+    description: "Approved proposals ready for client delivery.",
+    statuses: ["Approved"],
+  },
+  {
+    title: "Awaiting Client Action",
+    description: "Delivered proposals awaiting acceptance or decline.",
+    statuses: ["Sent", "Viewed"],
+  },
+  {
+    title: "Accepted — Handoff",
+    description:
+      "Accepted proposals awaiting Job or Service Agreement creation.",
+    statuses: ["Accepted"],
+  },
+  {
+    title: "Attention Needed",
+    description: "Declined or expired proposals requiring follow-up.",
+    statuses: ["Declined", "Expired"],
+  },
 ];
 export function OpenProposalsPage() {
   const { profile } = useAuth();
@@ -150,7 +190,13 @@ export function OpenProposalsPage() {
       window.removeEventListener(PROPOSAL_JOB_CREATED_EVENT, handleJobCreated);
   }, []);
   const visibleRows = useMemo(
-    () => rows.filter((p) => !p.archived_at && p.status !== "Archived" && (p.status !== "Accepted" || !jobProposalIds.has(p.id))),
+    () =>
+      rows.filter(
+        (p) =>
+          !p.archived_at &&
+          p.status !== "Archived" &&
+          (p.status !== "Accepted" || !jobProposalIds.has(p.id)),
+      ),
     [jobProposalIds, rows],
   );
   const filtered = useMemo(
@@ -209,7 +255,16 @@ export function OpenProposalsPage() {
       </section>
       <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
         <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_170px_150px_180px_190px]">
-          <label><span className="sr-only">Search proposals</span><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search proposals" className={input} /></label>
+          <label>
+            <span className="sr-only">Search proposals</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search proposals"
+              className={input}
+            />
+          </label>
           <Filter
             v={status}
             set={(v) => setStatus(v as typeof status)}
@@ -239,16 +294,20 @@ export function OpenProposalsPage() {
             ]}
           />
         </div>
-        {loading ? <Loading /> : <ProposalList
-          rows={filtered}
-          busy={busy}
-          view={setView}
-          edit={setEdit}
-          accept={setAccepting}
-          history={(p) => void showHistory(p)}
-          send={setSending}
-          mutate={mutate}
-        />}
+        {loading ? (
+          <Loading />
+        ) : (
+          <ProposalList
+            rows={filtered}
+            busy={busy}
+            view={setView}
+            edit={setEdit}
+            accept={setAccepting}
+            history={(p) => void showHistory(p)}
+            send={setSending}
+            mutate={mutate}
+          />
+        )}
       </section>{" "}
       {view && <SharedProposalPreview p={view} close={() => setView(null)} />}{" "}
       {edit && (
@@ -274,7 +333,19 @@ export function OpenProposalsPage() {
       {history && (
         <HistoryModal data={history} close={() => setHistory(null)} />
       )}
-      {sending && <SendProposalModal proposal={sending} sender={profile?.display_name||profile?.email||"StudioScrubz User"} close={()=>setSending(null)} sent={(notice)=>{setSending(null);void refresh(notice)}} />}
+      {sending && (
+        <SendProposalModal
+          proposal={sending}
+          sender={
+            profile?.display_name || profile?.email || "StudioScrubz User"
+          }
+          close={() => setSending(null)}
+          sent={(notice) => {
+            setSending(null);
+            void refresh(notice);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -302,16 +373,52 @@ function ProposalList({
   ) => Promise<void>;
 }) {
   if (rows.length === 0) return <Empty />;
-  return <div className="divide-y divide-neutral-100">
-    {workflowGroups.map((group) => {
-      const groupRows = rows.filter((proposal) => group.statuses.includes(proposal.status));
-      if (groupRows.length === 0) return null;
-      return <section key={group.title} aria-label={group.title} className="p-4 sm:p-5">
-        <header className="mb-3 flex items-start justify-between gap-4"><div><h2 className="text-sm font-extrabold text-[#143d1a]">{group.title}</h2><p className="mt-1 text-xs text-neutral-500">{group.description}</p></div><span className="rounded-full bg-[#edf4ec] px-2.5 py-1 text-xs font-bold text-[#143d1a]">{groupRows.length}</span></header>
-        <div className="grid gap-3">{groupRows.map((proposal) => <Card key={proposal.id} p={proposal} busy={busy === proposal.id} view={() => view(proposal)} edit={() => edit(proposal)} accept={() => accept(proposal)} history={() => history(proposal)} openSend={() => send(proposal)} mutate={(fn, text) => void mutate(proposal, fn, text)} />)}</div>
-      </section>;
-    })}
-  </div>;
+  return (
+    <div className="divide-y divide-neutral-100">
+      {workflowGroups.map((group) => {
+        const groupRows = rows.filter((proposal) =>
+          group.statuses.includes(proposal.status),
+        );
+        if (groupRows.length === 0) return null;
+        return (
+          <section
+            key={group.title}
+            aria-label={group.title}
+            className="p-4 sm:p-5"
+          >
+            <header className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-extrabold text-[#143d1a]">
+                  {group.title}
+                </h2>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {group.description}
+                </p>
+              </div>
+              <span className="rounded-full bg-[#edf4ec] px-2.5 py-1 text-xs font-bold text-[#143d1a]">
+                {groupRows.length}
+              </span>
+            </header>
+            <div className="grid gap-3">
+              {groupRows.map((proposal) => (
+                <Card
+                  key={proposal.id}
+                  p={proposal}
+                  busy={busy === proposal.id}
+                  view={() => view(proposal)}
+                  edit={() => edit(proposal)}
+                  accept={() => accept(proposal)}
+                  history={() => history(proposal)}
+                  openSend={() => send(proposal)}
+                  mutate={(fn, text) => void mutate(proposal, fn, text)}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
 }
 function Card({
   p,
@@ -355,10 +462,49 @@ function Card({
   }
   return (
     <article className="rounded-xl border border-[#143d1a]/10 bg-white p-4 shadow-sm">
-      <button type="button" onClick={view} className="grid w-full gap-4 text-left md:grid-cols-[minmax(0,1.25fr)_minmax(180px,.9fr)_140px] md:items-center">
-        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-extrabold text-[#143d1a]">{p.proposal_number}</p><StatusBadge status={p.status} /></div><p className="mt-2 truncate text-sm font-bold text-neutral-700">{p.client_name || "Unnamed client"}</p><p className="mt-1 truncate text-xs text-neutral-500">{proposalProperty(p)}</p></div>
-        <div className="min-w-0"><p className="truncate text-sm font-bold text-[#143d1a]">{p.result.serviceName || "Service not selected"}</p><p className="mt-1 text-xs text-neutral-500">{p.division} · {p.frequency}</p><p className="mt-2 text-xs text-neutral-500">Approval: <span className="font-bold text-neutral-700">{p.approval_status}</span></p></div>
-        <div className="md:text-right"><p className="text-xl font-extrabold text-[#143d1a]">{money(p.result.perVisitTotal)}</p><p className="mt-1 text-xs text-neutral-500">{proposalActivityDate(p)}</p><div className="mt-2 flex flex-wrap gap-1 md:justify-end">{p.estimate_id && <Badge t="Estimate" />}{p.walkthrough_id && <Badge t="Walkthrough" />}</div></div>
+      <button
+        type="button"
+        onClick={view}
+        className="grid w-full gap-4 text-left md:grid-cols-[minmax(0,1.25fr)_minmax(180px,.9fr)_140px] md:items-center"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-extrabold text-[#143d1a]">{p.proposal_number}</p>
+            <StatusBadge status={p.status} />
+          </div>
+          <p className="mt-2 truncate text-sm font-bold text-neutral-700">
+            {p.client_name || "Unnamed client"}
+          </p>
+          <p className="mt-1 truncate text-xs text-neutral-500">
+            {proposalProperty(p)}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-[#143d1a]">
+            {p.result.serviceName || "Service not selected"}
+          </p>
+          <p className="mt-1 text-xs text-neutral-500">
+            {p.division} · {p.frequency}
+          </p>
+          <p className="mt-2 text-xs text-neutral-500">
+            Approval:{" "}
+            <span className="font-bold text-neutral-700">
+              {p.approval_status}
+            </span>
+          </p>
+        </div>
+        <div className="md:text-right">
+          <p className="text-xl font-extrabold text-[#143d1a]">
+            {money(p.result.perVisitTotal)}
+          </p>
+          <p className="mt-1 text-xs text-neutral-500">
+            {proposalActivityDate(p)}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1 md:justify-end">
+            {p.estimate_id && <Badge t="Estimate" />}
+            {p.walkthrough_id && <Badge t="Walkthrough" />}
+          </div>
+        </div>
       </button>
       <div className="mt-4 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
         <Action t="Preview" f={view} />
@@ -377,7 +523,8 @@ function Card({
             />
           </>
         )}
-        {canApprove && p.status === "Ready for Approval" &&
+        {canApprove &&
+          p.status === "Ready for Approval" &&
           p.approval_status === "Pending Approval" && (
             <>
               <Action
@@ -399,12 +546,14 @@ function Card({
               />
             </>
           )}
-        {canSend && p.status === "Approved" && p.approval_status === "Approved" && (
-          <>
-            <Action t="Send to Client" f={openSend} />
-            <Action t="Print / Save PDF" f={() => printProposal(p)} />
-          </>
-        )}
+        {canSend &&
+          p.status === "Approved" &&
+          p.approval_status === "Approved" && (
+            <>
+              <Action t="Send to Client" f={openSend} />
+              <Action t="Print / Save PDF" f={() => printProposal(p)} />
+            </>
+          )}
         {(p.status === "Sent" || p.status === "Viewed") && (
           <>
             {canSend && <Action t="Resend Proposal" f={openSend} />}
@@ -419,7 +568,13 @@ function Card({
         )}
         {p.status === "Accepted" && (
           <>
-            {isRecurringFrequency(p.frequency) ? <ProposalAgreementAction proposalId={p.id} /> : <ProposalJobAction proposalId={p.id} />}
+            {isRecurringFrequency(p.frequency) ||
+            (p.frequency === "One-Time" &&
+              /post[- ]construction/i.test(p.result.serviceName)) ? (
+              <ProposalAgreementAction proposalId={p.id} autoDraft={p.frequency === "One-Time"} />
+            ) : (
+              <ProposalJobAction proposalId={p.id} />
+            )}
             <Action t="Print / Save PDF" f={() => printProposal(p)} />
           </>
         )}{" "}
@@ -438,11 +593,188 @@ function Card({
     </article>
   );
 }
-function SharedProposalPreview({p,close}:{p:ProposalWithRelations;close:()=>void}){const{profile}=useAuth();return <Modal title={p.proposal_number} close={close}><ProposalDocument document={proposalDocumentFromRecord(p)}/><div className="mt-6 print:hidden"><ProposalPricingPhotos proposalId={p.id} status={p.status} canManage={canManageProposalPricingPhotos(profile)}/></div><button type="button" onClick={()=>window.print()} className="mt-5 rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white print:hidden">Print / Save PDF</button></Modal>}
+function SharedProposalPreview({
+  p,
+  close,
+}: {
+  p: ProposalWithRelations;
+  close: () => void;
+}) {
+  const { profile } = useAuth();
+  return (
+    <Modal title={p.proposal_number} close={close}>
+      <ProposalDocument document={proposalDocumentFromRecord(p)} />
+      <div className="mt-6 print:hidden">
+        <ProposalPricingPhotos
+          proposalId={p.id}
+          status={p.status}
+          canManage={canManageProposalPricingPhotos(profile)}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="mt-5 rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white print:hidden"
+      >
+        Print / Save PDF
+      </button>
+    </Modal>
+  );
+}
 
-function SendProposalModal({proposal,sender,close,sent}:{proposal:ProposalWithRelations;sender:string;close:()=>void;sent:(notice:string)=>void}){const email=proposal.customer_email||"";const phone=proposal.customer_phone||"";const[subject,setSubject]=useState(`StudioScrubz Proposal Ready - ${proposal.client_name||proposal.client?.first_name||proposal.proposal_number}`);const[body,setBody]=useState(`Hello ${proposal.client?.first_name||proposal.client_name||"Client"},\n\nThank you for the opportunity to work with you.\n\nYour StudioScrubz proposal is ready for review. It includes the service scope and pricing prepared for your property or project.\n\nPlease use the secure link below to review the proposal. If you have any questions or would like to discuss any part of the scope, feel free to contact us before accepting.\n\nNo mess. No stress.\n\nStudioScrubz`);const[busy,setBusy]=useState(false);const[error,setError]=useState<string|null>(null);const token=useMemo(()=>validClientToken(proposal.client_access_token,proposal.client_access_token_expires_at)?proposal.client_access_token!:generateSecureClientToken(),[proposal]);const expiresAt=useMemo(()=>validClientToken(proposal.client_access_token,proposal.client_access_token_expires_at)?proposal.client_access_token_expires_at!:clientTokenExpiration(),[proposal]);const reviewUrl=`${getPublicSiteUrl()}/proposal/${token}`;async function submit(){if(!email&&!phone)return setError("Customer does not have an email address or phone number on file.");setBusy(true);setError(null);try{const result=await deliverDocument({documentType:"Proposal",documentId:proposal.id,documentNumber:proposal.proposal_number,clientId:proposal.client_id,propertyId:proposal.property_id,email,phone,subject:subject.trim(),messageBody:body.trim(),publicUrl:reviewUrl,publicLinkLabel:"Review Proposal",prepare:async(channel,recipient)=>{await markProposalSent(proposal.id,channel,{recipient,sender,token,expiresAt,snapshot:proposalDeliverySnapshot(proposal)})}});sent(result.message)}catch(caught){console.error("Proposal delivery failed",caught);setError(msg(caught,"Proposal delivery could not be completed."));setBusy(false)}}return <Modal title={`Send Proposal ${proposal.proposal_number}`} close={close}><div className="space-y-5"><ProposalDocument document={proposalDocumentFromRecord(proposal)}/><DeliverySummary email={email} phone={phone}/><label className="block text-sm font-bold">Subject<input className={`${input} mt-2`} value={subject} onChange={e=>setSubject(e.target.value)}/></label><label className="block text-sm font-bold">Editable Message<textarea className="mt-2 min-h-36 w-full rounded-lg border border-neutral-200 p-3 font-normal" value={body} onChange={e=>setBody(e.target.value)}/></label><div><p className="text-sm font-bold">Review Proposal</p><p className="mt-1 break-all rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">{reviewUrl}</p></div>{error&&<p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="flex flex-wrap gap-3 print:hidden"><button type="button" disabled={busy||(!email&&!phone)} onClick={()=>void submit()} className="rounded-lg bg-[#143d1a] px-5 py-2.5 font-bold text-white disabled:opacity-50">{busy?"Sending…":proposal.sent_at?"Resend":"Send"}</button><button type="button" onClick={()=>window.print()} className="rounded-lg border px-4 py-2 font-bold text-[#143d1a]">Print / Save PDF</button><button type="button" onClick={close} className="rounded-lg border px-4 py-2 font-bold text-[#143d1a]">Cancel</button></div></div></Modal>}
+function SendProposalModal({
+  proposal,
+  sender,
+  close,
+  sent,
+}: {
+  proposal: ProposalWithRelations;
+  sender: string;
+  close: () => void;
+  sent: (notice: string) => void;
+}) {
+  const email = proposal.customer_email || "";
+  const phone = proposal.customer_phone || "";
+  const [subject, setSubject] = useState(
+    `StudioScrubz Proposal Ready - ${proposal.client_name || proposal.client?.first_name || proposal.proposal_number}`,
+  );
+  const [body, setBody] = useState(
+    `Hello ${proposal.client?.first_name || proposal.client_name || "Client"},\n\nThank you for the opportunity to work with you.\n\nYour StudioScrubz proposal is ready for review. It includes the service scope and pricing prepared for your property or project.\n\nPlease use the secure link below to review the proposal. If you have any questions or would like to discuss any part of the scope, feel free to contact us before accepting.\n\nNo mess. No stress.\n\nStudioScrubz`,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const token = useMemo(
+    () =>
+      validClientToken(
+        proposal.client_access_token,
+        proposal.client_access_token_expires_at,
+      )
+        ? proposal.client_access_token!
+        : generateSecureClientToken(),
+    [proposal],
+  );
+  const expiresAt = useMemo(
+    () =>
+      validClientToken(
+        proposal.client_access_token,
+        proposal.client_access_token_expires_at,
+      )
+        ? proposal.client_access_token_expires_at!
+        : clientTokenExpiration(),
+    [proposal],
+  );
+  const reviewUrl = `${getPublicSiteUrl()}/proposal/${token}`;
+  async function submit() {
+    if (!email && !phone)
+      return setError(
+        "Customer does not have an email address or phone number on file.",
+      );
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await deliverDocument({
+        documentType: "Proposal",
+        documentId: proposal.id,
+        documentNumber: proposal.proposal_number,
+        clientId: proposal.client_id,
+        propertyId: proposal.property_id,
+        email,
+        phone,
+        subject: subject.trim(),
+        messageBody: body.trim(),
+        publicUrl: reviewUrl,
+        publicLinkLabel: "Review Proposal",
+        prepare: async (channel, recipient) => {
+          await markProposalSent(proposal.id, channel, {
+            recipient,
+            sender,
+            token,
+            expiresAt,
+            snapshot: proposalDeliverySnapshot(proposal),
+          });
+        },
+      });
+      sent(result.message);
+    } catch (caught) {
+      console.error("Proposal delivery failed", caught);
+      setError(msg(caught, "Proposal delivery could not be completed."));
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal title={`Send Proposal ${proposal.proposal_number}`} close={close}>
+      <div className="space-y-5">
+        <ProposalDocument document={proposalDocumentFromRecord(proposal)} />
+        <DeliverySummary email={email} phone={phone} />
+        <label className="block text-sm font-bold">
+          Subject
+          <input
+            className={`${input} mt-2`}
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
+        </label>
+        <label className="block text-sm font-bold">
+          Editable Message
+          <textarea
+            className="mt-2 min-h-36 w-full rounded-lg border border-neutral-200 p-3 font-normal"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </label>
+        <div>
+          <p className="text-sm font-bold">Review Proposal</p>
+          <p className="mt-1 break-all rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">
+            {reviewUrl}
+          </p>
+        </div>
+        {error && (
+          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-3 print:hidden">
+          <button
+            type="button"
+            disabled={busy || (!email && !phone)}
+            onClick={() => void submit()}
+            className="rounded-lg bg-[#143d1a] px-5 py-2.5 font-bold text-white disabled:opacity-50"
+          >
+            {busy ? "Sending…" : proposal.sent_at ? "Resend" : "Send"}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-lg border px-4 py-2 font-bold text-[#143d1a]"
+          >
+            Print / Save PDF
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-lg border px-4 py-2 font-bold text-[#143d1a]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
-function DeliverySummary({email,phone}:{email:string;phone:string}){return <div className="rounded-lg border bg-neutral-50 p-3 text-sm"><p className="font-bold text-[#143d1a]">Delivery</p><p className="mt-2">{email?`✓ Email: ${email}`:"— Email: No email address on file"}</p><p className="mt-1">{phone?`✓ Text: ${phone}`:"— Text: No phone number on file"}</p></div>}
+function DeliverySummary({ email, phone }: { email: string; phone: string }) {
+  return (
+    <div className="rounded-lg border bg-neutral-50 p-3 text-sm">
+      <p className="font-bold text-[#143d1a]">Delivery</p>
+      <p className="mt-2">
+        {email ? `✓ Email: ${email}` : "— Email: No email address on file"}
+      </p>
+      <p className="mt-1">
+        {phone ? `✓ Text: ${phone}` : "— Text: No phone number on file"}
+      </p>
+    </div>
+  );
+}
 
 // Retained for the legacy compact proposal print preview.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -456,7 +788,15 @@ function ViewModal({
   return (
     <Modal title={p.proposal_number} close={close}>
       <div className="print-proposal">
-        <div className="mb-6 flex items-center gap-4 border-b-2 border-[#143d1a] pb-4"><StudioScrubzLogo size={88}/><div><h1 className="text-2xl font-extrabold text-[#143d1a]">StudioScrubz Proposal</h1><p>{p.proposal_number}</p></div></div>
+        <div className="mb-6 flex items-center gap-4 border-b-2 border-[#143d1a] pb-4">
+          <StudioScrubzLogo size={88} />
+          <div>
+            <h1 className="text-2xl font-extrabold text-[#143d1a]">
+              StudioScrubz Proposal
+            </h1>
+            <p>{p.proposal_number}</p>
+          </div>
+        </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <Details
             title="Customer"
@@ -686,7 +1026,9 @@ function Header() {
       <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">
         Operations workspace
       </p>
-      <h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">Open Proposals</h1>
+      <h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">
+        Open Proposals
+      </h1>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">
         Review, approve, send, and track StudioScrubz proposals.
       </p>
@@ -696,7 +1038,9 @@ function Header() {
 function Summary({ l, v }: { l: string; v: number | string }) {
   return (
     <article className="rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-[0_8px_25px_rgba(20,61,26,.045)]">
-      <p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-neutral-500 sm:text-xs">{l}</p>
+      <p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-neutral-500 sm:text-xs">
+        {l}
+      </p>
       <p className="mt-5 text-3xl font-extrabold text-[#143d1a]">{v}</p>
     </article>
   );
@@ -746,12 +1090,38 @@ function Badge({ t }: { t: string }) {
   );
 }
 function StatusBadge({ status }: { status: ProposalStatus }) {
-  const tone = status === "Accepted" ? "bg-emerald-50 text-emerald-700" : status === "Declined" || status === "Expired" ? "bg-red-50 text-red-700" : status === "Ready for Approval" || status === "Approved" ? "bg-amber-50 text-amber-800" : "bg-[#edf4ec] text-[#143d1a]";
-  return <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${tone}`}>{status}</span>;
+  const tone =
+    status === "Accepted"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "Declined" || status === "Expired"
+        ? "bg-red-50 text-red-700"
+        : status === "Ready for Approval" || status === "Approved"
+          ? "bg-amber-50 text-amber-800"
+          : "bg-[#edf4ec] text-[#143d1a]";
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${tone}`}
+    >
+      {status}
+    </span>
+  );
 }
-function proposalProperty(p: ProposalWithRelations): string { return p.property ? [p.property.property_name, p.property.address].filter(Boolean).join(" · ") : p.property_name || "Deleted Property"; }
-function proposalActivityDate(p: ProposalWithRelations): string { if (p.sent_at) return `Sent ${formatDate(p.sent_at)}`; if (p.status === "Ready for Approval" || p.status === "Approved") return `Submitted ${formatDate(p.updated_at)}`; return `Created ${formatDate(p.created_at)}`; }
-function formatDate(value: string): string { return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)); }
+function proposalProperty(p: ProposalWithRelations): string {
+  return p.property
+    ? [p.property.property_name, p.property.address].filter(Boolean).join(" · ")
+    : p.property_name || "Deleted Property";
+}
+function proposalActivityDate(p: ProposalWithRelations): string {
+  if (p.sent_at) return `Sent ${formatDate(p.sent_at)}`;
+  if (p.status === "Ready for Approval" || p.status === "Approved")
+    return `Submitted ${formatDate(p.updated_at)}`;
+  return `Created ${formatDate(p.created_at)}`;
+}
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+    new Date(value),
+  );
+}
 function Alert({ text, success }: { text: string; success?: boolean }) {
   return (
     <div
@@ -762,9 +1132,30 @@ function Alert({ text, success }: { text: string; success?: boolean }) {
   );
 }
 function Loading() {
-  return <div className="space-y-3 p-5" aria-label="Loading proposals">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-neutral-100" />)}</div>;
+  return (
+    <div className="space-y-3 p-5" aria-label="Loading proposals">
+      {[1, 2, 3].map((item) => (
+        <div
+          key={item}
+          className="h-24 animate-pulse rounded-xl bg-neutral-100"
+        />
+      ))}
+    </div>
+  );
 }
-function Empty() { return <div className="flex min-h-64 flex-col items-center justify-center text-center"><span className="mb-5 h-1 w-10 rounded-full bg-[#d4af37]" /><h2 className="font-extrabold text-[#143d1a]">No open proposals match these filters</h2><p className="mt-2 text-sm text-neutral-500">Adjust search or filters to see other open proposal work.</p></div>; }
+function Empty() {
+  return (
+    <div className="flex min-h-64 flex-col items-center justify-center text-center">
+      <span className="mb-5 h-1 w-10 rounded-full bg-[#d4af37]" />
+      <h2 className="font-extrabold text-[#143d1a]">
+        No open proposals match these filters
+      </h2>
+      <p className="mt-2 text-sm text-neutral-500">
+        Adjust search or filters to see other open proposal work.
+      </p>
+    </div>
+  );
+}
 function Modal({
   title,
   close,

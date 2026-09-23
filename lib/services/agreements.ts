@@ -56,6 +56,18 @@ export async function getAgreementForProposal(id: string) {
   if (error) throw error;
   return data as AgreementWithRelations | null;
 }
+export async function createPostConstructionDraftAgreement(proposalId:string){
+  const {error}=await getSupabaseClient().rpc("create_post_construction_draft_agreement",{p_proposal_id:proposalId});
+  if(error)throw new Error(error.message||"Draft Agreement could not be created.");
+  const agreement=await getAgreementForProposal(proposalId);
+  if(!agreement)throw new Error("The generated Draft Agreement could not be loaded.");
+  return agreement;
+}
+export async function deleteUnsentDraftAgreement(id:string){
+  const {data,error}=await getSupabaseClient().rpc("delete_unsent_draft_service_agreement",{p_agreement_id:id});
+  if(error)throw new Error(error.message||"Draft Agreement could not be deleted.");
+  return data as string;
+}
 export async function createAgreement(input: AgreementInput) {
   if (input.proposal_id) {
     const old = await getAgreementForProposal(input.proposal_id);

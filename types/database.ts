@@ -265,6 +265,8 @@ export interface Database {
       get_invoice_by_token:{Args:{p_token:string};Returns:import("@/types/publicInvoice").PublicInvoice};
       get_invoice_payment_confirmation_by_token:{Args:{p_token:string};Returns:string|null};
       accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};
+      create_post_construction_draft_agreement:{Args:{p_proposal_id:string};Returns:string};
+      delete_unsent_draft_service_agreement:{Args:{p_agreement_id:string};Returns:string};
       mark_estimate_sent_for_delivery:{Args:{p_estimate_id:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
       mark_proposal_sent_for_delivery:{Args:{p_proposal_id:string;p_via:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
       get_operational_photos:{Args:{p_record_type:string;p_record_id:string};Returns:import("@/types/photo").OperationalPhoto[]};

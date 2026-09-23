@@ -8,7 +8,7 @@ import {
   activateAgreement, agreementScopeFromProposal, agreementServiceDescriptionFromProposal, archiveAgreement, cancelAgreement, completeAgreement, createAgreement, createAgreementFromProposal,
   estimatedMonthlyAmount, getAgreements, markAgreementAccepted, markAgreementSent,
   monthlyRecurringRevenue, pauseAgreement, resumeAgreement, saveAgreementEdits, validateAgreementConfiguration,
-  getAgreementFinancialSummary,
+  getAgreementFinancialSummary, deleteUnsentDraftAgreement,
 } from "@/lib/services/agreements";
 import { createBiweeklyContractInvoice, createFlatContractInvoice, createMonthlyContractInvoice, createWeeklyContractInvoice, getAgreementInvoices } from "@/lib/services/invoices";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
@@ -41,6 +41,7 @@ import type { ProposalWithRelations } from "@/types/proposal";
 export function AgreementsPage() {
   const { profile } = useAuth();
   const canManage = hasPermission(profile, "agreements.manage");
+  const canDeleteDraft = ["Master Admin", "Administrator", "Manager"].includes(profile?.role ?? "");
   const canCreateJobs = hasPermission(profile, "jobs.create");
   const canViewInvoices = hasPermission(profile, "invoices.view");
   const canCreateInvoices = hasPermission(profile, "invoices.create");
@@ -99,6 +100,13 @@ export function AgreementsPage() {
     catch (cause) { setActionErrors((current) => ({ ...current, [agreement.id]: message(cause) })); }
     finally { setActivatingId(null); }
   }
+  async function deleteDraft(agreement:AgreementWithRelations){
+    const customer=clientName(agreement);
+    if(!window.confirm(`Permanently delete unsent Draft Agreement ${agreement.agreement_number} for ${customer}?\n\nThe accepted Proposal will remain unchanged. This cannot be undone.`))return;
+    setError(null);setNotice(null);
+    try{await deleteUnsentDraftAgreement(agreement.id);setAgreements(current=>current.filter(item=>item.id!==agreement.id));setPreview(current=>current?.id===agreement.id?null:current);setForm(current=>current && current!=="new" && current.id===agreement.id?null:current);setNotice("Unsent Draft Agreement deleted. The source Proposal remains accepted and can generate a replacement Draft on request.")}
+    catch(cause){setError(message(cause))}
+  }
   const shown = useMemo(() => agreements.filter((agreement) =>
     (status === "All" || agreement.status === status) &&
     (!query || [agreement.agreement_number, agreement.agreement_name, agreement.service_name, clientName(agreement), agreement.property?.address]
@@ -138,6 +146,7 @@ export function AgreementsPage() {
         <button className={secondary} onClick={() => setDocuments(agreement)}>Documents</button>
         {canViewInvoices && (["Weekly","Biweekly"].includes(agreement.billing_type) || agreement.division === "Commercial" && ["Monthly", "Flat Contract"].includes(agreement.billing_type)) && <button className={secondary} onClick={() => setBilling(agreement)}>Contract Billing</button>}
         {canManage && agreement.status === "Draft" && <button className={secondary} onClick={() => setSend(agreement)}>Send to Client</button>}
+        {canDeleteDraft && agreement.status === "Draft" && !agreement.sent_at && <button className="rounded-lg border border-red-300 px-3 py-2 text-xs font-bold text-red-700" onClick={() => void deleteDraft(agreement)}>Delete Draft</button>}
         {canManage && agreement.status === "Sent" && <><button className={secondary} onClick={() => setSend(agreement)}>Resend</button><button className={secondary} onClick={() => void act(() => markAgreementAccepted(agreement.id), "Agreement marked accepted.")}>Mark Accepted</button></>}
         {canManage && agreement.status === "Accepted" && <button disabled={activatingId === agreement.id} className={secondary} onClick={() => void activate(agreement)}>{activatingId === agreement.id ? "Activating..." : "Activate"}</button>}
         {canManage && agreement.status === "Active" && <><button className={secondary} onClick={() => void act(() => generateOccurrences(agreement.id), "60-day schedule generated.")}>Generate Schedule</button><button className={secondary} onClick={() => void act(() => pauseAgreement(agreement.id), "Agreement paused.")}>Pause</button><button className={secondary} onClick={() => void completeWithWarning(agreement)}>Complete</button><button className={secondary} onClick={() => void act(() => cancelAgreement(agreement.id), "Agreement cancelled.")}>Cancel</button></>}
@@ -196,6 +205,7 @@ function AgreementDocument({ agreement, settings }: { agreement: AgreementWithRe
     <h2 className="mt-6 text-2xl font-bold">{agreement.division} Service Agreement</h2><p className="font-semibold">{agreement.agreement_number} · {agreement.status}</p>
     <div className="mt-5 grid grid-cols-2 gap-4"><Detail label="Agreement" value={agreement.agreement_name}/><Detail label="Division" value={agreement.division}/><Detail label={agreement.division === "Commercial" ? "Company / Client" : "Client"} value={clientName(agreement)}/><Detail label={agreement.division === "Commercial" ? "Property / Site" : "Property / Service Location"} value={agreement.property?.property_name || agreement.property?.address || "Deleted Property"}/><Detail label="Service" value={agreement.service_name}/><Detail label="Frequency" value={serviceFrequencyLabel(agreement.frequency)}/><Detail label={billingLabel(agreement.billing_type)} value={money(agreement.billing_amount)}/><Detail label="Billing Type" value={agreement.billing_type}/><Detail label="Estimated Monthly Amount" value={estimatedMonthlyAmount(agreement) ? `${money(estimatedMonthlyAmount(agreement))} (estimate)` : "Not applicable"}/><Detail label="Start Date" value={agreement.start_date}/><Detail label="End Date" value={agreement.end_date || "No end date"}/><Detail label="Service Days" value={schedule}/><Detail label="Service Time" value={formatTime12Hour(agreement.default_start_time)}/><Detail label="Assigned Crew" value={agreement.crew?.crew_name || "Not assigned"}/><Detail label="Proposal" value={agreement.proposal?.proposal_number || "Not linked"}/></div>
     <Section title="Service Description" value={agreement.pricing_snapshot?.service_description || "—"}/>{included.length>0&&<Section title="Included Services / Cleaning Specifications" value={included.join("\n")}/>}<Section title="Special Instructions" value={agreement.special_instructions || "—"}/><Section title="Payment Terms" value={agreement.payment_terms || "—"}/><Section title="Agreement Terms" value={agreement.agreement_terms || agreement.notes || "—"}/><Section title="Cancellation Terms" value={agreement.cancellation_terms || "—"}/>
+    {agreement.pricing_snapshot?.estimated_cleaning_days!=null&&<Section title="Estimated Cleaning Duration" value={`Approximately ${agreement.pricing_snapshot.estimated_cleaning_days} days${agreement.pricing_snapshot.estimated_hours_per_day!=null?`, up to ${agreement.pricing_snapshot.estimated_hours_per_day} hours per day`:""}. This is an estimate. Actual timing may vary based on site readiness, access, construction conditions, and approved scope.`}/>}
     {agreement.billing_type==="Per Visit"&&<AgreementPricingBreakdown pricing={agreement.pricing_snapshot}/>}
     <p className="mt-5 text-xs text-neutral-500">This operational agreement record reflects the supplied business terms and is not a substitute for independent legal advice.</p>
     <div className="mt-12 grid grid-cols-2 gap-12"><Signature label="Client Signature"/><Signature label="StudioScrubz Signature"/></div>

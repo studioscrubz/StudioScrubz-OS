@@ -27,6 +27,8 @@ export type AgreementPricingSnapshot = {
   final_per_visit_price: number;
   estimated_monthly_total: number | null;
   accepted_pricing_allocation?: AcceptedPricingAllocation | null;
+  estimated_cleaning_days?: number | null;
+  estimated_hours_per_day?: number | null;
   upkeep_plan?: { standard_cleaning_value: number; adjustment_percent: number; upkeep_visit_value: number; visits_included: 3; monthly_package: number } | null;
   captured_at: string;
   catalog_addons?: ProposalAdjustment[];
