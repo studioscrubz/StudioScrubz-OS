@@ -37,6 +37,7 @@ import type { BusinessSettings } from "@/types/businessSettings";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import type { CatalogService, RecurringPricingRule } from "@/types/serviceCatalog";
 import type { ProposalWithRelations } from "@/types/proposal";
+import { AgreementDepositPanel } from "@/components/agreements/AgreementDepositPanel";
 
 export function AgreementsPage() {
   const { profile } = useAuth();
@@ -140,6 +141,7 @@ export function AgreementsPage() {
       {agreement.sent_at && <p className="mt-1 text-xs text-neutral-500">Last sent {new Date(agreement.sent_at).toLocaleString()} to {agreement.sent_to}</p>}
       {agreement.status === "Sent" && <p className="mt-1 text-xs font-semibold text-amber-700">Awaiting Client Signature</p>}
       {agreement.client_signed_at && <p className="mt-1 text-xs font-semibold text-green-700">Signed by {agreement.client_signed_name} on {new Date(agreement.client_signed_at).toLocaleString()}</p>}
+      {canDeleteDraft&&agreement.proposal_id&&<AgreementDepositPanel proposalId={agreement.proposal_id} onChange={()=>void load()}/>}
       <div className="mt-3 flex flex-wrap gap-1">
         {canManage && ["Draft", "Sent", "Accepted", "Active", "Paused"].includes(agreement.status) && <button className={secondary} onClick={() => setForm(agreement)}>Edit</button>}
         <button className={secondary} onClick={() => setPreview(agreement)}>Preview</button>

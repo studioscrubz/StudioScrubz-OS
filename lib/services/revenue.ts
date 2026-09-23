@@ -410,7 +410,7 @@ export function getRevenueDateRange(
   };
 }
 async function getPayments(range: RevenueDateRange): Promise<RawPayment[]> {
-  let query = getSupabaseClient().from("payments").select(paymentSelect);
+  let query = getSupabaseClient().from("payments").select(paymentSelect).is("voided_at",null);
   if (range.start) query = query.gte("payment_date", range.start);
   if (range.end) query = query.lte("payment_date", range.end);
   const { data, error } = await query.order("payment_date", {

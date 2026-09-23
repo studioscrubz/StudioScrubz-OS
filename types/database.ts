@@ -38,6 +38,7 @@ import type {FieldDiscovery,FieldDiscoveryMedia,OperationalFieldDiscovery} from 
 import type {ChangeRequest,ChangeRequestApproval,ChangeRequestItem,OperationalChangeRequest,PublicChangeRequest} from "@/types/changeRequest";
 import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 import type {PorterNotificationEvent} from "@/types/porterNotification";
+import type {ProposalDepositEvent,ProposalDepositRequirement} from "@/types/proposalDeposit";
 
 export interface Database {
   public: {
@@ -99,6 +100,8 @@ export interface Database {
         { foreignKeyName: "proposals_walkthrough_id_fkey"; columns: ["walkthrough_id"]; isOneToOne: false; referencedRelation: "walkthroughs"; referencedColumns: ["id"] },
       ] };
       proposal_history: { Row: ProposalHistory; Insert: Omit<ProposalHistory, "id" | "created_at"> & { id?: string; created_at?: string }; Update: never; Relationships: [{ foreignKeyName: "proposal_history_proposal_id_fkey"; columns: ["proposal_id"]; isOneToOne: false; referencedRelation: "proposals"; referencedColumns: ["id"] }] };
+      proposal_deposit_requirements:{Row:ProposalDepositRequirement;Insert:never;Update:never;Relationships:[{foreignKeyName:"proposal_deposit_requirements_proposal_id_fkey";columns:["proposal_id"];isOneToOne:true;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"proposal_deposit_requirements_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]}]};
+      proposal_deposit_events:{Row:ProposalDepositEvent;Insert:never;Update:never;Relationships:[{foreignKeyName:"proposal_deposit_events_requirement_id_fkey";columns:["requirement_id"];isOneToOne:false;referencedRelation:"proposal_deposit_requirements";referencedColumns:["id"]}]};
       jobs: { Row: Job; Insert: JobInsert & { id?: string; created_at?: string; updated_at?: string }; Update: JobUpdate; Relationships: [
         { foreignKeyName: "jobs_proposal_id_fkey"; columns: ["proposal_id"]; isOneToOne: false; referencedRelation: "proposals"; referencedColumns: ["id"] },
         { foreignKeyName: "jobs_estimate_id_fkey"; columns: ["estimate_id"]; isOneToOne: false; referencedRelation: "estimates"; referencedColumns: ["id"] },
@@ -197,6 +200,11 @@ export interface Database {
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
       get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
       get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};
+      confirm_post_construction_deposit:{Args:{p_proposal_id:string;p_received_date:string;p_reference_number?:string|null;p_notes?:string|null};Returns:ProposalDepositRequirement};
+      refresh_post_construction_deposit_instructions:{Args:{p_proposal_id:string};Returns:ProposalDepositRequirement};
+      reverse_post_construction_deposit:{Args:{p_proposal_id:string;p_reason:string};Returns:ProposalDepositRequirement};
+      reopen_post_construction_deposit:{Args:{p_proposal_id:string};Returns:ProposalDepositRequirement};
+      mark_service_agreement_sent_for_delivery:{Args:{p_agreement_id:string;p_sent_to:string;p_sent_by:string;p_token:string;p_token_expires_at:string};Returns:ServiceAgreement};
       get_job_performance_rows:{Args:{p_start_date:string|null;p_end_date:string|null};Returns:JobPerformanceRow[]};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};

@@ -278,7 +278,7 @@ async function transition(id: string, allowed: ServiceAgreement["status"][], sta
 export async function markAgreementSent(id: string, sentTo: string, sentBy: string, token: string, tokenExpiresAt: string) {
   if (!sentTo.trim()) throw new Error("A client delivery recipient is required.");
   if (!token) throw new Error("A secure agreement access token is required.");
-  return withImmediateAttentionPush(() => transition(id, ["Draft", "Sent"], "Sent", { sent_at: new Date().toISOString(), sent_to: sentTo.trim(), sent_by: sentBy.trim() || null, client_access_token: token, client_access_token_expires_at: tokenExpiresAt }));
+  return withImmediateAttentionPush(async()=>{const{data,error}=await getSupabaseClient().rpc("mark_service_agreement_sent_for_delivery",{p_agreement_id:id,p_sent_to:sentTo.trim(),p_sent_by:sentBy.trim(),p_token:token,p_token_expires_at:tokenExpiresAt});if(error)throw new Error(error.message);return data});
 }
 export const markAgreementAccepted = (id: string) => withImmediateAttentionPush(() => transition(id, ["Sent"], "Accepted", { accepted_at: new Date().toISOString() }));
 export async function activateAgreement(id: string) {

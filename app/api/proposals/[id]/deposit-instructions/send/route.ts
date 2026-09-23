@@ -1,0 +1,4 @@
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { sendPostConstructionDepositInstructions } from "@/lib/email/postConstructionDeposit";
+
+export async function POST(_request:Request,{params}:{params:Promise<{id:string}>}){try{const{id}=await params,supabase=await createSupabaseServerClient(),{data:{user}}=await supabase.auth.getUser();if(!user)return Response.json({error:"Authentication is required."},{status:401});const{data:profile}=await supabase.from("user_profiles").select("role,is_active").eq("id",user.id).single();if(!profile?.is_active||!["Master Admin","Administrator","Manager"].includes(profile.role))return Response.json({error:"Deposit instruction delivery permission denied."},{status:403});return Response.json(await sendPostConstructionDepositInstructions({proposalId:id}))}catch(error){return Response.json({error:error instanceof Error?error.message:"Deposit instructions could not be sent."},{status:400})}}
