@@ -39,7 +39,7 @@ const CONFIGS: ArchiveConfig[] = [
 
 const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> = {
   Clients: [["properties", "client_id"], ["estimates", "client_id"], ["walkthroughs", "client_id"], ["proposals", "client_id"], ["jobs", "client_id"], ["invoices", "client_id"], ["payments", "client_id"], ["expenses", "client_id"], ["mileage_entries", "client_id"], ["service_agreements", "client_id"]],
-  Properties: [["estimates", "property_id"], ["walkthroughs", "property_id"], ["proposals", "property_id"], ["jobs", "property_id"], ["invoices", "property_id"], ["expenses", "property_id"], ["mileage_entries", "property_id"], ["service_agreements", "property_id"]],
+  Properties: [["property_service_plans", "property_id"], ["estimates", "property_id"], ["walkthroughs", "property_id"], ["proposals", "property_id"], ["jobs", "property_id"], ["invoices", "property_id"], ["expenses", "property_id"], ["mileage_entries", "property_id"], ["service_agreements", "property_id"]],
   Estimates: [["walkthroughs", "estimate_id"], ["proposals", "estimate_id"], ["jobs", "estimate_id"]],
   Walkthroughs: [["proposals", "walkthrough_id"], ["jobs", "walkthrough_id"]],
   Proposals: [["jobs", "proposal_id"], ["invoices", "proposal_id"], ["proposal_history", "proposal_id"], ["service_agreements", "proposal_id"]],
@@ -80,13 +80,18 @@ export async function restoreArchivedRecord(record: ArchivedRecord): Promise<voi
 export async function canPermanentlyDeleteRecord(record: ArchivedRecord): Promise<ArchiveDeleteCheck> {
   const db = archiveDb();
   let dependencyCount = 0;
+  let propertyServicePlanCount = 0;
   for (const [table, column] of DEPENDENCIES[record.type] ?? []) {
     const { error, count } = await db.from(table).select("id", { count: "exact", head: true }).eq(column, record.id);
     if (error) throw new Error(`Dependency check failed: ${error.message}`);
-    dependencyCount += count ?? 0;
+    const relatedCount = count ?? 0;
+    dependencyCount += relatedCount;
+    if (record.type === "Properties" && table === "property_service_plans") propertyServicePlanCount = relatedCount;
   }
   return dependencyCount > 0
-    ? { allowed: false, dependencyCount, reason: "This record cannot be permanently deleted because it is linked to existing business records." }
+    ? { allowed: false, dependencyCount, reason: propertyServicePlanCount > 0
+      ? "This Property cannot be permanently deleted because it has a Property Service Plan. Permanently delete the eligible archived Service Plan first, or keep the Property archived."
+      : "This record cannot be permanently deleted because it is linked to existing business records." }
     : { allowed: true, dependencyCount: 0, reason: null };
 }
 

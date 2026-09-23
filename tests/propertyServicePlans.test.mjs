@@ -112,16 +112,34 @@ test("permanent deletion invokes RPC for management roles and surfaces foreign k
   await assert.rejects(api.deletePropertyServicePlan(planWithVisits), /associated Porter Visit/);
 });
 
-test("delete migration defines secure RPC with role authorization and visit protection", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/20260910000000_delete_property_service_plan.sql", import.meta.url), "utf8");
+test("forward deletion hardening requires an archived plan and preserves all Porter history", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20260923224528_fix_archived_property_plan_delete_dependency.sql", import.meta.url), "utf8");
   assert.match(sql, /create or replace function public\.delete_property_service_plan/);
   assert.match(sql, /security definer set search_path = ''/);
   assert.match(sql, /auth\.uid\(\) is null or not public\.has_any_role\(array\['Master Admin','Administrator','Manager'\]\)/);
-  assert.match(sql, /select count\(\*\) into v_visits_count from public\.property_service_visits where service_plan_id = p_id/);
+  assert.match(sql, /if v_old\.archived_at is null then/);
+  assert.match(sql, /Only an archived Property Service Plan can be permanently deleted/);
+  assert.match(sql, /select count\(\*\) into v_visits_count[\s\S]*from public\.property_service_visits[\s\S]*where service_plan_id = p_id/);
+  assert.match(sql, /Porter Visits and their routes, reports, photos, invoices, and other operational history must be retained/);
   assert.match(sql, /delete from public\.property_service_plan_areas where service_plan_id = p_id/);
   assert.match(sql, /delete from public\.property_service_plans where id = p_id/);
+  assert.doesNotMatch(sql, /on delete cascade/i);
   assert.match(sql, /revoke all on function public\.delete_property_service_plan\(uuid\) from public, anon, authenticated/);
   assert.match(sql, /grant execute on function public\.delete_property_service_plan\(uuid\) to authenticated/);
+});
+
+test("archived Property deletion reports the plan dependency before the foreign key does", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20260923224528_fix_archived_property_plan_delete_dependency.sql", import.meta.url), "utf8");
+  const archives = readFileSync(new URL("../lib/services/archives.ts", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../components/properties/PropertyServicePlansPage.tsx", import.meta.url), "utf8");
+  const dependencyMessage = "This Property cannot be permanently deleted because it has a Property Service Plan. Permanently delete the eligible archived Service Plan first, or keep the Property archived.";
+  assert.match(sql, /before delete on public\.properties/);
+  assert.match(sql, /from public\.property_service_plans plan[\s\S]*plan\.property_id = old\.id/);
+  assert.ok(sql.includes(dependencyMessage));
+  assert.match(archives, /Properties: \[\["property_service_plans", "property_id"\]/);
+  assert.ok(archives.includes(dependencyMessage));
+  assert.match(page, /plan\.archived_at && <button[\s\S]*Delete Permanently/);
+  assert.doesNotMatch(sql, /delete from public\.property_service_visits|delete from public\.porter_routes|delete from public\.invoices/);
 });
 
 test("common service area options constant is exported and includes standard options plus custom area", () => {

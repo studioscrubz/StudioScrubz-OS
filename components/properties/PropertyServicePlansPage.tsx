@@ -106,7 +106,7 @@ export function PropertyServicePlansPage() {
           <div className="mt-4 flex flex-wrap gap-3">
             {!plan.archived_at && <button type="button" className={button} disabled={busy} onClick={() => { setEditing(plan); setError(""); setNotice(""); }}>Edit Plan</button>}
             {!plan.archived_at && <button type="button" className={button} disabled={busy} onClick={() => void archive(plan)}>End &amp; Archive</button>}
-            <button type="button" className={button} disabled={busy} onClick={() => void removePlan(plan)}>Delete Plan</button>
+            {plan.archived_at && <button type="button" className={button} disabled={busy} onClick={() => void removePlan(plan)}>Delete Permanently</button>}
           </div>
         </article>;
       })}</div>}
