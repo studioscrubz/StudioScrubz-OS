@@ -3,7 +3,7 @@ import type { ArchiveDeleteCheck, ArchivedRecord, ArchiveRecordType } from "@/ty
 import { getCurrentProfile, getCurrentUser } from "@/lib/services/auth";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
-import { getArchivedJobs, restoreArchivedJob } from "@/lib/services/jobs";
+import { getArchivedJobs, getReopenableArchivedCancelledJobIds, restoreAndReopenCancelledJob, restoreArchivedJob } from "@/lib/services/jobs";
 import { OPERATIONAL_PHOTO_BUCKET } from "@/types/photo";
 
 type DbError = { message: string; code?: string };
@@ -58,13 +58,20 @@ export async function getArchivedRecords(): Promise<ArchivedRecord[]> {
   const db = archiveDb();
   const groups = await Promise.all(CONFIGS.map(async (config) => {
     if (config.type === "Jobs") {
-      return (await getArchivedJobs()).map((row) => toArchivedRecord(config, row as unknown as Record<string, unknown>));
+      const [jobs, reopenableIds] = await Promise.all([getArchivedJobs(), getReopenableArchivedCancelledJobIds()]);
+      const reopenable = new Set(reopenableIds);
+      return jobs.map((row) => ({ ...toArchivedRecord(config, row as unknown as Record<string, unknown>), canRestoreAndReopen: reopenable.has(row.id) }));
     }
     const { data, error } = await db.from(config.table).select("*").not("archived_at", "is", null).order("archived_at", { ascending: false });
     if (error) throw new Error(`${config.type} archives could not be loaded: ${error.message}`);
     return rows(data).map((row) => toArchivedRecord(config, row));
   }));
   return groups.flat().sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+}
+
+export async function restoreAndReopenArchivedJob(record: ArchivedRecord): Promise<void> {
+  if (record.type !== "Jobs" || !record.canRestoreAndReopen) throw new Error("Only an archived Cancelled Job can be restored and reopened.");
+  await restoreAndReopenCancelledJob(record.id);
 }
 
 export async function restoreArchivedRecord(record: ArchivedRecord): Promise<void> {

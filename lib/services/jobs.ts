@@ -468,6 +468,17 @@ async function requestJobAttentionPush(job: JobWithRelations) {
 function jobAttentionFieldsChanged(input: JobUpdate) {
   return "status" in input || "scheduled_date" in input || "assigned_crew_id" in input || "assigned_employee_id" in input;
 }
+export async function getReopenableArchivedCancelledJobIds(): Promise<string[]> {
+  const { data, error } = await getSupabaseClient().rpc("get_reopenable_archived_cancelled_job_ids");
+  if (error) throw new Error(safeDatabaseMessage(error, "Reopenable Cancelled Jobs could not be loaded."));
+  return data;
+}
+export async function restoreAndReopenCancelledJob(id: string): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("restore_and_reopen_cancelled_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "The Cancelled Job could not be restored and reopened."));
+  notifyAttentionRefresh();
+  return operationalJob(data);
+}
 export function jobWorkerTarget(job:Pick<Job,"assigned_employee_id"|"assigned_crew_id">):JobWorkerTarget{return job.assigned_employee_id?{kind:"individual",employeeId:job.assigned_employee_id}:job.assigned_crew_id?{kind:"crew",crewId:job.assigned_crew_id}:{kind:"unassigned"}}
 export function jobAssignmentLabel(job:Pick<Job,"assigned_employee_name"|"assigned_crew_name">){return job.assigned_employee_name||job.assigned_crew_name||"Unassigned"}
 export function displayJobStatus(status:JobStatus){return status==="Crew Assigned"?"Assigned":status}

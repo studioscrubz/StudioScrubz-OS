@@ -14,6 +14,7 @@ export type ArchivedRecord = {
   archivedAt: string;
   status: string;
   href: string;
+  canRestoreAndReopen?: boolean;
 };
 
 export type ArchiveDeleteCheck = {

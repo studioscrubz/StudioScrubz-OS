@@ -196,6 +196,7 @@ export interface Database {
       delete_property_service_plan: { Args: { p_id: string }; Returns: void };
       initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
       get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
+      archive_sales_assessment: { Args: { p_assessment_id: string }; Returns: Walkthrough };
       submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
       get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
@@ -242,6 +243,8 @@ export interface Database {
       archive_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       get_archived_operational_jobs:{Args:Record<string,never>;Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
       restore_archived_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
+      get_reopenable_archived_cancelled_job_ids:{Args:Record<string,never>;Returns:string[]};
+      restore_and_reopen_cancelled_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       start_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
       start_or_clock_in_to_job:{Args:{p_job_id:string};Returns:import("@/types/job").JobClockInResult};
       complete_in_progress_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
