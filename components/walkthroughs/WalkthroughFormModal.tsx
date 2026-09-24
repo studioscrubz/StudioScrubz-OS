@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createWalkthrough, getAvailableEstimates, getWalkthroughClients, getWalkthroughProperties, syncQualificationRecords, updateWalkthrough, WalkthroughDuplicateError } from "@/lib/services/walkthroughs";
+import { archiveWalkthrough, createWalkthrough, getAvailableEstimates, getWalkthroughClients, getWalkthroughProperties, syncQualificationRecords, updateWalkthrough, WalkthroughDuplicateError } from "@/lib/services/walkthroughs";
 import type { Client } from "@/types/client";
 import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughUpdate, WalkthroughWithRelations } from "@/types/walkthrough";
 import { EMPTY_MEASUREMENTS } from "@/types/walkthrough";
@@ -25,12 +25,13 @@ const scopeOptions = ["Floors", "Bathrooms", "Kitchen", "Windows", "Baseboards",
 const recommendationOptions = ["Deep cleaning recommended", "Recurring service recommended", "Additional crew recommended", "Special equipment required", "Pressure washing recommended", "Carpet service recommended"];
 const photoCategories: readonly WalkthroughPhotoCategory[] = ["General", "Exterior", "Interior", "Kitchen", "Bathroom", "Flooring", "Damage / Concern", "Other"];
 
-type Props = { walkthrough?: WalkthroughWithRelations; initialEstimate?: AvailableEstimate; onClose: () => void; onSaved: () => void; onViewDuplicate?: (walkthrough: WalkthroughWithRelations) => void };
+type Props = { walkthrough?: WalkthroughWithRelations; initialEstimate?: AvailableEstimate; onClose: () => void; onSaved: () => void; onArchived?: () => void; onViewDuplicate?: (walkthrough: WalkthroughWithRelations) => void };
 
-export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, onSaved, onViewDuplicate }: Props) {
+export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, onSaved, onArchived, onViewDuplicate }: Props) {
   const router = useRouter();
   const { profile } = useAuth();
   const canWritePhotos = Boolean(profile && ["Master Admin", "Administrator", "Sales"].includes(profile.role));
+  const canArchive = Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role));
   const [mode, setMode] = useState<"estimate" | "manual">(walkthrough?.estimate_id || initialEstimate ? "estimate" : "manual");
   const [estimates, setEstimates] = useState<AvailableEstimate[]>(initialEstimate ? [initialEstimate] : []);
   const [clients, setClients] = useState<Client[]>(walkthrough?.client ? [walkthrough.client] : []);
@@ -103,6 +104,14 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
       if (!walkthrough) router.push("/walkthroughs");
     }
     catch (caught) { console.error("Walkthrough save failed", caught); if (caught instanceof WalkthroughDuplicateError) setDuplicate(caught.walkthrough); else setError(message(caught, "The walkthrough could not be saved.")); }
+    finally { setSaving(false); }
+  }
+
+  async function archive() {
+    if (!walkthrough || !window.confirm("Archive this Assessment?")) return;
+    setSaving(true); setError(null);
+    try { await archiveWalkthrough(walkthrough.id); (onArchived ?? onSaved)(); }
+    catch (caught) { setError(message(caught, "The Assessment could not be archived.")); }
     finally { setSaving(false); }
   }
 
@@ -179,7 +188,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
       <ListEditor title="Scope" presets={scopeOptions} items={scope.map((item) => ({ id: item.id, text: item.label }))} custom={customScope} setCustom={setCustomScope} add={addScope} remove={(id) => setScope(scope.filter((item) => item.id !== id))} />
       <ListEditor title="Recommendations" presets={recommendationOptions} items={recommendations} custom={customRecommendation} setCustom={setCustomRecommendation} add={addRecommendation} remove={(id) => setRecommendations(recommendations.filter((item) => item.id !== id))} />
       {walkthrough ? <PhotoUploader recordType="walkthroughs" recordId={walkthrough.id} categories={photoCategories} title="Assessment Photos" readonly={!canWritePhotos} canDelete={canWritePhotos} /> : <Panel title="Assessment Photos"><div className="rounded-xl border border-dashed border-[#143d1a]/20 bg-[#f8faf7] px-6 py-8 text-center"><p className="text-sm font-bold text-[#143d1a]">Save this assessment before adding photos</p><p className="mt-1 text-sm text-neutral-500">Reopen the saved assessment to upload internal photos or create a customer submission link.</p></div></Panel>}
-      <footer className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={saving} className={secondaryClass}>Cancel</button><button type="button" onClick={() => void save()} disabled={saving || loading} className={secondaryClass}>{saving ? "Saving…" : walkthrough ? "Save Assessment" : "Create Assessment"}</button>{walkthrough && (status === "New" || status === "Scheduled") && (measurements.assessmentMethod??"In-Person Walkthrough")==="In-Person Walkthrough" && <button type="button" onClick={() => void save("Completed")} disabled={saving || loading} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">Submit Walkthrough</button>}{walkthrough && (status === "New" || status === "Scheduled") && measurements.assessmentMethod==="Customer Photo Submission" && measurements.photoSubmissionStatus==="Submitted" && <button type="button" onClick={() => void save("Completed")} disabled={saving || loading} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">Complete Assessment & Review Pricing</button>}</footer>
+      <footer className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">{walkthrough && !walkthrough.archived_at && walkthrough.status !== "Archived" && canArchive && <button type="button" onClick={() => void archive()} disabled={saving || loading} className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 disabled:opacity-50">Archive Assessment</button>}<button type="button" onClick={onClose} disabled={saving} className={secondaryClass}>Cancel</button><button type="button" onClick={() => void save()} disabled={saving || loading} className={secondaryClass}>{saving ? "Saving…" : walkthrough ? "Save Assessment" : "Create Assessment"}</button>{walkthrough && (status === "New" || status === "Scheduled") && (measurements.assessmentMethod??"In-Person Walkthrough")==="In-Person Walkthrough" && <button type="button" onClick={() => void save("Completed")} disabled={saving || loading} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">Submit Walkthrough</button>}{walkthrough && (status === "New" || status === "Scheduled") && measurements.assessmentMethod==="Customer Photo Submission" && measurements.photoSubmissionStatus==="Submitted" && <button type="button" onClick={() => void save("Completed")} disabled={saving || loading} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">Complete Assessment & Review Pricing</button>}</footer>
     </div></section></div>;
 }
 
