@@ -4,6 +4,7 @@ import { getCurrentProfile, getCurrentUser } from "@/lib/services/auth";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import { getArchivedJobs, restoreArchivedJob } from "@/lib/services/jobs";
+import { OPERATIONAL_PHOTO_BUCKET } from "@/types/photo";
 
 type DbError = { message: string; code?: string };
 type QueryResult = { data: unknown; error: DbError | null; count?: number | null };
@@ -38,7 +39,7 @@ const CONFIGS: ArchiveConfig[] = [
 ];
 
 const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> = {
-  Clients: [["properties", "client_id"], ["estimates", "client_id"], ["walkthroughs", "client_id"], ["proposals", "client_id"], ["jobs", "client_id"], ["invoices", "client_id"], ["payments", "client_id"], ["expenses", "client_id"], ["mileage_entries", "client_id"], ["service_agreements", "client_id"]],
+  Clients: [["property_service_plans", "client_id"], ["properties", "client_id"], ["estimates", "client_id"], ["proposals", "client_id"], ["jobs", "client_id"], ["invoices", "client_id"], ["payments", "client_id"], ["expenses", "client_id"], ["mileage_entries", "client_id"], ["service_agreements", "client_id"]],
   Properties: [["property_service_plans", "property_id"], ["estimates", "property_id"], ["walkthroughs", "property_id"], ["proposals", "property_id"], ["jobs", "property_id"], ["invoices", "property_id"], ["expenses", "property_id"], ["mileage_entries", "property_id"], ["service_agreements", "property_id"]],
   Estimates: [["walkthroughs", "estimate_id"], ["proposals", "estimate_id"], ["jobs", "estimate_id"]],
   Walkthroughs: [["proposals", "walkthrough_id"], ["jobs", "walkthrough_id"]],
@@ -81,16 +82,20 @@ export async function canPermanentlyDeleteRecord(record: ArchivedRecord): Promis
   const db = archiveDb();
   let dependencyCount = 0;
   let propertyServicePlanCount = 0;
+  let clientServicePlanCount = 0;
   for (const [table, column] of DEPENDENCIES[record.type] ?? []) {
     const { error, count } = await db.from(table).select("id", { count: "exact", head: true }).eq(column, record.id);
     if (error) throw new Error(`Dependency check failed: ${error.message}`);
     const relatedCount = count ?? 0;
     dependencyCount += relatedCount;
     if (record.type === "Properties" && table === "property_service_plans") propertyServicePlanCount = relatedCount;
+    if (record.type === "Clients" && table === "property_service_plans") clientServicePlanCount = relatedCount;
   }
   return dependencyCount > 0
     ? { allowed: false, dependencyCount, reason: propertyServicePlanCount > 0
       ? "This Property cannot be permanently deleted because it has a Property Service Plan. Permanently delete the eligible archived Service Plan first, or keep the Property archived."
+      : clientServicePlanCount > 0
+        ? "This Client cannot be permanently deleted because it has a Property Service Plan. Permanently delete the eligible archived Service Plan first, or keep the Client archived."
       : "This record cannot be permanently deleted because it is linked to existing business records." }
     : { allowed: true, dependencyCount: 0, reason: null };
 }
@@ -100,12 +105,29 @@ export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): P
   if (!user) throw new Error("You must be signed in to permanently delete archived records.");
   const profile = await getCurrentProfile(user.id);
   if (!canPermanentlyDelete(profile)) throw new Error("Master Admin authorization is required for permanent deletion.");
-  const { error } = await getSupabaseClient().rpc("master_admin_permanently_delete_archived_record", {
+  const client = getSupabaseClient();
+  const assessmentPhotoPaths = record.type === "Clients" ? await getClientAssessmentPhotoPaths(client, record.id) : [];
+  const { error } = await client.rpc("master_admin_permanently_delete_archived_record", {
     p_record_type: record.type,
     p_record_id: record.id,
   });
   if (error) throw new Error(error.message || "Permanent deletion was rejected.");
+  if (assessmentPhotoPaths.length) {
+    const { error: storageError } = await client.storage.from(OPERATIONAL_PHOTO_BUCKET).remove(assessmentPhotoPaths);
+    if (storageError) console.error("Deleted Client Assessment photo cleanup failed", { clientId: record.id, photoCount: assessmentPhotoPaths.length, message: storageError.message });
+  }
   notifyAttentionRefresh();
+}
+
+async function getClientAssessmentPhotoPaths(client: ReturnType<typeof getSupabaseClient>, clientId: string): Promise<string[]> {
+  const { data, error } = await client.from("walkthroughs").select("id,photos").eq("client_id", clientId);
+  if (error) throw new Error(`Assessment photo cleanup could not be prepared: ${error.message}`);
+  const prefixById = new Map((data ?? []).map((assessment) => [assessment.id, `walkthroughs/${assessment.id}/`]));
+  const paths = (data ?? []).flatMap((assessment) => Array.isArray(assessment.photos) ? assessment.photos.map((photo) => {
+    if (!photo || typeof photo !== "object" || !("storagePath" in photo) || typeof photo.storagePath !== "string") return null;
+    return photo.storagePath.startsWith(prefixById.get(assessment.id) ?? "\0") ? photo.storagePath : null;
+  }) : []);
+  return [...new Set(paths.filter((path): path is string => Boolean(path)))];
 }
 
 function archiveDb() { return getSupabaseClient() as unknown as ArchiveDb; }
