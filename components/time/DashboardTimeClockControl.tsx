@@ -44,24 +44,18 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
     finally { setBusy(false); }
   }
 
-  return <section className="mt-6 rounded-2xl border border-[#143d1a]/15 bg-[#f6f8f5] p-5 shadow-sm">
-    <h2 className="text-xs font-extrabold uppercase tracking-[.14em] text-[#143d1a]">My Availability</h2>
-    {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
-    {loading ? <p className="mt-3 text-sm text-neutral-500">Loading status...</p> : jobEntry ? <div className="mt-3">
-      <button type="button" disabled aria-pressed="true" className="min-h-12 rounded-xl bg-[#143d1a] px-5 py-3 font-extrabold text-white opacity-70">ACTIVE</button>
-      <p className="font-extrabold text-amber-700">● ON JOB · UNAVAILABLE</p>
-      <p className="mt-1 text-lg font-extrabold text-[#143d1a]">{jobEntry.job_number ?? "Assigned Job"}</p>
-      <p className="mt-1 text-sm text-neutral-600">Time on this Job · {elapsed(now - Date.parse(jobEntry.clock_in))}</p>
-      <Link href={`/jobs?jobId=${jobEntry.job_id}`} className="mt-4 inline-flex min-h-12 items-center justify-center rounded-xl border border-[#143d1a] px-5 py-3 font-extrabold text-[#143d1a]">OPEN JOB</Link>
-      <p className="mt-3 text-xs text-neutral-500">End this Job before deactivating.</p>
-    </div> : session ? <div className="mt-3">
-      <p className="font-extrabold text-emerald-700">● ACTIVE · AVAILABLE</p>
-      <p className="mt-1 text-sm text-neutral-600">Platform presence only. No payroll time is running.</p>
-      <button type="button" disabled={busy} aria-pressed="true" onClick={() => void toggle()} className="mt-3 min-h-12 rounded-xl bg-[#143d1a] px-5 py-3 font-extrabold text-white disabled:opacity-60">{busy ? "DEACTIVATING…" : "ACTIVE"}</button>
-    </div> : <div className="mt-3">
-      <p className="font-bold text-neutral-600">OFFLINE</p>
-      <button type="button" disabled={busy} aria-pressed="false" onClick={() => void toggle()} className="mt-4 min-h-12 rounded-xl border border-[#143d1a] bg-white px-5 py-3 font-extrabold text-[#143d1a] disabled:opacity-60">{busy ? "ACTIVATING…" : "INACTIVE"}</button>
-    </div>}
+  return <section className="mt-4 rounded-2xl border border-[#143d1a]/15 bg-[#f6f8f5] px-4 py-3 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-xs font-extrabold uppercase tracking-[.14em] text-[#143d1a]">My Availability</h2>
+      {loading ? <span className="text-xs text-neutral-500">Loading status...</span> : jobEntry ? <span className="inline-flex items-center gap-2 text-xs font-extrabold text-amber-700"><span aria-hidden="true" className="size-2 rounded-full bg-amber-500"/>On Job · Unavailable</span> : session ? <button type="button" disabled={busy} aria-pressed="true" onClick={() => void toggle()} className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 disabled:opacity-60"><span aria-hidden="true" className="size-2 rounded-full bg-emerald-500"/>{busy ? "Deactivating…" : "Active · Available"}</button> : <button type="button" disabled={busy} aria-pressed="false" onClick={() => void toggle()} className="inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-extrabold text-neutral-600 disabled:opacity-60"><span aria-hidden="true" className="size-2 rounded-full bg-neutral-400"/>{busy ? "Activating…" : "Inactive"}</button>}
+    </div>
+    {error && <p role="alert" className="mt-2 rounded-lg bg-red-50 p-2 text-sm font-bold text-red-700">{error}</p>}
+    {!loading && jobEntry ? <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <p className="font-extrabold text-[#143d1a]">{jobEntry.job_number ?? "Assigned Job"}</p>
+      <p className="text-neutral-600">Time on this Job · {elapsed(now - Date.parse(jobEntry.clock_in))}</p>
+      <Link href={`/jobs?jobId=${jobEntry.job_id}`} className="rounded-lg border border-[#143d1a] bg-white px-3 py-1.5 text-xs font-extrabold text-[#143d1a]">Open Job</Link>
+      <p className="w-full text-xs text-neutral-500">End this Job before deactivating.</p>
+    </div> : !loading && session ? <p className="mt-1 text-xs text-neutral-600">Presence only — no payroll time running.</p> : null}
   </section>;
 }
 
