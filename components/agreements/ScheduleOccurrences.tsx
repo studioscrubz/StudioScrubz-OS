@@ -18,6 +18,7 @@ export function ScheduleOccurrences() {
   const [error, setError] = useState(false);
 
   async function load() {
+    if (!canCreateJobs) return;
     const records = await getUpcomingOccurrences(day(), add(day(), 60));
 
     setRows(
@@ -38,6 +39,7 @@ export function ScheduleOccurrences() {
   );
 
   useEffect(() => {
+    if (!canCreateJobs) return;
     let active = true;
 
     void getUpcomingOccurrences(day(), add(day(), 60))
@@ -60,7 +62,7 @@ export function ScheduleOccurrences() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [canCreateJobs]);
 
   async function create(id: string) {
     try {
@@ -73,6 +75,8 @@ export function ScheduleOccurrences() {
       setError(true);
     }
   }
+
+  if (!canCreateJobs) return null;
 
   return (
     <section className="mt-6 rounded-2xl border border-dashed bg-white p-5">

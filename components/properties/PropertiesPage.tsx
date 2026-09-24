@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PropertyFormModal, clientDisplayName } from "./PropertyFormModal";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import {
   archiveProperty,
   createProperty,
@@ -23,6 +25,10 @@ type TypeFilter = "All" | PropertyType;
 type ArchiveFilter = "Active Records" | "Archived Records" | "All Records";
 
 export function PropertiesPage() {
+  const { profile } = useAuth();
+  const canCreate = hasPermission(profile, "properties.create");
+  const canEdit = hasPermission(profile, "properties.edit");
+  const canArchive = hasPermission(profile, "properties.archive");
   const [properties, setProperties] = useState<PropertyWithClient[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,7 +224,7 @@ export function PropertiesPage() {
       <div className="flex flex-col gap-5 border-b border-[#143d1a]/10 pb-7 sm:flex-row sm:items-end sm:justify-between sm:pb-8">
         <Header />
 
-        <button
+        {canCreate && <button
           type="button"
           onClick={() => {
             setNotice(null);
@@ -228,7 +234,7 @@ export function PropertiesPage() {
           className="shrink-0 rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)] hover:bg-[#0d2b12] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Add Property
-        </button>
+        </button>}
       </div>
 
       {notice && (
@@ -241,7 +247,7 @@ export function PropertiesPage() {
 
       {error && <Message kind="error" text={error} />}
 
-      {!loading && clients.length === 0 && !error && (
+      {canCreate && !loading && clients.length === 0 && !error && (
         <Message
           kind="error"
           text="Add a client before creating a property. Properties must be linked to an existing client."
@@ -309,15 +315,15 @@ export function PropertiesPage() {
         ) : filtered.length === 0 ? (
           <Empty
             hasRecords={properties.length > 0}
-            canAdd={clients.length > 0}
+            canAdd={canCreate && clients.length > 0}
             add={() => setFormProperty(null)}
           />
         ) : (
           <PropertyTable
             properties={filtered}
             archivingId={archivingId}
-            edit={setFormProperty}
-            archive={handleArchive}
+            edit={canEdit ? setFormProperty : undefined}
+            archive={canArchive ? handleArchive : undefined}
           />
         )}
       </section>
@@ -453,8 +459,8 @@ function PropertyTable({
 }: {
   properties: PropertyWithClient[];
   archivingId: string | null;
-  edit: (property: PropertyWithClient) => void;
-  archive: (property: PropertyWithClient) => Promise<void>;
+  edit?: (property: PropertyWithClient) => void;
+  archive?: (property: PropertyWithClient) => Promise<void>;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -522,15 +528,15 @@ function PropertyTable({
 
               <td className="px-5 py-4">
                 <div className="flex justify-end gap-2">
-                  <button
+                  {edit && <button
                     type="button"
                     onClick={() => edit(property)}
                     className={actionClass}
                   >
                     Edit
-                  </button>
+                  </button>}
 
-                  {!property.archived_at && (
+                  {archive && !property.archived_at && (
                     <button
                       type="button"
                       disabled={archivingId === property.id}

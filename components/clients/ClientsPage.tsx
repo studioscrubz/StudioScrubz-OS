@@ -5,6 +5,8 @@ import { ClientFormModal } from "./ClientFormModal";
 import { ClientDetailModal } from "./ClientDetailModal";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { archiveClient, createClient, findPotentialDuplicateClients, getClients, updateClient } from "@/lib/services/clients";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { hasPermission } from "@/lib/auth/permissions";
 import { CLIENT_STATUSES, CLIENT_TYPES, type Client, type ClientInput, type ClientStatus, type ClientType } from "@/types/client";
 
 type TypeFilter = "All" | ClientType;
@@ -12,6 +14,10 @@ type StatusFilter = "All" | ClientStatus;
 type ArchiveFilter = "Active Records" | "Archived Records" | "All Records";
 
 export function ClientsPage() {
+  const { profile } = useAuth();
+  const canCreate = hasPermission(profile, "clients.create");
+  const canEdit = hasPermission(profile, "clients.edit");
+  const canArchive = hasPermission(profile, "clients.archive");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +153,7 @@ export function ClientsPage() {
     <>
       <div className="flex flex-col gap-5 border-b border-[#143d1a]/10 pb-7 sm:flex-row sm:items-end sm:justify-between sm:pb-8">
         <PageHeaderContent />
-        <button type="button" onClick={() => { setNotice(null); setFormClient(null); }} className="shrink-0 rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)] hover:bg-[#0d2b12]">Add Client</button>
+        {canCreate && <button type="button" onClick={() => { setNotice(null); setFormClient(null); }} className="shrink-0 rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)] hover:bg-[#0d2b12]">Add Client</button>}
       </div>
 
       {notice && <div role="status" className="mt-6 flex items-center justify-between rounded-xl border border-[#143d1a]/15 bg-[#edf4ec] px-4 py-3 text-sm font-semibold text-[#143d1a]"><span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss message" className="text-lg text-[#143d1a]/50">×</button></div>}
@@ -169,11 +175,11 @@ export function ClientsPage() {
           <Filter label="Archived records" value={archiveFilter} onChange={(value) => setArchiveFilter(value as ArchiveFilter)} options={["Active Records", "Archived Records", "All Records"]} />
         </div>
 
-        {loading ? <LoadingState /> : filteredClients.length === 0 ? <EmptyState hasClients={clients.length > 0} onAdd={() => setFormClient(null)} /> : <ClientList clients={filteredClients} archivingId={archivingId} onView={setDetailClient} onEdit={setFormClient} onArchive={handleArchive} />}
+        {loading ? <LoadingState /> : filteredClients.length === 0 ? <EmptyState hasClients={clients.length > 0} canAdd={canCreate} onAdd={() => setFormClient(null)} /> : <ClientList clients={filteredClients} archivingId={archivingId} onView={setDetailClient} onEdit={canEdit ? setFormClient : undefined} onArchive={canArchive ? handleArchive : undefined} />}
       </section>
 
       {formClient !== undefined && <ClientFormModal key={formClient?.id ?? "new"} client={formClient} saving={saving} onClose={() => { if (!saving) setFormClient(undefined); }} onSubmit={handleSubmit} />}
-      {detailClient && <ClientDetailModal client={detailClient} initialServiceId={reminderServiceId} onClose={() => { setDetailClient(null); setReminderServiceId(undefined); }} onEdit={() => { setFormClient(detailClient); setDetailClient(null); }} />}
+      {detailClient && <ClientDetailModal client={detailClient} initialServiceId={reminderServiceId} onClose={() => { setDetailClient(null); setReminderServiceId(undefined); }} onEdit={canEdit ? () => { setFormClient(detailClient); setDetailClient(null); } : undefined} />}
       {duplicateInput && <DuplicateWarning matches={duplicateMatches} saving={saving} onCancel={() => { setDuplicateInput(null); setDuplicateMatches([]); }} onContinue={continueDuplicate} />}
     </>
   );
@@ -191,7 +197,7 @@ function Filter({ label, value, onChange, options }: { label: string; value: str
   return <label><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={filterClass}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
 }
 
-function ClientList({ clients, archivingId, onView, onEdit, onArchive }: { clients: Client[]; archivingId: string | null; onView: (client: Client) => void; onEdit: (client: Client) => void; onArchive: (client: Client) => Promise<void> }) {
+function ClientList({ clients, archivingId, onView, onEdit, onArchive }: { clients: Client[]; archivingId: string | null; onView: (client: Client) => void; onEdit?: (client: Client) => void; onArchive?: (client: Client) => Promise<void> }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[850px] border-collapse text-left">
@@ -202,7 +208,7 @@ function ClientList({ clients, archivingId, onView, onEdit, onArchive }: { clien
             <td className="px-5 py-4 text-sm text-neutral-600">{client.client_type}</td>
             <td className="px-5 py-4"><p className="text-sm text-neutral-700">{client.email || "—"}</p><p className="mt-1 text-xs text-neutral-500">{client.phone || "—"}</p></td>
             <td className="px-5 py-4"><StatusBadge status={client.status} /></td>
-            <td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => onView(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">View</button><button type="button" onClick={() => onEdit(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">Edit</button>{!client.archived_at && <button type="button" disabled={archivingId === client.id} onClick={() => void onArchive(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">{archivingId === client.id ? "Archiving…" : "Archive"}</button>}</div></td>
+            <td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => onView(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">View</button>{onEdit && <button type="button" onClick={() => onEdit(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] hover:bg-[#f3f6f2]">Edit</button>}{onArchive && !client.archived_at && <button type="button" disabled={archivingId === client.id} onClick={() => void onArchive(client)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">{archivingId === client.id ? "Archiving…" : "Archive"}</button>}</div></td>
           </tr>
         ))}</tbody>
       </table>
@@ -217,8 +223,8 @@ function StatusBadge({ status }: { status: ClientStatus }) {
 
 function LoadingState() { return <div className="space-y-3 p-5" aria-label="Loading clients"><div className="h-16 animate-pulse rounded-xl bg-neutral-100" /><div className="h-16 animate-pulse rounded-xl bg-neutral-100" /><div className="h-16 animate-pulse rounded-xl bg-neutral-100" /></div>; }
 
-function EmptyState({ hasClients, onAdd }: { hasClients: boolean; onAdd: () => void }) {
-  return <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><span aria-hidden className="mb-5 h-1 w-10 rounded-full bg-[#d4af37]" /><h2 className="text-base font-extrabold text-[#143d1a]">{hasClients ? "No clients match these filters" : "No clients yet"}</h2><p className="mt-2 max-w-sm text-sm leading-6 text-neutral-500">{hasClients ? "Adjust the search or filters to see other records." : "Add the first StudioScrubz client to get started."}</p>{!hasClients && <button type="button" onClick={onAdd} className="mt-5 rounded-lg border border-[#143d1a]/20 px-4 py-2 text-sm font-bold text-[#143d1a] hover:bg-[#f3f6f2]">Add Client</button>}</div>;
+function EmptyState({ hasClients, canAdd, onAdd }: { hasClients: boolean; canAdd: boolean; onAdd: () => void }) {
+  return <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><span aria-hidden className="mb-5 h-1 w-10 rounded-full bg-[#d4af37]" /><h2 className="text-base font-extrabold text-[#143d1a]">{hasClients ? "No clients match these filters" : "No clients yet"}</h2><p className="mt-2 max-w-sm text-sm leading-6 text-neutral-500">{hasClients ? "Adjust the search or filters to see other records." : canAdd ? "Add the first StudioScrubz client to get started." : "No assigned clients are available."}</p>{!hasClients && canAdd && <button type="button" onClick={onAdd} className="mt-5 rounded-lg border border-[#143d1a]/20 px-4 py-2 text-sm font-bold text-[#143d1a] hover:bg-[#f3f6f2]">Add Client</button>}</div>;
 }
 
 function DuplicateWarning({ matches, saving, onCancel, onContinue }: { matches: Client[]; saving: boolean; onCancel: () => void; onContinue: () => Promise<void> }) {
