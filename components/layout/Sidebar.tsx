@@ -74,7 +74,6 @@ const navItems: Array<NavLink | NavGroup> = [
     ],
   },
   { label: "Vendor Packets", href: "/vendor-packets", marker: "V", permission: "estimates.create" },
-  { label: "Applications", href: "/applications", marker: "A", permission: "jobApplications.manage" },
   {
     label: "Employees",
     marker: "E",
@@ -83,6 +82,7 @@ const navItems: Array<NavLink | NavGroup> = [
       { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "", permission: "employees.view" },
       { label: "Sales", href: "/employees/sales", marker: "", permission: "employees.view" },
       { label: "Administration / Management", href: "/employees/administration", marker: "", permission: "employees.view" },
+      { label: "Applications", href: "/applications", marker: "", permission: "jobApplications.manage" },
       { label: "Time Clock", href: "/time-clock", marker: "", permission: "timeClock.view" },
     ],
   },

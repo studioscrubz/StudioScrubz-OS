@@ -14,8 +14,14 @@ const schema = read("supabase/migrations/20260924142944_lead_generator_applicati
 test("Applications is the canonical management route and old bookmarks permanently redirect", () => {
   assert.match(page, /<JobApplicationsPage \/>/);
   assert.match(legacyPage, /permanentRedirect\("\/applications"\)/);
-  assert.match(sidebar, /label: "Applications", href: "\/applications"/);
   assert.doesNotMatch(sidebar, /href: "\/lead-generator-applications"/);
+});
+
+test("Applications is a permission-filtered child of Employees after employee management links", () => {
+  const employeesGroup = sidebar.match(/label: "Employees",[\s\S]*?children: \[([\s\S]*?)\n    \],/)?.[1] ?? "";
+  assert.match(employeesGroup, /label: "Applications", href: "\/applications", marker: "", permission: "jobApplications\.manage"/);
+  assert.ok(employeesGroup.indexOf('href: "/employees/administration"') < employeesGroup.indexOf('href: "/applications"'));
+  assert.equal(sidebar.match(/href: "\/applications"/g)?.length, 1);
 });
 
 test("canonical and legacy routes retain the management-only permission", () => {
