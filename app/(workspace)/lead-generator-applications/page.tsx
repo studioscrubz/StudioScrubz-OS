@@ -1,2 +1,5 @@
-import { JobApplicationsPage } from "@/components/recruiting/JobApplicationsPage";
-export default function Page(){return <JobApplicationsPage/>}
+import { permanentRedirect } from "next/navigation";
+
+export default function Page() {
+  permanentRedirect("/applications");
+}

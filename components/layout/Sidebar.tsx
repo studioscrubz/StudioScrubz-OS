@@ -74,7 +74,7 @@ const navItems: Array<NavLink | NavGroup> = [
     ],
   },
   { label: "Vendor Packets", href: "/vendor-packets", marker: "V", permission: "estimates.create" },
-  { label: "Lead Generator Applications", href: "/lead-generator-applications", marker: "L", permission: "jobApplications.manage" },
+  { label: "Applications", href: "/applications", marker: "A", permission: "jobApplications.manage" },
   {
     label: "Employees",
     marker: "E",

@@ -176,6 +176,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/properties/service-reports", "porterVisits.manage"],
   ["/properties/porter-visits", "porterVisits.view"],
   ["/properties/service-plans", "propertyServicePlans.manage"],
+  ["/applications", "jobApplications.manage"],
   ["/lead-generator-applications", "jobApplications.manage"],
 
   ["/field-walkthroughs", "walkthroughs.field"],
