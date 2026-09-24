@@ -34,7 +34,7 @@ export function PropertyServicePlansPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
+  const [view, setView] = useState<"active" | "archived">("active");
   const [editing, setEditing] = useState<PropertyServicePlanWithAreas | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
 
@@ -83,7 +83,8 @@ export function PropertyServicePlansPage() {
   const visible = plans.filter(plan => {
     const property = options.properties.find(p => p.id === plan.property_id);
     const text = [plan.name, plan.status, property ? propertyLabel(property) : "", clientLabel(property)].join(" ");
-    return (showArchived || !plan.archived_at) && text.toLowerCase().includes(search.toLowerCase());
+    const matchesView = view === "archived" ? Boolean(plan.archived_at) : !plan.archived_at;
+    return matchesView && text.toLowerCase().includes(search.toLowerCase());
   });
   return <>
     <Link href="/properties" className="text-sm font-bold text-[#143d1a]">Back to Properties</Link>
@@ -95,11 +96,11 @@ export function PropertyServicePlansPage() {
     {notice && <p role="status" className="mt-5 rounded-lg bg-green-50 p-4 text-sm text-[#143d1a]">{notice}</p>}
     {editing !== undefined && <PlanEditor key={editing?.id ?? "new"} plan={editing} options={options} busy={busy} save={save} close={() => setEditing(undefined)} />}
     <section className="mt-6 rounded-2xl border border-[#143d1a]/10 bg-white p-5">
-      <div className="flex flex-wrap items-center gap-4"><label className="flex-1 text-sm font-bold">Search plans<input className={field} type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Plan, property, client, or status"/></label><label className="text-sm"><input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)}/> Include archived</label><button type="button" className={button} disabled={busy || loading} onClick={() => { setError(""); void refresh().catch(error => setError(message(error))); }}>Refresh</button></div>
+      <div className="flex flex-wrap items-end gap-4"><label className="min-w-64 flex-1 text-sm font-bold">Search plans<input className={field} type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Plan, property, client, or status"/></label><div className="flex rounded-lg border border-[#143d1a]/20 p-1" role="tablist" aria-label="Property Service Plan status"><button type="button" role="tab" aria-selected={view === "active"} className={`${button} border-0 ${view === "active" ? "bg-[#143d1a] text-white" : ""}`} onClick={() => setView("active")}>Active</button><button type="button" role="tab" aria-selected={view === "archived"} className={`${button} border-0 ${view === "archived" ? "bg-[#143d1a] text-white" : ""}`} onClick={() => setView("archived")}>Archived</button></div><button type="button" className={button} disabled={busy || loading} onClick={() => { setError(""); void refresh().catch(error => setError(message(error))); }}>Refresh</button></div>
       {loading ? <p className="py-8">Loading plans…</p> : visible.length === 0 ? <p className="py-8 text-neutral-600">No Property Service Plans match this view.</p> : <div className="mt-5 grid gap-4 lg:grid-cols-2">{visible.map(plan => {
         const property = options.properties.find(p => p.id === plan.property_id);
         return <article key={plan.id} className="rounded-xl border border-neutral-200 p-5">
-          <p className="text-xs font-bold text-[#9a7a17]">{plan.archived_at ? "Archived" : plan.status}</p><h2 className="mt-1 text-xl font-extrabold text-[#143d1a]">{plan.name}</h2>
+          <p className="text-xs font-bold text-[#9a7a17]">{plan.archived_at ? `Archived · ${plan.status}` : plan.status}</p><h2 className="mt-1 text-xl font-extrabold text-[#143d1a]">{plan.name}</h2>
           <p className="mt-2 text-sm">{property ? propertyLabel(property) : "Property unavailable"} · {clientLabel(property)}</p>
           <p className="mt-2 text-sm text-neutral-600">{plan.frequency}{plan.service_days.length ? ` · ${plan.service_days.map(day => PLAN_DAYS[day - 1]).join(", ")}` : ""}</p>
           <p className="mt-2 text-sm text-neutral-600">{plan.start_date}{plan.end_date ? ` through ${plan.end_date}` : " · No end date"} · {plan.areas.filter(area => area.active).length} active areas</p>

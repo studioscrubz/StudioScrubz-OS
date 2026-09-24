@@ -142,6 +142,45 @@ test("archived Property deletion reports the plan dependency before the foreign 
   assert.doesNotMatch(sql, /delete from public\.property_service_visits|delete from public\.porter_routes|delete from public\.invoices/);
 });
 
+test("archived Client deletion uses the same defensive plan dependency pattern", () => {
+  const propertySql = readFileSync(new URL("../supabase/migrations/20260923224528_fix_archived_property_plan_delete_dependency.sql", import.meta.url), "utf8");
+  const clientSql = readFileSync(new URL("../supabase/migrations/20260924011144_fix_archived_client_plan_delete_dependency.sql", import.meta.url), "utf8");
+  const archives = readFileSync(new URL("../lib/services/archives.ts", import.meta.url), "utf8");
+  const dependencyMessage = "This Client cannot be permanently deleted because it has a Property Service Plan. Permanently delete the eligible archived Service Plan first, or keep the Client archived.";
+  assert.match(clientSql, /create or replace function private\.prevent_client_delete_with_service_plan\(\)/);
+  assert.match(clientSql, /security invoker[\s\S]*set search_path = ''/);
+  assert.match(clientSql, /from public\.property_service_plans plan[\s\S]*plan\.client_id = old\.id/);
+  assert.match(clientSql, /create trigger clients_prevent_service_plan_delete[\s\S]*before delete on public\.clients/);
+  assert.ok(clientSql.includes(dependencyMessage));
+  assert.match(clientSql, /revoke all on function private\.prevent_client_delete_with_service_plan\(\)[\s\S]*from public, anon, authenticated/);
+  assert.doesNotMatch(clientSql, /on delete cascade|delete from public\./i);
+  assert.match(archives, /Clients: \[\["property_service_plans", "client_id"\]/);
+  assert.ok(archives.includes(dependencyMessage));
+  assert.match(propertySql, /before delete on public\.properties/);
+  assert.match(propertySql, /Only an archived Property Service Plan can be permanently deleted/);
+  assert.match(propertySql, /Porter Visits and their routes, reports, photos, invoices, and other operational history must be retained/);
+});
+
+test("Service Plans page exposes separate searchable Active and Archived views", () => {
+  const page = readFileSync(new URL("../components/properties/PropertyServicePlansPage.tsx", import.meta.url), "utf8");
+  const serviceSource = readFileSync(new URL("../lib/services/propertyServicePlans.ts", import.meta.url), "utf8");
+  const propertySource = readFileSync(new URL("../lib/services/properties.ts", import.meta.url), "utf8");
+  assert.match(page, /useState<"active" \| "archived">\("active"\)/);
+  assert.match(page, /role="tab"[\s\S]*>Active<[\s\S]*role="tab"[\s\S]*>Archived</);
+  assert.match(page, /view === "archived" \? Boolean\(plan\.archived_at\) : !plan\.archived_at/);
+  assert.match(page, /\[plan\.name, plan\.status, property \? propertyLabel\(property\) : "", clientLabel\(property\)\]/);
+  assert.match(page, /Archived · \$\{plan\.status\}/);
+  assert.match(page, /listPropertyServicePlans\(true\)/);
+  assert.match(serviceSource, /if \(!includeArchived\) query = query\.is\("archived_at", null\)/);
+  assert.match(page, /Promise\.all\(\[listPropertyServicePlans\(true\), getProperties\(\)/);
+  assert.match(propertySource, /client:clients!properties_client_id_fkey\(\*\)/);
+  assert.doesNotMatch(propertySource, /getProperties[\s\S]{0,500}\.is\("archived_at", null\)/);
+  assert.match(page, /const allowed = hasPermission\(profile, "propertyServicePlans\.manage"\)/);
+  assert.match(page, /plan\.archived_at && <button[\s\S]*Delete Permanently/);
+  assert.match(page, /await deletePropertyServicePlan\(plan\)/);
+  assert.match(page, /setPlans\(rows => rows\.filter\(row => row\.id !== plan\.id\)\)/);
+});
+
 test("common service area options constant is exported and includes standard options plus custom area", () => {
   assert.ok(Array.isArray(models.COMMON_SERVICE_AREA_OPTIONS));
   assert.ok(models.COMMON_SERVICE_AREA_OPTIONS.includes("Lobby / Entrance"));
