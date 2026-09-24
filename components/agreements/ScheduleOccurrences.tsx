@@ -15,22 +15,28 @@ export function ScheduleOccurrences() {
   const { profile } = useAuth();
   const canCreateJobs = hasPermission(profile, "jobs.create");
   const [rows, setRows] = useState<ServiceOccurrenceWithRelations[]>([]);
-  const [error, setError] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function load() {
     if (!canCreateJobs) return;
-    const records = await getUpcomingOccurrences(day(), add(day(), 60));
+    try {
+      const records = await getUpcomingOccurrences(day(), add(day(), 60));
 
-    setRows(
-      records.filter(
-        (row) =>
-          row.agreement.status === "Active" &&
-          !row.job_id &&
-          !["Skipped", "Cancelled"].includes(row.status)
-      )
-    );
+      setRows(
+        records.filter(
+          (row) =>
+            row.agreement.status === "Active" &&
+            !row.job_id &&
+            !["Skipped", "Cancelled"].includes(row.status)
+        )
+      );
 
-    setError(false);
+      setLoadError(null);
+    } catch (cause: unknown) {
+      console.error("Recurring services failed to load", cause);
+      setLoadError(message(cause));
+    }
   }
 
   useOperationalRealtime(
@@ -45,6 +51,7 @@ export function ScheduleOccurrences() {
     void getUpcomingOccurrences(day(), add(day(), 60))
       .then((records) => {
         if (active) {
+          setLoadError(null);
           setRows(
             records.filter(
               (row) =>
@@ -55,8 +62,9 @@ export function ScheduleOccurrences() {
           );
         }
       })
-      .catch(() => {
-        if (active) setError(true);
+      .catch((cause: unknown) => {
+        console.error("Recurring services failed to load", cause);
+        if (active) setLoadError(message(cause));
       });
 
     return () => {
@@ -65,14 +73,17 @@ export function ScheduleOccurrences() {
   }, [canCreateJobs]);
 
   async function create(id: string) {
+    setActionError(null);
+
     try {
       await createJobFromOccurrence(id);
 
       setRows((current) =>
         current.filter((row) => row.id !== id)
       );
-    } catch {
-      setError(true);
+    } catch (cause: unknown) {
+      console.error("Recurring service Job creation failed", cause);
+      setActionError(message(cause));
     }
   }
 
@@ -84,9 +95,15 @@ export function ScheduleOccurrences() {
         Upcoming Recurring Services
       </h2>
 
-      {error && (
+      {loadError && (
         <p className="text-sm text-red-700">
-          Recurring services could not be loaded.
+          Recurring services could not be loaded: {loadError}
+        </p>
+      )}
+
+      {actionError && (
+        <p className="text-sm text-red-700">
+          {actionError}
         </p>
       )}
 
@@ -144,13 +161,19 @@ export function ScheduleOccurrences() {
         })}
       </div>
 
-      {!rows.length && !error && (
+      {!rows.length && !loadError && (
         <p className="mt-3 text-sm text-neutral-500">
           No recurring occurrences are awaiting Jobs.
         </p>
       )}
     </section>
   );
+}
+
+function message(cause: unknown) {
+  return cause instanceof Error && cause.message
+    ? cause.message
+    : "The request failed. Please try again.";
 }
 
 function day() {
