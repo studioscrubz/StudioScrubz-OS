@@ -97,7 +97,6 @@ export function DashboardPage() {
               />
             ))}
           </section>
-          {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
           {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
@@ -109,6 +108,7 @@ export function DashboardPage() {
               <Empty text="No jobs scheduled today." />
             )}
           </Panel>}
+          {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
           {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
           <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
             <Panel title="Attention Required">
