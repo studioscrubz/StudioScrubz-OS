@@ -1,5 +1,7 @@
 # Database dependency manifest
 
+2026-09-24 recruiting additions: `get_job_applications` and `update_job_application` are defined by `20260924142944_lead_generator_applications.sql`. The same migration adds the application relations `job_applications` and `job_application_events`.
+
 2026-09-23 forward-migration additions: `confirm_post_construction_deposit`, `refresh_post_construction_deposit_instructions`, `reverse_post_construction_deposit`, `reopen_post_construction_deposit`, and `mark_service_agreement_sent_for_delivery` are defined by `20260923200258_post_construction_deposit_workflow.sql`. The same migration adds the application relation `proposal_deposit_requirements`; `proposal_deposit_events` is its immutable database audit relation.
 
 Phase 1 static inventory, generated from the repository on 2026-09-19. This is a repository-provenance document, not evidence of the live database state. No remote or local database was queried.
