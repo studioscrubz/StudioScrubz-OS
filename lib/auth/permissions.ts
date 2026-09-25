@@ -3,6 +3,7 @@ import type { UserProfile, UserRole } from "@/types/auth";
 export const PERMISSIONS = [
   "porterVisits.view", "porterVisits.manage",
   "propertyServicePlans.manage",
+  "marketingMaterials.send",
   "jobApplications.manage",
   "walkthroughs.field",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
@@ -27,6 +28,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 const operationalAdmin: Permission[] = [
   "porterVisits.view", "porterVisits.manage",
   "propertyServicePlans.manage",
+  "marketingMaterials.send",
   "jobApplications.manage",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
@@ -52,6 +54,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   Manager: new Set([
     "porterVisits.view", "porterVisits.manage",
     "propertyServicePlans.manage",
+    "marketingMaterials.send",
     "jobApplications.manage",
     "dashboard.view",
     "clients.view", "clients.edit",
@@ -70,6 +73,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   ]),
 
   Sales: new Set([
+    "marketingMaterials.send",
     "dashboard.view",
     "clients.view", "clients.create", "clients.edit",
     "properties.view", "properties.create", "properties.edit",
@@ -176,6 +180,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/properties/service-reports", "porterVisits.manage"],
   ["/properties/porter-visits", "porterVisits.view"],
   ["/properties/service-plans", "propertyServicePlans.manage"],
+  ["/marketing-materials", "marketingMaterials.send"],
   ["/applications", "jobApplications.manage"],
   ["/lead-generator-applications", "jobApplications.manage"],
 

@@ -5,6 +5,7 @@ import type { PorterVisit, PorterVisitArea, PorterVisitWithAreas } from "@/types
 import type { PropertyServicePlan, PropertyServicePlanInput, PropertyServicePlanArea, PropertyServicePlanAreaInput, PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
 import type { FieldMeasurements, FieldWalkthrough } from "@/types/fieldWalkthrough";
 import type { Client, ClientInput } from "@/types/client";
+import type { MarketingMaterial, MarketingMaterialDelivery, MarketingMaterialVersion } from "@/types/marketingMaterial";
 import type { Property, PropertyInput } from "@/types/property";
 import type { Estimate, EstimateInsert, EstimateUpdate } from "@/types/estimate";
 import type { Walkthrough, WalkthroughInput, WalkthroughUpdate } from "@/types/walkthrough";
@@ -145,6 +146,9 @@ export interface Database {
       recurring_pricing_rules:{Row:RecurringPricingRule;Insert:RecurringPricingRuleInput;Update:Partial<RecurringPricingRuleInput>;Relationships:[{foreignKeyName:"recurring_pricing_rules_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
       business_settings:{Row:BusinessSettings;Insert:BusinessSettingsUpdate&{id?:string};Update:Partial<BusinessSettingsUpdate>;Relationships:[]};
       client_communications:{Row:ClientCommunication;Insert:ClientCommunicationInput&{id?:string;communication_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:Partial<ClientCommunication>;Relationships:[{foreignKeyName:"client_communications_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"client_communications_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"client_communications_estimate_id_fkey";columns:["estimate_id"];isOneToOne:false;referencedRelation:"estimates";referencedColumns:["id"]},{foreignKeyName:"client_communications_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"client_communications_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"client_communications_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"client_communications_sent_by_user_id_fkey";columns:["sent_by_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
+      marketing_materials:{Row:MarketingMaterial;Insert:never;Update:never;Relationships:[]};
+      marketing_material_versions:{Row:MarketingMaterialVersion;Insert:never;Update:never;Relationships:[]};
+      marketing_material_deliveries:{Row:MarketingMaterialDelivery;Insert:never;Update:never;Relationships:[]};
       attention_item_states:{Row:AttentionStateRecord;Insert:{id?:string;user_id:string;attention_key:string;state:AttentionStateRecord["state"];snoozed_until?:string|null;dismissed_at?:string|null;created_at?:string;updated_at?:string};Update:Partial<Pick<AttentionStateRecord,"state"|"snoozed_until"|"dismissed_at">>;Relationships:[{foreignKeyName:"attention_item_states_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
       browser_push_subscriptions:{Row:BrowserPushSubscription;Insert:Omit<BrowserPushSubscription,"id"|"created_at"|"updated_at">&{id?:string;created_at?:string;updated_at?:string};Update:Partial<Pick<BrowserPushSubscription,"user_id"|"p256dh"|"auth"|"user_agent"|"revoked_at"|"updated_at">>;Relationships:[]};
       attention_push_deliveries:{Row:AttentionPushDelivery;Insert:Omit<AttentionPushDelivery,"id"|"created_at"|"updated_at"|"sent_at"|"failure_code"|"failure_message">&{id?:string;created_at?:string;updated_at?:string;sent_at?:string|null;failure_code?:string|null;failure_message?:string|null};Update:Partial<Pick<AttentionPushDelivery,"delivery_status"|"last_attempt_at"|"sent_at"|"failure_code"|"failure_message"|"updated_at">>;Relationships:[]};
@@ -171,6 +175,12 @@ export interface Database {
     };
 
     Functions: {
+      prepare_marketing_material_delivery:{Args:{p_id:string;p_material_identifier:string;p_recipient_kind:string;p_client_id:string|null;p_recipient_name:string;p_recipient_company:string|null;p_recipient_email:string;p_recipient_phone:string|null;p_subject:string;p_message_body:string};Returns:MarketingMaterialDelivery};
+      retry_marketing_material_delivery:{Args:{p_id:string};Returns:MarketingMaterialDelivery};
+      mark_marketing_material_delivery:{Args:{p_id:string;p_status:string;p_provider_message_id?:string|null;p_failure_reason?:string|null};Returns:MarketingMaterialDelivery};
+      register_marketing_material_version:{Args:{p_identifier:string;p_title:string;p_description:string;p_category:string;p_internal_notes:string|null;p_version_id:string;p_storage_path:string;p_original_filename:string;p_media_type:string;p_size_bytes:number};Returns:{material:MarketingMaterial;version:MarketingMaterialVersion}};
+      set_marketing_material_active:{Args:{p_identifier:string;p_is_active:boolean};Returns:MarketingMaterial};
+      update_marketing_material_metadata:{Args:{p_identifier:string;p_title:string;p_description:string;p_category:string;p_internal_notes:string|null};Returns:MarketingMaterial};
       get_lead_representatives: { Args: { p_estimate_id?: string | null }; Returns: import("@/types/employee").LeadRepresentativeOption[] };
       get_company_mileage_rate: { Args: Record<string, never>; Returns: number | null };
       set_company_mileage_rate: { Args: { p_rate: number | null }; Returns: undefined };

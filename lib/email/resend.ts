@@ -9,12 +9,12 @@ export async function sendWithResend(input: { recipientEmail: string; subject: s
   });
 }
 
-export async function sendResendEmail(input: { recipientEmail: string; subject: string; text: string; html: string; idempotencyKey: string; replyTo: string }) {
+export async function sendResendEmail(input: { recipientEmail: string; subject: string; text: string; html: string; idempotencyKey: string; replyTo: string; from?: string; attachments?: Array<{ filename: string; content: string; contentType?: string }> }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": input.idempotencyKey, "User-Agent": "StudioScrubz-OS/1.0" }, body: JSON.stringify({
-    from: FROM, to: [input.recipientEmail], reply_to: input.replyTo, subject: input.subject,
-    text: input.text, html: input.html,
+    from: input.from ?? FROM, to: [input.recipientEmail], reply_to: input.replyTo, subject: input.subject,
+    text: input.text, html: input.html, attachments: input.attachments?.map(({ contentType, ...attachment }) => ({ ...attachment, content_type: contentType })),
   }) });
   const result = await response.json().catch(() => null) as { id?: string; message?: string } | null;
   if (!response.ok || !result?.id) throw new Error(result?.message || `Resend returned HTTP ${response.status}.`);
