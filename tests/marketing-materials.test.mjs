@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import test from "node:test";
+import { buildMarketingMaterialEmailTemplate } from "../lib/marketingMaterials/emailTemplate.mjs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const page = read("components/marketingMaterials/MarketingMaterialsPage.tsx");
@@ -74,13 +75,47 @@ test("management can add replace activate deactivate preview and download", () =
   assert.match(route, /multipart\/form-data/);
 });
 
-test("Property Porter Services prefills the approved editable email copy", () => {
-  assert.match(page, /Property Porter Services from StudioScrubz/);
-  assert.match(page, /StudioScrubz Property Porter Services—reliable, ongoing support designed to help keep your property clean, monitored, and well maintained\./);
-  assert.match(page, /routine property checks, common-area upkeep, light cleaning, photo documentation, and maintenance issue reporting/);
-  assert.match(page, /create a service plan tailored to your community\./);
-  assert.match(page, /747-365-6265\\ninfo@studioscrubz\.com\\nStudioScrubz\.com/);
-  assert.match(page, /material\.identifier==="property-porter-services"/);
+test("Porter retains its approved specialized copy with the plural opening", () => {
+  const template = buildMarketingMaterialEmailTemplate({identifier:"property-porter-services",title:"Property Porter Services",category:"Property Management / Multifamily",description:"Catalog description"});
+  assert.equal(template.subject, "Property Porter Services from StudioScrubz");
+  assert.match(template.messageBody, /We’re reaching out to introduce StudioScrubz Property Porter Services—reliable, ongoing support/);
+  assert.doesNotMatch(template.messageBody, /I’m reaching out/);
+  assert.match(template.messageBody, /routine property checks, common-area upkeep, light cleaning, photo documentation, and maintenance issue reporting/);
+});
+
+test("generic defaults use exact metadata for Post-Construction and another category", () => {
+  for (const material of [
+    {identifier:"post-construction-cleaning",title:"Post-Construction Cleaning",category:"Post-Construction",description:"Detailed turnover cleaning after construction."},
+    {identifier:"restaurant-care",title:"Restaurant Care",category:"Restaurants / Hospitality",description:"Reliable dining and back-of-house cleaning."},
+  ]) {
+    const template = buildMarketingMaterialEmailTemplate(material);
+    assert.equal(template.subject, `${material.title} from StudioScrubz`);
+    assert.match(template.messageBody, new RegExp(`StudioScrubz ${material.title}—professional, reliable service`));
+    assert.ok(template.messageBody.includes(material.description));
+    assert.doesNotMatch(template.messageBody, /I’m reaching out/);
+  }
+});
+
+test("future custom materials work without template code changes", () => {
+  const template = buildMarketingMaterialEmailTemplate({identifier:"future-custom-flyer",title:"Future Custom Care",category:"Other",description:"A newly uploaded custom service description."});
+  assert.equal(template.subject, "Future Custom Care from StudioScrubz");
+  assert.match(template.messageBody, /A newly uploaded custom service description\./);
+  assert.match(template.messageBody, /custom service plan for your property or business/);
+  assert.match(template.messageBody, /747-365-6265\ninfo@studioscrubz\.com\nStudioScrubz\.com/);
+});
+
+test("manual edits persist until selecting a different material", () => {
+  const first={identifier:"office-care",title:"Office Care",category:"Commercial Offices",description:"Office description."};
+  const second={identifier:"luxury-care",title:"Luxury Care",category:"Luxury Property Care",description:"Luxury description."};
+  let draft={material:first,...buildMarketingMaterialEmailTemplate(first)};
+  draft={...draft,subject:"Sender-edited subject",messageBody:"Sender-edited body"};
+  assert.equal(draft.subject,"Sender-edited subject");
+  assert.equal(draft.messageBody,"Sender-edited body");
+  draft={material:second,...buildMarketingMaterialEmailTemplate(second)};
+  assert.equal(draft.subject,"Luxury Care from StudioScrubz");
+  assert.match(draft.messageBody,/Luxury description\./);
+  assert.doesNotMatch(draft.messageBody,/Sender-edited/);
+  assert.match(page, /function compose\(material:MarketingMaterialCatalogItem\)\{const template=buildMarketingMaterialEmailTemplate\(material\)/);
   assert.match(page, /value=\{draft\.subject\} set=\{v=>setDraft\(\{\.\.\.draft,subject:v\}\)\}/);
   assert.match(page, /value=\{draft\.messageBody\} onChange=\{e=>setDraft\(\{\.\.\.draft,messageBody:e\.target\.value\}\)\}/);
 });
