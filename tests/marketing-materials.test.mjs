@@ -74,6 +74,17 @@ test("management can add replace activate deactivate preview and download", () =
   assert.match(route, /multipart\/form-data/);
 });
 
+test("Property Porter Services prefills the approved editable email copy", () => {
+  assert.match(page, /Property Porter Services from StudioScrubz/);
+  assert.match(page, /StudioScrubz Property Porter Services—reliable, ongoing support designed to help keep your property clean, monitored, and well maintained\./);
+  assert.match(page, /routine property checks, common-area upkeep, light cleaning, photo documentation, and maintenance issue reporting/);
+  assert.match(page, /create a service plan tailored to your community\./);
+  assert.match(page, /747-365-6265\\ninfo@studioscrubz\.com\\nStudioScrubz\.com/);
+  assert.match(page, /material\.identifier==="property-porter-services"/);
+  assert.match(page, /value=\{draft\.subject\} set=\{v=>setDraft\(\{\.\.\.draft,subject:v\}\)\}/);
+  assert.match(page, /value=\{draft\.messageBody\} onChange=\{e=>setDraft\(\{\.\.\.draft,messageBody:e\.target\.value\}\)\}/);
+});
+
 test("versions are immutable and delivery snapshots exact version and path", () => {
   assert.match(sql, /unique \(material_identifier, version\)/);
   assert.match(sql, /material_version_id uuid not null references public\.marketing_material_versions\(id\)/);
