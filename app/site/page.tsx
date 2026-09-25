@@ -9,6 +9,7 @@ import {
   ServiceGrid,
 } from "@/components/site/SiteSections";
 import { ProjectResults } from "@/components/site/ProjectResults";
+import { FaqJsonLd } from "@/components/site/SeoJsonLd";
 
 export const metadata: Metadata = {
   title: {
@@ -110,6 +111,7 @@ const faqItems = [
 export default function MarketingHome() {
   return (
     <>
+      <FaqJsonLd items={faqItems} />
       <section className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-24 lg:py-28">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_30%,rgba(212,175,55,.16),transparent_30%),radial-gradient(circle_at_80%_75%,rgba(20,61,26,.10),transparent_35%)]" />
 

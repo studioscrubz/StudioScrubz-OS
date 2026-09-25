@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EstimateCta, FeatureList, PageHero, RelatedServices, SectionHeading } from "@/components/site/SiteSections";
+import { ServicePageJsonLd } from "@/components/site/SeoJsonLd";
 
 export const metadata: Metadata = {
   title: { absolute: "Property Porter Services Los Angeles | StudioScrubz" },
@@ -44,6 +45,7 @@ const responsibilities = [
 
 export default function PropertyPorterServicesPage() {
   return <>
+    <ServicePageJsonLd name="Property Porter Services" path="/property-porter-services" description="Recurring property porter services for managed apartment and multifamily communities across Los Angeles County and the San Fernando Valley, with common-area upkeep, visual condition checks, photo documentation, and property issue reporting."/>
     <PageHero eyebrow="Property Porter Services" title="Property Porter Services with Consistent Eyes on Your Property." copy="StudioScrubz provides recurring scheduled property support for property managers, apartment communities, multifamily properties, and other appropriate managed properties across Los Angeles County and the San Fernando Valley. Agreed porter visits can combine common-area upkeep with visual condition checks, photo documentation, and property issue reporting that helps management stay informed." cta="Request a Porter Service Walkthrough"/>
 
     <section className="px-5 py-20 sm:px-8 sm:py-28">

@@ -76,7 +76,7 @@ export default async function SiteLayout({
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "CleaningService",
+    "@type": ["LocalBusiness", "CleaningService"],
     "@id": "https://studioscrubz.com/#business",
     name: contact.businessName,
     url: "https://studioscrubz.com",

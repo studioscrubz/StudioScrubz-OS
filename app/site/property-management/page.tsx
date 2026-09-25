@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactBand, EstimateCta, FeatureList, PageHero, RelatedServices, SectionHeading } from "@/components/site/SiteSections";
+import { ServicePageJsonLd } from "@/components/site/SeoJsonLd";
 
 export const metadata: Metadata = {
   title: { absolute: "Property Management Cleaning in Los Angeles | StudioScrubz" },
@@ -33,6 +34,7 @@ const propertyAreas = [
 
 export default function PropertyManagementPage() {
   return <>
+    <ServicePageJsonLd name="Property Management Cleaning" path="/property-management" description="Property management cleaning for apartment and multifamily communities, common areas, recurring service, and unit turns across Los Angeles County and the San Fernando Valley."/>
     <PageHero eyebrow="Property management cleaning" title="Property Management Cleaning Built Around Your Community." copy="StudioScrubz provides apartment community and multifamily property cleaning across Los Angeles County and the San Fernando Valley. We help property managers coordinate recurring common-area cleaning, leasing and amenity-space care, and vacant-unit turns around each property's schedule and priorities." cta="Request a Property Walkthrough"/>
     <section className="px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Managed-property support" title="Cleaning plans shaped around how your community operates." copy="For property managers, community managers, multifamily operators, apartment owners, and management companies: a clear property-specific scope for shared spaces, recurring janitorial support, and unit-turn cleaning. We confirm service areas, frequency, access, communication needs, and turnover requirements around your property priorities."/><div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{propertyAreas.map(([title,copy])=><article key={title} className="rounded-[1.6rem] border border-[#143d1a]/10 bg-[#f4f7f1] p-7"><h2 className="text-2xl font-extrabold text-[#143d1a]">{title}</h2><p className="mt-3 leading-7 text-neutral-600">{copy}</p></article>)}</div></div></section>
     <section aria-labelledby="porter-services-heading" className="px-5 pb-20 sm:px-8 sm:pb-28">

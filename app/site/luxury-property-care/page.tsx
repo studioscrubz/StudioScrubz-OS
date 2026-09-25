@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { ServicePageJsonLd } from "@/components/site/SeoJsonLd";
 import {
   EstimateCta,
   FeatureList,
@@ -123,6 +124,7 @@ const howItWorks = [
 export default function LuxuryPropertyCarePage() {
   return (
     <>
+      <ServicePageJsonLd name="Luxury Property Care" path="/luxury-property-care" description="Discreet recurring property care, private porter support, arrival preparation, and documented visits for luxury homes and estates across Greater Los Angeles."/>
       <section className="bg-[#eef3ea] px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
         <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
           <div>
