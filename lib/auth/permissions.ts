@@ -130,7 +130,8 @@ export function hasPermission(
   if (permission === "walkthroughs.field") {
     return (
       profile?.is_active === true &&
-      ["Master Admin", "Crew Lead", "Scrub Technician"].includes(profile.role)
+      Boolean(profile.employee_id) &&
+      ["Crew Lead", "Scrub Technician"].includes(profile.role)
     );
   }
 

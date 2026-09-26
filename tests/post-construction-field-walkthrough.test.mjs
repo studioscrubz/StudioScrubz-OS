@@ -5,6 +5,7 @@ import test from "node:test";
 const component = readFileSync("components/walkthroughs/PostConstructionFieldWalkthrough.tsx", "utf8");
 const page = readFileSync("components/walkthroughs/FieldWalkthroughsPage.tsx", "utf8");
 const migration = readFileSync("supabase/migrations/20260926051557_technician_post_construction_field_walkthrough.sql", "utf8");
+const permissions = readFileSync("lib/auth/permissions.ts", "utf8");
 
 const sections = [
   "Project Overview & Boundaries", "Construction Readiness", "Property Measurements", "Cleaning Standard",
@@ -30,4 +31,6 @@ test("Post-Construction field walkthrough renders all 15 ordered sections and ga
   assert.match(migration, /create or replace function public\.submit_assigned_field_walkthrough/);
   assert.match(migration, /Only the technician field walkthrough is writable/);
   assert.match(migration, /set search_path = ''/);
+  assert.match(permissions, /permission === "walkthroughs\.field"[\s\S]*Boolean\(profile\.employee_id\)[\s\S]*\["Crew Lead", "Scrub Technician"\]/);
+  assert.doesNotMatch(permissions, /\["Master Admin", "Crew Lead", "Scrub Technician"\]/);
 });
