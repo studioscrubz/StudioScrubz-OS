@@ -1,6 +1,7 @@
 import type { ProposalStatus } from "@/types/proposal";
 import type {
   AssessmentMethod,
+  AssessmentSalesStage,
   WalkthroughMeasurements,
   WalkthroughStatus,
 } from "@/types/walkthrough";
@@ -31,7 +32,8 @@ export function residentialPostConstructionScopeError(input: { division?: string
 export function assessmentMethod(input: {
   measurements?: Partial<WalkthroughMeasurements> | null;
 }): AssessmentMethod {
-  return input.measurements?.assessmentMethod ?? "In-Person Walkthrough";
+  const method = input.measurements?.assessmentMethod;
+  return method === "In-Person Walkthrough" ? "On-Site Walkthrough" : method ?? "On-Site Walkthrough";
 }
 
 export function assessmentReadyForPricing(input: {
@@ -40,8 +42,9 @@ export function assessmentReadyForPricing(input: {
   photos?: unknown[];
 }): boolean {
   if (input.status !== "Completed") return false;
+  if (/post[- ]construction/i.test(input.measurements?.serviceType ?? "") && !input.measurements?.postConstructionAssessment) return false;
 
-  if (assessmentMethod(input) === "In-Person Walkthrough") {
+  if (assessmentMethod(input) === "On-Site Walkthrough") {
     return true;
   }
 
@@ -69,7 +72,7 @@ export function assertWalkthroughSchedule(
   }
 
   if (
-    assessmentMethod(input) === "In-Person Walkthrough" &&
+    assessmentMethod(input) === "On-Site Walkthrough" &&
     input.status &&
     ["Scheduled", "Completed", "Proposal Ready"].includes(input.status) &&
     (!input.walkthrough_date || !input.walkthrough_time)
@@ -106,4 +109,21 @@ export function proposalRetiresWalkthrough(
   status: ProposalStatus | null | undefined
 ): boolean {
   return Boolean(status && RETIRED_PROPOSAL_STATUSES.has(status));
+}
+
+export function salesStageForAssessment(input: {
+  status: WalkthroughStatus;
+  measurements?: Partial<WalkthroughMeasurements> | null;
+  walkthrough_date?: string | null;
+  walkthrough_time?: string | null;
+  pricing_review?: unknown;
+}): AssessmentSalesStage {
+  if (input.status === "Archived") return "Closed / Not Proceeding";
+  if (input.pricing_review) return "Proposal Ready";
+  if (input.status === "Completed") return "Pricing Review";
+  const method = input.measurements?.assessmentMethod;
+  if (!method) return "Assessment Method Required";
+  if (method === "Customer Photo Submission") return input.measurements?.photoSubmittedAt ? "Assessment In Progress" : "Awaiting Customer Photos";
+  if (input.walkthrough_date && input.walkthrough_time) return "Walkthrough Scheduled";
+  return "Qualification";
 }

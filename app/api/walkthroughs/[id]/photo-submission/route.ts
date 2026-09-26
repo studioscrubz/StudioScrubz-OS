@@ -14,11 +14,13 @@ export async function POST(_request:Request,{params}:{params:Promise<{id:string}
   if(!profile?.is_active||!["Master Admin","Administrator","Manager","Sales"].includes(profile.role))return NextResponse.json({error:"Photo submission access denied."},{status:403});
   const {data:walkthrough}=await server.from("walkthroughs").select("id,measurements").eq("id",id).maybeSingle();
   if(!walkthrough)return NextResponse.json({error:"Assessment unavailable."},{status:404});
+  const {data:existing}=await admin.from("assessment_photo_access").select("token_value,expires_at,submitted_at").eq("walkthrough_id",id).maybeSingle();
+  if(existing?.token_value&&Date.parse(existing.expires_at)>Date.now())return NextResponse.json({url:`${getPublicSiteUrl()}/assessment/${existing.token_value}`,expiresAt:existing.expires_at,reused:true},{headers:{"Cache-Control":"private, no-store"}});
   const token=newAssessmentToken();
   const expiresAt=new Date(Date.now()+ASSESSMENT_PHOTO_TOKEN_DAYS*86400000).toISOString();
-  const {error}=await admin.from("assessment_photo_access").upsert({walkthrough_id:id,token_hash:hashAssessmentToken(token),expires_at:expiresAt,submitted_at:null,created_by:user.id},{onConflict:"walkthrough_id"});
+  const {error}=await admin.from("assessment_photo_access").upsert({walkthrough_id:id,token_hash:hashAssessmentToken(token),token_value:token,expires_at:expiresAt,submitted_at:existing?.submitted_at??null,created_by:user.id},{onConflict:"walkthrough_id"});
   if(error)return NextResponse.json({error:"Photo submission link could not be created."},{status:500});
   const measurements={...(walkthrough.measurements as Record<string,unknown>),assessmentMethod:"Customer Photo Submission",photoSubmissionStatus:"Sent"};
-  await admin.from("walkthroughs").update({measurements}).eq("id",id);
+  await admin.from("walkthroughs").update({measurements,sales_stage:existing?.submitted_at?"Assessment In Progress":"Awaiting Customer Photos"}).eq("id",id);
   return NextResponse.json({url:`${getPublicSiteUrl()}/assessment/${token}`,expiresAt},{headers:{"Cache-Control":"private, no-store"}});
 }

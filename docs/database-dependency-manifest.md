@@ -1,5 +1,7 @@
 # Database dependency manifest
 
+2026-09-26 Post-Construction sales-assessment additions: `assessment_history` and `transition_post_construction_assessment` are defined by `20260926031557_post_construction_sales_assessment_workflow.sql`. The migration extends the existing `walkthroughs` Assessment and secure photo-access records rather than introducing competing sales or upload systems.
+
 2026-09-25 Marketing Materials additions: `register_marketing_material_version`, `set_marketing_material_active`, `update_marketing_material_metadata`, `prepare_marketing_material_delivery`, `retry_marketing_material_delivery`, and `mark_marketing_material_delivery` are defined by `20260925131341_marketing_material_deliveries.sql`. The same migration adds the locked-down `marketing_materials`, `marketing_material_versions`, and `marketing_material_deliveries` relations plus the private `marketing-materials-private` Storage bucket.
 
 2026-09-24 Assessment archive addition: `archive_sales_assessment` is defined by `20260924162216_archive_sales_assessment.sql`.

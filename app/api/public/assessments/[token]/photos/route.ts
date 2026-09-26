@@ -29,7 +29,7 @@ export async function POST(request:Request,{params}:{params:Promise<{token:strin
   const now=new Date().toISOString(),photo={id,storagePath,category:"General",originalFilename:file.name.slice(0,255),mimeType:file.type,sizeBytes:file.size,uploadedAt:now,uploadedBy:"customer",caption:caption.slice(0,1000)||null,source:"library",customerVisible:false};
   const photos=[...(Array.isArray(assessment.walkthrough.photos)?assessment.walkthrough.photos:[]),photo];
   const measurements={...(assessment.walkthrough.measurements as Record<string,unknown>),assessmentMethod:"Customer Photo Submission",photoSubmissionStatus:"Submitted",photoSubmittedAt:now};
-  const {error:updateError}=await admin.from("walkthroughs").update({photos,measurements}).eq("id",assessment.walkthrough.id);
+  const {error:updateError}=await admin.from("walkthroughs").update({photos,measurements,sales_stage:"Assessment In Progress"}).eq("id",assessment.walkthrough.id);
   if(updateError){await admin.storage.from(OPERATIONAL_PHOTO_BUCKET).remove([storagePath]);return NextResponse.json({error:"Photo metadata could not be saved."},{status:500});}
   await admin.from("assessment_photo_access").update({submitted_at:now}).eq("walkthrough_id",assessment.walkthrough.id);
   return NextResponse.json({photo:{id,caption:photo.caption,originalFilename:photo.originalFilename},submittedAt:now},{status:201,headers:{"Cache-Control":"private, no-store"}});

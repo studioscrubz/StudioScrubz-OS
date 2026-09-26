@@ -39,7 +39,7 @@ const legacy = {
 
 assert.equal(
   workflow.assessmentMethod(legacy),
-  "In-Person Walkthrough"
+  "On-Site Walkthrough"
 );
 
 assert.doesNotThrow(() =>
@@ -110,7 +110,7 @@ const publicRequest = source(
 
 assert.match(
   publicRequest,
-  /from\("walkthroughs"\)\.insert/
+  /from\("walkthroughs"\)\s*\.insert/
 );
 
 assert.match(

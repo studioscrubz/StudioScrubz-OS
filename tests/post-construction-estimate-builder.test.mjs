@@ -21,7 +21,7 @@ test("Post-Construction UI exposes the approved grouped fields and live breakdow
 
 test("drafts preserve separate generic Commercial and Post-Construction state", () => {
   assert.match(builder, /postConstruction\?: PostConstructionCalculatorInput/);
-  assert.match(builder, /setPostConstruction\(parsed\.postConstruction \?\? defaultPostConstruction\)/);
+  assert.match(builder, /setPostConstruction\(parsed\.postConstruction \?\? defaultPostConstructionV2\)/);
   assert.match(builder, /const draft: EstimateDraft = \{ version: 1, customer, division, residential, commercial, postConstruction/);
 });
 

@@ -179,6 +179,7 @@ export async function POST(request: Request) {
         pricing_review: review,
         pricing_reviewed_at: reviewedAt,
         pricing_reviewed_by: profile.id,
+        sales_stage: "Proposal Ready",
       })
       .eq("id", walkthrough.id)
       .select("pricing_review,pricing_reviewed_at,pricing_reviewed_by")
