@@ -13,6 +13,23 @@ const sections = [
   "Debris & Exclusions", "Specialty Surfaces", "Access, Utilities & Equipment Staging", "Schedule & Deadline",
   "Active Trades & Re-cleaning Responsibility", "Crew & Site Restrictions", "Completion & Sign-Off",
 ];
+const questions = [
+  "What type of construction project is this, which areas are affected, and which areas are specifically excluded from cleaning?",
+  "What stage is construction in, and when will StudioScrubz have exclusive access to begin cleaning?",
+  "What are the property measurements, quantities, and rooms or areas included in the cleaning scope?",
+  "Which cleaning level is required, and which horizontal and vertical surfaces must be cleaned?",
+  "Are windows or glass included, how many are included, what components or residue require cleaning, and is ladder or special access needed?",
+  "Which floor materials are present, and is there paint, grout haze, adhesive, drywall compound, or no construction residue?",
+  "Which cabinet, drawer, closet, shelving, or exterior-only storage surfaces are included?",
+  "Are appliances excluded, exterior-only, or interior and exterior; which appliance types are included; and is protective film or sticker removal required?",
+  "Is the site limited to cleaning waste, does it contain light debris, or does construction debris remain, and who is responsible for removing it?",
+  "Which specialty or high-value surfaces and fixtures require special cleaning care?",
+  "For parking, stairs or elevator, gate or security, loading, equipment staging, water, electricity, and restroom access, is each available, unavailable, or restricted?",
+  "When may cleaning start, when must it be completed, and who or what arrives immediately afterward?",
+  "Will other trades be absent, working during cleaning, or returning afterward, and who is responsible for any required re-cleaning?",
+  "Which HOA, building-hour, quiet-hour, security, crew-size, or other site restrictions apply?",
+  "Who will approve completion, what is their role, and will acceptance use a visual walkthrough, written punch list, photo approval, or another standard?",
+];
 
 test("Post-Construction field walkthrough renders all 15 ordered sections and gates completion", () => {
   let cursor = -1;
@@ -21,10 +38,18 @@ test("Post-Construction field walkthrough renders all 15 ordered sections and ga
     assert.ok(next > cursor, `${section} is present in order`);
     cursor = next;
   }
-  assert.match(component, /POST_CONSTRUCTION_FIELD_SECTIONS\.filter/);
-  assert.match(component, /!field\?\.sectionConfirmations/);
-  assert.match(component, /!field\?\.answers/);
-  assert.match(component, /Unknown \/ Confirm Later/);
+  for (const question of questions) assert.ok(component.includes(question), `renders: ${question}`);
+  assert.match(component, /type="radio"/);
+  assert.match(component, /type="checkbox"/);
+  assert.match(component, /type="number"/);
+  assert.match(component, /type="datetime-local"/);
+  assert.match(component, /stage==="Other"/);
+  assert.match(component, /specialAccess==="Yes"/);
+  assert.match(component, /residuePhotoConfirmed/);
+  assert.match(component, /disabled=\{!!missing\.length\|\|current===14\}/);
+  assert.match(component, /Before continuing:/);
+  assert.match(component, /Previous/);
+  assert.match(component, /Continue/);
   assert.match(page, /if\(complete&&isPostConstruction\).*postConstructionCompletionIssues/);
   assert.match(page, /Save Draft/);
   assert.match(migration, /create or replace function public\.get_assigned_field_walkthroughs/);
