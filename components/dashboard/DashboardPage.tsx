@@ -411,11 +411,11 @@ function Panel({
 }
 function Metric({ label, value, active, onClick }: { label: string; value: number; active?: boolean; onClick?: () => void }) {
   const content = <>
-      <p className="text-xs font-bold uppercase text-neutral-500">{label}</p>
-      <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{value}</p>
+      <p className="text-[11px] font-bold uppercase text-neutral-500">{label}</p>
+      <p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p>
     </>;
-  if (onClick) return <button type="button" aria-pressed={active} onClick={onClick} className={`rounded-2xl border p-5 text-left transition ${active ? "border-emerald-400 bg-emerald-50 shadow-sm" : "bg-white hover:border-emerald-300"}`}>{content}</button>;
-  return <article className="rounded-2xl border bg-white p-5">{content}</article>;
+  if (onClick) return <button type="button" aria-pressed={active} onClick={onClick} className={`min-h-20 rounded-2xl border p-4 text-left transition ${active ? "border-emerald-400 bg-emerald-50 shadow-sm" : "bg-white hover:border-emerald-300"}`}>{content}</button>;
+  return <article className="min-h-20 rounded-2xl border bg-white p-4">{content}</article>;
 }
 function Stats({ values }: { values: [string, number][] }) {
   return (
