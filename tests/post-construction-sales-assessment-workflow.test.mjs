@@ -13,6 +13,7 @@ const upload=read("app/api/public/assessments/[token]/photos/route.ts");
 const proposal=read("components/proposals/ProposalBuilder.tsx");
 const publicProposal=read("components/proposals/ProposalDocument.tsx");
 const agreement=read("supabase/migrations/20260923182045_post_construction_proposal_duration_agreement_handoff.sql");
+const assignmentOptions=read("supabase/migrations/20260928180955_allow_sales_load_eligible_walkthrough_technicians.sql");
 
 test("one authoritative Assessment preserves existing Estimate linkage and Proposal idempotency",()=>{
   assert.match(migration,/proposals_one_active_per_walkthrough/);
@@ -30,8 +31,8 @@ test("qualification, stages, and every structured Post-Construction area are per
 });
 
 test("exactly one method is active, scheduling is enforced, and secure tokens are reused",()=>{
-  assert.match(form,/assessmentMethod: "On-Site Walkthrough"/);
-  assert.match(form,/assessmentMethod: "Customer Photo Submission"/);
+  assert.match(form,/value:"On-Site Walkthrough"/);
+  assert.match(form,/value:"Customer Photo Submission"/);
   assert.match(workflow,/An in-person walkthrough must have both a scheduled date and scheduled time/);
   assert.match(migration,/must be scheduled before it can begin/);
   assert.match(link,/existing\?\.token_value/);
@@ -39,6 +40,25 @@ test("exactly one method is active, scheduling is enforced, and secure tokens ar
   assert.match(link,/token_hash:hashAssessmentToken\(token\)/);
   assert.match(upload,/photos=\[\.\.\./);
   assert.match(upload,/sales_stage:"Assessment In Progress"/);
+});
+
+test("new assessments require the existing technician assignment and use the reduced scheduling form",()=>{
+  assert.match(form,/<Panel title="Schedule Walkthrough">/);
+  assert.match(form,/Assigned Scrub Technician/);
+  assert.match(form,/operational_role==="Scrub Technician"/);
+  assert.match(form,/getEligibleJobTechs/);
+  assert.match(form,/!walkthrough && !assignedEmployeeId/);
+  assert.match(form,/assigned_employee_id: assignedEmployeeId \|\| null/);
+  assert.match(assignmentOptions,/public\.has_any_role\(array\['Master Admin', 'Administrator', 'Manager', 'Sales'\]\)/);
+  assert.match(assignmentOptions,/e\.employment_status = 'Active'/);
+  assert.match(assignmentOptions,/up\.is_active/);
+  for(const removed of ["Access Restrictions","Parking / Loading","Water Access","Power Access","Security / Alarm Information","Damage Observed","Hazards Observed","Heavy Soil / Buildup"]){
+    assert.doesNotMatch(form,new RegExp(`label="${removed.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}"`));
+  }
+  assert.match(form,/walkthrough && \/post\[- \]construction\/i\.test\(measurements\.serviceType\)/);
+  assert.match(form,/walkthrough && <ListEditor title="Scope"/);
+  assert.match(form,/walkthrough && <ListEditor title="Recommendations"/);
+  assert.match(form,/walkthrough && <PhotoUploader/);
 });
 
 test("V2 pricing keeps person-hours, crew, workday, planned days, and completion duration distinct",()=>{
