@@ -37,9 +37,9 @@ export function DashboardActiveEmployeesMonitor() {
   useOperationalRealtime(["employee_work_sessions", "time_entries"], load);
   if (!canView) return null;
   return <div className="mt-7">
-    <div className="min-h-28 w-full rounded-2xl border bg-white p-5 sm:max-w-64">
-      <p className="text-xs font-bold uppercase text-neutral-500">Active Techs</p>
-      <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{loading ? "..." : error ? "Unavailable" : staff.length}</p>
+    <div className="min-h-20 w-full rounded-2xl border bg-white p-4 sm:max-w-56">
+      <p className="text-[11px] font-bold uppercase text-neutral-500">Active Techs</p>
+      <p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{loading ? "..." : error ? "Unavailable" : staff.length}</p>
     </div>
     {error && <p className="mt-3 text-sm font-bold text-amber-700">Active employee status is temporarily unavailable.</p>}
     {!error && <ActiveStaffPanel staff={staff} />}
