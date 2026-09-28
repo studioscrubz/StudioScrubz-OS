@@ -1,1 +1,1 @@
-import {EmployeeDirectory} from "@/components/employees/EmployeeDirectory";export default function Page(){return <EmployeeDirectory departments={["Sales"]} title="Sales" description="Support the StudioScrubz sales team and its workflow." directory={false}/>}
+import {EmployeeDirectory} from "@/components/employees/EmployeeDirectory";export default function Page(){return <EmployeeDirectory departments={["Sales","Lead Representative"]} title="Sales" description="Support the StudioScrubz sales team and its workflow." directory={false}/>}
