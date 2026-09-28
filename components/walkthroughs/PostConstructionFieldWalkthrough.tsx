@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GuidedWalkthroughChoice } from "@/components/walkthroughs/GuidedWalkthroughChoice";
 import type { PostConstructionFieldAssessment } from "@/types/fieldWalkthrough";
 import type {
   OperationalPhotoWithUrl,
@@ -992,26 +993,7 @@ function Choice({
   value: unknown;
   change: (v: string) => void;
 }) {
-  return (
-    <fieldset className="mt-4">
-      <legend className="font-medium">{label}</legend>
-
-      <div className="mt-2 flex flex-wrap gap-3">
-        {options.map((o) => (
-          <label key={o} className="flex gap-2">
-            <input
-              type="radio"
-              name={label}
-              checked={value === o}
-              onChange={() => change(o)}
-            />
-
-            {o}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
+  return <GuidedWalkthroughChoice className="mt-4" label={label} options={options} selected={typeof value === "string" ? [value] : []} onSelect={change} />;
 }
 
 function Multi({
@@ -1025,31 +1007,7 @@ function Multi({
   value: string[];
   onChange: (v: string[]) => void;
 }) {
-  return (
-    <fieldset className="mt-4">
-      <legend className="font-medium">{label}</legend>
-
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        {options.map((o) => (
-          <label key={o} className="flex gap-2">
-            <input
-              type="checkbox"
-              checked={value.includes(o)}
-              onChange={(e) =>
-                onChange(
-                  e.target.checked
-                    ? [...value, o]
-                    : value.filter((x) => x !== o)
-                )
-              }
-            />
-
-            {o}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
+  return <GuidedWalkthroughChoice className="mt-4" label={label} options={options} selected={value} multiple onSelect={(option) => onChange(value.includes(option) ? value.filter((item) => item !== option) : [...value, option])} />;
 }
 
 function Text({

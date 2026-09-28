@@ -43,8 +43,8 @@ test("Commercial and Janitorial walkthrough uses the existing secure guided arch
   assert.match(component, /Included Add-ons/);
   assert.match(component, /Upstream window scope/);
   assert.match(component, /commercialJanitorialAssessment:\{[\s\S]*fieldWalkthrough:\{answers:/);
-  assert.match(component, /type="radio"/);
-  assert.match(component, /type="checkbox"/);
+  assert.match(component, /GuidedWalkthroughChoice/);
+  assert.doesNotMatch(component, /type="radio"/);
   assert.match(component, /type="number"/);
   assert.match(component, /Before continuing:/);
   assert.match(component, /Previous/);

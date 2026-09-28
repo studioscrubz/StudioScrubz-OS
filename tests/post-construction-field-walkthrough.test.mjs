@@ -76,7 +76,8 @@ test("Post-Construction walkthrough is shared across field and management and ga
     assert.ok(component.includes(question), `renders: ${question}`);
   }
 
-  assert.match(component, /type="radio"/);
+  assert.match(component, /GuidedWalkthroughChoice/);
+  assert.doesNotMatch(component, /type="radio"/);
   assert.match(component, /type="checkbox"/);
   assert.match(component, /type="number"/);
   assert.match(component, /type="datetime-local"/);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GuidedWalkthroughChoice } from "@/components/walkthroughs/GuidedWalkthroughChoice";
 import { StandardResidentialCarryForward } from "@/components/walkthroughs/StandardResidentialFieldWalkthrough";
 import type { FieldMeasurements, MoveInOutFieldAssessment, StandardResidentialContext } from "@/types/fieldWalkthrough";
 
@@ -52,8 +53,8 @@ function readinessQuestion(service:string|null|undefined){if(service?.includes("
 function assessment(m:FieldMeasurements):MoveInOutFieldAssessment{return m.moveInOutAssessment?.fieldWalkthrough??{answers:{}}}
 function list(value:unknown):string[]{return Array.isArray(value)?value.filter((item):item is string=>typeof item==="string"):[]}
 function ReadOnlyStatus({label,items}:{label:string;items:string[]}){return <div className="rounded-lg bg-blue-50 p-3 text-sm"><b>{label}:</b> {items.length?items.join(", "):"No matching included add-on was provided."}</div>}
-function Radio({q,k,a,values,set}:{q:string;k:string;a:Answers;values:string[];set:(key:string,value:Value)=>void}){return <fieldset><legend className="text-sm font-bold">{q}</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{values.map(value=><label key={value} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={k} checked={a[k]===value} onChange={()=>set(k,value)}/>{value}</label>)}</div></fieldset>}
-function Checks({q,k,a,values,toggle}:{q:string;k:string;a:Answers;values:string[];toggle:(key:string,value:string)=>void}){const selected=list(a[k]);return <fieldset><legend className="text-sm font-bold">{q}</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{values.map(value=><label key={value} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={selected.includes(value)} onChange={()=>toggle(k,value)}/>{value}</label>)}</div></fieldset>}
+function Radio({q,k,a,values,set}:{q:string;k:string;a:Answers;values:string[];set:(key:string,value:Value)=>void}){return <GuidedWalkthroughChoice label={q} options={values} selected={typeof a[k]==="string"?[a[k]]:[]} onSelect={value=>set(k,value)}/>}
+function Checks({q,k,a,values,toggle}:{q:string;k:string;a:Answers;values:string[];toggle:(key:string,value:string)=>void}){return <GuidedWalkthroughChoice label={q} options={values} selected={list(a[k])} multiple onSelect={value=>toggle(k,value)}/>}
 function Notes({q,k,a,set}:{q:string;k:string;a:Answers;set:(key:string,value:Value)=>void}){return <label className="block text-sm font-bold">{q}<textarea maxLength={5000} className={input} value={typeof a[k]==="string"?a[k] as string:""} onChange={e=>set(k,e.target.value)}/></label>}
 const input="mt-2 block min-h-24 w-full rounded-lg border border-neutral-300 p-2 font-normal";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-40";

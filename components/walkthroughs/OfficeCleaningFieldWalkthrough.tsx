@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GuidedWalkthroughChoice } from "@/components/walkthroughs/GuidedWalkthroughChoice";
 import { StandardResidentialCarryForward } from "@/components/walkthroughs/StandardResidentialFieldWalkthrough";
 import type { FieldMeasurements, OfficeCleaningFieldAssessment, StandardResidentialContext } from "@/types/fieldWalkthrough";
 
@@ -76,8 +77,8 @@ function issues(i:number,a:Answers){
 }
 
 function Area({q,prefix,observations,a,set}:{q:string;prefix:string;observations:string[];a:Answers;set:(k:string,v:Value)=>void}){return <><Radio q={q} k={`${prefix}Condition`} values={["Not applicable",...levels]} a={a} set={set}/>{a[`${prefix}Condition`]!=="Not applicable"&&yesNo(observations,observations.map((_,i)=>`${prefix}Observation${i+1}`),a,set)}</>}
-function Radio({q,k,values,a,set}:{q:string;k:string;values:string[];a:Answers;set:(k:string,v:Value)=>void}){return <fieldset><legend className="text-sm font-bold">{q}</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{values.map(v=><label key={v} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={k} checked={a[k]===v} onChange={()=>set(k,v)}/>{v}</label>)}</div></fieldset>}
-function Checks({q,k,values,a,toggle}:{q:string;k:string;values:string[];a:Answers;toggle:(k:string,v:string)=>void}){return <fieldset><legend className="text-sm font-bold">{q}</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{values.map(v=><label key={v} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={list(a[k]).includes(v)} onChange={()=>toggle(k,v)}/>{v}</label>)}</div></fieldset>}
+function Radio({q,k,values,a,set}:{q:string;k:string;values:string[];a:Answers;set:(k:string,v:Value)=>void}){return <GuidedWalkthroughChoice label={q} options={values} selected={typeof a[k]==="string"?[a[k]]:[]} onSelect={value=>set(k,value)}/>}
+function Checks({q,k,values,a,toggle}:{q:string;k:string;values:string[];a:Answers;toggle:(k:string,v:string)=>void}){return <GuidedWalkthroughChoice label={q} options={values} selected={list(a[k])} multiple onSelect={value=>toggle(k,value)}/>}
 function Notes({q,k,a,set}:{q:string;k:string;a:Answers;set:(k:string,v:Value)=>void}){return <label className="block text-sm font-bold">{q}<textarea maxLength={5000} className="mt-2 block min-h-24 w-full rounded-lg border p-2 font-normal" value={typeof a[k]==="string"?a[k]:""} onChange={e=>set(k,e.target.value)}/></label>}
 function yesNo(q:string[],k:string[],a:Answers,set:(k:string,v:Value)=>void){return q.map((x,i)=><Radio key={x} q={x} k={k[i]} values={["Yes","No"]} a={a} set={set}/>)}
 function assessment(m:FieldMeasurements):OfficeCleaningFieldAssessment{return m.officeCleaningAssessment?.fieldWalkthrough??{answers:{}}}
