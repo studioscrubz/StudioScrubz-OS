@@ -6,7 +6,9 @@ const read=path=>readFileSync(path,"utf8");
 const component=read("components/walkthroughs/StandardResidentialFieldWalkthrough.tsx");
 const page=read("components/walkthroughs/FieldWalkthroughsPage.tsx");
 const migration=read("supabase/migrations/20260928183628_standard_residential_field_walkthrough.sql");
+const accessFix=read("supabase/migrations/20260928185819_fix_standard_residential_save_and_master_admin_oversight.sql");
 const postConstruction=read("components/walkthroughs/PostConstructionFieldWalkthrough.tsx");
+const permissions=read("lib/auth/permissions.ts");
 
 test("Standard Cleaning uses a guided assigned-technician walkthrough with safe carry-forward context",()=>{
   assert.match(component,/service\?\.trim\(\)===\"Standard Cleaning\"/);
@@ -34,4 +36,23 @@ test("technician observations save separately and Post-Construction remains inta
   assert.match(page,/isPostConstruction\?<PostConstructionFieldWalkthrough/);
   assert.match(postConstruction,/postConstructionAssessment/);
   assert.match(migration,/postConstructionAssessment/);
+});
+
+test("draft save normalizes unused questionnaire nulls and retains assignment conflict protection",()=>{
+  assert.match(accessFix,/jsonb_typeof\(normalized #> '\{postConstructionAssessment,fieldWalkthrough\}'\) = 'null'/);
+  assert.match(accessFix,/normalized := normalized - 'postConstructionAssessment'/);
+  assert.match(accessFix,/submit_assigned_field_walkthrough_assignment_guarded_20260928\([\s\S]*p_complete/);
+  assert.match(migration,/where id = p_id for update/);
+  assert.match(migration,/walkthrough\.assigned_employee_id is distinct from employee/);
+  assert.match(migration,/if p_complete and coalesce\(walkthrough\.measurements->>'serviceType',''\) = 'Standard Cleaning'/);
+});
+
+test("Master Admin can review all assignments while field staff remain assignment-scoped",()=>{
+  assert.match(accessFix,/master_admin boolean := public\.is_master_admin\(\)/);
+  assert.match(accessFix,/w\.assigned_employee_id is not null[\s\S]*master_admin or w\.assigned_employee_id = employee/);
+  assert.match(accessFix,/not master_admin[\s\S]*'Crew Lead', 'Scrub Technician'/);
+  assert.match(permissions,/permission === "walkthroughs\.field"[\s\S]*profile\.role === "Master Admin"[\s\S]*\["Crew Lead", "Scrub Technician"\]/);
+  assert.match(page,/readOnly=\{masterAdmin\}/);
+  assert.match(page,/Master Admin review — technician responses are read-only/);
+  assert.match(page,/isPostConstruction\?<PostConstructionFieldWalkthrough/);
 });
