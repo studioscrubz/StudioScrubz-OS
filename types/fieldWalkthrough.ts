@@ -17,6 +17,9 @@ export type MoveInOutFieldAssessment = {
 export type CommercialJanitorialFieldAssessment = {
   answers?: Record<string, string | string[] | number | boolean | null>;
 };
+export type PropertyManagementCommonAreasFieldAssessment = {
+  answers?: Record<string, string | string[] | number | boolean | null>;
+};
 export type StandardResidentialContext = {
   customerProperty?: string | null;
   service?: string | null;
@@ -39,5 +42,6 @@ export type FieldMeasurements = Partial<Record<(typeof fieldTextKeys)[number], s
   deepCleaningAssessment: Record<string, unknown> & { fieldWalkthrough?: DeepCleaningFieldAssessment };
   moveInOutAssessment: Record<string, unknown> & { fieldWalkthrough?: MoveInOutFieldAssessment };
   commercialJanitorialAssessment: Record<string, unknown> & { fieldWalkthrough?: CommercialJanitorialFieldAssessment };
+  propertyManagementCommonAreasAssessment: Record<string, unknown> & { fieldWalkthrough?: PropertyManagementCommonAreasFieldAssessment };
 }>;
 export type FieldWalkthrough = { id: string; walkthrough_date: string; walkthrough_time: string; contact_name: string | null; company_name: string | null; phone: string | null; email: string | null; property: string; service: string | null; scope: Array<{id: string; label: string}>; included_addons: string[]; standard_residential_context: StandardResidentialContext; measurements: FieldMeasurements };

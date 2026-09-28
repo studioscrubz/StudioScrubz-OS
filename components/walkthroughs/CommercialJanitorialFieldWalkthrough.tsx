@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { StandardResidentialCarryForward } from "@/components/walkthroughs/StandardResidentialFieldWalkthrough";
+import { isPropertyManagementCommonAreasService, PropertyManagementCommonAreasFieldWalkthrough, propertyManagementCommonAreasCompletionIssues } from "@/components/walkthroughs/PropertyManagementCommonAreasFieldWalkthrough";
 import type { CommercialJanitorialFieldAssessment, FieldMeasurements, StandardResidentialContext } from "@/types/fieldWalkthrough";
 
 type Props={measurements:FieldMeasurements;context:StandardResidentialContext;includedAddons:string[];onChange:(value:FieldMeasurements)=>void};
@@ -11,9 +12,10 @@ const services=["Office Cleaning","Barbershop / Salon Cleaning","Gym / Spa Clean
 const sections=["Facility Type","Occupancy / Operating Status","Overall Condition","Flooring","Restrooms","Breakroom / Kitchen","Workspaces / Common Areas","Entry / Lobby / Reception","Trash / Waste","Glass / Windows","Dust / Surfaces","Specialty / Sensitive Areas","Access / Security","Areas Requiring Extra Attention","Service Frequency Observation","Service Suitability","Expected Labor","Exceptions","Final Confirmation"] as const;
 
 export function isCommercialJanitorialService(service:string|null|undefined){return services.includes(service?.trim()??"")}
-export function commercialJanitorialCompletionIssues(measurements:FieldMeasurements,context:StandardResidentialContext){const a=assessment(measurements).answers??{};return sections.filter((_,i)=>issues(i,a,context,measurements).length)}
+export function commercialJanitorialCompletionIssues(measurements:FieldMeasurements,context:StandardResidentialContext){if(isPropertyManagementCommonAreasService(context.service))return propertyManagementCommonAreasCompletionIssues(measurements,context);const a=assessment(measurements).answers??{};return sections.filter((_,i)=>issues(i,a,context,measurements).length)}
 
-export function CommercialJanitorialFieldWalkthrough({measurements,context,includedAddons,onChange}:Props){
+export function CommercialJanitorialFieldWalkthrough(props:Props){if(isPropertyManagementCommonAreasService(props.context.service))return <PropertyManagementCommonAreasFieldWalkthrough {...props}/>;return <BaseCommercialJanitorialFieldWalkthrough {...props}/>}
+function BaseCommercialJanitorialFieldWalkthrough({measurements,context,includedAddons,onChange}:Props){
   const [current,setCurrent]=useState(0),answers=assessment(measurements).answers??{},missing=issues(current,answers,context,measurements);
   const set=(key:string,value:Value)=>onChange({...measurements,commercialJanitorialAssessment:{...measurements.commercialJanitorialAssessment,fieldWalkthrough:{answers:{...answers,[key]:value}}}});
   const toggle=(key:string,value:string,exclusive?:string)=>{const selected=list(answers[key]);set(key,selected.includes(value)?selected.filter(item=>item!==value):value===exclusive?[value]:[...selected.filter(item=>item!==exclusive),value])};
