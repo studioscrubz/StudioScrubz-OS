@@ -630,7 +630,7 @@ function JobModal({
       <Details
         title="Assigned Worker"
         rows={[
-          ["Individual Tech", job.assigned_employee_name || "â€”"],
+          ["Individual Tech", job.assigned_employee_name || "—"],
           ["Assigned Crew", job.assigned_crew_name || "—"],
           ["Crew Lead", job.crew_lead_name || "—"],
           ["Assigned Team", job.assigned_team.join(", ") || "—"],
