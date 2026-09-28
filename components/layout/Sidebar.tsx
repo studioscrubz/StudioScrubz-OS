@@ -18,7 +18,6 @@ type NavGroup = { label: string; marker: string; permission?: Permission; childr
 
 const navItems: Array<NavLink | NavGroup> = [
   { label: "Attention Center", href: "/attention", marker: "A", permission: "attention.view" },
-  { label: "Messages", href: "/messages", marker: "M", permission: "messages.view" },
   { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
   { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
   {
@@ -159,6 +158,10 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#143d1a] text-white shadow-2xl shadow-[#07190a]/25 lg:shadow-none">
       <div className="relative flex items-start justify-between border-b border-white/10 px-6 py-5">
+        {hasPermission(auth.profile, "messages.view") && <Link href="/messages" onClick={onClose} aria-label="Messages" title="Messages" className={`absolute left-3 top-3 grid size-10 place-items-center rounded-lg transition ${pathname === "/messages" ? "bg-[#d4af37] text-[#143d1a]" : "text-white/75 hover:bg-white/10 hover:text-white"}`}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 18.75 3 21v-4.5A8.25 8.25 0 1 1 7.5 18.75Z" /></svg>
+          {Boolean(messageCount) && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#d4af37] px-1 text-center text-[10px] font-extrabold leading-5 text-[#143d1a]">{messageCount}</span>}
+        </Link>}
         <div className="flex-1 text-center">
           <StudioScrubzLogo size={112} priority className="mx-auto drop-shadow-[0_8px_18px_rgba(0,0,0,.24)]" />
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.28em] text-[#d4af37]">Operations System</p>
