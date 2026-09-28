@@ -5,8 +5,27 @@ export type PostConstructionFieldAssessment = {
   sectionConfirmations?: Record<string, FieldWalkthroughAnswer>;
   answers?: Record<string, string | number | string[] | boolean | null>;
 };
+export type StandardResidentialFieldAssessment = {
+  answers?: Record<string, string | string[] | boolean | null>;
+};
+export type StandardResidentialContext = {
+  customerProperty?: string | null;
+  service?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  squareFeet?: number | null;
+  pets?: string | null;
+  currentCleanerVendor?: string | null;
+  majorConcerns?: string | null;
+  propertyContext?: string | null;
+  accessConsiderations?: string | null;
+  customerNotes?: string | null;
+  walkthroughDateTime?: string | null;
+  walkthroughMethod?: string | null;
+};
 export type FieldMeasurements = Partial<Record<(typeof fieldTextKeys)[number], string | null> & Record<(typeof fieldNumberKeys)[number], number | null> & {
   heavySoilBuildup: boolean;
   postConstructionAssessment: Record<string, unknown> & { fieldWalkthrough?: PostConstructionFieldAssessment };
+  standardResidentialAssessment: Record<string, unknown> & { fieldWalkthrough?: StandardResidentialFieldAssessment };
 }>;
-export type FieldWalkthrough = { id: string; walkthrough_date: string; walkthrough_time: string; contact_name: string | null; company_name: string | null; phone: string | null; email: string | null; property: string; service: string | null; scope: Array<{id: string; label: string}>; measurements: FieldMeasurements };
+export type FieldWalkthrough = { id: string; walkthrough_date: string; walkthrough_time: string; contact_name: string | null; company_name: string | null; phone: string | null; email: string | null; property: string; service: string | null; scope: Array<{id: string; label: string}>; included_addons: string[]; standard_residential_context: StandardResidentialContext; measurements: FieldMeasurements };
