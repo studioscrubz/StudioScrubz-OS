@@ -34,6 +34,7 @@ const navItems: Array<NavLink | NavGroup> = [
     children: [
       { label: "Assessments", href: "/walkthroughs", marker: "S", permission: "walkthroughs.view" },
       { label: "Assigned Walkthroughs", href: "/field-walkthroughs", marker: "W", permission: "walkthroughs.field" },
+      { label: "Prospects", href: "/prospects", marker: "P", permission: "prospects.view" },
       { label: "Marketing Materials", href: "/marketing-materials", marker: "", permission: "marketingMaterials.send" },
     ],
   },

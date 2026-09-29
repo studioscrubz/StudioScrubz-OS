@@ -5,6 +5,7 @@ export const PERMISSIONS = [
   "propertyServicePlans.manage",
   "marketingMaterials.send",
   "jobApplications.manage",
+  "prospects.view", "prospects.manage",
   "walkthroughs.field",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
@@ -30,6 +31,7 @@ const operationalAdmin: Permission[] = [
   "propertyServicePlans.manage",
   "marketingMaterials.send",
   "jobApplications.manage",
+  "prospects.view", "prospects.manage",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
   "estimates.view", "estimates.create", "estimates.edit", "walkthroughs.view",
@@ -56,6 +58,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "propertyServicePlans.manage",
     "marketingMaterials.send",
     "jobApplications.manage",
+    "prospects.view", "prospects.manage",
     "dashboard.view",
     "clients.view", "clients.edit",
     "properties.view", "properties.edit",
@@ -73,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   ]),
 
   Sales: new Set([
+    "prospects.view", "prospects.manage",
     "marketingMaterials.send",
     "dashboard.view",
     "clients.view", "clients.create", "clients.edit",
@@ -188,6 +192,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/lead-generator-applications", "jobApplications.manage"],
 
   ["/field-walkthroughs", "walkthroughs.field"],
+  ["/prospects", "prospects.view"],
 
   ["/vendor-packets", "estimates.create"],
   ["/attention", "attention.view"],
