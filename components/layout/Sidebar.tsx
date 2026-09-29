@@ -29,12 +29,6 @@ type NavGroup = {
 
 const navItems: Array<NavLink | NavGroup> = [
   {
-    label: "Attention Center",
-    href: "/attention",
-    marker: "A",
-    permission: "attention.view",
-  },
-  {
     label: "Dashboard",
     href: "/",
     marker: "D",
@@ -332,6 +326,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
+
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [attentionCount, setAttentionCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
@@ -430,13 +425,53 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#143d1a] text-white shadow-2xl shadow-[#07190a]/25 lg:shadow-none">
       <div className="relative flex items-start justify-between border-b border-white/10 px-6 py-5">
+        {hasPermission(auth.profile, "attention.view") && (
+          <Link
+            href="/attention"
+            onClick={onClose}
+            aria-label="Attention Center"
+            title="Attention Center"
+            className={`absolute left-3 top-3 grid size-10 place-items-center rounded-lg transition ${
+              pathname === "/attention"
+                ? "bg-[#d4af37] text-[#143d1a]"
+                : "text-white/75 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="size-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10 21h4"
+              />
+            </svg>
+
+            {Boolean(attentionCount) && (
+              <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#d4af37] px-1 text-center text-[10px] font-extrabold leading-5 text-[#143d1a]">
+                {attentionCount}
+              </span>
+            )}
+          </Link>
+        )}
+
         {hasPermission(auth.profile, "messages.view") && (
           <Link
             href="/messages"
             onClick={onClose}
             aria-label="Messages"
             title="Messages"
-            className={`absolute left-3 top-3 grid size-10 place-items-center rounded-lg transition ${
+            className={`absolute right-3 top-3 grid size-10 place-items-center rounded-lg transition ${
               pathname === "/messages"
                 ? "bg-[#d4af37] text-[#143d1a]"
                 : "text-white/75 hover:bg-white/10 hover:text-white"
@@ -488,7 +523,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           aria-label="Close navigation"
-          className="grid size-9 place-items-center rounded-lg text-xl text-white/70 hover:bg-white/10 lg:hidden"
+          className="absolute right-3 top-14 grid size-9 place-items-center rounded-lg text-xl text-white/70 hover:bg-white/10 lg:hidden"
         >
           ×
         </button>
@@ -526,7 +561,6 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                     }`}
                   >
                     <NavMarker value={item.marker} />
-
                     <span className="flex-1">{item.label}</span>
 
                     <span
@@ -547,11 +581,6 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                           item={child}
                           active={child.href === pathname}
                           onNavigate={onClose}
-                          badge={
-                            child.href === "/attention"
-                              ? attentionCount
-                              : undefined
-                          }
                         />
                       ))}
                     </ul>
@@ -566,13 +595,6 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                 item={item}
                 active={item.href === pathname}
                 onNavigate={onClose}
-                badge={
-                  item.href === "/attention"
-                    ? attentionCount
-                    : item.href === "/messages"
-                      ? messageCount
-                      : undefined
-                }
               />
             );
           })}
@@ -608,6 +630,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
               .then(() => router.replace("/login"))
               .catch((error: unknown) => {
                 console.error("Sign out failed", error);
+
                 setSignOutError(
                   error instanceof Error
                     ? error.message
@@ -640,12 +663,10 @@ function NavItem({
   item,
   active,
   onNavigate,
-  badge,
 }: {
   item: NavLink;
   active: boolean;
   onNavigate: () => void;
-  badge?: number;
 }) {
   return (
     <li>
@@ -661,12 +682,6 @@ function NavItem({
       >
         {item.marker && <NavMarker value={item.marker} />}
         <span>{item.label}</span>
-
-        {Boolean(badge) && (
-          <span className="ml-auto min-w-6 rounded-full bg-[#d4af37] px-1.5 py-0.5 text-center text-[10px] font-extrabold text-[#143d1a]">
-            {badge}
-          </span>
-        )}
       </Link>
     </li>
   );
