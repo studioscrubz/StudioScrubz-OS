@@ -1,4 +1,8 @@
+export const METERS_PER_MILE=1609.344;
+export const DISCOVERY_MIN_RADIUS_METERS=500;
 export const DISCOVERY_MAX_RADIUS_METERS=25_000;
+export const DISCOVERY_MIN_RADIUS_MILES=DISCOVERY_MIN_RADIUS_METERS/METERS_PER_MILE;
+export const DISCOVERY_MAX_RADIUS_MILES=DISCOVERY_MAX_RADIUS_METERS/METERS_PER_MILE;
 export const DISCOVERY_MAX_RESULTS=100;
 export const DISCOVERY_CATEGORIES={
   "Property Management / Multifamily":[["building","apartments"],["office","property_management"]],
@@ -18,7 +22,9 @@ export type DiscoveryResultFilter="All results"|"New"|"Possible Duplicate"|"Exac
 export const discoveryCategories=(Object.keys(DISCOVERY_CATEGORIES) as DiscoveryCategory[]).map(key=>({key,label:key}));
 export const discoveryResultFilters:DiscoveryResultFilter[]=["All results","New","Possible Duplicate","Exact Duplicate"];
 export function isDiscoveryCategory(value:string):value is DiscoveryCategory{return value in DISCOVERY_CATEGORIES;}
-export function buildOverpassQuery(category:DiscoveryCategory,latitude:number,longitude:number,radius:number,keyword?:string){const nameFilter=keyword?`["name"~"${escapeOverpass(keyword)}",i]`:"";const selectors=DISCOVERY_CATEGORIES[category].flatMap(([key,value])=>["node","way","relation"].map(type=>`${type}(around:${radius},${latitude},${longitude})["${key}"${value==="*"?"":`="${value}"`}]${nameFilter};`)).join("");return`[out:json][timeout:20];(${selectors});out center tags ${DISCOVERY_MAX_RESULTS};`;}
+export function milesToMeters(miles:number){return Math.round(miles*METERS_PER_MILE);}
+export function metersToMiles(meters:number){return meters/METERS_PER_MILE;}
+export function buildOverpassQuery(category:DiscoveryCategory,latitude:number,longitude:number,radiusMeters:number,keyword?:string){const nameFilter=keyword?`["name"~"${escapeOverpass(keyword)}",i]`:"";const selectors=DISCOVERY_CATEGORIES[category].flatMap(([key,value])=>["node","way","relation"].map(type=>`${type}(around:${radiusMeters},${latitude},${longitude})["${key}"${value==="*"?"":`="${value}"`}]${nameFilter};`)).join("");return`[out:json][timeout:20];(${selectors});out center tags ${DISCOVERY_MAX_RESULTS};`;}
 export function normalizeDiscoveryLocation(value:string){return value.trim().replace(/\s+/g," ").replace(/\s*,\s*/g,",").toLocaleLowerCase();}
 export function filterDiscoveryResults<T extends {businessName:string;classification?:string}>(results:T[],filter:DiscoveryResultFilter,search:string){const query=search.trim().toLocaleLowerCase();return results.filter(result=>(filter==="All results"||result.classification===filter)&&(!query||result.businessName.toLocaleLowerCase().includes(query)));}
 export function safeOpenStreetMapSourceUrl(value:string|null){if(!value)return null;try{const url=new URL(value);return url.protocol==="https:"&&url.hostname==="www.openstreetmap.org"&&/^\/(?:node|way|relation)\/\d+$/.test(url.pathname)?url.toString():null;}catch{return null;}}

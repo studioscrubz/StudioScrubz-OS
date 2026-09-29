@@ -46,6 +46,23 @@ test("RLS, role boundaries, caching, throttling, provenance, and idempotency are
   assert.doesNotMatch(migration,/grant (insert|update|delete|all) on table/i);
 });
 
+test("discovery accepts miles and converts provider and stored radii to meters",()=>{
+  assert.match(discovery,/METERS_PER_MILE=1609\.344/);
+  assert.match(discovery,/milesToMeters\(miles:number\).*Math\.round\(miles\*METERS_PER_MILE\)/);
+  assert.equal(Math.round(1*1609.344),1609);
+  assert.equal(Math.round(5*1609.344),8047);
+  assert.match(ui,/radiusMiles/);
+  assert.match(ui,/Radius in miles/);
+  assert.match(ui,/>\{value\} mi</);
+  assert.match(ui,/metersToMiles\(item\.distanceMeters\).*mi away/);
+  assert.doesNotMatch(ui,/\bkm\b|kilometers?/i);
+  assert.match(route,/const radiusMeters=milesToMeters\(radiusMiles\)/);
+  assert.match(route,/p_radius_meters:radiusMeters/);
+  assert.match(route,/buildOverpassQuery\(category,latitude,longitude,radiusMeters,keyword\)/);
+  assert.match(route,/radiusMiles<DISCOVERY_MIN_RADIUS_MILES/);
+  assert.match(route,/radiusMiles>DISCOVERY_MAX_RADIUS_MILES/);
+});
+
 test("result filters preserve underlying selections and source links are allowlisted",()=>{
   assert.match(discovery,/discoveryResultFilters.*All results.*New.*Possible Duplicate.*Exact Duplicate/);
   assert.match(discovery,/filterDiscoveryResults/);
