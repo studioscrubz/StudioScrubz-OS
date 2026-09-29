@@ -63,6 +63,16 @@ test("discovery accepts miles and converts provider and stored radii to meters",
   assert.match(route,/radiusMiles>DISCOVERY_MAX_RADIUS_MILES/);
 });
 
+test("blank optional assignee UUIDs are normalized before the discovery RPC",()=>{
+  assert.match(ui,/assignedUserId:assignedUserId\|\|null/);
+  assert.match(route,/function optionalUuid\(value:unknown\)/);
+  assert.match(route,/if\(!normalized\)return null/);
+  assert.match(route,/if\(!UUID_PATTERN\.test\(normalized\)\)throw new Error\("Invalid assignee\."\)/);
+  assert.match(route,/profile\.role==="Sales"\?user\.id:optionalUuid\(body\.assignedUserId\)/);
+  assert.match(route,/p_assigned_user_id:assigned/);
+  assert.doesNotMatch(route,/body\.assignedUserId\?\?null/);
+});
+
 test("result filters preserve underlying selections and source links are allowlisted",()=>{
   assert.match(discovery,/discoveryResultFilters.*All results.*New.*Possible Duplicate.*Exact Duplicate/);
   assert.match(discovery,/filterDiscoveryResults/);
