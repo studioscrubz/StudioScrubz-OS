@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { Prospect, ProspectAssignee, ProspectEvent, ProspectImportPreviewRow, ProspectImportResult, ProspectInput } from "@/types/prospect";
+import type { DiscoveryResult } from "@/types/prospectDiscovery";
 
 export async function getProspects(): Promise<Prospect[]> {
   const { data, error } = await prospectClient().from("prospects").select("*").order("score", { ascending: false });
@@ -34,6 +35,11 @@ export async function getProspectAssignees(): Promise<ProspectAssignee[]> {
 export async function createProspectImportBatch(requestId:string,filename:string,totalRows:number,assignedUserId:string|null):Promise<string>{const{data,error}=await prospectClient().rpc("create_prospect_import_batch",{p_request_id:requestId,p_filename:filename,p_total_rows:totalRows,p_assigned_user_id:assignedUserId});if(error)throw new Error(error.message);return data as string;}
 export async function importProspectRows(batchId:string,rows:ProspectImportPreviewRow[]):Promise<ProspectImportResult>{const{data,error}=await prospectClient().rpc("import_prospect_batch_rows",{p_batch_id:batchId,p_rows:rows});if(error)throw new Error(error.message);return data as ProspectImportResult;}
 export async function mergeProspects(survivorId:string,removedId:string,fieldDecisions:Record<string,"survivor"|"removed">,requestId:string):Promise<string>{const{data,error}=await prospectClient().rpc("merge_prospects",{p_survivor_id:survivorId,p_removed_id:removedId,p_field_decisions:fieldDecisions,p_request_id:requestId});if(error)throw new Error(error.message);return data as string;}
+export async function importDiscoveryResults(runId:string,results:DiscoveryResult[]):Promise<{imported:number;skipped:number}>{
+  const selections=results.filter(result=>result.selected).map(result=>({resultId:result.resultId,classification:result.classification,decision:result.decision,matchedProspectId:result.matchedProspectId}));
+  const{data,error}=await prospectClient().rpc("import_prospect_discovery_results",{p_run_id:runId,p_request_id:crypto.randomUUID(),p_selections:selections});
+  if(error)throw new Error(error.message);return data as {imported:number;skipped:number};
+}
 
 // These tables are introduced by the pending forward-only migration, so the
 // hand-maintained generated schema cannot expose them until that migration runs.
