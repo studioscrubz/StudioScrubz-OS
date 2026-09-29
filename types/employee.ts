@@ -1,13 +1,110 @@
-export const EMPLOYEE_DEPARTMENTS=["Scrub Technicians","Sales","Lead Representative","Administration","Management"] as const;
-export type LeadRepresentativeOption = { id: string; display_name: string; is_active: boolean };
+export const EMPLOYEE_DEPARTMENTS = [
+  "Scrub Technicians",
+  "Sales",
+  "Lead Representative",
+  "Administration",
+  "Management",
+] as const;
+
+export type LeadRepresentativeOption = {
+  id: string;
+  display_name: string;
+  is_active: boolean;
+};
+
 export type PorterServiceRole = "Porter Tech" | "Porter Manager";
-export type PorterAssignmentOption = { employee_id: string; display_name: string; service_role: PorterServiceRole };
-export const EMPLOYMENT_STATUSES=["Active","Inactive","On Leave","Terminated","Archived"] as const;
-export const EMPLOYMENT_TYPES=["Full-Time","Part-Time","On-Call","1099","Temporary"] as const;
-export type EmployeeDepartment=(typeof EMPLOYEE_DEPARTMENTS)[number];
-export type EmploymentStatus=(typeof EMPLOYMENT_STATUSES)[number];
-export type EmploymentType=(typeof EMPLOYMENT_TYPES)[number];
-export type Employee={id:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:EmployeeDepartment;job_title:string|null;employment_status:EmploymentStatus;employment_type:EmploymentType|null;hourly_rate:number;overtime_rate:number;commission_rate:number;hire_date:string|null;notes:string|null;created_at:string;updated_at:string;archived_at:string|null};
-export type EmployeeInput=Omit<Employee,"id"|"employee_number"|"created_at"|"updated_at"|"archived_at"|"overtime_rate">&{overtime_rate?:number};
-export type EmployeeUpdate=Partial<EmployeeInput> & {archived_at?:string|null};
-export function employeeName(e:Pick<Employee,"first_name"|"last_name"|"preferred_name">|null){return e?e.preferred_name?.trim()||`${e.first_name} ${e.last_name}`.trim():"Deleted Employee"}
+
+export type PorterAssignmentOption = {
+  employee_id: string;
+  display_name: string;
+  service_role: PorterServiceRole;
+};
+
+export const EMPLOYMENT_STATUSES = [
+  "Active",
+  "Inactive",
+  "On Leave",
+  "Terminated",
+  "Archived",
+] as const;
+
+export const EMPLOYMENT_TYPES = [
+  "Full-Time",
+  "Part-Time",
+  "On-Call",
+  "1099",
+  "Temporary",
+] as const;
+
+export type EmployeeDepartment =
+  (typeof EMPLOYEE_DEPARTMENTS)[number];
+
+export type EmploymentStatus =
+  (typeof EMPLOYMENT_STATUSES)[number];
+
+export type EmploymentType =
+  (typeof EMPLOYMENT_TYPES)[number];
+
+export type ActiveScrubTechnician = {
+  id: string;
+  employee_number: string;
+  first_name: string;
+  last_name: string;
+  preferred_name: string | null;
+  email: string | null;
+  phone: string | null;
+  department: "Scrub Technicians";
+  job_title: string | null;
+  employment_status: "Active";
+  employment_type: EmploymentType | null;
+};
+
+export type Employee = {
+  id: string;
+  employee_number: string;
+  first_name: string;
+  last_name: string;
+  preferred_name: string | null;
+  email: string | null;
+  phone: string | null;
+  department: EmployeeDepartment;
+  job_title: string | null;
+  employment_status: EmploymentStatus;
+  employment_type: EmploymentType | null;
+  hourly_rate: number;
+  overtime_rate: number;
+  commission_rate: number;
+  hire_date: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
+export type EmployeeInput = Omit<
+  Employee,
+  | "id"
+  | "employee_number"
+  | "created_at"
+  | "updated_at"
+  | "archived_at"
+  | "overtime_rate"
+> & {
+  overtime_rate?: number;
+};
+
+export type EmployeeUpdate = Partial<EmployeeInput> & {
+  archived_at?: string | null;
+};
+
+export function employeeName(
+  e: Pick<
+    Employee,
+    "first_name" | "last_name" | "preferred_name"
+  > | null,
+) {
+  return e
+    ? e.preferred_name?.trim() ||
+        `${e.first_name} ${e.last_name}`.trim()
+    : "Deleted Employee";
+}

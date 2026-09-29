@@ -2,6 +2,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { isMasterAdmin } from "@/lib/auth/permissions";
 import type {
+  ActiveScrubTechnician,
   Employee,
   EmployeeDepartment,
   EmployeeInput,
@@ -10,16 +11,53 @@ import type {
   PorterAssignmentOption,
 } from "@/types/employee";
 
-export async function getPorterAssignmentOptions(): Promise<PorterAssignmentOption[]> {
-  const { data, error } = await getSupabaseClient().rpc("get_porter_assignment_options", {});
-  if (error) throw new Error(`Porter assignment options could not be loaded: ${error.message}`);
+export async function getPorterAssignmentOptions(): Promise<
+  PorterAssignmentOption[]
+> {
+  const { data, error } = await getSupabaseClient().rpc(
+    "get_porter_assignment_options",
+    {},
+  );
+
+  if (error) {
+    throw new Error(
+      `Porter assignment options could not be loaded: ${error.message}`,
+    );
+  }
+
   return data;
 }
 
-export async function getLeadRepresentatives(estimateId: string | null = null): Promise<LeadRepresentativeOption[]> {
-  const { data, error } = await getSupabaseClient().rpc("get_lead_representatives", { p_estimate_id: estimateId });
+export async function getLeadRepresentatives(
+  estimateId: string | null = null,
+): Promise<LeadRepresentativeOption[]> {
+  const { data, error } = await getSupabaseClient().rpc(
+    "get_lead_representatives",
+    {
+      p_estimate_id: estimateId,
+    },
+  );
+
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function getActiveScrubTechnicians(): Promise<
+  ActiveScrubTechnician[]
+> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await (supabase as any).rpc(
+    "get_active_scrub_technicians",
+  );
+
+  if (error) {
+    throw new Error(
+      `Active Scrub Technicians could not be loaded: ${error.message}`,
+    );
+  }
+
+  return (data ?? []) as ActiveScrubTechnician[];
 }
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -171,7 +209,9 @@ export async function archiveEmployee(id: string) {
 }
 
 // Legacy UI/types may carry this field, but it is no longer a database column.
-function employeeWritePayload<T extends EmployeeInput | EmployeeUpdate>(input: T): Omit<T, "overtime_rate"> {
+function employeeWritePayload<T extends EmployeeInput | EmployeeUpdate>(
+  input: T,
+): Omit<T, "overtime_rate"> {
   const payload = { ...input };
   delete payload.overtime_rate;
   return payload;
