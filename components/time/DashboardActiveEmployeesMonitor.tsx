@@ -1,78 +1,62 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { hasPermission } from "@/lib/auth/permissions";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { ActiveStaffPanel } from "@/components/time/ActiveStaffPanel";
+import { hasPermission } from "@/lib/auth/permissions";
 import { getActiveScrubTechnicians } from "@/lib/services/employees";
 import { getOperationalActiveTimeEntries } from "@/lib/services/timeEntries";
-import {
-  getActiveEmployeeWorkSessions,
-  PLATFORM_PRESENCE_CHANGED_EVENT,
-} from "@/lib/services/workSessions";
-import type {
-  ActiveEmployeeWorkSession,
-  ActiveStaffStatus,
-} from "@/types/workSession";
+import { getActiveEmployeeWorkSessions, PLATFORM_PRESENCE_CHANGED_EVENT } from "@/lib/services/workSessions";
+import type { ActiveScrubTechnician } from "@/types/employee";
 import type { OperationalActiveTimeEntry } from "@/types/timeEntry";
-import { ActiveStaffPanel } from "@/components/time/ActiveStaffPanel";
+import type { ActiveEmployeeWorkSession } from "@/types/workSession";
+
+export type ScrubTechRosterStatus = {
+  employee_id: string;
+  employee_number: string | null;
+  employee_name: string;
+  availability: "Available" | "On Job / Unavailable" | "Offline";
+  job_id: string | null;
+  job_number: string | null;
+  joined_at: string | null;
+};
 
 export function DashboardActiveEmployeesMonitor() {
   const { profile } = useAuth();
-  const canViewRoster = hasPermission(
-    profile,
-    "employees.scrubTechRosterView",
-  );
+  const canViewRoster = hasPermission(profile, "employees.scrubTechRosterView");
   const canViewPresence = hasPermission(profile, "timeClock.view");
-
-  const [activeTechCount, setActiveTechCount] = useState(0);
-  const [staff, setStaff] = useState<ActiveStaffStatus[]>([]);
+  const [staff, setStaff] = useState<ScrubTechRosterStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     if (!canViewRoster) {
+      setStaff([]);
       setLoading(false);
       return;
     }
-
     try {
       const technicians = await getActiveScrubTechnicians();
-      setActiveTechCount(technicians.length);
-
+      let sessions: ActiveEmployeeWorkSession[] = [];
+      let entries: OperationalActiveTimeEntry[] = [];
       if (canViewPresence) {
         try {
-          const sessions = await getActiveEmployeeWorkSessions();
-
-          let entries: OperationalActiveTimeEntry[] = [];
-
-          try {
-            entries = await getOperationalActiveTimeEntries();
-          } catch (cause) {
-            console.error(
-              "Active Job participation could not be loaded. Showing platform presence only.",
-              cause,
-            );
-          }
-
-          setStaff(mergeActiveStaff(sessions, entries));
+          [sessions, entries] = await Promise.all([
+            getActiveEmployeeWorkSessions(),
+            getOperationalActiveTimeEntries(),
+          ]);
         } catch (cause) {
           console.error(
-            "Active employee presence could not be loaded",
+            "Active technician presence could not be loaded; showing the authoritative roster without presence.",
             cause,
           );
-          setStaff([]);
         }
-      } else {
-        setStaff([]);
       }
-
+      setStaff(mergeScrubTechRoster(technicians, sessions, entries));
       setError(false);
     } catch (cause) {
-      console.error(
-        "Active Scrub Technician roster could not be loaded",
-        cause,
-      );
+      console.error("Active Scrub Technician roster could not be loaded", cause);
       setError(true);
     } finally {
       setLoading(false);
@@ -86,94 +70,43 @@ export function DashboardActiveEmployeesMonitor() {
 
   useEffect(() => {
     if (!canViewPresence) return;
-
     const refresh = () => void load();
-
-    window.addEventListener(
-      PLATFORM_PRESENCE_CHANGED_EVENT,
-      refresh,
-    );
-
-    return () =>
-      window.removeEventListener(
-        PLATFORM_PRESENCE_CHANGED_EVENT,
-        refresh,
-      );
+    window.addEventListener(PLATFORM_PRESENCE_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(PLATFORM_PRESENCE_CHANGED_EVENT, refresh);
   }, [canViewPresence, load]);
 
-  useOperationalRealtime(
-    ["employees", "employee_work_sessions", "time_entries"],
-    load,
-  );
+  useOperationalRealtime(["employees", "employee_work_sessions", "time_entries"], load);
 
   if (!canViewRoster) return null;
-
-  return (
-    <div className="mt-7">
-      <div className="min-h-28 w-full rounded-2xl border bg-white p-5 sm:max-w-64">
-        <p className="text-xs font-bold uppercase text-neutral-500">
-          Active Techs
-        </p>
-
-        <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">
-          {loading ? "..." : error ? "Unavailable" : activeTechCount}
-        </p>
-      </div>
-
-      {error && (
-        <p className="mt-3 text-sm font-bold text-amber-700">
-          Active Scrub Technician roster is temporarily unavailable.
-        </p>
-      )}
-
-      {!error && canViewPresence && (
-        <ActiveStaffPanel staff={staff} />
-      )}
+  return <div className="mt-7">
+    <div className="min-h-28 w-full rounded-2xl border bg-white p-5 sm:max-w-64">
+      <p className="text-xs font-bold uppercase text-neutral-500">Active Techs</p>
+      <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{loading ? "..." : error ? "Unavailable" : staff.length}</p>
     </div>
-  );
+    {error ? <p className="mt-3 text-sm font-bold text-amber-700">Active Scrub Technician roster is temporarily unavailable.</p> : <ActiveStaffPanel staff={staff} showPresence={canViewPresence}/>}
+  </div>;
 }
 
-export function mergeActiveStaff(
-  sessions: ActiveEmployeeWorkSession[],
-  entries: OperationalActiveTimeEntry[],
-): ActiveStaffStatus[] {
-  const byEmployee = new Map<string, ActiveStaffStatus>();
-
-  for (const session of sessions) {
-    byEmployee.set(session.employee_id, {
-      ...session,
-      availability: "Active / Available",
+export function mergeScrubTechRoster(technicians: ActiveScrubTechnician[], sessions: ActiveEmployeeWorkSession[], entries: OperationalActiveTimeEntry[]): ScrubTechRosterStatus[] {
+  const byEmployee = new Map<string, ScrubTechRosterStatus>();
+  for (const technician of technicians) {
+    byEmployee.set(technician.id, {
+      employee_id: technician.id,
+      employee_number: technician.employee_number,
+      employee_name: technician.preferred_name?.trim() || `${technician.first_name} ${technician.last_name}`.trim(),
+      availability: "Offline",
       job_id: null,
       job_number: null,
       joined_at: null,
     });
   }
-
-  for (const entry of entries) {
-    const session = byEmployee.get(entry.employee_id);
-
-    byEmployee.set(entry.employee_id, {
-      id: session?.id ?? entry.id,
-      employee_id: entry.employee_id,
-      employee_number:
-        session?.employee_number ?? entry.employee_number,
-      employee_name:
-        session?.employee_name || entry.employee_name,
-      clock_in:
-        session?.clock_in ?? entry.clock_in,
-      status: "Open",
-      created_at:
-        session?.created_at ?? entry.clock_in,
-      updated_at:
-        session?.updated_at ?? entry.clock_in,
-      availability: "On Job / Unavailable",
-      job_id: entry.job_id,
-      job_number: entry.job_number,
-      joined_at: entry.clock_in,
-    });
+  for (const session of sessions) {
+    const technician = byEmployee.get(session.employee_id);
+    if (technician) byEmployee.set(session.employee_id, { ...technician, availability: "Available" });
   }
-
-  return [...byEmployee.values()].sort((left, right) =>
-    left.employee_name.localeCompare(right.employee_name),
-  );
+  for (const entry of entries) {
+    const technician = byEmployee.get(entry.employee_id);
+    if (technician) byEmployee.set(entry.employee_id, { ...technician, availability: "On Job / Unavailable", job_id: entry.job_id, job_number: entry.job_number, joined_at: entry.clock_in });
+  }
+  return [...byEmployee.values()].sort((left, right) => left.employee_name.localeCompare(right.employee_name));
 }
