@@ -84,7 +84,7 @@ export function DashboardPage() {
           </button>
         </div>
       )}
-      <DashboardTimeClockControl employeeId={profile?.employee_id ?? null} />
+      {profile?.role !== "Sales" && <DashboardTimeClockControl employeeId={profile?.employee_id ?? null} />}
       <DashboardActiveEmployeesMonitor />
       {data && (
         <>
