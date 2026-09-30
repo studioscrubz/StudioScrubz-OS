@@ -4,7 +4,7 @@ import type { EnrichmentFieldName } from "@/types/prospectEnrichment";
 
 export const ENRICHMENT_MAX_ITEMS=10, ENRICHMENT_MAX_PAGES=4, ENRICHMENT_MAX_BYTES=1_000_000;
 export const ENRICHMENT_USER_AGENT="StudioScrubz Prospect Enrichment/1.1 (contact: support@studioscrubz.com)";
-export interface Candidate{fieldName:EnrichmentFieldName;value:string;normalizedValue:string;sourceUrl:string;sourcePageType:string;confidence:number;retrievedAt:string}
+export interface Candidate{fieldName:EnrichmentFieldName;value:string;normalizedValue:string;sourceUrl:string;sourcePageType:string;confidence:number;retrievedAt:string;sourceType?:"Official Website"|"Generated Candidate"}
 export interface WebsiteDiscoveryInput{businessName:string;address?:string;city?:string;state?:string;zip?:string}
 export interface WebsiteDiscoveryResult{url:string;confidence:number;signals:string[]}
 
@@ -18,7 +18,7 @@ async function fetchBounded(url:URL,expectedHost?:string){let current=await vali
 function strip(value:string){return value.replace(/<[^>]+>/g," ").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g," ").trim()}
 function words(value:string){return new Set(value.toLowerCase().replace(/[^a-z0-9]+/g," ").split(/\s+/).filter(x=>x.length>2&&!["the","and","inc","llc","company","corp"].includes(x)))}
 function overlap(a:string,b:string){const aa=words(a),bb=words(b);if(!aa.size)return 0;let hit=0;for(const x of aa)if(bb.has(x))hit++;return hit/aa.size}
-function add(list:Candidate[],fieldName:EnrichmentFieldName,value:string|undefined,sourceUrl:string,page:string,confidence:number){const v=strip(value||"");if(!v)return;const normalized=fieldName==="business_email"?v.toLowerCase():fieldName==="business_phone"?v.replace(/\D/g,""):fieldName==="website"?v.toLowerCase():v.toLowerCase();if(!normalized)return;if(!list.some(x=>x.fieldName===fieldName&&x.normalizedValue===normalized))list.push({fieldName,value:v,normalizedValue:normalized,sourceUrl,sourcePageType:page,confidence,retrievedAt:new Date().toISOString()})}
+function add(list:Candidate[],fieldName:EnrichmentFieldName,value:string|undefined,sourceUrl:string,page:string,confidence:number,sourceType:"Official Website"|"Generated Candidate"="Official Website"){const v=strip(value||"");if(!v)return;const normalized=fieldName==="business_email"?v.toLowerCase():fieldName==="business_phone"?v.replace(/\D/g,""):fieldName==="website"?v.toLowerCase():v.toLowerCase();if(!normalized)return;if(!list.some(x=>x.fieldName===fieldName&&x.normalizedValue===normalized))list.push({fieldName,value:v,normalizedValue:normalized,sourceUrl,sourcePageType:page,confidence,retrievedAt:new Date().toISOString(),sourceType})}
 function extractJsonLd(html:string,url:string,page:string,list:Candidate[]){for(const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){try{const raw=JSON.parse(m[1]);const walk=(x:any)=>{if(Array.isArray(x))return x.forEach(walk);if(!x||typeof x!=="object")return;const type=Array.isArray(x["@type"])?x["@type"].join(" "):String(x["@type"]||"");if(/Organization|LocalBusiness|Restaurant|Person|ContactPoint/i.test(type)){add(list,"business_phone",x.telephone,url,"Structured Data",90);add(list,"business_email",x.email,url,"Structured Data",90);if(typeof x.url==="string")add(list,"website",x.url,url,"Structured Data",90);if(x.address&&typeof x.address==="object"){add(list,"address",[x.address.streetAddress].filter(Boolean).join(" "),url,"Structured Data",92);add(list,"city",x.address.addressLocality,url,"Structured Data",92);add(list,"state",x.address.addressRegion,url,"Structured Data",92);add(list,"zip",x.address.postalCode,url,"Structured Data",92)}if(/Person/i.test(type)){add(list,"contact_name",x.name,url,"Structured Data",75);add(list,"contact_title",x.jobTitle,url,"Structured Data",75)}}Object.values(x).forEach(walk)};walk(raw)}catch{}}}
 function extractPage(html:string,url:string,page:string,list:Candidate[]){extractJsonLd(html,url,page,list);for(const m of html.matchAll(/href=["']mailto:([^"'?]+)[^"']*["']/gi))add(list,"business_email",decodeURIComponent(m[1]),url,page,85);for(const m of html.matchAll(/href=["']tel:([^"']+)["']/gi))add(list,"business_phone",decodeURIComponent(m[1]),url,page,85)}
 function pageLinks(html:string,base:URL){const links:{url:string;page:string}[]=[];for(const m of html.matchAll(/<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)){try{const label=strip(m[2]).toLowerCase(),u=new URL(m[1],base);const patterns:Array<[RegExp,string]>=[[/contact/i,"Contact"],[/about/i,"About"],[/team/i,"Team"],[/staff/i,"Staff"],[/management/i,"Management"],[/locations?/i,"Locations"]];const hit=patterns.find(([r])=>r.test(label)||r.test(u.pathname));if(hit&&sameSite(u.hostname,base.hostname)&&u.protocol==="https:")links.push({url:u.toString(),page:hit[1]})}catch{}}return links.filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i).slice(0,3)}
@@ -66,4 +66,20 @@ async function verifyOfficialWebsite(url:string,input:WebsiteDiscoveryInput):Pro
 
 export async function discoverOfficialWebsite(input:WebsiteDiscoveryInput){const candidates=await searchOfficialWebsite(input);const verified:WebsiteDiscoveryResult[]=[];for(const url of candidates.slice(0,3)){const match=await verifyOfficialWebsite(url,input);if(match)verified.push(match)}verified.sort((a,b)=>b.confidence-a.confidence);return verified[0]??null}
 
-export async function enrichOfficialWebsite(input:string){const base=await validatePublicHttps(input);if(!(await robotsAllows(base)))throw new Error("Website robots policy blocks automated access.");const candidates:Candidate[]=[];const home=await fetchBounded(base);add(candidates,"website",base.origin,base.toString(),"Homepage",95);extractPage(home,base.toString(),"Homepage",candidates);for(const link of pageLinks(home,base)){try{const url=await validatePublicHttps(link.url,base.hostname),html=await fetchBounded(url,base.hostname);extractPage(html,url.toString(),link.page,candidates);if(link.page==="Contact")add(candidates,"contact_page_url",url.toString(),url.toString(),"Contact",95)}catch{}}return{canonicalUrl:base.origin,canonicalDomain:base.hostname.replace(/^www\./,""),candidates}}
+
+export function generateBusinessEmailCandidates(domain:string,existing:Candidate[]){
+  const clean=domain.toLowerCase().replace(/^www\./,"").replace(/\.$/,"");
+  if(!clean||clean.includes("/")||clean.includes("@"))return[];
+  const published=new Set(existing.filter(x=>x.fieldName==="business_email").map(x=>x.normalizedValue.toLowerCase()));
+  const generated:Candidate[]=[];
+  const mailboxes:[string,number][]=[["info",55],["contact",50],["hello",45]];
+  for(const [local,confidence] of mailboxes){
+    const email=`${local}@${clean}`;
+    if(!published.has(email)){
+      add(generated,"business_email",email,`https://${clean}/`,"Generated Email Pattern",confidence,"Generated Candidate");
+    }
+  }
+  return generated;
+}
+
+export async function enrichOfficialWebsite(input:string){const base=await validatePublicHttps(input);if(!(await robotsAllows(base)))throw new Error("Website robots policy blocks automated access.");const candidates:Candidate[]=[];const home=await fetchBounded(base);add(candidates,"website",base.origin,base.toString(),"Homepage",95);extractPage(home,base.toString(),"Homepage",candidates);for(const link of pageLinks(home,base)){try{const url=await validatePublicHttps(link.url,base.hostname),html=await fetchBounded(url,base.hostname);extractPage(html,url.toString(),link.page,candidates);if(link.page==="Contact")add(candidates,"contact_page_url",url.toString(),url.toString(),"Contact",95)}catch{}}const canonicalDomain=base.hostname.replace(/^www\./,"");if(!candidates.some(x=>x.fieldName==="business_email"&&x.sourceType!=="Generated Candidate"))candidates.push(...generateBusinessEmailCandidates(canonicalDomain,candidates));return{canonicalUrl:base.origin,canonicalDomain,candidates}}
