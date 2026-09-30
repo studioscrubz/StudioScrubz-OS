@@ -27,13 +27,11 @@ export function DashboardActiveEmployeesMonitor() {
   const canViewRoster = hasPermission(profile, "employees.scrubTechRosterView");
   const canViewPresence = hasPermission(profile, "timeClock.view");
   const [staff, setStaff] = useState<ScrubTechRosterStatus[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     if (!canViewRoster) {
       setStaff([]);
-      setLoading(false);
       return;
     }
     try {
@@ -58,8 +56,6 @@ export function DashboardActiveEmployeesMonitor() {
     } catch (cause) {
       console.error("Active Scrub Technician roster could not be loaded", cause);
       setError(true);
-    } finally {
-      setLoading(false);
     }
   }, [canViewRoster, canViewPresence]);
 
@@ -79,10 +75,6 @@ export function DashboardActiveEmployeesMonitor() {
 
   if (!canViewRoster) return null;
   return <div className="mt-7">
-    <div className="min-h-28 w-full rounded-2xl border bg-white p-5 sm:max-w-64">
-      <p className="text-xs font-bold uppercase text-neutral-500">Active Techs</p>
-      <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{loading ? "..." : error ? "Unavailable" : staff.length}</p>
-    </div>
     {error ? <p className="mt-3 text-sm font-bold text-amber-700">Active Scrub Technician roster is temporarily unavailable.</p> : <ActiveStaffPanel staff={staff} showPresence={canViewPresence}/>}
   </div>;
 }
