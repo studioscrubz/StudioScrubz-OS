@@ -8,7 +8,7 @@ const orchestrator=read("lib/prospect-enrichment/orchestrator.ts","utf8");
 const route=read("app/api/prospects/enrich/route.ts","utf8");
 const compatibilityMigration=read("supabase/migrations/20260930143423_allow_generated_email_enrichment_page_type.sql","utf8");
 
-const evidence=(sourceType,verificationStatus)=>({providerKey:"test",providerVersion:"1",sourceType,sourceUrl:"https://example.com/",sourcePageType:"Homepage",verificationStatus,discoveredAt:"2026-09-30T00:00:00.000Z"});
+const evidence=(sourceType,verificationStatus)=>({providerKey:sourceType==="Generated Candidate"?"generated-role-email":"official-website-contacts",providerVersion:"1",sourceKind:"Homepage",sourceType,sourceUrl:"https://example.com/",sourcePageType:"Homepage",verificationStatus,discoveredAt:"2026-09-30T00:00:00.000Z"});
 const candidate=(overrides={})=>({fieldName:"business_email",value:" INFO@Example.com ",normalizedValue:"",sourceType:"Official Website",sourceUrl:"https://example.com/",sourcePageType:"Homepage",confidence:85,retrievedAt:"2026-09-30T00:00:00.000Z",evidence:evidence("Official Website","published"),...overrides});
 
 test("provider registry orders providers and rejects duplicates or paid providers",()=>{
@@ -26,11 +26,11 @@ test("needs planner stops work for adequate original or provider data",()=>{
   assert.equal(foundation.planEnrichmentNeeds({discoveryResultId:"r",businessName:"Business",website:"https://example.com"},[candidate()]).businessEmail,false);
 });
 
-test("normalization deduplicates and deterministic ranking favors published over generated",()=>{
+test("normalization retains independent evidence and deterministic ranking favors published over generated",()=>{
   const generated=candidate({value:"info@example.com",normalizedValue:"info@example.com",sourceType:"Generated Candidate",confidence:55,evidence:evidence("Generated Candidate","unverified")});
   const published=candidate();
   const rows=foundation.normalizeDedupeAndRank([generated,published]);
-  assert.equal(rows.length,1);
+  assert.equal(rows.length,2);
   assert.equal(rows[0].sourceType,"Official Website");
   assert.equal(rows[0].normalizedValue,"info@example.com");
   assert.ok(foundation.candidateRank(published)>foundation.candidateRank(generated));

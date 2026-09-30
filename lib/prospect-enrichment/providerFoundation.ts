@@ -3,6 +3,23 @@ export type ProviderCapability="company_resolution"|"business_contact_enrichment
 export type ProviderSourceType="OpenStreetMap"|"Official Website"|"Generated Candidate";
 export type VerificationStatus="published"|"verified"|"valid"|"catch_all"|"risky"|"unverified"|"invalid"|"unknown";
 export type ProviderCostClass="free"|"paid";
+const BLOCKED_METADATA_KEY=/(authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|secret|password|cookie|raw[-_]?response|html)/i;
+const MAX_METADATA_KEYS=30;
+const MAX_METADATA_STRING_LENGTH=500;
+
+export function sanitizeProviderMetadata(value:unknown,depth=0):Record<string,unknown>{
+  if(!value||typeof value!=="object"||Array.isArray(value)||depth>2)return{};
+  const clean:Record<string,unknown>={};
+  for(const[key,raw]of Object.entries(value as Record<string,unknown>).slice(0,MAX_METADATA_KEYS)){
+    if(BLOCKED_METADATA_KEY.test(key))continue;
+    if(typeof raw==="string")clean[key]=raw.slice(0,MAX_METADATA_STRING_LENGTH);
+    else if(typeof raw==="number"&&Number.isFinite(raw))clean[key]=raw;
+    else if(typeof raw==="boolean"||raw===null)clean[key]=raw;
+    else if(raw&&typeof raw==="object"&&!Array.isArray(raw))clean[key]=sanitizeProviderMetadata(raw,depth+1);
+    else if(Array.isArray(raw))clean[key]=raw.slice(0,20).filter(item=>typeof item==="string"||typeof item==="number"||typeof item==="boolean").map(item=>typeof item==="string"?item.slice(0,MAX_METADATA_STRING_LENGTH):item);
+  }
+  return clean;
+}
 
 export interface EnrichmentSubject{
   discoveryResultId:string;
@@ -22,16 +39,19 @@ export interface EnrichmentSubject{
 export interface ProviderEvidence{
   providerKey:string;
   providerVersion:string;
+  providerCallId?:string;
+  sourceKind:string;
   sourceType:ProviderSourceType;
   sourceUrl:string;
   sourcePageType:string;
   verificationStatus:VerificationStatus;
   discoveredAt:string;
   verifiedAt?:string;
+  providerRecordId?:string;
   providerMetadata?:Record<string,unknown>;
 }
 
-export interface ProviderUsage{creditsUsed?:number;costMinorUnits?:number;currency?:string}
+export interface ProviderUsage{creditsUsed?:number;costMinorUnits?:number;costCurrency?:string}
 
 // The top-level fields deliberately match the existing staging RPC payload.
 export interface ProviderCandidate{
@@ -44,6 +64,7 @@ export interface ProviderCandidate{
   confidence:number;
   retrievedAt:string;
   evidence:ProviderEvidence;
+  usage?:ProviderUsage;
 }
 
 export interface ProviderResult{
@@ -53,6 +74,9 @@ export interface ProviderResult{
   resolvedCompany?:{website:string;domain:string};
   retryable?:boolean;
   errorCode?:string;
+  providerRequestId?:string;
+  httpStatus?:number;
+  responseMetadata?:Record<string,unknown>;
 }
 
 export interface ProviderContext{signal?:AbortSignal;requestId:string;allowPaidCall:false}
@@ -121,14 +145,15 @@ export function normalizeCandidate(candidate:ProviderCandidate):ProviderCandidat
   if(!value||candidate.evidence.verificationStatus==="invalid")return null;
   const normalized=normalizedValue(candidate.fieldName,candidate.normalizedValue||value);
   if(!normalized)return null;
-  return{...candidate,value,normalizedValue:normalized,confidence:Math.max(0,Math.min(100,Math.round(candidate.confidence)))};
+  return{...candidate,value,normalizedValue:normalized,confidence:Math.max(0,Math.min(100,Math.round(candidate.confidence))),evidence:{...candidate.evidence,providerMetadata:sanitizeProviderMetadata(candidate.evidence.providerMetadata)}};
 }
 
 export function normalizeDedupeAndRank(candidates:readonly ProviderCandidate[]){
   const byFieldValue=new Map<string,ProviderCandidate>();
   for(const raw of candidates){
     const candidate=normalizeCandidate(raw);if(!candidate)continue;
-    const key=`${candidate.fieldName}|${candidate.normalizedValue}`;
+    // Deduplicate repeated extraction from the same evidence, but retain independent corroboration.
+    const key=`${candidate.fieldName}|${candidate.normalizedValue}|${candidate.evidence.providerKey}|${candidate.evidence.providerVersion}|${candidate.evidence.sourceUrl}|${candidate.evidence.sourceKind}`;
     const current=byFieldValue.get(key);
     if(!current||candidateRank(candidate)>candidateRank(current))byFieldValue.set(key,candidate);
   }

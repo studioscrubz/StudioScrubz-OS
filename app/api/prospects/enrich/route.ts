@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ENRICHMENT_MAX_ITEMS } from "@/lib/prospectEnrichment";
 import { enrichmentOrchestrator } from "@/lib/prospect-enrichment/orchestrator";
+import { SupabaseProviderCallRecorder } from "@/lib/prospect-enrichment/providerCallRecorder";
 import type { UserProfile } from "@/types/auth";
 
 export async function POST(request:Request){
@@ -18,6 +19,7 @@ export async function POST(request:Request){
   const{data:started,error:startError}=await db.rpc("begin_prospect_enrichment",{p_request_id:body.requestId??crypto.randomUUID(),p_discovery_run_id:body.runId,p_result_ids:body.resultIds});
   if(startError)return NextResponse.json({error:startError.message},{status:startError.message.includes("rate limit")?429:400});
   const enrichmentRunId=started.runId;
+  const providerCalls=new SupabaseProviderCallRecorder(db);
   const{data:inputs,error:inputError}=await db.rpc("get_prospect_enrichment_inputs",{p_run_id:enrichmentRunId});
   if(inputError)return NextResponse.json({error:inputError.message},{status:400});
 
@@ -25,6 +27,7 @@ export async function POST(request:Request){
     try{
       const snapshot=item.input??{};
       const found=await enrichmentOrchestrator.enrich({
+        enrichmentItemId:String(item.itemId),
         discoveryResultId:String(item.resultId),businessName:String(snapshot.businessName??""),
         website:item.website?String(item.website):undefined,verifiedDomain:item.canonicalDomain?String(item.canonicalDomain):undefined,
         email:snapshot.email?String(snapshot.email):undefined,phone:snapshot.phone?String(snapshot.phone):undefined,
@@ -32,7 +35,7 @@ export async function POST(request:Request){
         state:snapshot.state?String(snapshot.state):undefined,zip:snapshot.zip?String(snapshot.zip):undefined,
         sourceUrl:snapshot.sourceUrl?String(snapshot.sourceUrl):undefined,locationQuery:item.locationQuery?String(item.locationQuery):undefined,
         cacheKey:item.cacheKey?String(item.cacheKey):null
-      },{getCached:async cacheKey=>{const{data,error}=await db.rpc("get_prospect_enrichment_cache",{p_cache_key:cacheKey});if(error)throw new Error(error.message);return data}});
+      },{providerCalls,getCached:async cacheKey=>{const{data,error}=await db.rpc("get_prospect_enrichment_cache",{p_cache_key:cacheKey});if(error)throw new Error(error.message);return data}});
       const{error}=await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:found.status,p_candidates:found.candidates,p_canonical_url:found.canonicalUrl,p_canonical_domain:found.canonicalDomain,p_cache_key:found.cacheKey,p_error:found.error??null});
       if(error)throw new Error(error.message);
     }catch(cause){

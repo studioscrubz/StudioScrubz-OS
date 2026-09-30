@@ -3,7 +3,7 @@ import { discoverOfficialWebsite, extractOfficialWebsiteContacts, generateBusine
 import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 
 const now=()=>new Date().toISOString();
-function evidence(providerKey:string,version:string,sourceType:ProviderEvidence["sourceType"],sourceUrl:string,sourcePageType:string,verificationStatus:ProviderEvidence["verificationStatus"]):ProviderEvidence{return{providerKey,providerVersion:version,sourceType,sourceUrl,sourcePageType,verificationStatus,discoveredAt:now()}}
+function evidence(providerKey:string,version:string,sourceType:ProviderEvidence["sourceType"],sourceUrl:string,sourcePageType:string,verificationStatus:ProviderEvidence["verificationStatus"]):ProviderEvidence{return{providerKey,providerVersion:version,sourceKind:sourcePageType,sourceType,sourceUrl,sourcePageType,verificationStatus,discoveredAt:now()}}
 function candidate(providerKey:string,version:string,fieldName:ProviderCandidate["fieldName"],value:string,normalizedValue:string,sourceType:ProviderCandidate["sourceType"],sourceUrl:string,sourcePageType:string,confidence:number,verificationStatus:ProviderEvidence["verificationStatus"]):ProviderCandidate{return{fieldName,value,normalizedValue,sourceType,sourceUrl,sourcePageType,confidence,retrievedAt:now(),evidence:evidence(providerKey,version,sourceType,sourceUrl,sourcePageType,verificationStatus)}}
 
 export const osmMetadataProvider:BusinessContactEnricher={
