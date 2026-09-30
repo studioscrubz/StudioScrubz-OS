@@ -85,7 +85,6 @@ export function DashboardPage() {
         </div>
       )}
       {profile?.role !== "Sales" && <DashboardTimeClockControl employeeId={profile?.employee_id ?? null} />}
-      <DashboardActiveEmployeesMonitor />
       {data && (
         <>
           <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
@@ -108,6 +107,11 @@ export function DashboardPage() {
               <Empty text="No jobs scheduled today." />
             )}
           </Panel>}
+        </>
+      )}
+      <DashboardActiveEmployeesMonitor />
+      {data && (
+        <>
           {hasPermission(profile, "attention.view") && <AttentionSummaryWidget />}
           {hasPermission(profile, "agreements.view") && <DashboardRecurringServices />}
           <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
