@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { discoverOfficialWebsite, enrichOfficialWebsite, ENRICHMENT_MAX_ITEMS, ENRICHMENT_PROVIDER_VERSION } from "@/lib/prospectEnrichment";
+import { ENRICHMENT_MAX_ITEMS } from "@/lib/prospectEnrichment";
+import { enrichmentOrchestrator } from "@/lib/prospect-enrichment/orchestrator";
 import type { UserProfile } from "@/types/auth";
 
 export async function POST(request:Request){
@@ -21,43 +22,21 @@ export async function POST(request:Request){
   if(inputError)return NextResponse.json({error:inputError.message},{status:400});
 
   for(const item of inputs??[]){
-    let website=item.website as string|null;
-    let canonicalDomain=item.canonicalDomain as string|null;
-    let cacheKey=item.cacheKey as string|null;
     try{
-      if(!website){
-        const snapshot=item.input??{};
-        const discovered=await discoverOfficialWebsite({
-          businessName:String(snapshot.businessName??""),
-          address:snapshot.address?String(snapshot.address):undefined,
-          city:snapshot.city?String(snapshot.city):undefined,
-          state:snapshot.state?String(snapshot.state):undefined,
-          zip:snapshot.zip?String(snapshot.zip):undefined,
-          locationQuery:item.locationQuery?String(item.locationQuery):undefined
-        });
-        if(!discovered){
-          await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:"No Additional Data Found",p_candidates:[],p_canonical_url:null,p_canonical_domain:null,p_cache_key:null,p_error:null});
-          continue;
-        }
-        website=discovered.url;
-        canonicalDomain=new URL(website).hostname.replace(/^www\./,"");
-        cacheKey=null;
-      }
-
-      if(cacheKey){
-        const{data:cached}=await db.rpc("get_prospect_enrichment_cache",{p_cache_key:cacheKey});
-        if(cached?.providerVersion===ENRICHMENT_PROVIDER_VERSION){
-          await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:cached.status,p_candidates:cached.results??[],p_canonical_url:website,p_canonical_domain:canonicalDomain,p_cache_key:cacheKey,p_error:null});
-          continue;
-        }
-      }
-
-      const found=await enrichOfficialWebsite(website);
-      const status=found.candidates.length?"Complete":"No Additional Data Found";
-      const{error}=await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:status,p_candidates:found.candidates,p_canonical_url:found.canonicalUrl,p_canonical_domain:found.canonicalDomain,p_cache_key:cacheKey,p_error:null});
+      const snapshot=item.input??{};
+      const found=await enrichmentOrchestrator.enrich({
+        discoveryResultId:String(item.resultId),businessName:String(snapshot.businessName??""),
+        website:item.website?String(item.website):undefined,verifiedDomain:item.canonicalDomain?String(item.canonicalDomain):undefined,
+        email:snapshot.email?String(snapshot.email):undefined,phone:snapshot.phone?String(snapshot.phone):undefined,
+        address:snapshot.address?String(snapshot.address):undefined,city:snapshot.city?String(snapshot.city):undefined,
+        state:snapshot.state?String(snapshot.state):undefined,zip:snapshot.zip?String(snapshot.zip):undefined,
+        sourceUrl:snapshot.sourceUrl?String(snapshot.sourceUrl):undefined,locationQuery:item.locationQuery?String(item.locationQuery):undefined,
+        cacheKey:item.cacheKey?String(item.cacheKey):null
+      },{getCached:async cacheKey=>{const{data,error}=await db.rpc("get_prospect_enrichment_cache",{p_cache_key:cacheKey});if(error)throw new Error(error.message);return data}});
+      const{error}=await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:found.status,p_candidates:found.candidates,p_canonical_url:found.canonicalUrl,p_canonical_domain:found.canonicalDomain,p_cache_key:found.cacheKey,p_error:found.error??null});
       if(error)throw new Error(error.message);
     }catch(cause){
-      await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:"Failed",p_candidates:[],p_canonical_url:website,p_canonical_domain:canonicalDomain,p_cache_key:cacheKey,p_error:cause instanceof Error?cause.message:"Enrichment failed."});
+      await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:"Failed",p_candidates:[],p_canonical_url:item.website??null,p_canonical_domain:item.canonicalDomain??null,p_cache_key:item.cacheKey??null,p_error:cause instanceof Error?cause.message:"Enrichment failed."});
     }
   }
   const{data:items,error:reviewError}=await db.rpc("get_prospect_enrichment_review",{p_run_id:enrichmentRunId});

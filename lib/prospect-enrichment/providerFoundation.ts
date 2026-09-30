@@ -1,0 +1,136 @@
+export type EnrichmentFieldName="website"|"business_email"|"business_phone"|"address"|"city"|"state"|"zip"|"contact_page_url"|"contact_name"|"contact_title";
+export type ProviderCapability="company_resolution"|"business_contact_enrichment"|"email_finding"|"email_verification"|"phone_finding";
+export type ProviderSourceType="OpenStreetMap"|"Official Website"|"Generated Candidate";
+export type VerificationStatus="published"|"verified"|"valid"|"catch_all"|"risky"|"unverified"|"invalid"|"unknown";
+export type ProviderCostClass="free"|"paid";
+
+export interface EnrichmentSubject{
+  discoveryResultId:string;
+  businessName:string;
+  website?:string;
+  verifiedDomain?:string;
+  email?:string;
+  phone?:string;
+  address?:string;
+  city?:string;
+  state?:string;
+  zip?:string;
+  sourceUrl?:string;
+  locationQuery?:string;
+}
+
+export interface ProviderEvidence{
+  providerKey:string;
+  providerVersion:string;
+  sourceType:ProviderSourceType;
+  sourceUrl:string;
+  sourcePageType:string;
+  verificationStatus:VerificationStatus;
+  discoveredAt:string;
+  verifiedAt?:string;
+  providerMetadata?:Record<string,unknown>;
+}
+
+export interface ProviderUsage{creditsUsed?:number;costMinorUnits?:number;currency?:string}
+
+// The top-level fields deliberately match the existing staging RPC payload.
+export interface ProviderCandidate{
+  fieldName:EnrichmentFieldName;
+  value:string;
+  normalizedValue:string;
+  sourceType:ProviderSourceType;
+  sourceUrl:string;
+  sourcePageType:string;
+  confidence:number;
+  retrievedAt:string;
+  evidence:ProviderEvidence;
+}
+
+export interface ProviderResult{
+  status:"complete"|"partial"|"not_found"|"failed";
+  candidates:ProviderCandidate[];
+  usage?:ProviderUsage;
+  resolvedCompany?:{website:string;domain:string};
+  retryable?:boolean;
+  errorCode?:string;
+}
+
+export interface ProviderContext{signal?:AbortSignal;requestId:string;allowPaidCall:false}
+export interface ProviderDescriptor{providerKey:string;version:string;capabilities:readonly ProviderCapability[];order:number;costClass:ProviderCostClass}
+export interface CompanyDomainResolver extends ProviderDescriptor{resolveCompany(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
+export interface BusinessContactEnricher extends ProviderDescriptor{enrichBusiness(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
+export interface EmailFinder extends ProviderDescriptor{findEmails(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
+export interface EmailVerifier extends ProviderDescriptor{verifyEmail(email:string,subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
+export interface PhoneFinder extends ProviderDescriptor{findPhones(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
+export type EnrichmentProvider=CompanyDomainResolver|BusinessContactEnricher|EmailFinder|EmailVerifier|PhoneFinder;
+
+export class ProviderRegistry{
+  readonly providers:readonly EnrichmentProvider[];
+  constructor(providers:readonly EnrichmentProvider[]){
+    const keys=new Set<string>();
+    for(const provider of providers){if(keys.has(provider.providerKey))throw new Error(`Duplicate enrichment provider: ${provider.providerKey}`);keys.add(provider.providerKey)}
+    this.providers=[...providers].sort((a,b)=>a.order-b.order||a.providerKey.localeCompare(b.providerKey));
+  }
+  forCapability(capability:ProviderCapability){return this.providers.filter(provider=>provider.capabilities.includes(capability))}
+  assertFreeOnly(){if(this.providers.some(provider=>provider.costClass!=="free"))throw new Error("Phase 4D.1 permits free internal providers only.")}
+}
+
+export interface EnrichmentNeeds{
+  companyResolution:boolean;
+  websiteContacts:boolean;
+  businessEmail:boolean;
+  businessPhone:boolean;
+  address:boolean;
+  city:boolean;
+  state:boolean;
+  zip:boolean;
+}
+
+const present=(value:unknown)=>typeof value==="string"&&value.trim().length>0;
+export function planEnrichmentNeeds(subject:EnrichmentSubject,candidates:readonly ProviderCandidate[]=[]):EnrichmentNeeds{
+  const found=(field:EnrichmentFieldName)=>candidates.some(candidate=>candidate.fieldName===field&&candidate.evidence.verificationStatus!=="invalid");
+  const missing=(value:unknown,field:EnrichmentFieldName)=>!present(value)&&!found(field);
+  const needs={
+    companyResolution:missing(subject.website,"website")&&!present(subject.verifiedDomain),
+    businessEmail:missing(subject.email,"business_email"),
+    businessPhone:missing(subject.phone,"business_phone"),
+    address:missing(subject.address,"address"),
+    city:missing(subject.city,"city"),
+    state:missing(subject.state,"state"),
+    zip:missing(subject.zip,"zip"),
+    websiteContacts:false
+  };
+  needs.websiteContacts=needs.businessEmail||needs.businessPhone||needs.address||needs.city||needs.state||needs.zip;
+  return needs;
+}
+
+function normalizedValue(field:EnrichmentFieldName,value:string){
+  const clean=value.trim();
+  if(field==="business_email")return clean.toLowerCase();
+  if(field==="business_phone")return clean.replace(/\D/g,"");
+  if(field==="website")try{return new URL(clean).origin.toLowerCase()}catch{return clean.toLowerCase()}
+  return clean.toLowerCase().replace(/\s+/g," ");
+}
+
+const sourceRank:Record<ProviderSourceType,number>={"Official Website":300,"OpenStreetMap":200,"Generated Candidate":100};
+const verificationRank:Record<VerificationStatus,number>={verified:70,valid:65,published:60,catch_all:40,risky:20,unknown:10,unverified:0,invalid:-1000};
+export function candidateRank(candidate:ProviderCandidate){return sourceRank[candidate.sourceType]+verificationRank[candidate.evidence.verificationStatus]+Math.max(0,Math.min(100,candidate.confidence))}
+
+export function normalizeCandidate(candidate:ProviderCandidate):ProviderCandidate|null{
+  const value=candidate.value.trim();
+  if(!value||candidate.evidence.verificationStatus==="invalid")return null;
+  const normalized=normalizedValue(candidate.fieldName,candidate.normalizedValue||value);
+  if(!normalized)return null;
+  return{...candidate,value,normalizedValue:normalized,confidence:Math.max(0,Math.min(100,Math.round(candidate.confidence)))};
+}
+
+export function normalizeDedupeAndRank(candidates:readonly ProviderCandidate[]){
+  const byFieldValue=new Map<string,ProviderCandidate>();
+  for(const raw of candidates){
+    const candidate=normalizeCandidate(raw);if(!candidate)continue;
+    const key=`${candidate.fieldName}|${candidate.normalizedValue}`;
+    const current=byFieldValue.get(key);
+    if(!current||candidateRank(candidate)>candidateRank(current))byFieldValue.set(key,candidate);
+  }
+  return[...byFieldValue.values()].sort((a,b)=>candidateRank(b)-candidateRank(a)||a.fieldName.localeCompare(b.fieldName)||a.normalizedValue.localeCompare(b.normalizedValue));
+}
