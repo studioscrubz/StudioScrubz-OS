@@ -117,7 +117,7 @@ test("review preserves public-source truth and explicit duplicate decisions",()=
   assert.match(ui,/Exact duplicate/);
   assert.match(ui,/Possible duplicate/);
   assert.match(ui,/Import Separately/);
-  assert.match(ui,/Â© OpenStreetMap contributors/);
+  assert.match(ui,/\(c\) OpenStreetMap contributors/);
   assert.match(migration,/decision not in\('Skip','Import Separately','Merge'\)/);
   assert.doesNotMatch(`${route}\n${ui}\n${migration}`,/send(email|sms)|automated outreach|createClient|createEstimate|cron\.schedule|openai/i);
 });
