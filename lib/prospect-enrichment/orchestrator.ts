@@ -65,7 +65,11 @@ export class EnrichmentOrchestrator{
             const callId=dependencies.providerCalls?await dependencies.providerCalls.begin({enrichmentItemId:input.enrichmentItemId,provider:cacheProvider,operation:"cache_lookup",requestFingerprint:fingerprint,cacheHit:true}):undefined;
             if(callId)await dependencies.providerCalls!.complete({providerCallId:callId,status:cached.status==="Failed"?"Failed":cached.status==="No Additional Data Found"?"No Data":"Completed",cacheHit:true,responseMetadata:{candidateCount:cached.results.length}});
             const cachedCandidates=cached.results.map(candidate=>({...candidate,usage:{creditsUsed:0,costMinorUnits:0},evidence:{...candidate.evidence,providerCallId:callId??undefined}}));
-            return{status:cached.status,candidates:normalizeDedupeAndRank(cachedCandidates),canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey};
+            const cachedNormalized=normalizeDedupeAndRank(cachedCandidates),cachedNeeds=planEnrichmentNeeds(subject,[...baseline,...candidates,...cachedNormalized]);
+            if(cached.status!=="Failed"&&!cachedNeeds.businessEmail&&!cachedNeeds.businessPhone)return{status:cached.status,candidates:cachedNormalized,canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey};
+            candidates.push(...cachedNormalized);
+            attemptedFingerprints.add(this.fingerprint(plan.provider,plan.operation,subject));
+            continue;
           }
         }
 

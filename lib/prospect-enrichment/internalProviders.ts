@@ -1,5 +1,5 @@
 import "server-only";
-import { discoverOfficialWebsite, extractOfficialWebsiteContacts, generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
+import { discoverOfficialSiteContacts,discoverOfficialWebsite,extractOfficialWebsiteContacts,generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
 import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 
 const now=()=>new Date().toISOString();
@@ -34,6 +34,15 @@ export const officialWebsiteContactProvider:BusinessContactEnricher={
   }
 };
 
+export const siteContactDiscoveryProvider:BusinessContactEnricher={
+  providerKey:"site-contact-discovery",version:"1",capabilities:["business_email_find","business_phone_find"],priority:40,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:true,supportsCache:false,stopPolicy:"when-needed",
+  async enrichBusiness(subject){
+    if(!subject.website||!subject.verifiedDomain)return{status:"not_found",candidates:[]};
+    const found=await discoverOfficialSiteContacts(subject.website,subject.verifiedDomain);
+    return{status:found.candidates.length?"complete":"not_found",resolvedCompany:{website:found.canonicalUrl,domain:found.canonicalDomain},candidates:found.candidates.map(item=>({...item,sourceType:"Official Website" as const,evidence:{...evidence("site-contact-discovery","1","Official Website",item.sourceUrl,item.sourcePageType,"published"),providerMetadata:{crawlDepth:1}}}))};
+  }
+};
+
 export const generatedRoleEmailProvider:EmailFinder={
   providerKey:"generated-role-email",version:"1",capabilities:["business_email_find"],priority:1000,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:false,supportsCache:false,stopPolicy:"last-resort",
   async findEmails(subject){
@@ -43,6 +52,6 @@ export const generatedRoleEmailProvider:EmailFinder={
   }
 };
 
-export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,generatedRoleEmailProvider] as const;
+export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,generatedRoleEmailProvider] as const;
 export const internalProviderContext=(requestId:string,allowPaidCall=false):ProviderContext=>({requestId,allowPaidCall});
 export const noProviderResult:ProviderResult={status:"not_found",candidates:[]};

@@ -42,6 +42,7 @@ function operationFor(provider:EnrichmentProvider,capability:ProviderCapability)
   if(capability==="business_contact_enrichment"&&"enrichBusiness" in provider)return"business_contact_enrichment";
   if(capability==="business_email_find"&&"findEmails" in provider)return"email_finding";
   if(capability==="business_phone_find"&&"findPhones" in provider)return"phone_finding";
+  if((capability==="business_email_find"||capability==="business_phone_find")&&"enrichBusiness" in provider)return"business_contact_enrichment";
   if(capability==="email_verification"&&"verifyEmail" in provider)return"email_verification";
   return capability;
 }
