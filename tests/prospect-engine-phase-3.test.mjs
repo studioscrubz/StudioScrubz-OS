@@ -10,7 +10,8 @@ const ui=read("components/prospects/ProspectDiscovery.tsx");
 
 test("Phase 3 centralizes bounded OSM discovery categories",()=>{
   for(const category of ["Property Management / Multifamily","Commercial Offices","Post-Construction / Contractors","Airbnb / Short-Term Rentals","Restaurants / Hospitality","Salons / Barbershops","Gyms / Spas","Recording / Production Facilities","Luxury Property Care","Pressure Washing Opportunities","Other Commercial"])assert.match(discovery,new RegExp(category.replace(/[\/-]/g,"\\$&")));
-  assert.match(discovery,/DISCOVERY_MAX_RADIUS_METERS=25_000/);
+  assert.match(discovery,/DISCOVERY_MAX_RADIUS_MILES=250/);
+  assert.match(discovery,/DISCOVERY_PROVIDER_TILE_RADIUS_METERS=25_000/);
   assert.match(discovery,/DISCOVERY_MAX_RESULTS=100/);
   assert.match(discovery,/\[out:json\]\[timeout:20\]/);
 });
@@ -19,10 +20,10 @@ test("discovery is server authenticated, provider-safe, and never automatic",()=
   assert.match(route,/server\.auth\.getUser\(\)/);
   assert.match(route,/profile\?\.is_active/);
   assert.match(route,/\["Master Admin","Administrator","Manager","Sales"\]/);
-  assert.match(route,/StudioScrubz Prospect Engine\/1\.0/);
+  assert.match(route,/StudioScrubz Prospect Engine\/1\.1/);
   assert.match(route,/nominatim\.openstreetmap\.org\/search/);
   assert.match(route,/overpass-api\.de\/api\/interpreter/);
-  assert.match(route,/25_000/);
+  assert.match(route,/DISCOVERY_PROVIDER_TILE_RADIUS_METERS/);
   assert.match(route,/cache:"no-store"/);
   assert.doesNotMatch(route,/google|yelp|linkedin/i);
   assert.doesNotMatch(route,/service[_-]?role/i);
@@ -56,9 +57,10 @@ test("discovery accepts miles and converts provider and stored radii to meters",
   assert.match(ui,/>\{value\} mi</);
   assert.match(ui,/metersToMiles\(item\.distanceMeters\).*mi away/);
   assert.doesNotMatch(ui,/\bkm\b|kilometers?/i);
-  assert.match(route,/const radiusMeters=milesToMeters\(radiusMiles\)/);
+  assert.match(route,/radiusMeters=milesToMeters\(radiusMiles\)/);
   assert.match(route,/p_radius_meters:radiusMeters/);
-  assert.match(route,/buildOverpassQuery\(category,latitude,longitude,radiusMeters,keyword\)/);
+  assert.match(route,/buildDiscoverySearchPoints\(latitude,longitude,radiusMeters\)/);
+  assert.match(route,/buildOverpassQuery\(category,point\.latitude,point\.longitude,tileRadius,keyword\)/);
   assert.match(route,/radiusMiles<DISCOVERY_MIN_RADIUS_MILES/);
   assert.match(route,/radiusMiles>DISCOVERY_MAX_RADIUS_MILES/);
 });
@@ -115,7 +117,7 @@ test("review preserves public-source truth and explicit duplicate decisions",()=
   assert.match(ui,/Exact duplicate/);
   assert.match(ui,/Possible duplicate/);
   assert.match(ui,/Import Separately/);
-  assert.match(ui,/© OpenStreetMap contributors/);
+  assert.match(ui,/Â© OpenStreetMap contributors/);
   assert.match(migration,/decision not in\('Skip','Import Separately','Merge'\)/);
   assert.doesNotMatch(`${route}\n${ui}\n${migration}`,/send(email|sms)|automated outreach|createClient|createEstimate|cron\.schedule|openai/i);
 });

@@ -1,0 +1,12 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const lib=fs.readFileSync("lib/prospectDiscovery.ts","utf8");
+const route=fs.readFileSync("app/api/prospects/discover/route.ts","utf8");
+const ui=fs.readFileSync("components/prospects/ProspectDiscovery.tsx","utf8");
+test("discovery supports 250 miles",()=>{assert.match(lib,/DISCOVERY_MAX_RADIUS_MILES=250/);assert.match(lib,/100,150,250/);});
+test("large searches keep individual Overpass queries bounded",()=>{assert.match(lib,/DISCOVERY_PROVIDER_TILE_RADIUS_METERS=25_000/);assert.match(lib,/Math\.min\(radiusMeters,DISCOVERY_PROVIDER_TILE_RADIUS_METERS\)/);});
+test("large searches tile the requested area",()=>{assert.match(lib,/buildDiscoverySearchPoints/);assert.match(route,/buildDiscoverySearchPoints\(latitude,longitude,radiusMeters\)/);});
+test("server filters tiled results to requested radius",()=>{assert.match(route,/if\(distanceMeters>radiusMeters\)return\[\]/);});
+test("provider work is bounded",()=>{assert.match(route,/MAX_PROVIDER_REQUESTS=48/);assert.match(route,/elements\.length>=DISCOVERY_MAX_RESULTS/);});
+test("UI exposes shared radius options",()=>{assert.match(ui,/DISCOVERY_RADIUS_OPTIONS_MILES\.map/);});
