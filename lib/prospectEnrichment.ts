@@ -6,7 +6,7 @@ export const ENRICHMENT_MAX_ITEMS=10, ENRICHMENT_MAX_PAGES=4, ENRICHMENT_MAX_BYT
 export const SITE_CONTACT_MAX_TOTAL_PAGES=7, SITE_CONTACT_MAX_ADDITIONAL_PAGES=SITE_CONTACT_MAX_TOTAL_PAGES-1;
 export const ENRICHMENT_PROVIDER_VERSION="official-site-v2";
 export const ENRICHMENT_USER_AGENT="StudioScrubz Prospect Enrichment/1.1 (contact: support@studioscrubz.com)";
-export interface Candidate{fieldName:EnrichmentFieldName;value:string;normalizedValue:string;sourceUrl:string;sourcePageType:string;confidence:number;retrievedAt:string;sourceType?:"OpenStreetMap"|"Official Website"|"Generated Candidate"}
+export interface Candidate{fieldName:EnrichmentFieldName;value:string;normalizedValue:string;sourceUrl:string;sourcePageType:string;confidence:number;retrievedAt:string;sourceType?:"OpenStreetMap"|"Official Website"|"Generated Candidate";personObservation?:{id:string;kind:"json-ld-person"|"team-card"|"directory-row"|"semantic-person-container"}}
 export interface WebsiteDiscoveryInput{businessName:string;address?:string;city?:string;state?:string;zip?:string;locationQuery?:string}
 export interface WebsiteDiscoveryResult{url:string;confidence:number;signals:string[]}
 
@@ -21,8 +21,48 @@ function strip(value:string){return value.replace(/<[^>]+>/g," ").replace(/&amp;
 function words(value:string){return new Set(value.toLowerCase().replace(/[^a-z0-9]+/g," ").split(/\s+/).filter(x=>x.length>2&&!["the","and","inc","llc","company","corp"].includes(x)))}
 function overlap(a:string,b:string){const aa=words(a),bb=words(b);if(!aa.size)return 0;let hit=0;for(const x of aa)if(bb.has(x))hit++;return hit/aa.size}
 function add(list:Candidate[],fieldName:EnrichmentFieldName,value:string|undefined,sourceUrl:string,page:string,confidence:number,sourceType:"Official Website"|"Generated Candidate"="Official Website"){const v=strip(value||"");if(!v)return;const normalized=fieldName==="business_email"?v.toLowerCase():fieldName==="business_phone"?v.replace(/\D/g,""):fieldName==="website"?v.toLowerCase():v.toLowerCase();if(!normalized)return;if(!list.some(x=>x.fieldName===fieldName&&x.normalizedValue===normalized))list.push({fieldName,value:v,normalizedValue:normalized,sourceUrl,sourcePageType:page,confidence,retrievedAt:new Date().toISOString(),sourceType})}
-function extractJsonLd(html:string,url:string,page:string,list:Candidate[]){for(const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){try{const raw=JSON.parse(m[1]);const walk=(x:any)=>{if(Array.isArray(x))return x.forEach(walk);if(!x||typeof x!=="object")return;const type=Array.isArray(x["@type"])?x["@type"].join(" "):String(x["@type"]||"");if(/Organization|LocalBusiness|Restaurant|Person|ContactPoint/i.test(type)){add(list,"business_phone",x.telephone,url,page,90);add(list,"business_email",x.email,url,page,90);if(typeof x.url==="string")add(list,"website",x.url,url,page,90);if(x.address&&typeof x.address==="object"){add(list,"address",[x.address.streetAddress].filter(Boolean).join(" "),url,page,92);add(list,"city",x.address.addressLocality,url,page,92);add(list,"state",x.address.addressRegion,url,page,92);add(list,"zip",x.address.postalCode,url,page,92)}if(/Person/i.test(type)){add(list,"contact_name",x.name,url,page,75);add(list,"contact_title",x.jobTitle,url,page,75)}}Object.values(x).forEach(walk)};walk(raw)}catch{}}}
-function extractPage(html:string,url:string,page:string,list:Candidate[]){extractJsonLd(html,url,page,list);for(const m of html.matchAll(/href=["']mailto:([^"'?]+)[^"']*["']/gi))add(list,"business_email",decodeURIComponent(m[1]),url,page,85);for(const m of html.matchAll(/href=["']tel:([^"']+)["']/gi))add(list,"business_phone",decodeURIComponent(m[1]),url,page,85);const visible=strip(html.replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," "));for(const m of visible.matchAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi))add(list,"business_email",m[0],url,page,72);for(const m of visible.matchAll(/(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3}[\s.-])\s*\d{3}[\s.-]\d{4}\b/g))add(list,"business_phone",m[0],url,page,70)}
+const GENERIC_EMAIL_LOCAL=/^(info|contact|hello|office|leasing)$/i;
+const PERSON_CONTAINER_SIGNAL=/\b(team[-_ ]?member|staff[-_ ]?member|person|profile|employee|leadership|management|directory[-_ ]?(?:row|entry)|member[-_ ]?card|bio)\b/i;
+const NON_PERSON_NAME=/^(contact us|about us|our team|our staff|leadership|management|directory|people|locations?|offices?|learn more|read more|home)$/i;
+function plausiblePersonName(value:string){const clean=strip(value);const parts=clean.split(/\s+/);return clean.length<=100&&parts.length>=2&&parts.length<=6&&!NON_PERSON_NAME.test(clean)&&!/@|\d|\b(inc|llc|ltd|company|corporation|properties|management group)\b/i.test(clean)&&parts.every(part=>/^[\p{L}][\p{L}'’.-]*$/u.test(part))}
+function plausibleTitle(value:string,name:string){const clean=strip(value);return clean.length>=2&&clean.length<=120&&clean.toLowerCase()!==name.toLowerCase()&&!/@|\d{3}|^(contact|email|phone|learn more|read more)$/i.test(clean)}
+function observationId(url:string,kind:string,name:string,email?:string,phone?:string){let hash=2166136261;for(const char of `${url}|${kind}|${name}|${email||""}|${phone||""}`){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619)}return `person-${(hash>>>0).toString(16).padStart(8,"0")}`}
+function addPersonCandidate(list:Candidate[],fieldName:EnrichmentFieldName,value:string|undefined,url:string,page:string,confidence:number,personObservation:Candidate["personObservation"]){const v=strip(value||"");if(!v)return;const normalized=fieldName==="business_email"?v.toLowerCase():fieldName==="business_phone"?v.replace(/\D/g,""):v.toLowerCase().replace(/\s+/g," ");if(normalized)list.push({fieldName,value:v,normalizedValue:normalized,sourceUrl:url,sourcePageType:page,confidence,retrievedAt:new Date().toISOString(),sourceType:"Official Website",personObservation})}
+function emitPersonObservation(list:Candidate[],input:{name?:string;title?:string;email?:string;phone?:string;explicitEmail?:boolean},url:string,page:string,kind:NonNullable<Candidate["personObservation"]>["kind"],confidence:number){
+  const name=strip(input.name||"");if(!plausiblePersonName(name))return;
+  const title=strip(input.title||"");const email=strip(input.email||"");const phone=strip(input.phone||"");
+  if(!title&&!email&&!phone)return;
+  const usableEmail=email&&(!GENERIC_EMAIL_LOCAL.test(email.split("@")[0])||input.explicitEmail)?email:undefined;
+  const observation={id:observationId(url,kind,name,usableEmail,phone),kind};
+  addPersonCandidate(list,"contact_name",name,url,page,confidence,observation);
+  if(title&&plausibleTitle(title,name))addPersonCandidate(list,"contact_title",title,url,page,confidence,observation);
+  if(usableEmail)addPersonCandidate(list,"business_email",usableEmail,url,page,confidence,observation);
+  if(phone)addPersonCandidate(list,"business_phone",phone,url,page,confidence,observation);
+}
+function attributeValue(attrs:string,name:string){return attrs.match(new RegExp(`\\b${name}=["']([^"']+)["']`,`i`))?.[1]}
+function elementTextBySignal(body:string,signal:RegExp){for(const m of body.matchAll(/<([a-z][a-z0-9]*)\b([^>]*)>([\s\S]*?)<\/\1>/gi))if(signal.test(`${attributeValue(m[2],"class")||""} ${attributeValue(m[2],"itemprop")||""}`))return strip(m[3]);return""}
+function firstHeading(body:string){return strip(body.match(/<h[2-5]\b[^>]*>([\s\S]*?)<\/h[2-5]>/i)?.[1]||"")}
+function firstParagraph(body:string){return strip(body.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1]||"")}
+function linkedValue(body:string,scheme:"mailto"|"tel"){const raw=body.match(new RegExp(`href=["']${scheme}:([^"'?]+)[^"']*["']`,`i`))?.[1];try{return raw?decodeURIComponent(raw):""}catch{return raw||""}}
+export function extractPublishedPersonContacts(html:string,url:string,page:string){
+  const candidates:Candidate[]=[];
+  const container=/<(article|li|div|section|tr)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+  for(const match of html.matchAll(container)){
+    const tag=match[1].toLowerCase(),attrs=match[2],body=match[3];
+    const semantic=PERSON_CONTAINER_SIGNAL.test(`${attributeValue(attrs,"class")||""} ${attributeValue(attrs,"id")||""} ${attributeValue(attrs,"itemtype")||""}`);
+    const directoryRow=tag==="tr"&&/^(Directory|People|Team|Staff|Leadership|Management)$/i.test(page);
+    if(!semantic&&!directoryRow)continue;
+    const name=elementTextBySignal(body,/\b(name|person-name|employee-name|member-name)\b/i)||firstHeading(body)||(directoryRow?strip(body.match(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/i)?.[1]||""):"");
+    const title=elementTextBySignal(body,/\b(jobtitle|job-title|title|role|position)\b/i)||(semantic?firstParagraph(body):strip([...body.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)][1]?.[1]||""));
+    const email=linkedValue(body,"mailto"),phone=linkedValue(body,"tel");
+    const explicitEmail=/itemprop=["']email["']/i.test(body)||/data-(?:person-)?contact/i.test(body);
+    emitPersonObservation(candidates,{name,title,email,phone,explicitEmail},url,page,directoryRow?"directory-row":semantic&&/itemtype=["'][^"']*Person/i.test(attrs)?"semantic-person-container":"team-card",86);
+  }
+  return candidates;
+}
+function extractJsonLd(html:string,url:string,page:string,list:Candidate[]){for(const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){try{const raw=JSON.parse(m[1]);const walk=(x:any)=>{if(Array.isArray(x))return x.forEach(walk);if(!x||typeof x!=="object")return;const type=Array.isArray(x["@type"])?x["@type"].join(" "):String(x["@type"]||"");if(/Person/i.test(type))emitPersonObservation(list,{name:x.name,title:x.jobTitle,email:x.email,phone:x.telephone,explicitEmail:true},url,page,"json-ld-person",92);if(/Organization|LocalBusiness|Restaurant|ContactPoint/i.test(type)){add(list,"business_phone",x.telephone,url,page,90);add(list,"business_email",x.email,url,page,90);if(typeof x.url==="string")add(list,"website",x.url,url,page,90);if(x.address&&typeof x.address==="object"){add(list,"address",[x.address.streetAddress].filter(Boolean).join(" "),url,page,92);add(list,"city",x.address.addressLocality,url,page,92);add(list,"state",x.address.addressRegion,url,page,92);add(list,"zip",x.address.postalCode,url,page,92)}}Object.values(x).forEach(walk)};walk(raw)}catch{}}}
+function extractPage(html:string,url:string,page:string,list:Candidate[]){extractJsonLd(html,url,page,list);list.push(...extractPublishedPersonContacts(html,url,page));for(const m of html.matchAll(/href=["']mailto:([^"'?]+)[^"']*["']/gi))add(list,"business_email",decodeURIComponent(m[1]),url,page,85);for(const m of html.matchAll(/href=["']tel:([^"']+)["']/gi))add(list,"business_phone",decodeURIComponent(m[1]),url,page,85);const visible=strip(html.replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," "));for(const m of visible.matchAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi))add(list,"business_email",m[0],url,page,72);for(const m of visible.matchAll(/(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3}[\s.-])\s*\d{3}[\s.-]\d{4}\b/g))add(list,"business_phone",m[0],url,page,70)}
+export function extractPublishedPageCandidates(html:string,url:string,page:string){const candidates:Candidate[]=[];extractPage(html,url,page,candidates);return candidates}
 function pageLinks(html:string,base:URL){const links:{url:string;page:string}[]=[];for(const m of html.matchAll(/<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)){try{const label=strip(m[2]).toLowerCase(),u=new URL(m[1],base);const patterns:Array<[RegExp,string]>=[[/contact/i,"Contact"],[/about/i,"About"],[/team/i,"Team"],[/staff/i,"Staff"],[/management/i,"Management"],[/locations?/i,"Locations"]];const hit=patterns.find(([r])=>r.test(label)||r.test(u.pathname));if(hit&&sameSite(u.hostname,base.hostname)&&u.protocol==="https:")links.push({url:u.toString(),page:hit[1]})}catch{}}return links.filter((x,i,a)=>a.findIndex(y=>y.url===x.url)===i).slice(0,3)}
 
 export interface RankedSiteContactLink{url:string;pageType:string;score:number}
@@ -116,12 +156,12 @@ export async function discoverOfficialSiteContacts(input:string,verifiedDomain:s
   const candidates:Candidate[]=[];
   const home=await fetchBounded(base,base.hostname);
   const homeCandidates:Candidate[]=[];extractPage(home,base.toString(),"Homepage",homeCandidates);
-  candidates.push(...homeCandidates.filter(item=>item.fieldName==="business_email"||item.fieldName==="business_phone"));
+  candidates.push(...homeCandidates.filter(item=>["business_email","business_phone","contact_name","contact_title"].includes(item.fieldName)));
   for(const link of rankOfficialSiteContactLinks(home,base)){
     try{
       const url=await validatePublicHttps(link.url,base.hostname),html=await fetchBounded(url,base.hostname),pageCandidates:Candidate[]=[];
       extractPage(html,url.toString(),link.pageType,pageCandidates);
-      candidates.push(...pageCandidates.filter(item=>item.fieldName==="business_email"||item.fieldName==="business_phone"));
+      candidates.push(...pageCandidates.filter(item=>["business_email","business_phone","contact_name","contact_title"].includes(item.fieldName)));
       if(link.pageType==="Contact")add(candidates,"contact_page_url",url.toString(),url.toString(),"Contact",95);
     }catch{}
   }

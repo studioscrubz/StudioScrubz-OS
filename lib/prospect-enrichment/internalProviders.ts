@@ -35,11 +35,11 @@ export const officialWebsiteContactProvider:BusinessContactEnricher={
 };
 
 export const siteContactDiscoveryProvider:BusinessContactEnricher={
-  providerKey:"site-contact-discovery",version:"1",capabilities:["business_email_find","business_phone_find"],priority:40,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:true,supportsCache:false,stopPolicy:"when-needed",
+  providerKey:"site-contact-discovery",version:"2",capabilities:["business_email_find","business_phone_find"],priority:40,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:true,supportsCache:false,stopPolicy:"when-needed",
   async enrichBusiness(subject){
     if(!subject.website||!subject.verifiedDomain)return{status:"not_found",candidates:[]};
     const found=await discoverOfficialSiteContacts(subject.website,subject.verifiedDomain);
-    return{status:found.candidates.length?"complete":"not_found",resolvedCompany:{website:found.canonicalUrl,domain:found.canonicalDomain},candidates:found.candidates.map(item=>({...item,sourceType:"Official Website" as const,evidence:{...evidence("site-contact-discovery","1","Official Website",item.sourceUrl,item.sourcePageType,"published"),providerMetadata:{crawlDepth:1}}}))};
+    return{status:found.candidates.length?"complete":"not_found",resolvedCompany:{website:found.canonicalUrl,domain:found.canonicalDomain},candidates:found.candidates.map(item=>({...item,sourceType:"Official Website" as const,evidence:{...evidence("site-contact-discovery","2","Official Website",item.sourceUrl,item.sourcePageType,"published"),sourceKind:item.personObservation?.kind??item.sourcePageType,providerMetadata:{crawlDepth:1,...(item.personObservation?{personObservationId:item.personObservation.id,structuralEvidence:item.personObservation.kind}:{})}}}))};
   }
 };
 
