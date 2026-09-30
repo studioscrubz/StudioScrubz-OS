@@ -21,7 +21,7 @@ test("provider registry orders providers and rejects duplicates or paid provider
 
 test("needs planner stops work for adequate original or provider data",()=>{
   const complete={discoveryResultId:"r",businessName:"Business",website:"https://example.com",verifiedDomain:"example.com",email:"info@example.com",phone:"8185551212",address:"1 Main",city:"Los Angeles",state:"CA",zip:"90001"};
-  assert.deepEqual(foundation.planEnrichmentNeeds(complete),{companyResolution:false,websiteContacts:false,businessEmail:false,businessPhone:false,address:false,city:false,state:false,zip:false,emailVerification:false,phoneVerification:false});
+  assert.deepEqual(foundation.planEnrichmentNeeds(complete),{companyResolution:false,websiteContacts:false,businessEmail:false,personEmailPattern:false,businessPhone:false,address:false,city:false,state:false,zip:false,emailVerification:false,phoneVerification:false});
   assert.equal(foundation.planEnrichmentNeeds({discoveryResultId:"r",businessName:"Business"}).companyResolution,true);
   assert.equal(foundation.planEnrichmentNeeds({discoveryResultId:"r",businessName:"Business",website:"https://example.com"},[candidate()]).businessEmail,false);
 });

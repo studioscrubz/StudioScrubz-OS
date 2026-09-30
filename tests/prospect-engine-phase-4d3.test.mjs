@@ -9,7 +9,7 @@ const orchestrator=readFileSync("lib/prospect-enrichment/orchestrator.ts","utf8"
 const adapters=readFileSync("lib/prospect-enrichment/internalProviders.ts","utf8");
 
 const descriptor=(key,priority,capabilities,extra={})=>({providerKey:key,version:"1",capabilities,priority,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",async findEmails(){return{status:"not_found",candidates:[]}},...extra});
-const emptyNeeds=()=>({companyResolution:false,websiteContacts:false,businessEmail:false,businessPhone:false,address:false,city:false,state:false,zip:false,emailVerification:false,phoneVerification:false});
+const emptyNeeds=()=>({companyResolution:false,websiteContacts:false,businessEmail:false,personEmailPattern:false,businessPhone:false,address:false,city:false,state:false,zip:false,emailVerification:false,phoneVerification:false});
 const state=(overrides={})=>({subject:{discoveryResultId:"result",businessName:"Business"},needs:emptyNeeds(),attemptedFingerprints:new Set(),executedBaselineProviders:new Set(),providerCalls:0,creditsUsed:0,costMinorUnits:0,...overrides});
 const fingerprint=(provider,operation)=>`${provider.providerKey}|${operation}|input`;
 

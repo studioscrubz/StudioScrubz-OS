@@ -14,7 +14,7 @@ async function executeProvider(plan:ProviderPlan,subject:EnrichmentSubject,conte
   const provider=plan.provider;
   if(plan.operation==="company_resolution"&&"resolveCompany" in provider)return provider.resolveCompany(subject,context);
   if(plan.operation==="business_contact_enrichment"&&"enrichBusiness" in provider)return provider.enrichBusiness(subject,context);
-  if(plan.operation==="email_finding"&&"findEmails" in provider)return provider.findEmails(subject,context);
+  if((plan.operation==="email_finding"||plan.operation==="person_email_pattern")&&"findEmails" in provider)return provider.findEmails(subject,context);
   if(plan.operation==="phone_finding"&&"findPhones" in provider)return provider.findPhones(subject,context);
   if(plan.operation==="email_verification"&&"verifyEmail" in provider&&subject.email)return provider.verifyEmail(subject.email,subject,context);
   return{status:"not_found",candidates:[]};
@@ -76,7 +76,7 @@ export class EnrichmentOrchestrator{
         const fingerprint=this.fingerprint(plan.provider,plan.operation,subject);
         attemptedFingerprints.add(fingerprint);providerCalls+=1;
         if(plan.provider.stopPolicy==="baseline")executedBaselineProviders.add(plan.provider.providerKey);
-        const result=await this.invoke(input,dependencies,plan,subject,context,fingerprint);
+        const result=await this.invoke(input,dependencies,plan,subject,{...context,evidenceCandidates:normalizeDedupeAndRank([...baseline,...candidates])},fingerprint);
         creditsUsed+=result.usage?.creditsUsed??0;costMinorUnits+=result.usage?.costMinorUnits??0;
         if(result.resolvedCompany){subject.website=result.resolvedCompany.website;subject.verifiedDomain=result.resolvedCompany.domain}
         if(plan.provider.stopPolicy==="baseline")baseline.push(...result.candidates);else candidates.push(...result.candidates);

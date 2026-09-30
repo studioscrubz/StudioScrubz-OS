@@ -31,6 +31,7 @@ const fieldCapabilities=(needs:EnrichmentNeeds):ProviderCapability[]=>{
   if(needs.companyResolution)capabilities.push("company_resolution","domain_resolution");
   if(needs.websiteContacts)capabilities.push("business_contact_enrichment");
   if(needs.businessEmail)capabilities.push("business_email_find");
+  if(needs.personEmailPattern)capabilities.push("person_email_pattern");
   if(needs.businessPhone)capabilities.push("business_phone_find");
   if(needs.emailVerification)capabilities.push("email_verification");
   if(needs.phoneVerification)capabilities.push("phone_verification");
@@ -40,7 +41,7 @@ const fieldCapabilities=(needs:EnrichmentNeeds):ProviderCapability[]=>{
 function operationFor(provider:EnrichmentProvider,capability:ProviderCapability){
   if((capability==="company_resolution"||capability==="domain_resolution")&&"resolveCompany" in provider)return"company_resolution";
   if(capability==="business_contact_enrichment"&&"enrichBusiness" in provider)return"business_contact_enrichment";
-  if(capability==="business_email_find"&&"findEmails" in provider)return"email_finding";
+  if((capability==="business_email_find"||capability==="person_email_pattern")&&"findEmails" in provider)return capability==="person_email_pattern"?"person_email_pattern":"email_finding";
   if(capability==="business_phone_find"&&"findPhones" in provider)return"phone_finding";
   if((capability==="business_email_find"||capability==="business_phone_find")&&"enrichBusiness" in provider)return"business_contact_enrichment";
   if(capability==="email_verification"&&"verifyEmail" in provider)return"email_verification";

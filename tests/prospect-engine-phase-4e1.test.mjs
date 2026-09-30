@@ -11,7 +11,7 @@ const engineSource=readFileSync("lib/prospectEnrichment.ts","utf8");
 
 test("site-contact-discovery is internal, free, priority 40, and precedes generated email",()=>{
   assert.match(adapters,/providerKey:"site-contact-discovery",version:"2"[\s\S]*priority:40[\s\S]*costClass:"free"/);
-  assert.match(adapters,/internalEnrichmentProviders=\[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,generatedRoleEmailProvider\]/);
+  assert.match(adapters,/internalEnrichmentProviders=\[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,generatedRoleEmailProvider\]/);
   assert.doesNotMatch(adapters,/A-Leads|Apollo|Hunter|RocketReach|Clearbit|api[_-]?key/i);
 });
 

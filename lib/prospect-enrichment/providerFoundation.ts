@@ -1,5 +1,5 @@
 export type EnrichmentFieldName="website"|"business_email"|"business_phone"|"address"|"city"|"state"|"zip"|"contact_page_url"|"contact_name"|"contact_title";
-export type ProviderCapability="company_resolution"|"domain_resolution"|"business_contact_enrichment"|"business_email_find"|"business_phone_find"|"email_verification"|"phone_verification";
+export type ProviderCapability="company_resolution"|"domain_resolution"|"business_contact_enrichment"|"business_email_find"|"person_email_pattern"|"business_phone_find"|"email_verification"|"phone_verification";
 export type ProviderSourceType="OpenStreetMap"|"Official Website"|"Generated Candidate";
 export type VerificationStatus="published"|"verified"|"valid"|"catch_all"|"risky"|"unverified"|"invalid"|"unknown";
 export type ProviderCostClass="free"|"paid";
@@ -79,7 +79,7 @@ export interface ProviderResult{
   responseMetadata?:Record<string,unknown>;
 }
 
-export interface ProviderContext{signal?:AbortSignal;requestId:string;allowPaidCall:boolean}
+export interface ProviderContext{signal?:AbortSignal;requestId:string;allowPaidCall:boolean;evidenceCandidates?:readonly ProviderCandidate[]}
 export type ProviderStopPolicy="baseline"|"when-needed"|"last-resort";
 export interface ProviderDescriptor{
   providerKey:string;
@@ -117,6 +117,7 @@ export interface EnrichmentNeeds{
   companyResolution:boolean;
   websiteContacts:boolean;
   businessEmail:boolean;
+  personEmailPattern:boolean;
   businessPhone:boolean;
   address:boolean;
   city:boolean;
@@ -127,12 +128,22 @@ export interface EnrichmentNeeds{
 }
 
 const present=(value:unknown)=>typeof value==="string"&&value.trim().length>0;
+function hasPersonPatternEvidence(candidates:readonly ProviderCandidate[]){
+  const groups=new Map<string,Set<EnrichmentFieldName>>();
+  for(const candidate of candidates){
+    if(candidate.sourceType!=="Official Website"||candidate.evidence.verificationStatus!=="published")continue;
+    const id=candidate.evidence.providerMetadata?.personObservationId;if(typeof id!=="string")continue;
+    const fields=groups.get(id)??new Set<EnrichmentFieldName>();fields.add(candidate.fieldName);groups.set(id,fields);
+  }
+  const people=[...groups.values()].filter(fields=>fields.has("contact_name"));
+  return people.some(fields=>fields.has("business_email"))&&people.some(fields=>!fields.has("business_email"));
+}
 export function planEnrichmentNeeds(subject:EnrichmentSubject,candidates:readonly ProviderCandidate[]=[]):EnrichmentNeeds{
   const found=(field:EnrichmentFieldName)=>candidates.some(candidate=>candidate.fieldName===field&&candidate.evidence.verificationStatus!=="invalid");
   const missing=(value:unknown,field:EnrichmentFieldName)=>!present(value)&&!found(field);
   const needs={
     companyResolution:missing(subject.website,"website")&&!present(subject.verifiedDomain),
-    businessEmail:missing(subject.email,"business_email"),
+    businessEmail:missing(subject.email,"business_email"),personEmailPattern:false,
     businessPhone:missing(subject.phone,"business_phone"),
     address:missing(subject.address,"address"),
     city:missing(subject.city,"city"),
@@ -141,6 +152,7 @@ export function planEnrichmentNeeds(subject:EnrichmentSubject,candidates:readonl
     websiteContacts:false
   };
   needs.websiteContacts=needs.businessEmail||needs.businessPhone||needs.address||needs.city||needs.state||needs.zip;
+  needs.personEmailPattern=Boolean(subject.verifiedDomain)&&hasPersonPatternEvidence(candidates);
   return needs;
 }
 

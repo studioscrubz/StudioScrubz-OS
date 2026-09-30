@@ -1,5 +1,6 @@
 import "server-only";
 import { discoverOfficialSiteContacts,discoverOfficialWebsite,extractOfficialWebsiteContacts,generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
+import { generatePersonPatternCandidates } from "@/lib/prospect-enrichment/companyEmailPattern";
 import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 
 const now=()=>new Date().toISOString();
@@ -43,6 +44,15 @@ export const siteContactDiscoveryProvider:BusinessContactEnricher={
   }
 };
 
+export const companyEmailPatternProvider:EmailFinder={
+  providerKey:"company-email-pattern",version:"1",capabilities:["person_email_pattern"],priority:50,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",
+  async findEmails(subject,context){
+    if(!subject.verifiedDomain)return{status:"not_found",candidates:[]};
+    const result=generatePersonPatternCandidates(context.evidenceCandidates??[],subject.verifiedDomain),sourceUrl=`https://${subject.verifiedDomain}/`;
+    return{status:result.candidates.length?"complete":"not_found",responseMetadata:{patternStatus:result.analysis.status,observedPatternIds:result.analysis.observedPatternIds,evidenceCount:result.analysis.evidenceCount},candidates:result.candidates.map(item=>candidate("company-email-pattern","1","business_email",item.email,item.email,"Generated Candidate",sourceUrl,"Generated Email Pattern",item.confidence,"unverified")).map((candidateItem,index)=>({...candidateItem,evidence:{...candidateItem.evidence,sourceKind:"Email Pattern Candidate",providerMetadata:{patternId:result.candidates[index].patternId,evidenceCount:result.candidates[index].evidenceCount,targetPersonObservationId:result.candidates[index].targetPersonObservationId,evidenceObservationIds:result.candidates[index].evidenceObservationIds,verifiedDomain:subject.verifiedDomain,patternConfidence:result.candidates[index].confidence,personObservationId:result.candidates[index].targetPersonObservationId}}}))};
+  }
+};
+
 export const generatedRoleEmailProvider:EmailFinder={
   providerKey:"generated-role-email",version:"1",capabilities:["business_email_find"],priority:1000,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:false,supportsCache:false,stopPolicy:"last-resort",
   async findEmails(subject){
@@ -52,6 +62,6 @@ export const generatedRoleEmailProvider:EmailFinder={
   }
 };
 
-export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,generatedRoleEmailProvider] as const;
+export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,generatedRoleEmailProvider] as const;
 export const internalProviderContext=(requestId:string,allowPaidCall=false):ProviderContext=>({requestId,allowPaidCall});
 export const noProviderResult:ProviderResult={status:"not_found",candidates:[]};
