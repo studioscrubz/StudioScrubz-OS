@@ -6,11 +6,13 @@ const engine=fs.readFileSync("lib/prospectEnrichment.ts","utf8");
 const route=fs.readFileSync("app/api/prospects/enrich/route.ts","utf8");
 const orchestrator=fs.readFileSync("lib/prospect-enrichment/orchestrator.ts","utf8");
 const adapters=fs.readFileSync("lib/prospect-enrichment/internalProviders.ts","utf8");
+const waterfall=fs.readFileSync("lib/prospect-enrichment/waterfallPlanner.ts","utf8");
 const migration=fs.readFileSync("supabase/migrations/20260930002727_prospect_engine_phase_4b_website_discovery.sql","utf8");
 const runtimeFix=fs.readFileSync("supabase/migrations/20260930134359_fix_prospect_enrichment_cache_provider_version.sql","utf8");
 
 test("phase 4b discovers a website only when the discovery result lacks one",()=>{
-  assert.match(orchestrator,/if\(needs\.companyResolution\)/);
+  assert.match(orchestrator,/this\.planner\.next/);
+  assert.match(waterfall,/if\(needs\.companyResolution\)capabilities\.push\("company_resolution","domain_resolution"\)/);
   assert.match(adapters,/discoverOfficialWebsite/);
 });
 test("website discovery verifies identity and location before enrichment",()=>{

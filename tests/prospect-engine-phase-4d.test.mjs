@@ -12,7 +12,7 @@ const evidence=(sourceType,verificationStatus)=>({providerKey:sourceType==="Gene
 const candidate=(overrides={})=>({fieldName:"business_email",value:" INFO@Example.com ",normalizedValue:"",sourceType:"Official Website",sourceUrl:"https://example.com/",sourcePageType:"Homepage",confidence:85,retrievedAt:"2026-09-30T00:00:00.000Z",evidence:evidence("Official Website","published"),...overrides});
 
 test("provider registry orders providers and rejects duplicates or paid providers",()=>{
-  const free=(key,order)=>({providerKey:key,version:"1",capabilities:["email_finding"],order,costClass:"free",async findEmails(){return{status:"not_found",candidates:[]}}});
+  const free=(key,priority)=>({providerKey:key,version:"1",capabilities:["business_email_find"],priority,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",async findEmails(){return{status:"not_found",candidates:[]}}});
   const registry=new foundation.ProviderRegistry([free("later",20),free("first",10)]);
   assert.deepEqual(registry.providers.map(x=>x.providerKey),["first","later"]);
   assert.throws(()=>new foundation.ProviderRegistry([free("same",1),free("same",2)]));
@@ -21,7 +21,7 @@ test("provider registry orders providers and rejects duplicates or paid provider
 
 test("needs planner stops work for adequate original or provider data",()=>{
   const complete={discoveryResultId:"r",businessName:"Business",website:"https://example.com",verifiedDomain:"example.com",email:"info@example.com",phone:"8185551212",address:"1 Main",city:"Los Angeles",state:"CA",zip:"90001"};
-  assert.deepEqual(foundation.planEnrichmentNeeds(complete),{companyResolution:false,websiteContacts:false,businessEmail:false,businessPhone:false,address:false,city:false,state:false,zip:false});
+  assert.deepEqual(foundation.planEnrichmentNeeds(complete),{companyResolution:false,websiteContacts:false,businessEmail:false,businessPhone:false,address:false,city:false,state:false,zip:false,emailVerification:false,phoneVerification:false});
   assert.equal(foundation.planEnrichmentNeeds({discoveryResultId:"r",businessName:"Business"}).companyResolution,true);
   assert.equal(foundation.planEnrichmentNeeds({discoveryResultId:"r",businessName:"Business",website:"https://example.com"},[candidate()]).businessEmail,false);
 });
@@ -37,15 +37,15 @@ test("normalization retains independent evidence and deterministic ranking favor
 });
 
 test("internal provider waterfall is free and ordered OSM, resolver, website, generated email",()=>{
-  assert.match(adapters,/order:10,costClass:"free"/);
-  assert.match(adapters,/order:20,costClass:"free"/);
-  assert.match(adapters,/order:30,costClass:"free"/);
-  assert.match(adapters,/order:40,costClass:"free"/);
+  assert.match(adapters,/priority:10,costClass:"free"/);
+  assert.match(adapters,/priority:20,costClass:"free"/);
+  assert.match(adapters,/priority:30,costClass:"free"/);
+  assert.match(adapters,/priority:1000,costClass:"free"/);
   assert.doesNotMatch(adapters,/A-Leads|Apollo|Hunter|api[_-]?key/i);
 });
 
 test("orchestrator preserves review payload and does not stage OSM baseline candidates",()=>{
-  assert.match(orchestrator,/OSM values remain original discovery truth/);
+  assert.match(orchestrator,/stopPolicy==="baseline"/);
   assert.match(orchestrator,/normalizeDedupeAndRank/);
   assert.match(route,/p_candidates:found\.candidates/);
   const row=foundation.normalizeCandidate(candidate());

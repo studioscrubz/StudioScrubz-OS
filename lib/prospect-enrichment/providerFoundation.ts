@@ -1,5 +1,5 @@
 export type EnrichmentFieldName="website"|"business_email"|"business_phone"|"address"|"city"|"state"|"zip"|"contact_page_url"|"contact_name"|"contact_title";
-export type ProviderCapability="company_resolution"|"business_contact_enrichment"|"email_finding"|"email_verification"|"phone_finding";
+export type ProviderCapability="company_resolution"|"domain_resolution"|"business_contact_enrichment"|"business_email_find"|"business_phone_find"|"email_verification"|"phone_verification";
 export type ProviderSourceType="OpenStreetMap"|"Official Website"|"Generated Candidate";
 export type VerificationStatus="published"|"verified"|"valid"|"catch_all"|"risky"|"unverified"|"invalid"|"unknown";
 export type ProviderCostClass="free"|"paid";
@@ -79,8 +79,22 @@ export interface ProviderResult{
   responseMetadata?:Record<string,unknown>;
 }
 
-export interface ProviderContext{signal?:AbortSignal;requestId:string;allowPaidCall:false}
-export interface ProviderDescriptor{providerKey:string;version:string;capabilities:readonly ProviderCapability[];order:number;costClass:ProviderCostClass}
+export interface ProviderContext{signal?:AbortSignal;requestId:string;allowPaidCall:boolean}
+export type ProviderStopPolicy="baseline"|"when-needed"|"last-resort";
+export interface ProviderDescriptor{
+  providerKey:string;
+  version:string;
+  capabilities:readonly ProviderCapability[];
+  priority:number;
+  costClass:ProviderCostClass;
+  enabled:boolean;
+  requiresVerifiedDomain:boolean;
+  requiresWebsite:boolean;
+  supportsCache:boolean;
+  stopPolicy:ProviderStopPolicy;
+  estimatedCredits?:number;
+  estimatedCostMinorUnits?:number;
+}
 export interface CompanyDomainResolver extends ProviderDescriptor{resolveCompany(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
 export interface BusinessContactEnricher extends ProviderDescriptor{enrichBusiness(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
 export interface EmailFinder extends ProviderDescriptor{findEmails(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
@@ -93,10 +107,10 @@ export class ProviderRegistry{
   constructor(providers:readonly EnrichmentProvider[]){
     const keys=new Set<string>();
     for(const provider of providers){if(keys.has(provider.providerKey))throw new Error(`Duplicate enrichment provider: ${provider.providerKey}`);keys.add(provider.providerKey)}
-    this.providers=[...providers].sort((a,b)=>a.order-b.order||a.providerKey.localeCompare(b.providerKey));
+    this.providers=[...providers].sort((a,b)=>a.priority-b.priority||a.providerKey.localeCompare(b.providerKey));
   }
   forCapability(capability:ProviderCapability){return this.providers.filter(provider=>provider.capabilities.includes(capability))}
-  assertFreeOnly(){if(this.providers.some(provider=>provider.costClass!=="free"))throw new Error("Phase 4D.1 permits free internal providers only.")}
+  assertFreeOnly(){if(this.providers.some(provider=>provider.enabled&&provider.costClass!=="free"))throw new Error("Free-only enrichment registry cannot enable paid providers.")}
 }
 
 export interface EnrichmentNeeds{
@@ -108,6 +122,8 @@ export interface EnrichmentNeeds{
   city:boolean;
   state:boolean;
   zip:boolean;
+  emailVerification:boolean;
+  phoneVerification:boolean;
 }
 
 const present=(value:unknown)=>typeof value==="string"&&value.trim().length>0;
@@ -121,7 +137,7 @@ export function planEnrichmentNeeds(subject:EnrichmentSubject,candidates:readonl
     address:missing(subject.address,"address"),
     city:missing(subject.city,"city"),
     state:missing(subject.state,"state"),
-    zip:missing(subject.zip,"zip"),
+    zip:missing(subject.zip,"zip"),emailVerification:false,phoneVerification:false,
     websiteContacts:false
   };
   needs.websiteContacts=needs.businessEmail||needs.businessPhone||needs.address||needs.city||needs.state||needs.zip;
