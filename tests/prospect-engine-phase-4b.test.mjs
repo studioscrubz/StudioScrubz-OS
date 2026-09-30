@@ -5,6 +5,7 @@ import fs from "node:fs";
 const engine=fs.readFileSync("lib/prospectEnrichment.ts","utf8");
 const route=fs.readFileSync("app/api/prospects/enrich/route.ts","utf8");
 const migration=fs.readFileSync("supabase/migrations/20260930002727_prospect_engine_phase_4b_website_discovery.sql","utf8");
+const runtimeFix=fs.readFileSync("supabase/migrations/20260930134359_fix_prospect_enrichment_cache_provider_version.sql","utf8");
 
 test("phase 4b discovers a website only when the discovery result lacks one",()=>{
   assert.match(route,/if\(!website\)/);
@@ -15,6 +16,11 @@ test("website discovery verifies identity and location before enrichment",()=>{
   assert.match(engine,/business name/);
   assert.match(engine,/ZIP/);
   assert.match(engine,/address/);
+});
+test("website discovery receives the original discovery search location when OSM address fields are sparse",()=>{
+  assert.match(route,/locationQuery:item\.locationQuery/);
+  assert.match(engine,/input\.locationQuery/);
+  assert.match(runtimeFix,/location_query/);
 });
 test("website candidates still pass public HTTPS SSRF protections",()=>{
   assert.match(engine,/validatePublicHttps/);

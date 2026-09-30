@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { discoverOfficialWebsite, enrichOfficialWebsite, ENRICHMENT_MAX_ITEMS } from "@/lib/prospectEnrichment";
+import { discoverOfficialWebsite, enrichOfficialWebsite, ENRICHMENT_MAX_ITEMS, ENRICHMENT_PROVIDER_VERSION } from "@/lib/prospectEnrichment";
 import type { UserProfile } from "@/types/auth";
 
 export async function POST(request:Request){
@@ -32,7 +32,8 @@ export async function POST(request:Request){
           address:snapshot.address?String(snapshot.address):undefined,
           city:snapshot.city?String(snapshot.city):undefined,
           state:snapshot.state?String(snapshot.state):undefined,
-          zip:snapshot.zip?String(snapshot.zip):undefined
+          zip:snapshot.zip?String(snapshot.zip):undefined,
+          locationQuery:item.locationQuery?String(item.locationQuery):undefined
         });
         if(!discovered){
           await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:"No Additional Data Found",p_candidates:[],p_canonical_url:null,p_canonical_domain:null,p_cache_key:null,p_error:null});
@@ -45,7 +46,7 @@ export async function POST(request:Request){
 
       if(cacheKey){
         const{data:cached}=await db.rpc("get_prospect_enrichment_cache",{p_cache_key:cacheKey});
-        if(cached){
+        if(cached?.providerVersion===ENRICHMENT_PROVIDER_VERSION){
           await db.rpc("stage_prospect_enrichment_result",{p_item_id:item.itemId,p_status:cached.status,p_candidates:cached.results??[],p_canonical_url:website,p_canonical_domain:canonicalDomain,p_cache_key:cacheKey,p_error:null});
           continue;
         }
