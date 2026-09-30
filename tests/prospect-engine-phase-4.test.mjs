@@ -1,0 +1,10 @@
+import test from "node:test";import assert from "node:assert/strict";import fs from "node:fs";
+const read=p=>fs.readFileSync(p,"utf8");
+const migration=read("supabase/migrations/20260929234238_prospect_engine_phase_4_enrichment.sql"),route=read("app/api/prospects/enrich/route.ts"),lib=read("lib/prospectEnrichment.ts"),ui=read("components/prospects/ProspectDiscovery.tsx");
+test("phase 4 uses a forward-only migration and separate overlay",()=>{assert.match(migration,/prospect_enrichment_runs/);assert.match(migration,/prospect_enrichment_fields/);assert.doesNotMatch(migration,/alter table public\.prospect_discovery_entities add/i)});
+test("enrichment is bounded and server-authorized",()=>{assert.match(route,/resultIds\.length>ENRICHMENT_MAX_ITEMS/);assert.match(migration,/cardinality\(p_result_ids\) not between 1 and 10/);assert.match(migration,/Sales.*created_by=actor.*assigned_user_id=actor/s)});
+test("fetcher blocks unsafe destinations and arbitrary redirects",()=>{assert.match(lib,/protocol!=="https:"/);assert.match(lib,/169\.254\.169\.254/);assert.match(lib,/dns\.lookup/);assert.match(lib,/redirect:"manual"/);assert.match(lib,/redirects===2/);assert.match(lib,/sameSite/)});
+test("fetcher is bounded and does not execute javascript",()=>{assert.match(lib,/ENRICHMENT_MAX_BYTES=1_000_000/);assert.match(lib,/setTimeout\(\(\)=>controller\.abort\(\),7000\)/);assert.doesNotMatch(lib,/puppeteer|playwright|eval\(/i)});
+test("extracts structured data mailto tel and bounded same-site pages",()=>{assert.match(lib,/application\\\/ld\\\+json/);assert.match(lib,/mailto:/);assert.match(lib,/tel:/);assert.match(lib,/slice\(0,3\)/)});
+test("UI requires review and reruns duplicate preview",()=>{assert.match(ui,/Enrich Selected/);assert.match(ui,/saveEnrichmentDecisions/);assert.match(ui,/buildPreview\(rows/);assert.match(ui,/decision==="Pending"/)});
+test("cache and rate limits are database enforced",()=>{assert.match(migration,/interval '7 days'/);assert.match(migration,/interval '24 hours'/);assert.match(migration,/>=3/);assert.match(migration,/>30/)});

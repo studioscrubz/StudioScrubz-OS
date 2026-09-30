@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { Prospect, ProspectAssignee, ProspectEvent, ProspectImportPreviewRow, ProspectImportResult, ProspectInput } from "@/types/prospect";
 import type { DiscoveryResult } from "@/types/prospectDiscovery";
+import type { EnrichmentReviewItem,EnrichmentDecision } from "@/types/prospectEnrichment";
 
 export async function getProspects(): Promise<Prospect[]> {
   const { data, error } = await prospectClient().from("prospects").select("*").order("score", { ascending: false });
@@ -44,3 +45,6 @@ export async function importDiscoveryResults(runId:string,results:DiscoveryResul
 // These tables are introduced by the pending forward-only migration, so the
 // hand-maintained generated schema cannot expose them until that migration runs.
 function prospectClient() { return getSupabaseClient() as unknown as { from: (table: string) => any; rpc: (name: string, args?: Record<string,unknown>) => Promise<{data:unknown;error:{message:string}|null}> }; }
+
+export async function saveEnrichmentDecisions(runId:string,decisions:Array<{fieldId:string;decision:Exclude<EnrichmentDecision,"Pending">}>):Promise<void>{const{error}=await prospectClient().rpc("save_prospect_enrichment_decisions",{p_run_id:runId,p_decisions:decisions});if(error)throw new Error(error.message)}
+export async function getEnrichmentReview(runId:string):Promise<EnrichmentReviewItem[]>{const{data,error}=await prospectClient().rpc("get_prospect_enrichment_review",{p_run_id:runId});if(error)throw new Error(error.message);return data as EnrichmentReviewItem[]}
