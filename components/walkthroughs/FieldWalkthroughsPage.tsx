@@ -173,8 +173,14 @@ function FieldForm({
   const [photos, setPhotos] = useState<OperationalPhotoWithUrl[]>([]);
   const operationInFlight = useRef(false);
   const pendingPhoto = useRef<File | null>(null);
+  const [retryPhoto, setRetryPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  function updatePendingPhoto(file: File | null) {
+    pendingPhoto.current = file;
+    setRetryPhoto(file);
+  }
 
   useEffect(() => {
     let live = true;
@@ -323,7 +329,7 @@ function FieldForm({
     if (operationInFlight.current) return;
 
     operationInFlight.current = true;
-    pendingPhoto.current = file;
+    updatePendingPhoto(file);
     setBusy(true);
     setError("");
 
@@ -338,7 +344,7 @@ function FieldForm({
         file,
       });
 
-      pendingPhoto.current = null;
+      updatePendingPhoto(null);
       setPhotos(await createPhotoSignedUrls(items));
     } catch {
       setError("Photo upload failed. Confirm your assignment and try again.");
@@ -551,11 +557,11 @@ function FieldForm({
           </p>
         )}
 
-        {pendingPhoto.current && !busy && !readOnly && (
+        {retryPhoto && !busy && !readOnly && (
           <button
             className={button}
             onClick={() => {
-              if (pendingPhoto.current) void upload(pendingPhoto.current);
+              void upload(retryPhoto);
             }}
           >
             Retry Photo Upload
@@ -586,7 +592,10 @@ function FieldForm({
           <button
             disabled={busy}
             className="rounded-lg border px-4 py-2"
-            onClick={close}
+            onClick={() => {
+              updatePendingPhoto(null);
+              close();
+            }}
           >
             Close
           </button>
