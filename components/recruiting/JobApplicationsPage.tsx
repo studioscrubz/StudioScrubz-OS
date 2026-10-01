@@ -34,7 +34,16 @@ export function JobApplicationsPage() {
   async function load() { setRows(await getJobApplications()); }
 
   useEffect(() => {
-    if (allowed) void load().catch((cause) => setError(cause instanceof Error ? cause.message : "Applications could not be loaded."));
+    if (!allowed) return;
+    let cancelled = false;
+    void getJobApplications()
+      .then((applications) => {
+        if (!cancelled) setRows(applications);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : "Applications could not be loaded.");
+      });
+    return () => { cancelled = true; };
   }, [allowed]);
 
   const visible = useMemo(() => rows.filter((application) => {

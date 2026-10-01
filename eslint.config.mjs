@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // This root maintenance artifact contains Python source despite its legacy .js suffix.
+    "job-alert-patch.js",
   ]),
 ]);
 

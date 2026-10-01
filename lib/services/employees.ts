@@ -11,6 +11,13 @@ import type {
   PorterAssignmentOption,
 } from "@/types/employee";
 
+type ActiveScrubTechnicianRpcClient = {
+  rpc: (name: "get_active_scrub_technicians") => Promise<{
+    data: unknown;
+    error: { message: string } | null;
+  }>;
+};
+
 export async function getPorterAssignmentOptions(): Promise<
   PorterAssignmentOption[]
 > {
@@ -47,7 +54,7 @@ export async function getActiveScrubTechnicians(): Promise<
 > {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await (supabase as any).rpc(
+  const { data, error } = await (supabase as unknown as ActiveScrubTechnicianRpcClient).rpc(
     "get_active_scrub_technicians",
   );
 
