@@ -10,7 +10,7 @@ export interface ProviderExecutionPolicy{
 }
 
 export const DEFAULT_PROVIDER_EXECUTION_POLICY:ProviderExecutionPolicy={
-  mode:"free-only",maxCreditsPerItem:0,maxCostMinorUnitsPerItem:0,maxProviderCallsPerItem:8,
+  mode:"allow-paid",maxCreditsPerItem:1,maxCostMinorUnitsPerItem:0,maxProviderCallsPerItem:8,
   collectCorroboratingEvidence:false,policyVersion:"waterfall-v1"
 };
 

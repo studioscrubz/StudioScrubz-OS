@@ -69,7 +69,7 @@ test("free-only policy rejects paid execution and budget limits future providers
   const paid=descriptor("paid",10,["business_email_find"],{costClass:"paid",estimatedCredits:1,estimatedCostMinorUnits:5});
   const registry=new foundation.ProviderRegistry([paid]);
   assert.throws(()=>registry.assertFreeOnly());
-  const planner=new waterfall.WaterfallPlanner(registry,{...waterfall.DEFAULT_PROVIDER_EXECUTION_POLICY});
+  const planner=new waterfall.WaterfallPlanner(registry,{...waterfall.DEFAULT_PROVIDER_EXECUTION_POLICY,mode:"free-only",maxCreditsPerItem:0,maxCostMinorUnitsPerItem:0});
   assert.equal(planner.next(state({needs:{...emptyNeeds(),businessEmail:true}}),fingerprint),null);
 });
 

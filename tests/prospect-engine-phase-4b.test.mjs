@@ -17,7 +17,7 @@ const input={businessName:"Triana",address:"6250 Canoga Avenue",city:"Woodland H
 test("phase 4b discovers a website only when the discovery result lacks one",()=>{
   assert.match(orchestrator,/this\.planner\.next/);
   assert.match(waterfall,/if\(needs\.companyResolution\)capabilities\.push\("company_resolution","domain_resolution"\)/);
-  assert.match(adapters,/discoverOfficialWebsite/);
+  assert.match(adapters,/resolveCompanyWithTavily/);
 });
 test("website discovery verifies identity and location before enrichment",()=>{
   assert.match(engine,/score<70/);
@@ -79,7 +79,7 @@ test("technical resolver failures propagate and cannot collapse into ordinary no
 test("resolver metadata is bounded and provider-neutral routing remains intact",()=>{
   assert.match(engine,/candidateOrigins:urls\.slice\(0,5\)/);
   assert.match(engine,/rejectionReasonCodes\.length<5/);
-  assert.doesNotMatch(route,/official-website-resolver|DuckDuckGo|search_challenge/);
+  assert.doesNotMatch(route,/official-website-resolver|tavily-company-resolution|DuckDuckGo|search_challenge/);
   assert.doesNotMatch(`${engine}\n${adapters}`,/Google|Bing|Hunter|Apollo|A-Leads/i);
 });
 test("phase 4b is forward only",()=>{

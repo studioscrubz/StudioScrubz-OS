@@ -1,7 +1,8 @@
 import "server-only";
-import { discoverOfficialSiteContacts,discoverOfficialWebsite,extractOfficialWebsiteContacts,generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
+import { discoverOfficialSiteContacts,extractOfficialWebsiteContacts,generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
 import { generatePersonPatternCandidates } from "@/lib/prospect-enrichment/companyEmailPattern";
 import { emailDomainVerificationService } from "@/lib/prospect-enrichment/emailDomainVerification";
+import { resolveCompanyWithTavily,TAVILY_COMPANY_RESOLUTION_VERSION } from "@/lib/prospect-enrichment/tavilyCompanyResolution";
 import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EmailVerifier,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 
 const now=()=>new Date().toISOString();
@@ -17,14 +18,15 @@ export const osmMetadataProvider:BusinessContactEnricher={
   }
 };
 
-export const officialWebsiteResolverProvider:CompanyDomainResolver={
-  providerKey:"official-website-resolver",version:"1",capabilities:["company_resolution","domain_resolution"],priority:20,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",
+export const tavilyCompanyResolutionProvider:CompanyDomainResolver={
+  providerKey:"tavily-company-resolution",version:TAVILY_COMPANY_RESOLUTION_VERSION,capabilities:["company_resolution","domain_resolution"],priority:20,costClass:"paid",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",estimatedCredits:1,
   async resolveCompany(subject){
-    const outcome=await discoverOfficialWebsite({businessName:subject.businessName,address:subject.address,city:subject.city,state:subject.state,zip:subject.zip,locationQuery:subject.locationQuery});
-    if(outcome.status==="failed")return{status:"failed",candidates:[],errorCode:outcome.errorCode,retryable:outcome.retryable,httpStatus:outcome.httpStatus,responseMetadata:outcome.diagnostics};
-    if(outcome.status==="not_found")return{status:"not_found",candidates:[],responseMetadata:outcome.diagnostics};
+    const outcome=await resolveCompanyWithTavily({businessName:subject.businessName,address:subject.address,city:subject.city,state:subject.state,zip:subject.zip,locationQuery:subject.locationQuery});
+    const usage={...(outcome.creditsUsed===undefined?{}:{creditsUsed:outcome.creditsUsed}),costMinorUnits:null};
+    if(outcome.status==="failed")return{status:"failed",candidates:[],errorCode:outcome.errorCode,retryable:outcome.retryable,httpStatus:outcome.httpStatus,providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage};
+    if(outcome.status==="not_found")return{status:"not_found",candidates:[],providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage};
     const found=outcome.result,url=new URL(found.url),domain=url.hostname.replace(/^www\./,"");
-    return{status:"complete",resolvedCompany:{website:url.origin,domain},responseMetadata:outcome.diagnostics,candidates:[candidate("official-website-resolver","1","website",url.origin,url.origin,"Official Website",url.origin,"Homepage",found.confidence,"verified")]};
+    return{status:"complete",resolvedCompany:{website:url.origin,domain},providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage,candidates:[candidate("tavily-company-resolution",TAVILY_COMPANY_RESOLUTION_VERSION,"website",url.origin,url.origin,"Official Website",url.origin,"Homepage",found.confidence,"verified")]};
   }
 };
 
@@ -83,6 +85,6 @@ export const emailDomainVerificationProvider:EmailVerifier={
   }
 };
 
-export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider] as const;
+export const internalEnrichmentProviders=[osmMetadataProvider,tavilyCompanyResolutionProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider] as const;
 export const internalProviderContext=(requestId:string,allowPaidCall=false):ProviderContext=>({requestId,allowPaidCall});
 export const noProviderResult:ProviderResult={status:"not_found",candidates:[]};

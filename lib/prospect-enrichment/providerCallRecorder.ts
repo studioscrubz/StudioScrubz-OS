@@ -22,7 +22,7 @@ export class SupabaseProviderCallRecorder implements ProviderCallRecorder{
   }
   async complete(input:CompleteProviderCallInput){
     const usage=input.usage??{};
-    const{error}=await this.db.rpc("complete_prospect_enrichment_provider_call",{p_provider_call_id:input.providerCallId,p_status:input.status,p_cache_hit:input.cacheHit??false,p_provider_request_id:input.providerRequestId??null,p_credits_used:usage.creditsUsed??0,p_cost_minor_units:usage.costMinorUnits??0,p_cost_currency:usage.costCurrency??null,p_http_status:input.httpStatus??null,p_error_code:input.errorCode??null,p_response_metadata:sanitizeProviderMetadata(input.responseMetadata)});
+    const{error}=await this.db.rpc("complete_prospect_enrichment_provider_call",{p_provider_call_id:input.providerCallId,p_status:input.status,p_cache_hit:input.cacheHit??false,p_provider_request_id:input.providerRequestId??null,p_credits_used:usage.creditsUsed??0,p_cost_minor_units:usage.costMinorUnits===undefined?0:usage.costMinorUnits,p_cost_currency:usage.costCurrency??null,p_http_status:input.httpStatus??null,p_error_code:input.errorCode??null,p_response_metadata:sanitizeProviderMetadata(input.responseMetadata)});
     if(error)throw new Error(error.message);
   }
 }

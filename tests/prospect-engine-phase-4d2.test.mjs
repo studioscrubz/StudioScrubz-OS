@@ -20,7 +20,7 @@ test("provider calls persist lifecycle, cache, usage, cost, and request identity
 
 test("internal provider calls and candidates default to zero cost",()=>{
   assert.match(recorder,/usage\.creditsUsed\?\?0/);
-  assert.match(recorder,/usage\.costMinorUnits\?\?0/);
+  assert.match(recorder,/usage\.costMinorUnits===undefined\?0:usage\.costMinorUnits/);
   assert.match(orchestrator,/usage:result\.usage\?\?\{creditsUsed:0,costMinorUnits:0\}/);
   assert.doesNotMatch(recorder,/A-Leads|Apollo|Hunter/i);
 });

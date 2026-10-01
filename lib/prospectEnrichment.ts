@@ -94,7 +94,7 @@ export async function robotsAllows(base:URL){try{const robots=await fetchBounded
 
 const SEARCH_ENDPOINT="https://html.duckduckgo.com/html/";
 const SEARCH_BLOCKED_HOSTS=["facebook.com","instagram.com","linkedin.com","yelp.com","yellowpages.com","mapquest.com","tripadvisor.com","opentable.com","doordash.com","ubereats.com","grubhub.com","wikipedia.org","bbb.org","chamberofcommerce.com"];
-function searchHostBlocked(host:string){const h=host.toLowerCase().replace(/^www\./,"");return SEARCH_BLOCKED_HOSTS.some(x=>h===x||h.endsWith("."+x))}
+export function isBlockedWebsiteSearchHost(host:string){const h=host.toLowerCase().replace(/^www\./,"");return SEARCH_BLOCKED_HOSTS.some(x=>h===x||h.endsWith("."+x))}
 function decodeSearchUrl(raw:string){try{const u=new URL(raw,"https://duckduckgo.com");const target=u.searchParams.get("uddg");return target?decodeURIComponent(target):u.toString()}catch{return""}}
 export function buildOfficialWebsiteSearchQuery(input:WebsiteDiscoveryInput){const specific=[input.address,input.city,input.state,input.zip].map(value=>value?.trim()).filter(Boolean),hasSpecificLocation=Boolean(input.address?.trim()||input.city?.trim()||input.zip?.trim());return[`"${input.businessName}"`,...(hasSpecificLocation?specific:[input.locationQuery?.trim()].filter(Boolean)),"official website"].join(" ")}
 export async function searchOfficialWebsite(input:WebsiteDiscoveryInput,searchFetch:typeof fetch=fetch){
@@ -124,7 +124,7 @@ export async function searchOfficialWebsite(input:WebsiteDiscoveryInput,searchFe
       const decoded=decodeSearchUrl(m[1]);
       try{
         const u=new URL(decoded);
-        if(searchHostBlocked(u.hostname)){blockedHostCount+=1;continue}
+        if(isBlockedWebsiteSearchHost(u.hostname)){blockedHostCount+=1;continue}
         if(u.protocol==="https:"&&!urls.includes(u.origin))urls.push(u.origin);
       }catch{}
       if(urls.length>=5)break;

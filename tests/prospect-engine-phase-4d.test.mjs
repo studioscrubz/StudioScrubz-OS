@@ -36,9 +36,9 @@ test("normalization retains independent evidence and deterministic ranking favor
   assert.ok(foundation.candidateRank(published)>foundation.candidateRank(generated));
 });
 
-test("internal provider waterfall is free and ordered OSM, resolver, website, generated email",()=>{
+test("provider waterfall orders OSM, metered resolver, website, and generated email",()=>{
   assert.match(adapters,/priority:10,costClass:"free"/);
-  assert.match(adapters,/priority:20,costClass:"free"/);
+  assert.match(adapters,/priority:20,costClass:"paid"/);
   assert.match(adapters,/priority:30,costClass:"free"/);
   assert.match(adapters,/priority:1000,costClass:"free"/);
   assert.doesNotMatch(adapters,/A-Leads|Apollo|Hunter|api[_-]?key/i);

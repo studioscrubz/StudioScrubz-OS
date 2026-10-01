@@ -51,7 +51,7 @@ export interface ProviderEvidence{
   providerMetadata?:Record<string,unknown>;
 }
 
-export interface ProviderUsage{creditsUsed?:number;costMinorUnits?:number;costCurrency?:string}
+export interface ProviderUsage{creditsUsed?:number;costMinorUnits?:number|null;costCurrency?:string}
 
 // The top-level fields deliberately match the existing staging RPC payload.
 export interface ProviderCandidate{
