@@ -1,7 +1,8 @@
 import "server-only";
 import { discoverOfficialSiteContacts,discoverOfficialWebsite,extractOfficialWebsiteContacts,generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
 import { generatePersonPatternCandidates } from "@/lib/prospect-enrichment/companyEmailPattern";
-import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
+import { emailDomainVerificationService } from "@/lib/prospect-enrichment/emailDomainVerification";
+import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EmailVerifier,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 
 const now=()=>new Date().toISOString();
 function evidence(providerKey:string,version:string,sourceType:ProviderEvidence["sourceType"],sourceUrl:string,sourcePageType:string,verificationStatus:ProviderEvidence["verificationStatus"]):ProviderEvidence{return{providerKey,providerVersion:version,sourceKind:sourcePageType,sourceType,sourceUrl,sourcePageType,verificationStatus,discoveredAt:now()}}
@@ -62,6 +63,25 @@ export const generatedRoleEmailProvider:EmailFinder={
   }
 };
 
-export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,generatedRoleEmailProvider] as const;
+export const emailDomainVerificationProvider:EmailVerifier={
+  providerKey:"email-domain-verification",version:"1",capabilities:["email_verification"],priority:900,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",
+  async verifyEmails(candidates){
+    const sourceByEmail=new Map<string,ProviderCandidate>();
+    for(const item of candidates){
+      if(item.fieldName!=="business_email"||item.evidence.providerKey==="email-domain-verification")continue;
+      const key=item.normalizedValue.toLowerCase(),current=sourceByEmail.get(key);
+      if(!current||current.sourceType==="Generated Candidate"&&item.sourceType!=="Generated Candidate")sourceByEmail.set(key,item);
+    }
+    const verified:ProviderCandidate[]=[],domainOutcomes=new Map<string,string>();let cacheHitCount=0;
+    for(const source of sourceByEmail.values()){
+      const result=await emailDomainVerificationService.verifyEmail(source.value);if(result.cacheHit)cacheHitCount+=1;if(result.normalizedDomain)domainOutcomes.set(result.normalizedDomain,result.dnsOutcome);
+      const checkedAt=new Date().toISOString(),metadata={syntaxValid:result.syntaxValid,normalizedDomain:result.normalizedDomain,domainResolved:result.domainResolved,mxPresent:result.mxPresent,mxCount:result.mxCount,nullMx:result.nullMx,fallbackMailHostSignal:result.fallbackMailHostSignal,roleAddress:result.roleAddress,dnsOutcome:result.dnsOutcome,disposableClassification:result.disposableClassification,cacheHit:result.cacheHit};
+      verified.push({...source,confidence:result.verificationStatus==="valid"?90:result.verificationStatus==="risky"?60:0,retrievedAt:checkedAt,evidence:{providerKey:"email-domain-verification",providerVersion:"1",sourceKind:"Domain/MX Verification",sourceType:source.sourceType,sourceUrl:source.sourceUrl,sourcePageType:source.sourcePageType,verificationStatus:result.verificationStatus,discoveredAt:checkedAt,...(result.verificationStatus!=="unknown"?{verifiedAt:checkedAt}:{}),providerMetadata:metadata},usage:{creditsUsed:0,costMinorUnits:0}});
+    }
+    return{status:verified.length?"complete":"not_found",usage:{creditsUsed:0,costMinorUnits:0},responseMetadata:{checkedEmails:verified.length,checkedDomains:domainOutcomes.size,cacheHitCount,dnsOutcomes:[...domainOutcomes.values()].slice(0,10)},candidates:verified};
+  }
+};
+
+export const internalEnrichmentProviders=[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider] as const;
 export const internalProviderContext=(requestId:string,allowPaidCall=false):ProviderContext=>({requestId,allowPaidCall});
 export const noProviderResult:ProviderResult={status:"not_found",candidates:[]};

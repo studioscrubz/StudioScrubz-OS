@@ -11,7 +11,7 @@ const engineSource=readFileSync("lib/prospectEnrichment.ts","utf8");
 
 test("site-contact-discovery is internal, free, priority 40, and precedes generated email",()=>{
   assert.match(adapters,/providerKey:"site-contact-discovery",version:"2"[\s\S]*priority:40[\s\S]*costClass:"free"/);
-  assert.match(adapters,/internalEnrichmentProviders=\[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,generatedRoleEmailProvider\]/);
+  assert.match(adapters,/internalEnrichmentProviders=\[osmMetadataProvider,officialWebsiteResolverProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider\]/);
   assert.doesNotMatch(adapters,/A-Leads|Apollo|Hunter|RocketReach|Clearbit|api[_-]?key/i);
 });
 
@@ -59,7 +59,7 @@ test("published email satisfies the field before generated fallback planning",()
   const candidate={fieldName:"business_email",value:"info@example.com",normalizedValue:"info@example.com",sourceType:"Official Website",sourceUrl:"https://example.com/contact",sourcePageType:"Contact",confidence:85,retrievedAt:new Date().toISOString(),evidence:{providerKey:"site-contact-discovery",providerVersion:"1",sourceKind:"Contact",sourceType:"Official Website",sourceUrl:"https://example.com/contact",sourcePageType:"Contact",verificationStatus:"published",discoveredAt:new Date().toISOString()}};
   const needs=foundation.planEnrichmentNeeds({discoveryResultId:"result",businessName:"Business",website:"https://example.com",verifiedDomain:"example.com"},[candidate]);
   assert.equal(needs.businessEmail,false);
-  assert.match(orchestrator,/planEnrichmentNeeds\(subject,\[\.\.\.baseline,\.\.\.candidates\]\)/);
+  assert.match(orchestrator,/evidenceCandidates=normalizeDedupeAndRank\(\[\.\.\.baseline,\.\.\.candidates\]\),needs=planEnrichmentNeeds\(subject,evidenceCandidates\)/);
 });
 
 test("partial legacy cache cannot suppress the deeper contact waterfall",()=>{

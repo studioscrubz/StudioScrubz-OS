@@ -98,7 +98,7 @@ export interface ProviderDescriptor{
 export interface CompanyDomainResolver extends ProviderDescriptor{resolveCompany(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
 export interface BusinessContactEnricher extends ProviderDescriptor{enrichBusiness(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
 export interface EmailFinder extends ProviderDescriptor{findEmails(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
-export interface EmailVerifier extends ProviderDescriptor{verifyEmail(email:string,subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
+export interface EmailVerifier extends ProviderDescriptor{verifyEmails(candidates:readonly ProviderCandidate[],subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
 export interface PhoneFinder extends ProviderDescriptor{findPhones(subject:EnrichmentSubject,context:ProviderContext):Promise<ProviderResult>}
 export type EnrichmentProvider=CompanyDomainResolver|BusinessContactEnricher|EmailFinder|EmailVerifier|PhoneFinder;
 
@@ -153,6 +153,9 @@ export function planEnrichmentNeeds(subject:EnrichmentSubject,candidates:readonl
   };
   needs.websiteContacts=needs.businessEmail||needs.businessPhone||needs.address||needs.city||needs.state||needs.zip;
   needs.personEmailPattern=Boolean(subject.verifiedDomain)&&hasPersonPatternEvidence(candidates);
+  const emailValues=[...new Set(candidates.filter(candidate=>candidate.fieldName==="business_email"&&candidate.evidence.providerKey!=="email-domain-verification").map(candidate=>candidate.normalizedValue.toLowerCase()))];
+  const technicallyChecked=new Set(candidates.filter(candidate=>candidate.fieldName==="business_email"&&candidate.evidence.providerKey==="email-domain-verification").map(candidate=>candidate.normalizedValue.toLowerCase()));
+  needs.emailVerification=emailValues.some(email=>!technicallyChecked.has(email));
   return needs;
 }
 
@@ -170,7 +173,7 @@ export function candidateRank(candidate:ProviderCandidate){return sourceRank[can
 
 export function normalizeCandidate(candidate:ProviderCandidate):ProviderCandidate|null{
   const value=candidate.value.trim();
-  if(!value||candidate.evidence.verificationStatus==="invalid")return null;
+  if(!value)return null;
   const normalized=normalizedValue(candidate.fieldName,candidate.normalizedValue||value);
   if(!normalized)return null;
   return{...candidate,value,normalizedValue:normalized,confidence:Math.max(0,Math.min(100,Math.round(candidate.confidence))),evidence:{...candidate.evidence,providerMetadata:sanitizeProviderMetadata(candidate.evidence.providerMetadata)}};

@@ -16,7 +16,7 @@ async function executeProvider(plan:ProviderPlan,subject:EnrichmentSubject,conte
   if(plan.operation==="business_contact_enrichment"&&"enrichBusiness" in provider)return provider.enrichBusiness(subject,context);
   if((plan.operation==="email_finding"||plan.operation==="person_email_pattern")&&"findEmails" in provider)return provider.findEmails(subject,context);
   if(plan.operation==="phone_finding"&&"findPhones" in provider)return provider.findPhones(subject,context);
-  if(plan.operation==="email_verification"&&"verifyEmail" in provider&&subject.email)return provider.verifyEmail(subject.email,subject,context);
+  if(plan.operation==="email_verification"&&"verifyEmails" in provider)return provider.verifyEmails(context.evidenceCandidates??[],subject,context);
   return{status:"not_found",candidates:[]};
 }
 
@@ -28,8 +28,9 @@ export class EnrichmentOrchestrator{
     if(policy.mode==="free-only")this.registry.assertFreeOnly();
   }
 
-  private fingerprint(provider:EnrichmentProvider,operation:string,subject:EnrichmentSubject){
-    return providerRequestFingerprint(provider,operation,{discoveryResultId:subject.discoveryResultId,website:subject.website??null,verifiedDomain:subject.verifiedDomain??null,email:subject.email??null,phone:subject.phone??null},this.planner.policy.policyVersion);
+  private fingerprint(provider:EnrichmentProvider,operation:string,subject:EnrichmentSubject,candidates:readonly ProviderCandidate[]=[]){
+    const emailDomains=operation==="email_verification"?[...new Set(candidates.filter(candidate=>candidate.fieldName==="business_email").map(candidate=>candidate.normalizedValue.split("@")[1]).filter(Boolean))].sort():undefined;
+    return providerRequestFingerprint(provider,operation,{discoveryResultId:subject.discoveryResultId,website:subject.website??null,verifiedDomain:subject.verifiedDomain??null,email:subject.email??null,phone:subject.phone??null,emailDomains},this.planner.policy.policyVersion);
   }
 
   private async invoke(input:EnrichmentOrchestratorInput,dependencies:EnrichmentOrchestratorDependencies,plan:ProviderPlan,subject:EnrichmentSubject,context:ReturnType<typeof internalProviderContext>,fingerprint:string){
@@ -52,8 +53,8 @@ export class EnrichmentOrchestrator{
     let cacheChecked=false;
     try{
       while(providerCalls<this.planner.policy.maxProviderCallsPerItem){
-        const needs=planEnrichmentNeeds(subject,[...baseline,...candidates]);
-        const plan=this.planner.next({subject,needs,attemptedFingerprints,executedBaselineProviders,providerCalls,creditsUsed,costMinorUnits},(provider,operation)=>this.fingerprint(provider,operation,subject));
+        const evidenceCandidates=normalizeDedupeAndRank([...baseline,...candidates]),needs=planEnrichmentNeeds(subject,evidenceCandidates);
+        const plan=this.planner.next({subject,needs,attemptedFingerprints,executedBaselineProviders,providerCalls,creditsUsed,costMinorUnits},(provider,operation)=>this.fingerprint(provider,operation,subject,evidenceCandidates));
         if(!plan)break;
 
         if(plan.provider.supportsCache&&!cacheChecked&&input.cacheKey){
@@ -66,17 +67,17 @@ export class EnrichmentOrchestrator{
             if(callId)await dependencies.providerCalls!.complete({providerCallId:callId,status:cached.status==="Failed"?"Failed":cached.status==="No Additional Data Found"?"No Data":"Completed",cacheHit:true,responseMetadata:{candidateCount:cached.results.length}});
             const cachedCandidates=cached.results.map(candidate=>({...candidate,usage:{creditsUsed:0,costMinorUnits:0},evidence:{...candidate.evidence,providerCallId:callId??undefined}}));
             const cachedNormalized=normalizeDedupeAndRank(cachedCandidates),cachedNeeds=planEnrichmentNeeds(subject,[...baseline,...candidates,...cachedNormalized]);
-            if(cached.status!=="Failed"&&!cachedNeeds.businessEmail&&!cachedNeeds.businessPhone)return{status:cached.status,candidates:cachedNormalized,canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey};
+            if(cached.status!=="Failed"&&!cachedNeeds.businessEmail&&!cachedNeeds.businessPhone&&!cachedNeeds.personEmailPattern&&!cachedNeeds.emailVerification)return{status:cached.status,candidates:cachedNormalized,canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey};
             candidates.push(...cachedNormalized);
-            attemptedFingerprints.add(this.fingerprint(plan.provider,plan.operation,subject));
+            attemptedFingerprints.add(this.fingerprint(plan.provider,plan.operation,subject,evidenceCandidates));
             continue;
           }
         }
 
-        const fingerprint=this.fingerprint(plan.provider,plan.operation,subject);
+        const fingerprint=this.fingerprint(plan.provider,plan.operation,subject,evidenceCandidates);
         attemptedFingerprints.add(fingerprint);providerCalls+=1;
         if(plan.provider.stopPolicy==="baseline")executedBaselineProviders.add(plan.provider.providerKey);
-        const result=await this.invoke(input,dependencies,plan,subject,{...context,evidenceCandidates:normalizeDedupeAndRank([...baseline,...candidates])},fingerprint);
+        const result=await this.invoke(input,dependencies,plan,subject,{...context,evidenceCandidates},fingerprint);
         creditsUsed+=result.usage?.creditsUsed??0;costMinorUnits+=result.usage?.costMinorUnits??0;
         if(result.resolvedCompany){subject.website=result.resolvedCompany.website;subject.verifiedDomain=result.resolvedCompany.domain}
         if(plan.provider.stopPolicy==="baseline")baseline.push(...result.candidates);else candidates.push(...result.candidates);

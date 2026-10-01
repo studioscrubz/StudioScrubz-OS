@@ -82,10 +82,11 @@ test("source evidence observation IDs are persisted",()=>assert.match(providerSo
 
 test("pattern provider performs no website crawl or network request",()=>{
   assert.doesNotMatch(patternSource,/\bfetch\s*\(|validatePublicHttps|robotsAllows|discoverOfficialSiteContacts/);
-  assert.match(orchestratorSource,/evidenceCandidates:normalizeDedupeAndRank/);
+  assert.match(orchestratorSource,/const evidenceCandidates=normalizeDedupeAndRank/);
+  assert.match(orchestratorSource,/\{\.\.\.context,evidenceCandidates\}/);
 });
 test("generic role fallback remains functional and last",()=>{
-  assert.match(providerSource,/companyEmailPatternProvider,generatedRoleEmailProvider/);
+  assert.match(providerSource,/companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider/);
   assert.match(discoverySource,/\[\["info",55\],\["contact",50\],\["hello",45\]\]/);
 });
 test("existing published-contact behavior remains intact",()=>{
