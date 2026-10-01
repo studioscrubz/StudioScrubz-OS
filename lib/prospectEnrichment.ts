@@ -9,6 +9,8 @@ export const ENRICHMENT_USER_AGENT="StudioScrubz Prospect Enrichment/1.1 (contac
 export interface Candidate{fieldName:EnrichmentFieldName;value:string;normalizedValue:string;sourceUrl:string;sourcePageType:string;confidence:number;retrievedAt:string;sourceType?:"OpenStreetMap"|"Official Website"|"Generated Candidate";personObservation?:{id:string;kind:"json-ld-person"|"team-card"|"directory-row"|"semantic-person-container"}}
 export interface WebsiteDiscoveryInput{businessName:string;address?:string;city?:string;state?:string;zip?:string;locationQuery?:string}
 export interface WebsiteDiscoveryResult{url:string;confidence:number;signals:string[]}
+export interface WebsiteResolverDiagnostics extends Record<string,unknown>{searchOutcome:"results"|"empty"|"challenge"|"http_failure"|"parser_failure"|"timeout"|"network_failure";httpStatus?:number;parsedResultCount:number;candidateOrigins:string[];blockedHostCount:number;verificationAttemptCount:number;rejectionReasonCodes:string[];acceptedOrigin?:string;acceptedDomain?:string}
+export type WebsiteDiscoveryOutcome={status:"resolved";result:WebsiteDiscoveryResult;diagnostics:WebsiteResolverDiagnostics}|{status:"not_found";diagnostics:WebsiteResolverDiagnostics}|{status:"failed";errorCode:string;retryable:boolean;httpStatus?:number;diagnostics:WebsiteResolverDiagnostics};
 
 const blockedV4=(ip:string)=>{const p=ip.split(".").map(Number);return p[0]===0||p[0]===10||p[0]===127||p[0]>=224||p[0]===169&&p[1]===254||p[0]===172&&p[1]>=16&&p[1]<=31||p[0]===192&&p[1]===168||p[0]===192&&p[1]===0&&p[2]===0||p[0]===198&&[18,19,51].includes(p[1])||p[0]===203&&p[1]===0&&p[2]===113};
 const blockedIp=(ip:string)=>net.isIPv4(ip)?blockedV4(ip):net.isIPv6(ip)?(/^(::|::1|fc|fd|fe8|fe9|fea|feb|ff)/i.test(ip)||ip.toLowerCase().startsWith("2001:db8:")):true;
@@ -94,12 +96,14 @@ const SEARCH_ENDPOINT="https://html.duckduckgo.com/html/";
 const SEARCH_BLOCKED_HOSTS=["facebook.com","instagram.com","linkedin.com","yelp.com","yellowpages.com","mapquest.com","tripadvisor.com","opentable.com","doordash.com","ubereats.com","grubhub.com","wikipedia.org","bbb.org","chamberofcommerce.com"];
 function searchHostBlocked(host:string){const h=host.toLowerCase().replace(/^www\./,"");return SEARCH_BLOCKED_HOSTS.some(x=>h===x||h.endsWith("."+x))}
 function decodeSearchUrl(raw:string){try{const u=new URL(raw,"https://duckduckgo.com");const target=u.searchParams.get("uddg");return target?decodeURIComponent(target):u.toString()}catch{return""}}
-async function searchOfficialWebsite(input:WebsiteDiscoveryInput){
-  const q=[`"${input.businessName}"`,input.address,input.city,input.state,input.zip,input.locationQuery,"official website"].filter(Boolean).join(" ");
+export function buildOfficialWebsiteSearchQuery(input:WebsiteDiscoveryInput){const specific=[input.address,input.city,input.state,input.zip].map(value=>value?.trim()).filter(Boolean),hasSpecificLocation=Boolean(input.address?.trim()||input.city?.trim()||input.zip?.trim());return[`"${input.businessName}"`,...(hasSpecificLocation?specific:[input.locationQuery?.trim()].filter(Boolean)),"official website"].join(" ")}
+export async function searchOfficialWebsite(input:WebsiteDiscoveryInput,searchFetch:typeof fetch=fetch){
+  const q=buildOfficialWebsiteSearchQuery(input),baseDiagnostics={parsedResultCount:0,candidateOrigins:[] as string[],blockedHostCount:0,verificationAttemptCount:0,rejectionReasonCodes:[] as string[]};
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),7000);
   try{
-    const response=await fetch(SEARCH_ENDPOINT,{
+    let response:Response;
+    try{response=await searchFetch(SEARCH_ENDPOINT,{
       method:"POST",
       headers:{
         "User-Agent":ENRICHMENT_USER_AGENT,
@@ -109,28 +113,34 @@ async function searchOfficialWebsite(input:WebsiteDiscoveryInput){
       body:new URLSearchParams({q}).toString(),
       signal:controller.signal,
       cache:"no-store"
-    });
-    if(!response.ok)throw new Error(`Website search returned ${response.status}.`);
+    });}catch(cause){const timeout=cause instanceof Error&&cause.name==="AbortError";return{status:"failed" as const,errorCode:timeout?"search_timeout":"search_network_failure",retryable:true,diagnostics:{...baseDiagnostics,searchOutcome:timeout?"timeout" as const:"network_failure" as const}}}
+    if(response.status===202)return{status:"failed" as const,errorCode:"search_challenge",retryable:true,httpStatus:202,diagnostics:{...baseDiagnostics,searchOutcome:"challenge" as const,httpStatus:202}};
+    if(!response.ok)return{status:"failed" as const,errorCode:"search_http_failure",retryable:response.status===429||response.status>=500,httpStatus:response.status,diagnostics:{...baseDiagnostics,searchOutcome:"http_failure" as const,httpStatus:response.status}};
     const html=await response.text();
-    const urls:string[]=[];
+    if(/captcha|anomaly|challenge|bots use this service/i.test(html))return{status:"failed" as const,errorCode:"search_challenge",retryable:true,httpStatus:response.status,diagnostics:{...baseDiagnostics,searchOutcome:"challenge" as const,httpStatus:response.status}};
+    const urls:string[]=[];let blockedHostCount=0;
     const resultLink=/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["']/gi;
     for(const m of html.matchAll(resultLink)){
       const decoded=decodeSearchUrl(m[1]);
       try{
         const u=new URL(decoded);
-        if(u.protocol==="https:"&&!searchHostBlocked(u.hostname)&&!urls.includes(u.origin))urls.push(u.origin);
+        if(searchHostBlocked(u.hostname)){blockedHostCount+=1;continue}
+        if(u.protocol==="https:"&&!urls.includes(u.origin))urls.push(u.origin);
       }catch{}
       if(urls.length>=5)break;
     }
-    return urls;
+    const diagnostics={...baseDiagnostics,searchOutcome:"results" as const,httpStatus:response.status,parsedResultCount:urls.length,candidateOrigins:urls.slice(0,5),blockedHostCount};
+    if(urls.length)return{status:"results" as const,urls,diagnostics};
+    if(/result--no-result|no results (?:found|for)|unfortunately,? no results/i.test(html))return{status:"empty" as const,urls:[],diagnostics:{...diagnostics,searchOutcome:"empty" as const}};
+    return{status:"failed" as const,errorCode:"search_parser_unexpected",retryable:false,httpStatus:response.status,diagnostics:{...diagnostics,searchOutcome:"parser_failure" as const,rejectionReasonCodes:["unexpected_search_structure"]}};
   }finally{
     clearTimeout(timer);
   }
 }
 
-async function verifyOfficialWebsite(url:string,input:WebsiteDiscoveryInput):Promise<WebsiteDiscoveryResult|null>{try{const base=await validatePublicHttps(url);const html=await fetchBounded(base);const text=strip(html).slice(0,200000);let score=0;const signals:string[]=[];const nameScore=overlap(input.businessName,text);if(nameScore>=0.8){score+=55;signals.push("business name")}else if(nameScore>=0.5){score+=35;signals.push("partial business name")}const hostName=base.hostname.replace(/^www\./,"").split(".")[0].replace(/[-_]/g," ");if(overlap(input.businessName,hostName)>=0.5){score+=20;signals.push("domain name")}if(input.city&&text.toLowerCase().includes(input.city.toLowerCase())){score+=15;signals.push("city")}if(input.zip&&text.includes(input.zip)){score+=20;signals.push("ZIP")}if(input.address&&overlap(input.address,text)>=0.5){score+=20;signals.push("address")}if(score<70)return null;return{url:base.origin,confidence:Math.min(95,score),signals}}catch{return null}}
+export async function verifyOfficialWebsite(url:string,input:WebsiteDiscoveryInput):Promise<{result:WebsiteDiscoveryResult|null;rejectionReason?:string}>{try{const base=await validatePublicHttps(url);const html=await fetchBounded(base);const text=strip(html).slice(0,200000);let score=0;const signals:string[]=[];const nameScore=overlap(input.businessName,text);if(nameScore>=0.8){score+=55;signals.push("business name")}else if(nameScore>=0.5){score+=35;signals.push("partial business name")}const hostName=base.hostname.replace(/^www\./,"").split(".")[0].replace(/[-_]/g," ");if(overlap(input.businessName,hostName)>=0.5){score+=20;signals.push("domain name")}if(input.city&&text.toLowerCase().includes(input.city.toLowerCase())){score+=15;signals.push("city")}if(input.zip&&text.includes(input.zip)){score+=20;signals.push("ZIP")}if(input.address&&overlap(input.address,text)>=0.5){score+=20;signals.push("address")}if(score<70)return{result:null,rejectionReason:"identity_score_below_threshold"};return{result:{url:base.origin,confidence:Math.min(95,score),signals}}}catch{return{result:null,rejectionReason:"candidate_security_or_fetch_rejected"}}}
 
-export async function discoverOfficialWebsite(input:WebsiteDiscoveryInput){const candidates=await searchOfficialWebsite(input);const verified:WebsiteDiscoveryResult[]=[];for(const url of candidates.slice(0,3)){const match=await verifyOfficialWebsite(url,input);if(match)verified.push(match)}verified.sort((a,b)=>b.confidence-a.confidence);return verified[0]??null}
+export async function discoverOfficialWebsite(input:WebsiteDiscoveryInput,dependencies:{searchFetch?:typeof fetch;verifyCandidate?:(url:string,input:WebsiteDiscoveryInput)=>ReturnType<typeof verifyOfficialWebsite>}={}):Promise<WebsiteDiscoveryOutcome>{const searched=await searchOfficialWebsite(input,dependencies.searchFetch);if(searched.status==="failed")return searched;if(searched.status==="empty")return{status:"not_found",diagnostics:searched.diagnostics};const verified:WebsiteDiscoveryResult[]=[];const rejectionReasonCodes:string[]=[];const verifyCandidate=dependencies.verifyCandidate??verifyOfficialWebsite;for(const url of searched.urls.slice(0,3)){const checked=await verifyCandidate(url,input);if(checked.result)verified.push(checked.result);else if(checked.rejectionReason&&!rejectionReasonCodes.includes(checked.rejectionReason)&&rejectionReasonCodes.length<5)rejectionReasonCodes.push(checked.rejectionReason)}verified.sort((a,b)=>b.confidence-a.confidence);const result=verified[0],diagnostics={...searched.diagnostics,verificationAttemptCount:Math.min(3,searched.urls.length),rejectionReasonCodes,...(result?{acceptedOrigin:result.url,acceptedDomain:new URL(result.url).hostname.replace(/^www\./,"")}:{})};return result?{status:"resolved",result,diagnostics}:{status:"not_found",diagnostics}}
 
 
 export function generateBusinessEmailCandidates(domain:string,existing:Candidate[]){

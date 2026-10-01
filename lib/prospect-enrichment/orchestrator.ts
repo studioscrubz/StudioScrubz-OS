@@ -50,6 +50,7 @@ export class EnrichmentOrchestrator{
     const attemptedFingerprints=new Set<string>();
     const executedBaselineProviders=new Set<string>();
     let providerCalls=0,creditsUsed=0,costMinorUnits=0;
+    const providerFailures:string[]=[];
     let cacheChecked=false;
     try{
       while(providerCalls<this.planner.policy.maxProviderCallsPerItem){
@@ -78,12 +79,14 @@ export class EnrichmentOrchestrator{
         attemptedFingerprints.add(fingerprint);providerCalls+=1;
         if(plan.provider.stopPolicy==="baseline")executedBaselineProviders.add(plan.provider.providerKey);
         const result=await this.invoke(input,dependencies,plan,subject,{...context,evidenceCandidates},fingerprint);
+        if(result.status==="failed"&&providerFailures.length<5)providerFailures.push(result.errorCode??"provider_execution_failed");
         creditsUsed+=result.usage?.creditsUsed??0;costMinorUnits+=result.usage?.costMinorUnits??0;
         if(result.resolvedCompany){subject.website=result.resolvedCompany.website;subject.verifiedDomain=result.resolvedCompany.domain}
         if(plan.provider.stopPolicy==="baseline")baseline.push(...result.candidates);else candidates.push(...result.candidates);
         // Provider-level failures are recorded and the next eligible adapter may continue.
       }
       const normalized=normalizeDedupeAndRank(candidates);
+      if(!normalized.length&&providerFailures.length)return{status:"Failed",candidates:[],canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey,error:`Enrichment provider failed (${providerFailures[0]}).`};
       return{status:normalized.length?"Complete":"No Additional Data Found",candidates:normalized,canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey};
     }catch(cause){
       return{status:"Failed",candidates:[],canonicalUrl:subject.website??null,canonicalDomain:subject.verifiedDomain??null,cacheKey:input.cacheKey,error:cause instanceof Error?cause.message:"Enrichment failed."};

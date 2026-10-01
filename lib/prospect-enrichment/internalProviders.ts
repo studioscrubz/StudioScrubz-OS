@@ -20,10 +20,11 @@ export const osmMetadataProvider:BusinessContactEnricher={
 export const officialWebsiteResolverProvider:CompanyDomainResolver={
   providerKey:"official-website-resolver",version:"1",capabilities:["company_resolution","domain_resolution"],priority:20,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",
   async resolveCompany(subject){
-    const found=await discoverOfficialWebsite({businessName:subject.businessName,address:subject.address,city:subject.city,state:subject.state,zip:subject.zip,locationQuery:subject.locationQuery});
-    if(!found)return{status:"not_found",candidates:[]};
-    const url=new URL(found.url),domain=url.hostname.replace(/^www\./,"");
-    return{status:"complete",resolvedCompany:{website:url.origin,domain},candidates:[candidate("official-website-resolver","1","website",url.origin,url.origin,"Official Website",url.origin,"Homepage",found.confidence,"verified")]};
+    const outcome=await discoverOfficialWebsite({businessName:subject.businessName,address:subject.address,city:subject.city,state:subject.state,zip:subject.zip,locationQuery:subject.locationQuery});
+    if(outcome.status==="failed")return{status:"failed",candidates:[],errorCode:outcome.errorCode,retryable:outcome.retryable,httpStatus:outcome.httpStatus,responseMetadata:outcome.diagnostics};
+    if(outcome.status==="not_found")return{status:"not_found",candidates:[],responseMetadata:outcome.diagnostics};
+    const found=outcome.result,url=new URL(found.url),domain=url.hostname.replace(/^www\./,"");
+    return{status:"complete",resolvedCompany:{website:url.origin,domain},responseMetadata:outcome.diagnostics,candidates:[candidate("official-website-resolver","1","website",url.origin,url.origin,"Official Website",url.origin,"Homepage",found.confidence,"verified")]};
   }
 };
 
