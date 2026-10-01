@@ -1,5 +1,5 @@
 import "server-only";
-import { ENRICHMENT_PROVIDER_VERSION } from "@/lib/prospectEnrichment";
+import { ENRICHMENT_PROVIDER_VERSION,sameSite } from "@/lib/prospectEnrichment";
 import { internalEnrichmentProviders,internalProviderContext } from "@/lib/prospect-enrichment/internalProviders";
 import { normalizeDedupeAndRank,planEnrichmentNeeds,ProviderRegistry,type EnrichmentProvider,type EnrichmentSubject,type ProviderCandidate,type ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 import { providerCallCompletion,providerRequestFingerprint,type ProviderCallRecorder } from "@/lib/prospect-enrichment/providerCallRecorder";
@@ -9,6 +9,16 @@ export interface EnrichmentOrchestratorInput extends EnrichmentSubject{enrichmen
 export interface CachedEnrichment{status:"Complete"|"Partially Enriched"|"No Additional Data Found"|"Failed";results:ProviderCandidate[];providerVersion?:string}
 export interface EnrichmentOrchestratorDependencies{getCached(cacheKey:string):Promise<CachedEnrichment|null>;providerCalls?:ProviderCallRecorder}
 export interface EnrichmentExecutionResult{status:"Complete"|"Partially Enriched"|"No Additional Data Found"|"Failed";candidates:ProviderCandidate[];canonicalUrl:string|null;canonicalDomain:string|null;cacheKey:string|null;error?:string}
+
+function cacheMatchesAuthorizedDomain(cached:CachedEnrichment,verifiedDomain:string){
+  let domainBoundEvidence=false;
+  for(const candidate of cached.results){
+    if(candidate.sourceType!=="Official Website"&&candidate.sourceType!=="Generated Candidate")continue;
+    const value=candidate.fieldName==="website"||candidate.fieldName==="contact_page_url"?candidate.value:candidate.sourceUrl;
+    try{const url=new URL(value);if(url.protocol!=="https:"||!sameSite(url.hostname,verifiedDomain))return false;domainBoundEvidence=true}catch{return false}
+  }
+  return domainBoundEvidence;
+}
 
 async function executeProvider(plan:ProviderPlan,subject:EnrichmentSubject,context:ReturnType<typeof internalProviderContext>):Promise<ProviderResult>{
   const provider=plan.provider;
@@ -30,7 +40,7 @@ export class EnrichmentOrchestrator{
 
   private fingerprint(provider:EnrichmentProvider,operation:string,subject:EnrichmentSubject,candidates:readonly ProviderCandidate[]=[]){
     const emailDomains=operation==="email_verification"?[...new Set(candidates.filter(candidate=>candidate.fieldName==="business_email").map(candidate=>candidate.normalizedValue.split("@")[1]).filter(Boolean))].sort():undefined;
-    return providerRequestFingerprint(provider,operation,{discoveryResultId:subject.discoveryResultId,website:subject.website??null,verifiedDomain:subject.verifiedDomain??null,email:subject.email??null,phone:subject.phone??null,emailDomains},this.planner.policy.policyVersion);
+    return providerRequestFingerprint(provider,operation,{discoveryResultId:subject.discoveryResultId,websiteCandidate:subject.websiteCandidate??null,website:subject.website??null,verifiedDomain:subject.verifiedDomain??null,email:subject.email??null,phone:subject.phone??null,emailDomains},this.planner.policy.policyVersion);
   }
 
   private async invoke(input:EnrichmentOrchestratorInput,dependencies:EnrichmentOrchestratorDependencies,plan:ProviderPlan,subject:EnrichmentSubject,context:ReturnType<typeof internalProviderContext>,fingerprint:string){
@@ -52,6 +62,7 @@ export class EnrichmentOrchestrator{
     let providerCalls=0,creditsUsed=0,costMinorUnits=0;
     const providerFailures:string[]=[];
     let cacheChecked=false;
+    let authorizedDomainThisRun:string|undefined;
     try{
       while(providerCalls<this.planner.policy.maxProviderCallsPerItem){
         const evidenceCandidates=normalizeDedupeAndRank([...baseline,...candidates]),needs=planEnrichmentNeeds(subject,evidenceCandidates);
@@ -61,7 +72,7 @@ export class EnrichmentOrchestrator{
         if(plan.provider.supportsCache&&!cacheChecked&&input.cacheKey){
           cacheChecked=true;
           const cached=await dependencies.getCached(input.cacheKey);
-          if(cached?.providerVersion===ENRICHMENT_PROVIDER_VERSION&&cached.results.every(candidate=>candidate.evidence?.providerKey&&candidate.evidence?.providerVersion)){
+          if(authorizedDomainThisRun&&cached?.providerVersion===ENRICHMENT_PROVIDER_VERSION&&cacheMatchesAuthorizedDomain(cached,authorizedDomainThisRun)&&cached.results.every(candidate=>candidate.evidence?.providerKey&&candidate.evidence?.providerVersion)){
             const cacheProvider={providerKey:"enrichment-cache",version:ENRICHMENT_PROVIDER_VERSION,capabilities:[],priority:0,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:true,stopPolicy:"when-needed"} as const;
             const fingerprint=providerRequestFingerprint(cacheProvider,"cache_lookup",{cacheKey:input.cacheKey},this.planner.policy.policyVersion);
             const callId=dependencies.providerCalls?await dependencies.providerCalls.begin({enrichmentItemId:input.enrichmentItemId,provider:cacheProvider,operation:"cache_lookup",requestFingerprint:fingerprint,cacheHit:true}):undefined;
@@ -81,7 +92,10 @@ export class EnrichmentOrchestrator{
         const result=await this.invoke(input,dependencies,plan,subject,{...context,evidenceCandidates},fingerprint);
         if(result.status==="failed"&&providerFailures.length<5)providerFailures.push(result.errorCode??"provider_execution_failed");
         creditsUsed+=result.usage?.creditsUsed??0;costMinorUnits+=result.usage?.costMinorUnits??0;
-        if(result.resolvedCompany){subject.website=result.resolvedCompany.website;subject.verifiedDomain=result.resolvedCompany.domain}
+        if(result.resolvedCompany&&plan.operation==="company_resolution"){
+          subject.website=result.resolvedCompany.website;subject.verifiedDomain=result.resolvedCompany.domain;
+          authorizedDomainThisRun=result.resolvedCompany.domain;
+        }
         if(plan.provider.stopPolicy==="baseline")baseline.push(...result.candidates);else candidates.push(...result.candidates);
         // Provider-level failures are recorded and the next eligible adapter may continue.
       }

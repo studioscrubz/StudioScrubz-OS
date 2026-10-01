@@ -1,5 +1,5 @@
 import "server-only";
-import { buildOfficialWebsiteSearchQuery,isBlockedWebsiteSearchHost,verifyOfficialWebsite,type WebsiteDiscoveryInput,type WebsiteDiscoveryResult } from "../prospectEnrichment";
+import { buildOfficialWebsiteSearchQuery,isBlockedWebsiteSearchHost,verifyOfficialWebsite,verifyOfficialWebsiteCandidates,type WebsiteDiscoveryInput,type WebsiteDiscoveryResult } from "../prospectEnrichment";
 
 const TAVILY_SEARCH_ENDPOINT="https://api.tavily.com/search";
 export const TAVILY_COMPANY_RESOLUTION_VERSION="1";
@@ -63,11 +63,8 @@ export async function resolveCompanyWithTavily(input:WebsiteDiscoveryInput,depen
   if(searched.status==="failed")return searched;
   const candidates=searched.candidates??[];
   if(!candidates.length)return searched;
-  const verified:WebsiteDiscoveryResult[]=[],related:WebsiteDiscoveryResult[]=[],rejectionReasonCodes:string[]=[],attempted=new Set<string>();
-  const verifyCandidate=dependencies.verifyCandidate??verifyOfficialWebsite;
-  const queue=candidates.map(candidate=>candidate.url);let attempts=0;
-  while(queue.length&&attempts<3){const url=queue.shift()!;if(attempted.has(url))continue;attempted.add(url);attempts+=1;const checked=await verifyCandidate(url,input);if(checked.result){if(checked.result.contactUseAllowed===false)related.push(checked.result);else verified.push(checked.result);for(const linked of checked.result.relatedWebsiteCandidates??[])if(!attempted.has(linked)&&!queue.includes(linked))queue.unshift(linked)}else if(checked.rejectionReason&&!rejectionReasonCodes.includes(checked.rejectionReason)&&rejectionReasonCodes.length<5)rejectionReasonCodes.push(checked.rejectionReason)}
-  verified.sort((a,b)=>b.confidence-a.confidence);const result=verified[0];
-  const diagnostics={...searched.diagnostics,verificationAttemptCount:attempts,rejectionReasonCodes,relationshipClassifications:[...verified,...related].slice(0,5).map(item=>({origin:item.url,relationshipType:item.relationshipType??"unknown_related",contactUseAllowed:item.contactUseAllowed!==false})),...(result?{acceptedOrigin:result.url,acceptedDomain:new URL(result.url).hostname.replace(/^www\./,"")}:{})};
+  const verified=await verifyOfficialWebsiteCandidates(candidates.map(candidate=>candidate.url),input,{verifyCandidate:dependencies.verifyCandidate??verifyOfficialWebsite,maxAttempts:3});
+  const result=verified.result;
+  const diagnostics={...searched.diagnostics,verificationAttemptCount:verified.attempts,rejectionReasonCodes:verified.rejectionReasonCodes,relationshipClassifications:[...verified.accepted,...verified.related].slice(0,5).map(item=>({origin:item.url,relationshipType:item.relationshipType??"unknown_related",contactUseAllowed:item.contactUseAllowed!==false})),...(result?{acceptedOrigin:result.url,acceptedDomain:new URL(result.url).hostname.replace(/^www\./,"")}:{})};
   return result?{status:"resolved",result,diagnostics,providerRequestId:searched.providerRequestId,creditsUsed:searched.creditsUsed}:{status:"not_found",diagnostics,providerRequestId:searched.providerRequestId,creditsUsed:searched.creditsUsed};
 }

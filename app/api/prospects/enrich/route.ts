@@ -33,7 +33,7 @@ export async function POST(request:Request){
       const found=await enrichmentOrchestrator.enrich({
         enrichmentItemId:String(item.itemId),
         discoveryResultId:String(item.resultId),businessName:String(snapshot.businessName??""),
-        website:item.website?String(item.website):undefined,verifiedDomain:item.canonicalDomain?String(item.canonicalDomain):undefined,
+        websiteCandidate:item.website?String(item.website):undefined,websiteCandidateDomain:item.canonicalDomain?String(item.canonicalDomain):undefined,
         email:snapshot.email?String(snapshot.email):undefined,phone:snapshot.phone?String(snapshot.phone):undefined,
         address:snapshot.address?String(snapshot.address):undefined,city:snapshot.city?String(snapshot.city):undefined,
         state:snapshot.state?String(snapshot.state):undefined,zip:snapshot.zip?String(snapshot.zip):undefined,

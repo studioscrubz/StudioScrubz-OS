@@ -10,6 +10,13 @@ export interface Candidate{fieldName:EnrichmentFieldName;value:string;normalized
 export type EntityRelationshipType="direct_property"|"direct_business"|"property_manager"|"owner"|"developer"|"related_corporate"|"unknown_related";
 export interface WebsiteDiscoveryInput{businessName:string;address?:string;city?:string;state?:string;zip?:string;locationQuery?:string;category?:string}
 export interface WebsiteDiscoveryResult{url:string;landingUrl?:string;confidence:number;signals:string[];relationshipType?:EntityRelationshipType;contactUseAllowed?:boolean;relatedWebsiteCandidates?:string[]}
+export interface WebsiteCandidateVerification{
+  result?:WebsiteDiscoveryResult;
+  accepted:WebsiteDiscoveryResult[];
+  related:WebsiteDiscoveryResult[];
+  attempts:number;
+  rejectionReasonCodes:string[];
+}
 export interface WebsiteResolverDiagnostics extends Record<string,unknown>{searchOutcome:"results"|"empty"|"challenge"|"http_failure"|"parser_failure"|"timeout"|"network_failure";httpStatus?:number;parsedResultCount:number;candidateOrigins:string[];blockedHostCount:number;verificationAttemptCount:number;rejectionReasonCodes:string[];acceptedOrigin?:string;acceptedDomain?:string}
 export type WebsiteDiscoveryOutcome={status:"resolved";result:WebsiteDiscoveryResult;diagnostics:WebsiteResolverDiagnostics}|{status:"not_found";diagnostics:WebsiteResolverDiagnostics}|{status:"failed";errorCode:string;retryable:boolean;httpStatus?:number;diagnostics:WebsiteResolverDiagnostics};
 
@@ -147,6 +154,25 @@ export async function searchOfficialWebsite(input:WebsiteDiscoveryInput,searchFe
 
 export async function verifyOfficialWebsite(url:string,input:WebsiteDiscoveryInput):Promise<{result:WebsiteDiscoveryResult|null;rejectionReason?:string}>{try{const landing=await validatePublicHttps(url);const html=await fetchBounded(landing);const text=strip(html).slice(0,200000),relatedWebsiteCandidates=relationshipLinks(html,landing,input);let score=0;const signals:string[]=[];const meaningful=[...words(input.businessName)],exactName=exactIdentity(text,input.businessName),nameScore=overlap(input.businessName,text);if(exactName){score+=55;signals.push("exact business name")}else if(meaningful.length>=2&&nameScore>=0.8){score+=55;signals.push("business name")}else if(meaningful.length>=2&&nameScore>=0.5){score+=35;signals.push("partial business name")}const hostName=landing.hostname.replace(/^www\./,"").split(".")[0].replace(/[-_]/g," "),strongDomain=compactIdentity(input.businessName).length>=4&&compactIdentity(hostName).includes(compactIdentity(input.businessName));if(strongDomain||meaningful.length>=2&&overlap(input.businessName,hostName)>=0.5){score+=20;signals.push("domain name")}if(input.city&&text.toLowerCase().includes(input.city.toLowerCase())){score+=15;signals.push("city")}if(input.zip&&text.includes(input.zip)){score+=20;signals.push("ZIP")}if(exactAddress(text,input.address)||input.address&&overlap(input.address,text)>=0.8){score+=20;signals.push("address")}if(score<70)return{result:null,rejectionReason:"identity_score_below_threshold"};const relationship=classifyEntityRelationship(input,landing.toString(),text,relatedWebsiteCandidates);return{result:{url:landing.origin,landingUrl:landing.toString(),confidence:Math.min(95,score),signals,relationshipType:relationship.type,contactUseAllowed:relationship.contactUseAllowed,relatedWebsiteCandidates}}}catch{return{result:null,rejectionReason:"candidate_security_or_fetch_rejected"}}}
 
+export async function verifyOfficialWebsiteCandidates(
+  urls:readonly string[],input:WebsiteDiscoveryInput,
+  dependencies:{verifyCandidate?:(url:string,input:WebsiteDiscoveryInput)=>ReturnType<typeof verifyOfficialWebsite>;maxAttempts?:number}={}
+):Promise<WebsiteCandidateVerification>{
+  const accepted:WebsiteDiscoveryResult[]=[],related:WebsiteDiscoveryResult[]=[],rejectionReasonCodes:string[]=[],attempted=new Set<string>();
+  const queue=[...urls],verifyCandidate=dependencies.verifyCandidate??verifyOfficialWebsite,maxAttempts=Math.max(1,Math.min(3,dependencies.maxAttempts??3));
+  let attempts=0;
+  while(queue.length&&attempts<maxAttempts){
+    const url=queue.shift()!;if(attempted.has(url))continue;attempted.add(url);attempts+=1;
+    const checked=await verifyCandidate(url,input);
+    if(checked.result){
+      if(checked.result.contactUseAllowed===false)related.push(checked.result);else accepted.push(checked.result);
+      for(const linked of checked.result.relatedWebsiteCandidates??[])if(!attempted.has(linked)&&!queue.includes(linked))queue.unshift(linked);
+    }else if(checked.rejectionReason&&!rejectionReasonCodes.includes(checked.rejectionReason)&&rejectionReasonCodes.length<5)rejectionReasonCodes.push(checked.rejectionReason);
+  }
+  accepted.sort((a,b)=>b.confidence-a.confidence||a.url.localeCompare(b.url));
+  return{result:accepted[0],accepted,related,attempts,rejectionReasonCodes};
+}
+
 export async function discoverOfficialWebsite(input:WebsiteDiscoveryInput,dependencies:{searchFetch?:typeof fetch;verifyCandidate?:(url:string,input:WebsiteDiscoveryInput)=>ReturnType<typeof verifyOfficialWebsite>}={}):Promise<WebsiteDiscoveryOutcome>{const searched=await searchOfficialWebsite(input,dependencies.searchFetch);if(searched.status==="failed")return searched;if(searched.status==="empty")return{status:"not_found",diagnostics:searched.diagnostics};const verified:WebsiteDiscoveryResult[]=[];const rejectionReasonCodes:string[]=[];const verifyCandidate=dependencies.verifyCandidate??verifyOfficialWebsite;for(const url of searched.urls.slice(0,3)){const checked=await verifyCandidate(url,input);if(checked.result)verified.push(checked.result);else if(checked.rejectionReason&&!rejectionReasonCodes.includes(checked.rejectionReason)&&rejectionReasonCodes.length<5)rejectionReasonCodes.push(checked.rejectionReason)}verified.sort((a,b)=>b.confidence-a.confidence);const result=verified[0],diagnostics={...searched.diagnostics,verificationAttemptCount:Math.min(3,searched.urls.length),rejectionReasonCodes,...(result?{acceptedOrigin:result.url,acceptedDomain:new URL(result.url).hostname.replace(/^www\./,"")}:{})};return result?{status:"resolved",result,diagnostics}:{status:"not_found",diagnostics}}
 
 
@@ -165,7 +191,7 @@ export function generateBusinessEmailCandidates(domain:string,existing:Candidate
   return generated;
 }
 
-export async function extractOfficialWebsiteContacts(input:string){const base=await validatePublicHttps(input);if(!(await robotsAllows(base)))throw new Error("Website robots policy blocks automated access.");const candidates:Candidate[]=[];const home=await fetchBounded(base);add(candidates,"website",base.origin,base.toString(),"Homepage",95);extractPage(home,base.toString(),"Homepage",candidates);for(const link of pageLinks(home,base)){try{const url=await validatePublicHttps(link.url,base.hostname),html=await fetchBounded(url,base.hostname);extractPage(html,url.toString(),link.page,candidates);if(link.page==="Contact")add(candidates,"contact_page_url",url.toString(),url.toString(),"Contact",95)}catch{}}return{canonicalUrl:base.origin,canonicalDomain:base.hostname.replace(/^www\./,""),candidates}}
+export async function extractOfficialWebsiteContacts(input:string,verifiedDomain?:string){const base=await validatePublicHttps(input);if(verifiedDomain&&!sameSite(base.hostname,verifiedDomain))throw new Error("Official website does not match the verified domain.");if(!(await robotsAllows(base)))throw new Error("Website robots policy blocks automated access.");const candidates:Candidate[]=[];const home=await fetchBounded(base);add(candidates,"website",base.origin,base.toString(),"Homepage",95);extractPage(home,base.toString(),"Homepage",candidates);for(const link of pageLinks(home,base)){try{const url=await validatePublicHttps(link.url,base.hostname),html=await fetchBounded(url,base.hostname);extractPage(html,url.toString(),link.page,candidates);if(link.page==="Contact")add(candidates,"contact_page_url",url.toString(),url.toString(),"Contact",95)}catch{}}return{canonicalUrl:base.origin,canonicalDomain:base.hostname.replace(/^www\./,""),candidates}}
 export async function discoverOfficialSiteContacts(input:string,verifiedDomain:string){
   const base=await validatePublicHttps(input);
   if(!sameSite(base.hostname,verifiedDomain))throw new Error("Official website does not match the verified domain.");

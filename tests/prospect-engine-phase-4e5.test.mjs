@@ -12,7 +12,7 @@ const route=readFileSync("app/api/prospects/enrich/route.ts","utf8");
 const migration=readFileSync("supabase/migrations/20261001011054_allow_unknown_provider_cost.sql","utf8");
 const harness=source
   .replace('import "server-only";','')
-  .replace(/import \{[\s\S]*?\} from "\.\.\/prospectEnrichment";/,`const buildOfficialWebsiteSearchQuery=input=>[\`"\${input.businessName}"\`,...(input.address||input.city||input.zip?[input.address,input.city,input.state,input.zip].filter(Boolean):[input.locationQuery].filter(Boolean)),"official website"].join(" ");const blocked=new Set(["facebook.com","linkedin.com","yelp.com","trulia.com","zillow.com"]);const isBlockedWebsiteSearchHost=host=>blocked.has(host.replace(/^www\\./,""));const verifyOfficialWebsite=async()=>({result:null,rejectionReason:"identity_score_below_threshold"});`);
+  .replace(/import \{[\s\S]*?\} from "\.\.\/prospectEnrichment";/,`const buildOfficialWebsiteSearchQuery=input=>[\`"\${input.businessName}"\`,...(input.address||input.city||input.zip?[input.address,input.city,input.state,input.zip].filter(Boolean):[input.locationQuery].filter(Boolean)),"official website"].join(" ");const blocked=new Set(["facebook.com","linkedin.com","yelp.com","trulia.com","zillow.com"]);const isBlockedWebsiteSearchHost=host=>blocked.has(host.replace(/^www\\./,""));const verifyOfficialWebsite=async()=>({result:null,rejectionReason:"identity_score_below_threshold"});const verifyOfficialWebsiteCandidates=async(urls,input,deps={})=>{const accepted=[],related=[],rejectionReasonCodes=[],attempted=new Set(),queue=[...urls],verify=deps.verifyCandidate??verifyOfficialWebsite;let attempts=0;while(queue.length&&attempts<(deps.maxAttempts??3)){const url=queue.shift();if(attempted.has(url))continue;attempted.add(url);attempts++;const checked=await verify(url,input);if(checked.result){(checked.result.contactUseAllowed===false?related:accepted).push(checked.result);for(const linked of checked.result.relatedWebsiteCandidates??[])if(!attempted.has(linked)&&!queue.includes(linked))queue.unshift(linked)}else if(checked.rejectionReason&&!rejectionReasonCodes.includes(checked.rejectionReason))rejectionReasonCodes.push(checked.rejectionReason)}accepted.sort((a,b)=>b.confidence-a.confidence||a.url.localeCompare(b.url));return{result:accepted[0],accepted,related,attempts,rejectionReasonCodes}};`);
 const js=ts.transpileModule(harness,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const tavily=await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 const identityEngine=await import("../lib/prospectEnrichment.ts");
@@ -22,7 +22,7 @@ const response=(body,status=200)=>new Response(typeof body==="string"?body:JSON.
 
 test("Tavily is the registered paid company resolver and DuckDuckGo is not registered",()=>{
   assert.match(adapters,/providerKey:"tavily-company-resolution"[\s\S]*capabilities:\["company_resolution","domain_resolution"\][\s\S]*priority:20[\s\S]*costClass:"paid"/);
-  assert.match(adapters,/internalEnrichmentProviders=\[osmMetadataProvider,tavilyCompanyResolutionProvider,officialWebsiteContactProvider/);
+  assert.match(adapters,/internalEnrichmentProviders=\[osmMetadataProvider,osmWebsiteVerificationProvider,tavilyCompanyResolutionProvider,officialWebsiteContactProvider/);
   assert.doesNotMatch(adapters,/officialWebsiteResolverProvider|discoverOfficialWebsite/);
   assert.match(waterfall,/mode:"allow-paid",maxCreditsPerItem:1/);
 });
@@ -127,10 +127,12 @@ test("technical failures are not no-data cache entries and downstream remains pr
   assert.doesNotMatch(route,/Tavily|tavily|company-resolution/);
 });
 
-test("OSM website satisfaction prevents unnecessary Tavily planning",async()=>{
+test("only a verified OSM website prevents unnecessary Tavily planning",async()=>{
   const foundationModule=await import("../lib/prospect-enrichment/providerFoundation.ts");
-  const needs=foundationModule.planEnrichmentNeeds({discoveryResultId:"result",businessName:"Hammond",website:"https://example.com",verifiedDomain:"example.com"});
-  assert.equal(needs.companyResolution,false);
+  const candidateOnly=foundationModule.planEnrichmentNeeds({discoveryResultId:"result",businessName:"Hammond",websiteCandidate:"https://example.com",websiteCandidateDomain:"example.com"});
+  assert.equal(candidateOnly.companyResolution,true);
+  const verified=foundationModule.planEnrichmentNeeds({discoveryResultId:"result",businessName:"Hammond",website:"https://example.com",verifiedDomain:"example.com"});
+  assert.equal(verified.companyResolution,false);
 });
 
 test("no CAPTCHA bypass, external contact provider, or client-side key was introduced",()=>{

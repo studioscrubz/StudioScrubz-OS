@@ -24,6 +24,8 @@ export function sanitizeProviderMetadata(value:unknown,depth=0):Record<string,un
 export interface EnrichmentSubject{
   discoveryResultId:string;
   businessName:string;
+  websiteCandidate?:string;
+  websiteCandidateDomain?:string;
   website?:string;
   verifiedDomain?:string;
   email?:string;
@@ -143,7 +145,9 @@ export function planEnrichmentNeeds(subject:EnrichmentSubject,candidates:readonl
   const found=(field:EnrichmentFieldName)=>candidates.some(candidate=>candidate.fieldName===field&&candidate.evidence.verificationStatus!=="invalid");
   const missing=(value:unknown,field:EnrichmentFieldName)=>!present(value)&&!found(field);
   const needs={
-    companyResolution:missing(subject.website,"website")&&!present(subject.verifiedDomain),
+    // A supplied URL is only a candidate. Resolution remains necessary until
+    // StudioScrubz has authorized a contact-applicable domain.
+    companyResolution:!present(subject.verifiedDomain),
     businessEmail:missing(subject.email,"business_email"),personEmailPattern:false,
     businessPhone:missing(subject.phone,"business_phone"),
     address:missing(subject.address,"address"),

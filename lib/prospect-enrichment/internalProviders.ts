@@ -2,6 +2,7 @@ import "server-only";
 import { discoverOfficialSiteContacts,extractOfficialWebsiteContacts,generateBusinessEmailCandidates } from "@/lib/prospectEnrichment";
 import { generatePersonPatternCandidates } from "@/lib/prospect-enrichment/companyEmailPattern";
 import { emailDomainVerificationService } from "@/lib/prospect-enrichment/emailDomainVerification";
+import { osmWebsiteVerificationProvider } from "@/lib/prospect-enrichment/osmWebsiteVerification";
 import { resolveCompanyWithTavily,TAVILY_COMPANY_RESOLUTION_VERSION } from "@/lib/prospect-enrichment/tavilyCompanyResolution";
 import type { BusinessContactEnricher,CompanyDomainResolver,EmailFinder,EmailVerifier,EnrichmentSubject,ProviderCandidate,ProviderContext,ProviderEvidence,ProviderResult } from "@/lib/prospect-enrichment/providerFoundation";
 
@@ -13,7 +14,7 @@ export const osmMetadataProvider:BusinessContactEnricher={
   providerKey:"osm-metadata",version:"1",capabilities:["business_contact_enrichment","business_email_find","business_phone_find"],priority:10,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"baseline",
   async enrichBusiness(subject){
     const source=subject.sourceUrl??"https://www.openstreetmap.org/copyright";
-    const fields:Array<[ProviderCandidate["fieldName"],string|undefined]>=[["website",subject.website],["business_email",subject.email],["business_phone",subject.phone],["address",subject.address],["city",subject.city],["state",subject.state],["zip",subject.zip]];
+    const fields:Array<[ProviderCandidate["fieldName"],string|undefined]>=[["website",subject.websiteCandidate??subject.website],["business_email",subject.email],["business_phone",subject.phone],["address",subject.address],["city",subject.city],["state",subject.state],["zip",subject.zip]];
     return{status:"complete",candidates:fields.filter((entry):entry is [ProviderCandidate["fieldName"],string]=>Boolean(entry[1]?.trim())).map(([field,value])=>candidate("osm-metadata","1",field,value,value,"OpenStreetMap",source,"OSM",70,"published"))};
   }
 };
@@ -33,11 +34,11 @@ export const tavilyCompanyResolutionProvider:CompanyDomainResolver={
 };
 
 export const officialWebsiteContactProvider:BusinessContactEnricher={
-  providerKey:"official-website-contacts",version:"2",capabilities:["business_contact_enrichment","business_email_find","business_phone_find"],priority:30,costClass:"free",enabled:true,requiresVerifiedDomain:false,requiresWebsite:true,supportsCache:true,stopPolicy:"when-needed",
+  providerKey:"official-website-contacts",version:"3",capabilities:["business_contact_enrichment","business_email_find","business_phone_find"],priority:30,costClass:"free",enabled:true,requiresVerifiedDomain:true,requiresWebsite:true,supportsCache:true,stopPolicy:"when-needed",
   async enrichBusiness(subject){
-    if(!subject.website)return{status:"not_found",candidates:[]};
-    const found=await extractOfficialWebsiteContacts(subject.website);
-    return{status:found.candidates.length?"complete":"not_found",resolvedCompany:{website:found.canonicalUrl,domain:found.canonicalDomain},candidates:found.candidates.map(item=>({...item,sourceType:item.sourceType??"Official Website",evidence:evidence("official-website-contacts","2",item.sourceType??"Official Website",item.sourceUrl,item.sourcePageType,"published")}))};
+    if(!subject.website||!subject.verifiedDomain)return{status:"not_found",candidates:[]};
+    const found=await extractOfficialWebsiteContacts(subject.website,subject.verifiedDomain);
+    return{status:found.candidates.length?"complete":"not_found",candidates:found.candidates.map(item=>({...item,sourceType:item.sourceType??"Official Website",evidence:evidence("official-website-contacts","3",item.sourceType??"Official Website",item.sourceUrl,item.sourcePageType,"published")}))};
   }
 };
 
@@ -46,7 +47,7 @@ export const siteContactDiscoveryProvider:BusinessContactEnricher={
   async enrichBusiness(subject){
     if(!subject.website||!subject.verifiedDomain)return{status:"not_found",candidates:[]};
     const found=await discoverOfficialSiteContacts(subject.website,subject.verifiedDomain);
-    return{status:found.candidates.length?"complete":"not_found",resolvedCompany:{website:found.canonicalUrl,domain:found.canonicalDomain},candidates:found.candidates.map(item=>({...item,sourceType:"Official Website" as const,evidence:{...evidence("site-contact-discovery","2","Official Website",item.sourceUrl,item.sourcePageType,"published"),sourceKind:item.personObservation?.kind??item.sourcePageType,providerMetadata:{crawlDepth:1,...(item.personObservation?{personObservationId:item.personObservation.id,structuralEvidence:item.personObservation.kind}:{})}}}))};
+    return{status:found.candidates.length?"complete":"not_found",candidates:found.candidates.map(item=>({...item,sourceType:"Official Website" as const,evidence:{...evidence("site-contact-discovery","2","Official Website",item.sourceUrl,item.sourcePageType,"published"),sourceKind:item.personObservation?.kind??item.sourcePageType,providerMetadata:{crawlDepth:1,...(item.personObservation?{personObservationId:item.personObservation.id,structuralEvidence:item.personObservation.kind}:{})}}}))};
   }
 };
 
@@ -87,6 +88,6 @@ export const emailDomainVerificationProvider:EmailVerifier={
   }
 };
 
-export const internalEnrichmentProviders=[osmMetadataProvider,tavilyCompanyResolutionProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider] as const;
+export const internalEnrichmentProviders=[osmMetadataProvider,osmWebsiteVerificationProvider,tavilyCompanyResolutionProvider,officialWebsiteContactProvider,siteContactDiscoveryProvider,companyEmailPatternProvider,emailDomainVerificationProvider,generatedRoleEmailProvider] as const;
 export const internalProviderContext=(requestId:string,allowPaidCall=false):ProviderContext=>({requestId,allowPaidCall});
 export const noProviderResult:ProviderResult={status:"not_found",candidates:[]};

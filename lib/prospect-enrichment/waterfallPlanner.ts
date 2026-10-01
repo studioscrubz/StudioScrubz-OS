@@ -11,7 +11,7 @@ export interface ProviderExecutionPolicy{
 
 export const DEFAULT_PROVIDER_EXECUTION_POLICY:ProviderExecutionPolicy={
   mode:"allow-paid",maxCreditsPerItem:1,maxCostMinorUnitsPerItem:0,maxProviderCallsPerItem:8,
-  collectCorroboratingEvidence:false,policyVersion:"waterfall-v1"
+  collectCorroboratingEvidence:false,policyVersion:"waterfall-v2"
 };
 
 export interface WaterfallState{
