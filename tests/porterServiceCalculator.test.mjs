@@ -70,8 +70,8 @@ test("migration preserves RPC security/version checks and supports omitted/null 
 });
 test("component initial state displays friendly incomplete helper message instead of validation error", () => {
   const componentCode = readFileSync(new URL("../components/properties/PorterServiceCalculator.tsx", import.meta.url), "utf8");
-  assert.ok(componentCode.includes("Enter labor hours per visit to calculate porter pricing."));
-  assert.ok(componentCode.includes("!Number.isFinite(inputs.laborHoursPerVisit) || inputs.laborHoursPerVisit <= 0"));
+  assert.match(componentCode, /Enter labor hours per visit to calculate (?:recurring property-care|porter) pricing\./);
+  assert.match(componentCode, /!Number\.isFinite\(inputs\.laborHoursPerVisit\)\s*\|\|\s*inputs\.laborHoursPerVisit\s*<=\s*0/);
 });
 test("visits per week accepts only whole service-day counts from 1 through 7", () => {
   for (let days = 1; days <= 7; days++) assert.doesNotThrow(() => calculate({ ...input, visitsPerWeek: days }, at));

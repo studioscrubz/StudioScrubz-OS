@@ -34,33 +34,33 @@ test("the database RPC is tightened to Master Admin and Administrator only, with
 
 test("the announcement composer is only rendered for messages.announce, not merely hidden by a role check", () => {
   assert.match(page, /const canAnnounce = hasPermission\(profile, "messages\.announce"\)/);
-  assert.match(page, /canAnnounce \? <button type="button" onClick=\{\(\) => setNewAnnouncementOpen\(true\)\}/);
-  assert.match(page, /\{newAnnouncementOpen && canAnnounce &&/);
+  assert.match(page, /canAnnounce\s*\?\s*\(\s*<button[\s\S]*?setNewAnnouncementOpen\(true\)/);
+  assert.match(page, /\{newAnnouncementOpen\s*&&\s*canAnnounce\s*&&\s*\(/);
 });
 
 test("sending an announcement uses the existing send_company_announcement RPC with title, body, and priority", () => {
-  assert.match(service, /rpc\("send_company_announcement", \{ p_title: trimmedTitle, p_body: trimmedBody, p_priority: priority \}\)/);
+  assert.match(service, /rpc\(\s*"send_company_announcement",\s*\{[\s\S]*?p_title:\s*trimmedTitle,[\s\S]*?p_body:\s*trimmedBody,[\s\S]*?p_priority:\s*priority/);
 });
 
 test("Requires Acknowledgment uses the existing acknowledge_required_announcement RPC and hides the action once acknowledged", () => {
-  assert.match(service, /rpc\("acknowledge_required_announcement", \{ p_message_id: messageId \}\)/);
-  assert.match(page, /requiresAcknowledgment && <div className="mt-3">\{message\.acknowledgedAt \? <span/);
+  assert.match(service, /rpc\(\s*"acknowledge_required_announcement",\s*\{\s*p_message_id:\s*messageId/);
+  assert.match(page, /requiresAcknowledgment\s*&&\s*\([\s\S]*?message\.acknowledgedAt\s*\?\s*\(/);
 });
 
 test("Normal and Important priorities never expose an acknowledgment action", () => {
-  assert.match(page, /const requiresAcknowledgment = message\.priority === "Requires Acknowledgment"/);
+  assert.match(page, /const requiresAcknowledgment\s*=\s*message\.priority\s*===\s*"Requires Acknowledgment"/);
   assert.doesNotMatch(page, /priority === "Normal".*Acknowledge/);
   assert.doesNotMatch(page, /priority === "Important".*Acknowledge/);
 });
 
 test("announcements participate in the existing read-state infrastructure without altering Direct Message read behavior", () => {
-  assert.match(page, /markConversationMessagesRead\(conversation\.id, unreadMessageIds\)/);
-  assert.match(page, /markConversationMessagesRead\(selected\.id, unreadMessageIds\)/);
+  assert.match(page, /markConversationMessagesRead\(\s*conversation\.id,\s*unreadMessageIds/);
+  assert.match(page, /markConversationMessagesRead\(\s*selected\.id,\s*unreadMessageIds/);
   assert.match(page, /markingReadAnnouncements\.current/);
   assert.match(page, /markingReadConversation\.current/);
 });
 
 test("Direct Message send/behavior is untouched by the announcement slice", () => {
-  assert.match(service, /rpc\("send_direct_message"/);
-  assert.match(page, /sendDirectMessage\(selected\.id, body\)/);
+  assert.match(service, /rpc\(\s*"send_direct_message"/);
+  assert.match(page, /sendDirectMessage\(\s*selected\.id,\s*body\s*\)/);
 });

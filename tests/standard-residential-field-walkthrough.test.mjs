@@ -22,7 +22,7 @@ test("Standard Cleaning uses a guided assigned-technician walkthrough with safe 
 test("all required and conditional Standard Residential questions are present and gate completion",()=>{
   for(const text of ["Occupied","Vacant","Partially occupied","Areas inaccessible due to clutter","Natural stone","Heavy grease/buildup?","Visible mold/mildew-like buildup?","pet hair level","Management review needed","Significantly above normal","8+ hours","materially affect the service","I have physically reviewed the accessible service areas"])assert.ok(component.includes(text),text);
   for(const key of ["inaccessibleAreas","flooringOther","flooringConditionNotes","extraAttentionOther","specialSurfaceNotes","serviceRecommendationNotes","exceptionNotes","technicianConfirmation"])assert.ok(component.includes(key),key);
-  assert.match(page,/standardResidentialCompletionIssues\(measurements,row\.standard_residential_context\)/);
+  assert.match(page,/standardResidentialCompletionIssues\(\s*measurements,\s*row\.standard_residential_context\s*\)/);
   assert.match(component,/disabled=\{!!missing\.length\|\|current===sections\.length-1\}/);
   assert.match(component,/Previous/);
   assert.match(component,/Continue/);
@@ -33,7 +33,7 @@ test("technician observations save separately and Post-Construction remains inta
   assert.match(component,/standardResidentialAssessment:\{[\s\S]*fieldWalkthrough:\{answers:/);
   assert.match(migration,/standardResidentialAssessment/);
   assert.match(migration,/jsonb_set\(existing_standard,'\{fieldWalkthrough\}'/);
-  assert.match(page,/isPostConstruction\?<PostConstructionFieldWalkthrough/);
+  assert.match(page,/isPostConstruction\s*\?\s*\(\s*<PostConstructionFieldWalkthrough/);
   assert.match(postConstruction,/postConstructionAssessment/);
   assert.match(migration,/postConstructionAssessment/);
 });
@@ -52,7 +52,7 @@ test("Master Admin can review all assignments while field staff remain assignmen
   assert.match(accessFix,/w\.assigned_employee_id is not null[\s\S]*master_admin or w\.assigned_employee_id = employee/);
   assert.match(accessFix,/not master_admin[\s\S]*'Crew Lead', 'Scrub Technician'/);
   assert.match(permissions,/permission === "walkthroughs\.field"[\s\S]*profile\.role === "Master Admin"[\s\S]*\["Crew Lead", "Scrub Technician"\]/);
-  assert.match(page,/readOnly=\{masterAdmin\}/);
+  assert.match(page,/readOnly=\{masterAdmin\s*&&\s*!active\.isAssignedEmployee\}/);
   assert.match(page,/Master Admin review — technician responses are read-only/);
-  assert.match(page,/isPostConstruction\?<PostConstructionFieldWalkthrough/);
+  assert.match(page,/isPostConstruction\s*\?\s*\(\s*<PostConstructionFieldWalkthrough/);
 });

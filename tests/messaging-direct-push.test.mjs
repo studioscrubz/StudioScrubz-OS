@@ -10,8 +10,8 @@ const immediate = readFileSync("lib/push/messagingImmediate.ts", "utf8");
 const migration = readFileSync("supabase/migrations/20260903160000_add_messaging_push_deliveries.sql", "utf8");
 
 test("sending a Direct Message still succeeds via the existing RPC and triggers the push notify path", () => {
-  assert.match(service, /rpc\("send_direct_message"/);
-  assert.match(service, /notifyDirectMessagePushBestEffort\(conversationId, message\.id\)/);
+  assert.match(service, /rpc\(\s*"send_direct_message"/);
+  assert.match(service, /notifyDirectMessagePushBestEffort\(\s*conversationId,\s*message\.id\s*\)/);
   assert.match(service, /fetch\("\/api\/messages\/notify"/);
   assert.match(service, /return message;/);
 });

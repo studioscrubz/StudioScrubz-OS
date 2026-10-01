@@ -7,7 +7,10 @@ const read = (path) => readFile(new URL(path, root), "utf8");
 
 test("Manager receives only the granular Invoice send capability", async () => {
   const permissions = await read("lib/auth/permissions.ts");
-  const manager = permissions.match(/Manager: new Set\(\[([\s\S]*?)\]\),\n  Sales:/)?.[1] ?? "";
+  const manager = permissions.slice(
+    permissions.indexOf("Manager: new Set(["),
+    permissions.indexOf("Sales: new Set(["),
+  );
   assert.match(manager, /"invoices\.view"/);
   assert.match(manager, /"invoices\.send"/);
   assert.doesNotMatch(manager, /"invoices\.(?:create|edit|recordPayment)"/);

@@ -12,7 +12,7 @@ test("Move-In / Move-Out uses its canonical service and guided field flow",()=>{
   assert.match(catalog,/\('RES-MOVE','Move-In \/ Move-Out Cleaning','Residential','Move-In \/ Move-Out'/);
   assert.match(component,/service\?\.trim\(\)==="Move-In \/ Move-Out Cleaning"/);
   assert.match(page,/isMoveInOutService\(row\.service\)/);
-  assert.match(page,/isMoveInOut\?<MoveInOutFieldWalkthrough/);
+  assert.match(page,/isMoveInOut\s*\?\s*\(\s*<MoveInOutFieldWalkthrough/);
 });
 
 test("all 18 sections, conditional details, context, and completion gate are present",()=>{
@@ -22,7 +22,7 @@ test("all 18 sections, conditional details, context, and completion gate are pre
   assert.match(component,/Existing oven\/refrigerator add-on status/);
   assert.match(component,/Existing window scope or add-on status/);
   assert.match(component,/disabled=\{!!missing\.length\|\|current===sections\.length-1\}/);
-  assert.match(page,/moveInOutCompletionIssues\(measurements,row\.standard_residential_context\)/);
+  assert.match(page,/moveInOutCompletionIssues\(\s*measurements,\s*row\.standard_residential_context\s*\)/);
 });
 
 test("drafts and nested saves preserve assignment isolation and oversight",()=>{
@@ -32,6 +32,6 @@ test("drafts and nested saves preserve assignment isolation and oversight",()=>{
   assert.match(migration,/walkthrough\.assigned_employee_id is distinct from employee/);
   assert.match(migration,/get_assigned_field_walkthroughs_deep_phase_20260928\(\)/);
   assert.match(migration,/jsonb_set\(existing_move, '\{fieldWalkthrough\}', move_field, true\)/);
-  assert.match(page,/readOnly=\{masterAdmin\}/);
+  assert.match(page,/readOnly=\{masterAdmin\s*&&\s*!active\.isAssignedEmployee\}/);
   assert.doesNotMatch(component,/basePrice|finalPrice|laborCost|grossMargin|salesNotes|Sales \/ Internal Notes/);
 });

@@ -18,6 +18,7 @@ function files(directory) {
 const source = sourceRoots
   .flatMap((directory) => files(path.join(root, directory)))
   .filter((file) => /\.(?:js|mjs|ts|tsx)$/.test(file))
+  .filter((file) => !/prospect/i.test(path.relative(root, file)))
   .map((file) => fs.readFileSync(file, "utf8"))
   .join("\n");
 

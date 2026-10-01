@@ -14,9 +14,9 @@ test("Estimate and Proposal authoritative prices are durable explicit overrides"
   assert.match(estimate,/Use Calculated Price/);
   assert.match(proposal,/Manual \/ Custom Final Price/);
   assert.match(proposal,/proposal\?\.result\.manualPerVisitTotal \?\? null/);
-  assert.match(proposal,/withPreservedProposalPrice\(calculatedResult,proposal!\.result\.perVisitTotal,frequency\)/);
-  assert.match(proposal,/preserveStoredPriceBaseline&&manualPrice===null/);
-  assert.match(proposal,/setPreserveStoredPriceBaseline\(false\);setManualPrice\(null\)/);
+  assert.match(proposal,/withPreservedProposalPrice\(\s*calculatedResult,\s*proposal!\.result\.perVisitTotal,\s*frequency/);
+  assert.match(proposal,/preserveStoredPriceBaseline\s*&&\s*manualPrice\s*===\s*null/);
+  assert.match(proposal,/setPreserveStoredPriceBaseline\(false\);[\s\S]*?setManualPrice\(null\)/);
   assert.match(helper,/manualPerVisitTotal: null/);
 });
 
@@ -34,7 +34,7 @@ test("Walkthrough reviewed pricing is separate from the historical Estimate and 
   const route=read("app/api/walkthroughs/pricing-review/route.ts");
   const proposals=read("lib/pricing/proposals.ts");
   assert.match(modal,/The original Estimate is not changed/);
-  assert.match(route,/withAuthoritativeEstimatePrice\(calculatedResult, manualPrice\)/);
+  assert.match(route,/withAuthoritativeEstimatePrice\(\s*calculatedResult,\s*manualPrice\s*\)/);
   assert.match(route,/finalReviewedPrice: estimateResult\.finalPrice/);
   assert.match(proposals,/input\.estimate\.finalPrice/);
 });

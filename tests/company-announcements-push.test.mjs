@@ -9,16 +9,16 @@ const server = readFileSync("lib/push/messagingServer.ts", "utf8");
 const immediate = readFileSync("lib/push/messagingImmediate.ts", "utf8");
 
 test("sending an announcement triggers the push notify path only after the RPC resolves", () => {
-  assert.match(service, /rpc\("send_company_announcement"/);
+  assert.match(service, /rpc\(\s*"send_company_announcement"/);
   const sendFn = service.slice(service.indexOf("export async function sendCompanyAnnouncement"), service.indexOf("function notifyAnnouncementPushBestEffort"));
-  assert.match(sendFn, /if \(error\) throw new Error/);
-  assert.match(sendFn, /const message = data as Message;\s*\n\s*notifyAnnouncementPushBestEffort\(message\.id\);/);
+  assert.match(sendFn, /if \(error\)\s*\{\s*throw new Error/);
+  assert.match(sendFn, /const message = data as Message;\s*notifyAnnouncementPushBestEffort\(message\.id\);/);
   assert.match(sendFn, /return message;/);
 });
 
 test("a failed announcement RPC never reaches the push trigger", () => {
   const sendFn = service.slice(service.indexOf("export async function sendCompanyAnnouncement"), service.indexOf("function notifyAnnouncementPushBestEffort"));
-  const errorIndex = sendFn.indexOf("if (error) throw new Error");
+  const errorIndex = sendFn.indexOf("if (error)");
   const notifyIndex = sendFn.indexOf("notifyAnnouncementPushBestEffort(message.id)");
   assert.ok(errorIndex > -1 && notifyIndex > -1 && errorIndex < notifyIndex);
 });

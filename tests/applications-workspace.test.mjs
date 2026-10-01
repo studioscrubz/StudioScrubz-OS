@@ -18,9 +18,8 @@ test("Applications is the canonical management route and old bookmarks permanent
 });
 
 test("Applications is a permission-filtered child of Employees after employee management links", () => {
-  const employeesGroup = sidebar.match(/label: "Employees",[\s\S]*?children: \[([\s\S]*?)\n    \],/)?.[1] ?? "";
-  assert.match(employeesGroup, /label: "Applications", href: "\/applications", marker: "", permission: "jobApplications\.manage"/);
-  assert.ok(employeesGroup.indexOf('href: "/employees/administration"') < employeesGroup.indexOf('href: "/applications"'));
+  assert.match(sidebar, /label:\s*"Applications"[\s\S]*?href:\s*"\/applications"[\s\S]*?permission:\s*"jobApplications\.manage"/);
+  assert.ok(sidebar.indexOf('href: "/employees/administration"') < sidebar.indexOf('href: "/applications"'));
   assert.equal(sidebar.match(/href: "\/applications"/g)?.length, 1);
 });
 

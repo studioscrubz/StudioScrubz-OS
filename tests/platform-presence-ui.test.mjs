@@ -15,12 +15,12 @@ test("platform presence uses only work-session RPCs", async () => {
   assert.match(service, /session\?\.status === "Open" && !session\.clock_out \? session : null/);
 });
 
-test("Dashboard labels offline and online presence as INACTIVE and ACTIVE", async () => {
+test("Dashboard presents inactive, available, and on-job platform presence", async () => {
   const component = await read("components/time/DashboardTimeClockControl.tsx");
-  assert.match(component, />ACTIVE<\/button>/);
-  assert.match(component, /"INACTIVE"/);
-  assert.match(component, /disabled aria-pressed="true"/);
-  assert.match(component, /ON JOB · UNAVAILABLE/);
+  assert.match(component, /"Active · Available"/);
+  assert.match(component, /"Inactive"/);
+  assert.match(component, /aria-pressed="true"/);
+  assert.match(component, /On Job · Unavailable/);
   assert.match(component, /Time on this Job/);
   assert.doesNotMatch(component, />CLOCK IN<|>CLOCK OUT</);
 });

@@ -7,20 +7,20 @@ const read = (path) => readFile(new URL(path, root), "utf8");
 
 test("Property Management has a dedicated canonical landing page", async () => {
   const page = await read("app/site/property-management/page.tsx");
-  assert.match(page, /Property Management Cleaning Los Angeles \| StudioScrubz/);
+  assert.match(page, /Property Management Cleaning in Los Angeles \| StudioScrubz/);
   assert.match(page, /canonical: "https:\/\/studioscrubz\.com\/property-management"/);
   assert.match(page, /url: "https:\/\/studioscrubz\.com\/property-management"/);
-  assert.match(page, /title="Property management cleaning built for busy communities\."/);
+  assert.match(page, /title="Property Management Cleaning Built Around Your Community\."/);
   assert.equal((page.match(/<PageHero/g) ?? []).length, 1);
 });
 
 test("Airbnb has a distinct canonical turnover-cleaning page", async () => {
   const page = await read("app/site/airbnb-cleaning/page.tsx");
-  assert.match(page, /Airbnb Cleaning Services Los Angeles \| StudioScrubz/);
+  assert.match(page, /Airbnb & Short-Term Rental Cleaning Los Angeles \| StudioScrubz/);
   assert.match(page, /canonical: "https:\/\/studioscrubz\.com\/airbnb-cleaning"/);
   assert.match(page, /url: "https:\/\/studioscrubz\.com\/airbnb-cleaning"/);
-  assert.match(page, /title="Turnover cleaning that keeps your rental guest-ready\."/);
-  assert.match(page, /Same-day turnover capability depends on scheduling/);
+  assert.match(page, /title="Airbnb and Short-Term Rental Turnover Cleaning\."/);
+  assert.match(page, /Availability in surrounding areas depends on the property, turnover scope, access window, location, and scheduling\./);
   assert.match(page, /host-provided consumables/i);
   assert.equal((page.match(/<PageHero/g) ?? []).length, 1);
 });
