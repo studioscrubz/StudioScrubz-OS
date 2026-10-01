@@ -21,12 +21,14 @@ export const osmMetadataProvider:BusinessContactEnricher={
 export const tavilyCompanyResolutionProvider:CompanyDomainResolver={
   providerKey:"tavily-company-resolution",version:TAVILY_COMPANY_RESOLUTION_VERSION,capabilities:["company_resolution","domain_resolution"],priority:20,costClass:"paid",enabled:true,requiresVerifiedDomain:false,requiresWebsite:false,supportsCache:false,stopPolicy:"when-needed",estimatedCredits:1,
   async resolveCompany(subject){
-    const outcome=await resolveCompanyWithTavily({businessName:subject.businessName,address:subject.address,city:subject.city,state:subject.state,zip:subject.zip,locationQuery:subject.locationQuery});
+    const outcome=await resolveCompanyWithTavily({businessName:subject.businessName,address:subject.address,city:subject.city,state:subject.state,zip:subject.zip,locationQuery:subject.locationQuery,category:subject.category});
     const usage={...(outcome.creditsUsed===undefined?{}:{creditsUsed:outcome.creditsUsed}),costMinorUnits:null};
     if(outcome.status==="failed")return{status:"failed",candidates:[],errorCode:outcome.errorCode,retryable:outcome.retryable,httpStatus:outcome.httpStatus,providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage};
     if(outcome.status==="not_found")return{status:"not_found",candidates:[],providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage};
     const found=outcome.result,url=new URL(found.url),domain=url.hostname.replace(/^www\./,"");
-    return{status:"complete",resolvedCompany:{website:url.origin,domain},providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage,candidates:[candidate("tavily-company-resolution",TAVILY_COMPANY_RESOLUTION_VERSION,"website",url.origin,url.origin,"Official Website",url.origin,"Homepage",found.confidence,"verified")]};
+    const websiteCandidate=candidate("tavily-company-resolution",TAVILY_COMPANY_RESOLUTION_VERSION,"website",url.origin,url.origin,"Official Website",found.landingUrl??url.origin,"Homepage",found.confidence,"verified");
+    websiteCandidate.evidence.providerMetadata={relationshipType:found.relationshipType??"unknown_related",identityConfidence:found.confidence,identitySignals:found.signals.slice(0,10),landingUrl:found.landingUrl??url.origin};
+    return{status:"complete",resolvedCompany:{website:url.origin,domain},providerRequestId:outcome.providerRequestId,responseMetadata:outcome.diagnostics,usage,candidates:[websiteCandidate]};
   }
 };
 

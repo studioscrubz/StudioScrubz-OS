@@ -12,9 +12,11 @@ const route=readFileSync("app/api/prospects/enrich/route.ts","utf8");
 const migration=readFileSync("supabase/migrations/20261001011054_allow_unknown_provider_cost.sql","utf8");
 const harness=source
   .replace('import "server-only";','')
-  .replace(/import \{[\s\S]*?\} from "\.\.\/prospectEnrichment";/,`const buildOfficialWebsiteSearchQuery=input=>[\`"\${input.businessName}"\`,...(input.address||input.city||input.zip?[input.address,input.city,input.state,input.zip].filter(Boolean):[input.locationQuery].filter(Boolean)),"official website"].join(" ");const blocked=new Set(["facebook.com","linkedin.com","yelp.com"]);const isBlockedWebsiteSearchHost=host=>blocked.has(host.replace(/^www\\./,""));const verifyOfficialWebsite=async()=>({result:null,rejectionReason:"identity_score_below_threshold"});`);
+  .replace(/import \{[\s\S]*?\} from "\.\.\/prospectEnrichment";/,`const buildOfficialWebsiteSearchQuery=input=>[\`"\${input.businessName}"\`,...(input.address||input.city||input.zip?[input.address,input.city,input.state,input.zip].filter(Boolean):[input.locationQuery].filter(Boolean)),"official website"].join(" ");const blocked=new Set(["facebook.com","linkedin.com","yelp.com","trulia.com","zillow.com"]);const isBlockedWebsiteSearchHost=host=>blocked.has(host.replace(/^www\\./,""));const verifyOfficialWebsite=async()=>({result:null,rejectionReason:"identity_score_below_threshold"});`);
 const js=ts.transpileModule(harness,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const tavily=await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+const identityEngine=await import("../lib/prospectEnrichment.ts");
+const review=await import("../lib/prospect-enrichment/reviewGrouping.ts");
 const input={businessName:"Triana",address:"6250 Canoga Avenue",city:"Woodland Hills",state:"CA",zip:"91367",locationQuery:"91306"};
 const response=(body,status=200)=>new Response(typeof body==="string"?body:JSON.stringify(body),{status,headers:{"content-type":"application/json"}});
 
@@ -40,10 +42,58 @@ test("Tavily results remain candidates until existing verification accepts one",
   assert.equal(outcome.status,"resolved");assert.equal(outcome.result.url,"https://triana.example");assert.equal(attempts,2);assert.equal(outcome.diagnostics.verificationAttemptCount,2);assert.deepEqual(outcome.diagnostics.rejectionReasonCodes,["identity_score_below_threshold"]);assert.equal(outcome.providerRequestId,"request-1");assert.equal(outcome.creditsUsed,1);
 });
 
+test("The Q Variel preserves paths, excludes directories, ranks the direct property, and verifies it",async()=>{
+  const attempted=[];
+  const outcome=await tavily.resolveCompanyWithTavily({businessName:"The Q Variel",address:"6200 Variel Avenue",city:"Woodland Hills",state:"CA",zip:"91367",category:"Property Management / Multifamily"},{apiKey:"key",searchFetch:async()=>response({results:[
+    {url:"https://balaciano.com/the-q-variel/",title:"The Q Variel - Balaciano Group",content:"The Q Variel 6200 Variel Avenue Woodland Hills CA 91367"},
+    {url:"https://trulia.com/building/the-q-variel",title:"The Q Variel"},
+    {url:"https://zillow.com/apartments/the-q-variel",title:"The Q Variel"},
+    {url:"https://theqvariel.com/",title:"The Q Variel",content:"6200 Variel Avenue 91367 official website"}
+  ]}),verifyCandidate:async url=>{attempted.push(url);return url.includes("theqvariel.com")?{result:{url:"https://theqvariel.com",landingUrl:url,confidence:95,signals:["domain name","exact business name"],relationshipType:"direct_property",contactUseAllowed:true}}:{result:{url:"https://balaciano.com",landingUrl:url,confidence:95,signals:["exact business name","address","ZIP"],relationshipType:"developer",contactUseAllowed:false,relatedWebsiteCandidates:["https://theqvariel.com/"]}}}});
+  assert.equal(outcome.status,"resolved");assert.equal(outcome.result.url,"https://theqvariel.com");assert.equal(outcome.result.relationshipType,"direct_property");
+  assert.deepEqual(attempted,["https://theqvariel.com/", "https://balaciano.com/the-q-variel/"]);
+  assert.equal(outcome.diagnostics.blockedHostCount,2);assert.equal(outcome.diagnostics.verificationAttemptCount,2);
+  assert.ok(outcome.diagnostics.candidateOrigins.includes("https://theqvariel.com"));
+});
+
+test("candidate representation bounds support text and never reduces the landing URL to its origin",async()=>{
+  const long="x".repeat(1000),searched=await tavily.searchTavilyCompanyCandidates(input,{apiKey:"key",searchFetch:async()=>response({results:[{url:"https://candidate.example/company/path?ref=1#section",title:long,content:long}]})});
+  assert.equal(searched.candidates[0].url,"https://candidate.example/company/path?ref=1");assert.equal(searched.candidates[0].origin,"https://candidate.example");assert.equal(searched.candidates[0].title.length,200);assert.equal(searched.candidates[0].snippet.length,500);
+});
+
+test("relationship classification separates direct properties, managers, owners, and developers",()=>{
+  const property={businessName:"The Q Variel",address:"6200 Variel Avenue",category:"Property Management / Multifamily"};
+  assert.deepEqual(identityEngine.classifyEntityRelationship(property,"https://theqvariel.com/","The Q Variel"),{type:"direct_property",contactUseAllowed:true});
+  assert.deepEqual(identityEngine.classifyEntityRelationship(property,"https://manager.example/q","The Q Variel is managed by Example Property Management"),{type:"property_manager",contactUseAllowed:true});
+  assert.deepEqual(identityEngine.classifyEntityRelationship(property,"https://owner.example/q","The Q Variel is owned by Example Holdings"),{type:"owner",contactUseAllowed:false});
+  assert.deepEqual(identityEngine.classifyEntityRelationship(property,"https://balaciano.com/the-q-variel/","The Q Variel development portfolio",["https://theqvariel.com/"]),{type:"developer",contactUseAllowed:false});
+});
+
+test("weak single-token identity cannot receive the legacy business-name score",()=>{
+  assert.match(readFileSync("lib/prospectEnrichment.ts","utf8"),/meaningful\.length>=2&&nameScore>=0\.8/);
+  assert.match(readFileSync("lib/prospectEnrichment.ts","utf8"),/exactName/);
+});
+
+test("review grouping shows one value while retaining all evidence and distinct confidence concepts",()=>{
+  const base={fieldName:"business_email",value:"info@example.com",normalizedValue:"info@example.com",sourceType:"Official Website",sourceUrl:"https://example.com/",sourcePageType:"Homepage",retrievedAt:"2026-01-01T00:00:00Z",decision:"Pending"};
+  const grouped=review.groupEnrichmentCandidates([
+    {...base,id:"published",confidence:85,providerKey:"official-website-contacts",verificationStatus:"published"},
+    {...base,id:"mx",confidence:90,providerKey:"email-domain-verification",verificationStatus:"valid"}
+  ]);
+  assert.equal(grouped.length,1);assert.deepEqual(grouped[0].evidenceIds,["mx","published"]);assert.equal(grouped[0].evidenceCount,2);assert.equal(grouped[0].published,true);assert.equal(grouped[0].technicalVerificationStatus,"valid");assert.equal(grouped[0].confidence,85);
+});
+
+test("website grouping keeps resolver identity confidence separate from crawler confidence",()=>{
+  const base={fieldName:"website",value:"https://example.com",normalizedValue:"https://example.com",sourceType:"Official Website",sourceUrl:"https://example.com/",sourcePageType:"Homepage",retrievedAt:"2026-01-01T00:00:00Z",decision:"Pending"};
+  const grouped=review.groupEnrichmentCandidates([{...base,id:"resolver",confidence:70,identityConfidence:70,providerKey:"tavily-company-resolution",verificationStatus:"verified"},{...base,id:"crawler",confidence:95,providerKey:"official-website-contacts",verificationStatus:"published"}]);
+  assert.equal(grouped.length,1);assert.equal(grouped[0].confidence,95);assert.equal(grouped[0].identityConfidence,70);assert.deepEqual(grouped[0].evidenceIds,["crawler","resolver"]);
+  assert.match(readFileSync("lib/prospect-enrichment/reviewGrouping.ts","utf8"),/evidenceIds/);assert.match(readFileSync("components\/prospects\/ProspectDiscovery.tsx","utf8"),/fieldIds=grouped\?\.evidenceIds\?\?\[fieldId\]/);
+});
+
 test("blocked hosts and non-HTTPS URLs never reach candidate verification",async()=>{
   const attempted=[];
   const outcome=await tavily.resolveCompanyWithTavily(input,{apiKey:"key",searchFetch:async()=>response({results:[{url:"https://yelp.com/triana"},{url:"http://private.example"},{url:"https://candidate.example"}]}),verifyCandidate:async url=>{attempted.push(url);return{result:null,rejectionReason:"candidate_security_or_fetch_rejected"}}});
-  assert.equal(outcome.status,"not_found");assert.deepEqual(attempted,["https://candidate.example"]);assert.equal(outcome.diagnostics.blockedHostCount,1);
+  assert.equal(outcome.status,"not_found");assert.deepEqual(attempted,["https://candidate.example/"]);assert.equal(outcome.diagnostics.blockedHostCount,1);
   const engine=readFileSync("lib/prospectEnrichment.ts","utf8");assert.match(engine,/validatePublicHttps/);assert.match(engine,/blockedIp/);assert.match(engine,/169\.254\.169\.254/);
 });
 

@@ -34,6 +34,7 @@ export interface EnrichmentSubject{
   zip?:string;
   sourceUrl?:string;
   locationQuery?:string;
+  category?:string;
 }
 
 export interface ProviderEvidence{
