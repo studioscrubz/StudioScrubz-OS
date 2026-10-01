@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import ts from "typescript";
 
 const read=path=>readFileSync(new URL(`../${path}`,import.meta.url),"utf8");
 const migration=read("supabase/migrations/20260929160406_prospect_engine_phase_3_public_discovery.sql");
 const discovery=read("lib/prospectDiscovery.ts");
 const route=read("app/api/prospects/discover/route.ts");
 const ui=read("components/prospects/ProspectDiscovery.tsx");
+const discoveryModule=await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(discovery,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString("base64")}`);
 
 test("Phase 3 centralizes bounded OSM discovery categories",()=>{
   for(const category of ["Property Management / Multifamily","Commercial Offices","Post-Construction / Contractors","Airbnb / Short-Term Rentals","Restaurants / Hospitality","Salons / Barbershops","Gyms / Spas","Recording / Production Facilities","Luxury Property Care","Pressure Washing Opportunities","Other Commercial"])assert.match(discovery,new RegExp(category.replace(/[\/-]/g,"\\$&")));
@@ -14,6 +16,36 @@ test("Phase 3 centralizes bounded OSM discovery categories",()=>{
   assert.match(discovery,/DISCOVERY_PROVIDER_TILE_RADIUS_METERS=25_000/);
   assert.match(discovery,/DISCOVERY_MAX_RESULTS=100/);
   assert.match(discovery,/\[out:json\]\[timeout:20\]/);
+});
+
+test("Property Management keeps offices while filtering unusable apartment buildings upstream",()=>{
+  const query=discoveryModule.buildOverpassQuery("Property Management / Multifamily",34.2068925,-118.5734436,25_000);
+  for(const type of ["node","way","relation"]){
+    assert.match(query,new RegExp(`${type}\\(around:25000,[^;]+\\)\\["building"="apartments"\\]\\["name"\\]`));
+    assert.match(query,new RegExp(`${type}\\(around:25000,[^;]+\\)\\["office"="property_management"\\];`));
+  }
+  assert.doesNotMatch(query,/\["office"="property_management"\]\["name"\]/);
+});
+
+test("provider HTTP failures remain distinct from valid empty discovery",()=>{
+  assert.equal(discoveryModule.overpassUnavailableMessage([504]),"OpenStreetMap discovery provider temporarily unavailable (504).");
+  assert.equal(discoveryModule.overpassUnavailableMessage([429]),"OpenStreetMap discovery provider temporarily unavailable (429).");
+  assert.match(route,/if\(!response\.ok\)\{diagnostics\.failedResponses\+=1;recordHttpStatus\(response\.status\);continue;\}/);
+  assert.match(route,/diagnostics\.successfulResponses\+=1/);
+  assert.match(route,/if\(diagnostics\.successfulResponses===0\)throw new Error\(overpassUnavailableMessage/);
+  assert.match(route,/if\(!results\.length\)throw new Error\("OpenStreetMap discovery provider returned no usable results\."\)/);
+});
+
+test("a failed tile does not prevent a later successful tile",()=>{
+  assert.match(route,/if\(!response\.ok\).*continue;/);
+  assert.ok(route.indexOf("if(!response.ok)")<route.indexOf("diagnostics.successfulResponses+=1"));
+  assert.match(route,/for\(const point of points\.slice\(0,MAX_PROVIDER_REQUESTS\)\)/);
+});
+
+test("discovery diagnostics are bounded and do not retain provider bodies",()=>{
+  for(const field of ["attemptedRequests","successfulResponses","failedResponses","rawElements","rejectedMissingName","rejectedMissingCoordinate","rejectedOutsideRadius","duplicates","finalUsable"])assert.match(route,new RegExp(field));
+  assert.match(route,/diagnostics\.httpStatuses\.length<5/);
+  assert.doesNotMatch(route,/response\.(text|arrayBuffer|blob)\(/);
 });
 
 test("discovery is server authenticated, provider-safe, and never automatic",()=>{
