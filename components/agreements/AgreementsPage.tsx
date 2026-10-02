@@ -42,6 +42,7 @@ import { AgreementDepositPanel } from "@/components/agreements/AgreementDepositP
 export function AgreementsPage() {
   const { profile } = useAuth();
   const canManage = hasPermission(profile, "agreements.manage");
+  const canViewFinancialSummary = hasPermission(profile, "agreements.financialSummary");
   const canDeleteDraft = ["Master Admin", "Administrator", "Manager"].includes(profile?.role ?? "");
   const canCreateJobs = hasPermission(profile, "jobs.create");
   const canViewInvoices = hasPermission(profile, "invoices.view");
@@ -117,7 +118,7 @@ export function AgreementsPage() {
   const active = agreements.filter((agreement) => agreement.status === "Active" && !agreement.archived_at);
   const metrics = [
     ["Active Agreements", String(active.length)],
-    ["Recurring Monthly Revenue", money(active.reduce((sum, agreement) => sum + monthlyRecurringRevenue(agreement), 0))],
+    ...(canViewFinancialSummary ? [["Recurring Monthly Revenue", money(active.reduce((sum, agreement) => sum + monthlyRecurringRevenue(agreement), 0))]] : []),
     ["Services This Week", String(visibleOccurrences.filter((row) => row.scheduled_date >= today && row.scheduled_date <= addDays(today, 7)).length)],
     ["Services This Month", String(visibleOccurrences.filter((row) => row.scheduled_date >= today && row.scheduled_date <= addDays(today, 30)).length)],
     ["Expiring Soon", String(active.filter((agreement) => agreement.end_date && agreement.end_date <= addDays(today, 30)).length)],

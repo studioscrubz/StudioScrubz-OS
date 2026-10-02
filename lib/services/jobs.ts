@@ -20,6 +20,13 @@ import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import { requestPendingJobCalendarSync } from "@/lib/google-calendar/client";
 import { requestImmediateAttentionPush } from "@/lib/push/client";
 
+type SalesScheduleRpcClient = {
+  rpc: (
+    name: "get_sales_schedule_jobs",
+    args?: { p_start?: string | null; p_end?: string | null },
+  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+};
+
 export type JobCompletionResult = {
   job: JobWithRelations;
   invoice: Pick<Invoice, "id" | "invoice_number"> | null;
@@ -46,6 +53,14 @@ export async function getJobs(): Promise<JobWithRelations[]> {
   const jobsResult = await getSupabaseClient().from("jobs").select(select).in("id", ids).order("created_at", { ascending: false });
   if (jobsResult.error) throw jobsResult.error;
   return jobsResult.data as JobWithRelations[];
+}
+export async function getScheduleJobs(): Promise<JobWithRelations[]> {
+  const profile = await getCurrentProfile();
+  if (profile?.role !== "Sales") return getJobs();
+  if (!hasPermission(profile, "schedule.view")) throw new Error("Schedule access is denied.");
+  const { data, error } = await (getSupabaseClient() as unknown as SalesScheduleRpcClient).rpc("get_sales_schedule_jobs", {});
+  if (error) throw new Error(safeDatabaseMessage(error, "Schedule jobs could not be loaded."));
+  return (data as Parameters<typeof operationalJob>[0][]).map(operationalJob);
 }
 export async function getJobsForMileageAssociation(): Promise<JobWithRelations[]> {
   if (!(await master())) throw new Error("Mileage Job association access is denied.");
