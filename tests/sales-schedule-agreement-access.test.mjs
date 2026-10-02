@@ -7,7 +7,9 @@ const sidebar = readFileSync("components/layout/Sidebar.tsx", "utf8");
 const schedule = readFileSync("components/jobs/SchedulePage.tsx", "utf8");
 const agreements = readFileSync("components/agreements/AgreementsPage.tsx", "utf8");
 const jobs = readFileSync("lib/services/jobs.ts", "utf8");
+const crews = readFileSync("lib/services/crews.ts", "utf8");
 const migration = readFileSync("supabase/migrations/20261002134919_sales_schedule_agreement_access.sql", "utf8");
+const directorySecurity = readFileSync("supabase/security_definer_hardening_phase_a.sql", "utf8");
 
 const salesBlock = permissions.slice(permissions.indexOf("Sales: new Set"), permissions.indexOf('"Crew Lead": new Set'));
 const managerBlock = permissions.slice(permissions.indexOf("Manager: new Set"), permissions.indexOf("Sales: new Set"));
@@ -49,6 +51,28 @@ test("Sales Schedule data is a dedicated non-financial read-only RPC", () => {
   assert.doesNotMatch(migration, /update public\.jobs|insert into public\.jobs|delete from public\.jobs/i);
 });
 
+test("Sales Schedule does not load crew or employee directories", () => {
+  assert.match(schedule, /salesReadOnly\?Promise\.resolve\(\[\]\):getActiveCrews\(\)/);
+  assert.match(schedule, /crewFilterOptions=useMemo<CrewDisplayOption\[\]>/);
+  assert.match(schedule, /assigned_crew_id&&job\.assigned_crew_name/);
+  assert.match(schedule, /\{id:job\.assigned_crew_id!,crew_name:job\.assigned_crew_name!\}/);
+  assert.match(crews, /rpc\("get_crew_directory"\)/);
+  assert.match(crews, /rpc\("get_crew_members_directory"\)/);
+  assert.match(directorySecurity, /get_employee_directory[\s\S]*?has_any_role\(array\['Master Admin','Administrator','Manager','Crew Lead','Scrub Technician'\]\)/);
+  assert.match(directorySecurity, /get_crew_directory[\s\S]*?has_any_role\(array\['Master Admin','Administrator','Manager','Crew Lead','Scrub Technician'\]\)/);
+});
+
+test("Sales assignment display contains no HR, payroll, or employee financial fields", () => {
+  const salesProjection = migration.slice(migration.indexOf("create or replace function public.get_sales_schedule_jobs"), migration.indexOf("revoke all on function public.get_sales_schedule_jobs"));
+  assert.match(salesProjection, /'assigned_crew_id', job\.assigned_crew_id/);
+  assert.match(salesProjection, /'assigned_crew_name', job\.assigned_crew_name/);
+  assert.match(salesProjection, /'crew_lead_name', job\.crew_lead_name/);
+  assert.match(salesProjection, /'assigned_team', job\.assigned_team/);
+  assert.match(salesProjection, /'assigned_employee_id', job\.assigned_employee_id/);
+  assert.match(salesProjection, /'assigned_employee_name', job\.assigned_employee_name/);
+  assert.doesNotMatch(salesProjection, /hourly_rate|overtime_rate|gross_pay|payroll|commission|hire_date|employee_number|employee_email|employee_phone/i);
+});
+
 test("Schedule mutation controls remain gated by schedule.edit", () => {
   assert.match(schedule, /canEditSchedule=hasPermission\(profile,"schedule\.edit"\)/);
   assert.match(schedule, /canEditSchedule&&<Unscheduled/);
@@ -56,6 +80,8 @@ test("Schedule mutation controls remain gated by schedule.edit", () => {
   assert.match(schedule, /<QuickDetail job=\{detail\} canEdit=\{canEditSchedule\} canViewJobTime=\{canViewJobTime\}/);
   assert.match(schedule, /\{canViewJobTime&&<JobTimeSummary job=\{job\}\/?>\}/);
   assert.match(schedule, /\{canEdit&&<>/);
+  assert.match(schedule, /canEditSchedule&&edit&&<ScheduleModal/);
+  assert.match(schedule, /canEdit&&<><label[\s\S]*updateJobInternalNotes[\s\S]*cancelJob/);
 });
 
 test("database policies keep Sales Agreement and occurrence access read-only", () => {
