@@ -84,6 +84,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
   {
 
+    label: "Commissions",
+
+    href: "/lead-rep/commissions",
+
+    marker: "$",
+
+    permission: "leadRep.commissions.viewOwn",
+
+  },
+
+  {
+
     label: "Dashboard",
 
     href: "/",

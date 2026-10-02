@@ -23,7 +23,7 @@ export const PERMISSIONS = [
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
-  "leadRep.portal", "leadRep.leads.viewOwn",
+  "leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -115,7 +115,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   ]),
 
   "Lead Representative": new Set([
-    "leadRep.portal", "leadRep.leads.viewOwn",
+    "leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn",
   ]),
 
   "Crew Lead": new Set(crewLeadPermissions),
@@ -140,7 +140,7 @@ export function hasPermission(
   profile: UserProfile | null,
   permission: Permission,
 ): boolean {
-  if (permission === "leadRep.portal" || permission === "leadRep.leads.viewOwn") {
+  if (["leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn"].includes(permission)) {
     return profile?.is_active === true && profile.role === "Lead Representative";
   }
 
@@ -196,6 +196,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) =>
   ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/lead-rep/commissions", "leadRep.commissions.viewOwn"],
   ["/lead-rep/leads", "leadRep.leads.viewOwn"],
   ["/lead-rep", "leadRep.portal"],
   ["/properties/porter-routes", "porterVisits.view"],

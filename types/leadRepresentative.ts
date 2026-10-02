@@ -23,3 +23,16 @@ export type LeadRepresentativeLead = {
   paid: boolean;
   terminal_reason: string | null;
 };
+
+export type LeadRepresentativeCommission = {
+  commission_id: string;
+  customer_name: string;
+  commission_type: "NEW_CUSTOMER_LEAD" | "GENERATE_PERSONALLY_CLOSE" | "RECURRING_CONVERSION_BONUS" | "REVERSAL";
+  cleaning_ordinal: 1 | 2;
+  job_number: string;
+  service_name: string;
+  earned_at: string;
+  amount: number;
+  status: "EARNED_UNPAID";
+  is_reversal: boolean;
+};

@@ -49,15 +49,17 @@ test("other roles retain the existing root landing fallback", () => {
   assert.match(login, /router\.replace\(auth\.profile\.role === "Lead Representative" \? "\/lead-rep" : "\/"\)/);
 });
 
-test("Lead Representative receives only Home and My Leads permissions", () => {
+test("Lead Representative receives only portal, own leads, and own commissions permissions", () => {
   assert.match(leadRepPermissions, /"leadRep\.portal"/);
   assert.match(leadRepPermissions, /"leadRep\.leads\.viewOwn"/);
+  assert.match(leadRepPermissions, /"leadRep\.commissions\.viewOwn"/);
   for (const denied of ["dashboard.view", "clients.view", "estimates.view", "proposals.view", "jobs.view", "schedule.view", "agreements.view", "invoices.view", "finances.view", "payrollPrep.view", "prospects.view", "employees.view", "users.manage"]) {
     assert.doesNotMatch(leadRepPermissions, new RegExp(denied.replace(".", "\\.")));
   }
   assert.match(sidebar, /label: "Home"[\s\S]*?href: "\/lead-rep"[\s\S]*?permission: "leadRep\.portal"/);
   assert.match(sidebar, /label: "My Leads"[\s\S]*?href: "\/lead-rep\/leads"[\s\S]*?permission: "leadRep\.leads\.viewOwn"/);
-  assert.match(permissions, /permission === "leadRep\.portal" \|\| permission === "leadRep\.leads\.viewOwn"[\s\S]*profile\.role === "Lead Representative"/);
+  assert.match(sidebar, /label: "Commissions"[\s\S]*?href: "\/lead-rep\/commissions"[\s\S]*?permission: "leadRep\.commissions\.viewOwn"/);
+  assert.match(permissions, /\["leadRep\.portal", "leadRep\.leads\.viewOwn", "leadRep\.commissions\.viewOwn"\]\.includes\(permission\)[\s\S]*profile\.role === "Lead Representative"/);
 });
 
 test("own-leads RPC derives identity and cannot accept another representative id", () => {
