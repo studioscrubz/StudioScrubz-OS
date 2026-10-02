@@ -136,7 +136,7 @@ test("portal exposes only the representative commission projection", () => {
   assert.match(permissions, /leadRep\.commissions\.viewOwn/);
   assert.match(sidebar, /href: "\/lead-rep\/commissions"/);
   assert.match(portal, /getMyLeadRepresentativeCommissions/);
-  assert.match(portal, /Bi-weekly payout batches will be added in Phase 3/);
+  assert.match(portal, /weekly payout history/i);
   assert.doesNotMatch(portal, /company-wide|margin|payroll/i);
 });
 

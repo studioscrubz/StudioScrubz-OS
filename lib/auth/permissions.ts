@@ -23,7 +23,7 @@ export const PERMISSIONS = [
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
-  "leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn",
+  "leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn", "leadRep.payouts.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -48,6 +48,7 @@ const operationalAdmin: Permission[] = [
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
+  "leadRep.payouts.manage",
 ];
 
 const crewLeadPermissions: Permission[] = [
@@ -196,6 +197,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) =>
   ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/lead-commission-payouts", "leadRep.payouts.manage"],
   ["/lead-rep/commissions", "leadRep.commissions.viewOwn"],
   ["/lead-rep/leads", "leadRep.leads.viewOwn"],
   ["/lead-rep", "leadRep.portal"],

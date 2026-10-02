@@ -36,3 +36,53 @@ export type LeadRepresentativeCommission = {
   status: "EARNED_UNPAID";
   is_reversal: boolean;
 };
+
+export type LeadPayoutOpenEntry = {
+  commissionId: string;
+  customerName: string;
+  commissionType: LeadRepresentativeCommission["commission_type"];
+  jobNumber: string;
+  serviceName: string;
+  earnedAt: string;
+  amount: number;
+  status: "Pending Weekly Payout" | "Held";
+};
+
+export type LeadPayoutBatchStatus = "Awaiting Approval" | "Approved / Awaiting Payment" | "Approved / No Payment Due" | "Paid" | "Discarded";
+
+export type LeadPayoutBatch = {
+  batchId: string;
+  batchNumber: string;
+  leadRepresentativeId?: string;
+  representativeName?: string;
+  periodStart: string;
+  periodEnd: string;
+  status: LeadPayoutBatchStatus;
+  grossPositiveAmount: number;
+  negativeActivityAmount: number;
+  carryForwardIn: number;
+  accountingTotal: number;
+  payoutAmount: number;
+  carryForwardOut: number;
+  generatedAt: string;
+  approvedAt: string | null;
+  paymentDate: string | null;
+  paymentMethod: string | null;
+  paymentMethodDescription: string | null;
+  confirmationReference: string | null;
+  items?: Array<{ itemId: string; sourceType: string; amount: number; effectiveAt: string; description: string }>;
+};
+
+export type MyLeadPayouts = {
+  businessTimezone: string;
+  openPeriodStart: string;
+  openEntries: LeadPayoutOpenEntry[];
+  batches: LeadPayoutBatch[];
+};
+
+export type LeadPayoutManagement = {
+  businessTimezone: string;
+  ledgerEntries: Array<{ commissionId: string; leadRepresentativeId: string; representativeName: string; customerName: string; eventType: string; earnedAt: string; amount: number; held: boolean; consumed: boolean }>;
+  representatives: Array<{ employeeId: string; displayName: string }>;
+  batches: LeadPayoutBatch[];
+};

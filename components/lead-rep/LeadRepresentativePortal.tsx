@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getMyLeadRepresentativeCommissions, getMyLeadRepresentativeLeads } from "@/lib/services/leadRepresentative";
-import type { LeadRepresentativeCommission, LeadRepresentativeLead } from "@/types/leadRepresentative";
+import { getMyLeadRepresentativeCommissions, getMyLeadRepresentativeLeads, getMyLeadRepresentativePayouts } from "@/lib/services/leadRepresentative";
+import type { LeadPayoutBatch, LeadPayoutOpenEntry, LeadRepresentativeCommission, LeadRepresentativeLead, MyLeadPayouts } from "@/types/leadRepresentative";
 
 export function LeadRepresentativePortal({ view }: { view: "home" | "leads" | "commissions" }) {
   return view === "commissions" ? <CommissionPortal/> : <LeadPortal view={view}/>;
@@ -54,34 +54,41 @@ function LeadPortal({ view }: { view: "home" | "leads" }) {
 
 function CommissionPortal() {
   const [rows, setRows] = useState<LeadRepresentativeCommission[]>([]);
+  const [payouts, setPayouts] = useState<MyLeadPayouts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    void getMyLeadRepresentativeCommissions()
-      .then((result) => { if (active) { setRows(result); setError(null); } })
+    void Promise.all([getMyLeadRepresentativeCommissions(), getMyLeadRepresentativePayouts()])
+      .then(([result, payoutResult]) => { if (active) { setRows(result); setPayouts(payoutResult); setError(null); } })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Your commissions could not be loaded."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
-  const netEarned = rows.reduce((sum, row) => sum + Number(row.amount), 0);
+  const pending = payouts?.openEntries.filter(row=>row.status === "Pending Weekly Payout").reduce((sum,row)=>sum+Number(row.amount),0) ?? 0;
   return <>
     <header className="border-b pb-7">
       <p className="text-sm font-extrabold uppercase tracking-[.2em] text-[#9a7a16]">Lead Representative Portal</p>
       <h1 className="mt-2 text-3xl font-extrabold text-[#143d1a]">Commissions / Payouts</h1>
-      <p className="mt-3 text-neutral-600">Your earned commission ledger. Bi-weekly payout batches will be added in Phase 3.</p>
+      <p className="mt-3 text-neutral-600">Your earned commissions and weekly payout history in the StudioScrubz business timezone.</p>
     </header>
     {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{error}</p>}
     <section className="mt-6 grid gap-4 sm:grid-cols-2">
-      <SummaryCard label="Earned / Unpaid" value={`$${netEarned.toFixed(2)}`}/>
-      <SummaryCard label="Ledger Entries" value={rows.length}/>
+      <SummaryCard label="Pending Weekly Payout" value={`$${pending.toFixed(2)}`}/>
+      <SummaryCard label="Payout Batches" value={payouts?.batches.length ?? 0}/>
     </section>
+    <section className="mt-7 rounded-2xl border bg-white p-5 shadow-sm"><h2 className="text-xl font-extrabold text-[#143d1a]">Open Week</h2><p className="mt-1 text-sm text-neutral-500">Starts {payouts?.openPeriodStart ?? "—"} · {payouts?.businessTimezone ?? "business timezone"}. Pending amounts are not finalized payouts.</p>{loading?<div className="mt-5 h-24 animate-pulse rounded-xl bg-neutral-100"/>:payouts?.openEntries.length?<div className="mt-5 grid gap-3">{payouts.openEntries.map(row=><PendingCommissionCard key={row.commissionId} row={row}/>)}</div>:<p className="mt-5 rounded-xl bg-neutral-50 p-5 text-sm text-neutral-500">No open-week earnings yet.</p>}</section>
+    <section className="mt-7 rounded-2xl border bg-white p-5 shadow-sm"><h2 className="text-xl font-extrabold text-[#143d1a]">Weekly Payout History</h2>{loading?<div className="mt-5 h-24 animate-pulse rounded-xl bg-neutral-100"/>:payouts?.batches.length?<div className="mt-5 grid gap-3">{payouts.batches.map(batch=><PayoutBatchCard key={batch.batchId} batch={batch}/>)}</div>:<p className="mt-5 rounded-xl bg-neutral-50 p-5 text-sm text-neutral-500">No generated payout batches yet.</p>}</section>
     <section className="mt-7 rounded-2xl border bg-white p-5 shadow-sm">
       <h2 className="text-xl font-extrabold text-[#143d1a]">Commission History</h2>
       {loading ? <div className="mt-5 h-36 animate-pulse rounded-xl bg-neutral-100"/> : rows.length ? <div className="mt-5 grid gap-4">{rows.map((row) => <CommissionCard key={row.commission_id} row={row}/>)}</div> : <p className="mt-5 rounded-xl bg-neutral-50 p-5 text-sm text-neutral-500">No earned commissions yet.</p>}
     </section>
   </>;
 }
+
+function PendingCommissionCard({row}:{row:LeadPayoutOpenEntry}) { return <article className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><b className="text-[#143d1a]">{row.customerName}</b><p className="text-sm text-neutral-500">{row.jobNumber} · {row.serviceName}</p></div><div className="text-right"><b>${Number(row.amount).toFixed(2)}</b><p className="text-xs font-bold text-neutral-500">{row.status}</p></div></article>; }
+
+function PayoutBatchCard({batch}:{batch:LeadPayoutBatch}) { return <article className="rounded-xl border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><b className="text-[#143d1a]">{batch.batchNumber}</b><p className="text-sm text-neutral-500">{batch.periodStart} – {batch.periodEnd}</p></div><div className="text-right"><b>${Number(batch.payoutAmount).toFixed(2)}</b><p className="text-xs font-bold text-[#143d1a]">{batch.status}</p></div></div>{batch.status==="Paid"&&<p className="mt-3 text-sm text-neutral-600">Paid {batch.paymentDate} via {batch.paymentMethod}{batch.paymentMethodDescription?` (${batch.paymentMethodDescription})`:""}{batch.confirmationReference?` · ${batch.confirmationReference}`:""}</p>}{Number(batch.carryForwardOut)<0&&<p className="mt-3 text-sm text-neutral-600">Negative balance carried forward: ${Math.abs(Number(batch.carryForwardOut)).toFixed(2)}</p>}</article>; }
 
 function CommissionCard({ row }: { row: LeadRepresentativeCommission }) {
   const labels: Record<LeadRepresentativeCommission["commission_type"], string> = {
