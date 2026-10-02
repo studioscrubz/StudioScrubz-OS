@@ -60,6 +60,30 @@ const navItems: Array<NavLink | NavGroup> = [
 
   {
 
+    label: "Home",
+
+    href: "/lead-rep",
+
+    marker: "H",
+
+    permission: "leadRep.portal",
+
+  },
+
+  {
+
+    label: "My Leads",
+
+    href: "/lead-rep/leads",
+
+    marker: "L",
+
+    permission: "leadRep.leads.viewOwn",
+
+  },
+
+  {
+
     label: "Dashboard",
 
     href: "/",

@@ -16,7 +16,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.loading && auth.user && auth.profile?.is_active) router.replace("/");
+    if (!auth.loading && auth.user && auth.profile?.is_active) router.replace(auth.profile.role === "Lead Representative" ? "/lead-rep" : "/");
   }, [auth.loading, auth.user, auth.profile, router]);
 
   async function submit(event: React.FormEvent) {
@@ -24,8 +24,8 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await signIn(email, password);
-      router.replace("/");
+      const result = await signIn(email, password);
+      router.replace(result.profile.role === "Lead Representative" ? "/lead-rep" : "/");
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sign in failed.");

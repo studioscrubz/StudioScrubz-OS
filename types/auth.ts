@@ -1,6 +1,6 @@
 import type { Session, User } from "@supabase/supabase-js";
 
-export const USER_ROLES = ["Master Admin", "Administrator", "Manager", "Sales", "Crew Lead", "Scrub Technician"] as const;
+export const USER_ROLES = ["Master Admin", "Administrator", "Manager", "Sales", "Lead Representative", "Crew Lead", "Scrub Technician"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 export type UserProfile = {
   id: string;

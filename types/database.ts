@@ -40,6 +40,7 @@ import type {ChangeRequest,ChangeRequestApproval,ChangeRequestItem,OperationalCh
 import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 import type {PorterNotificationEvent} from "@/types/porterNotification";
 import type {ProposalDepositEvent,ProposalDepositRequirement} from "@/types/proposalDeposit";
+import type {LeadRepresentativeLead} from "@/types/leadRepresentative";
 
 export interface Database {
   public: {
@@ -183,6 +184,8 @@ export interface Database {
       set_marketing_material_active:{Args:{p_identifier:string;p_is_active:boolean};Returns:MarketingMaterial};
       update_marketing_material_metadata:{Args:{p_identifier:string;p_title:string;p_description:string;p_category:string;p_internal_notes:string|null};Returns:MarketingMaterial};
       get_lead_representatives: { Args: { p_estimate_id?: string | null }; Returns: import("@/types/employee").LeadRepresentativeOption[] };
+      is_current_lead_representative_eligible: { Args: Record<string, never>; Returns: boolean };
+      get_my_lead_representative_leads: { Args: Record<string, never>; Returns: LeadRepresentativeLead[] };
       get_company_mileage_rate: { Args: Record<string, never>; Returns: number | null };
       set_company_mileage_rate: { Args: { p_rate: number | null }; Returns: undefined };
       get_job_gps_trips: { Args: { p_job_id: string }; Returns: GpsMileageTrip[] };

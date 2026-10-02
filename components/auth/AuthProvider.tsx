@@ -90,9 +90,11 @@ export function useAuth() { const value = useContext(AuthContext); if (!value) t
 export function ProtectedWorkspace({ children }: { children: ReactNode }) {
   const auth = useAuth(); const router = useRouter(); const pathname = usePathname();
   useEffect(() => { if (!auth.loading && !auth.user) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`); }, [auth.loading, auth.user, pathname, router]);
+  useEffect(() => { if (!auth.loading && auth.profile?.role === "Lead Representative" && pathname === "/") router.replace("/lead-rep"); }, [auth.loading, auth.profile, pathname, router]);
   if (auth.loading) return <AuthLoading />;
   if (!auth.user) return null;
   if (auth.error || !auth.profile) return <AccessBlocked message={auth.error ?? "Your account is not authorized for this version of StudioScrubz OS."} signOut={auth.signOut} />;
+  if (auth.profile.role === "Lead Representative" && pathname === "/") return <AuthLoading />;
   if (pathname !== "/access-denied" && !hasPermission(auth.profile, permissionForPath(pathname))) return <AccessDenied />;
   return <>{children}</>;
 }

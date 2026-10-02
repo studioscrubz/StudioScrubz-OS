@@ -1,6 +1,13 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { USER_ROLES, type UserProfile } from "@/types/auth";
 
+type LeadRepresentativeIdentityClient = {
+  rpc: (name: "is_current_lead_representative_eligible") => Promise<{
+    data: boolean | null;
+    error: { message?: string } | null;
+  }>;
+};
+
 export async function signIn(email: string, password: string) {
   const { data, error } = await getSupabaseClient().auth.signInWithPassword({ email: email.trim(), password });
   if (error) {
@@ -49,5 +56,13 @@ export async function getCurrentProfile(userId?: string): Promise<UserProfile | 
     console.error("Supabase profile query failed", { message: error.message, code: error.code });
     throw new Error("Your StudioScrubz OS profile could not be loaded.");
   }
-  return data as UserProfile | null;
+  const profile = data as UserProfile | null;
+  if (profile?.role === "Lead Representative") {
+    const { data: eligible, error: eligibilityError } = await (getSupabaseClient() as unknown as LeadRepresentativeIdentityClient)
+      .rpc("is_current_lead_representative_eligible");
+    if (eligibilityError || eligible !== true) {
+      throw new Error("Your Lead Representative account is not linked to an active Lead Representative employee.");
+    }
+  }
+  return profile;
 }
