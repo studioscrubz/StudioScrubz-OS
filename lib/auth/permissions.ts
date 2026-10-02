@@ -50,12 +50,30 @@ const operationalAdmin: Permission[] = [
   "messages.view", "messages.send", "messages.announce",
 ];
 
+const crewLeadPermissions: Permission[] = [
+  "porterVisits.view",
+  "walkthroughs.field",
+  "dashboard.view",
+  "jobs.view", "jobs.edit", "jobs.complete",
+  "schedule.view",
+  "employees.directory_view", "employees.scrubTechRosterView",
+  "timeClock.view",
+  "crews.view",
+  "clients.view",
+  "properties.view",
+  "vehicles.view",
+  "attention.view",
+  "messages.view", "messages.send",
+  "appearance.view",
+];
+
 export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
   "Master Admin": new Set(PERMISSIONS),
 
   Administrator: new Set(operationalAdmin),
 
   Manager: new Set([
+    ...crewLeadPermissions,
     "porterVisits.view", "porterVisits.manage",
     "propertyServicePlans.manage",
     "marketingMaterials.send",
@@ -100,26 +118,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "leadRep.portal", "leadRep.leads.viewOwn",
   ]),
 
-  "Crew Lead": new Set([
-    "porterVisits.view",
-    "walkthroughs.field",
-    "dashboard.view",
-    "jobs.view", "jobs.edit", "jobs.complete",
-    "schedule.view",
-    "employees.directory_view", "employees.scrubTechRosterView",
-    "timeClock.view",
-    "crews.view",
-    "clients.view",
-    "properties.view",
-    "vehicles.view",
-    "attention.view",
-    "messages.view", "messages.send",
-    "appearance.view",
-  ]),
+  "Crew Lead": new Set(crewLeadPermissions),
 
   "Scrub Technician": new Set([
     "porterVisits.view",
-    "walkthroughs.field",
     "dashboard.view",
     "jobs.view",
     "schedule.view",
@@ -147,7 +149,7 @@ export function hasPermission(
       profile?.is_active === true &&
       (profile.role === "Master Admin" || (
         Boolean(profile.employee_id) &&
-        ["Crew Lead", "Scrub Technician"].includes(profile.role)
+        ["Manager", "Crew Lead"].includes(profile.role)
       ))
     );
   }

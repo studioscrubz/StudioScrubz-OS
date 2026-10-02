@@ -151,11 +151,11 @@ test("Post-Construction walkthrough is shared across field and management and ga
 
   assert.match(
     permissions,
-    /permission === "walkthroughs\.field"[\s\S]*Boolean\(profile\.employee_id\)[\s\S]*\["Crew Lead", "Scrub Technician"\]/
+    /permission === "walkthroughs\.field"[\s\S]*Boolean\(profile\.employee_id\)[\s\S]*\["Manager", "Crew Lead"\]/
   );
 
   assert.doesNotMatch(
     permissions,
-    /\["Master Admin", "Crew Lead", "Scrub Technician"\]/
+    /\["Master Admin", "Manager", "Crew Lead"\]/
   );
 });

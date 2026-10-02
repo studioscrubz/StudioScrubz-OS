@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { archiveWalkthrough, createWalkthrough, getAvailableEstimates, getWalkthroughClients, getWalkthroughProperties, syncQualificationRecords, updateWalkthrough, WalkthroughDuplicateError } from "@/lib/services/walkthroughs";
+import { archiveWalkthrough, createWalkthrough, getAvailableEstimates, getEligibleWalkthroughAssignees, getWalkthroughClients, getWalkthroughProperties, syncQualificationRecords, updateWalkthrough, WalkthroughDuplicateError } from "@/lib/services/walkthroughs";
+import type { WalkthroughAssigneeOption } from "@/lib/services/walkthroughs";
 import type { Client } from "@/types/client";
 import type { AvailableEstimate, WalkthroughInput, WalkthroughMeasurements, WalkthroughRecommendation, WalkthroughScopeItem, WalkthroughStatus, WalkthroughUpdate, WalkthroughWithRelations } from "@/types/walkthrough";
 import { EMPTY_MEASUREMENTS } from "@/types/walkthrough";
@@ -23,8 +24,6 @@ import {
   postConstructionCompletionIssues,
 } from "@/components/walkthroughs/PostConstructionFieldWalkthrough";
 import { AssessmentHistory } from "@/components/walkthroughs/AssessmentHistory";
-import { getEligibleJobTechs } from "@/lib/services/jobs";
-import type { EligibleJobTech } from "@/types/job";
 
 const scopeOptions = ["Floors", "Bathrooms", "Kitchen", "Windows", "Baseboards", "Appliances", "Common Areas", "Workstations", "Trash", "Sanitizing", "Pressure Washing", "Other"];
 const recommendationOptions = ["Deep cleaning recommended", "Recurring service recommended", "Additional crew recommended", "Special equipment required", "Pressure washing recommended", "Carpet service recommended"];
@@ -49,7 +48,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const [estimateSearch, setEstimateSearch] = useState("");
   const [date, setDate] = useState(walkthrough?.walkthrough_date ?? "");
   const [time, setTime] = useState(walkthrough?.walkthrough_time?.slice(0, 5) ?? "");
-  const [eligibleTechs, setEligibleTechs] = useState<EligibleJobTech[]>([]);
+  const [eligibleAssignees, setEligibleAssignees] = useState<WalkthroughAssigneeOption[]>([]);
   const [assignedEmployeeId, setAssignedEmployeeId] = useState(walkthrough?.assigned_employee_id ?? "");
   const [assignedTo, setAssignedTo] = useState(walkthrough?.assigned_to ?? "");
   const [notes, setNotes] = useState(walkthrough?.notes ?? initialEstimate?.notes ?? "");
@@ -74,8 +73,8 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
 
   useEffect(() => {
     let active = true;
-    void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties(), getServiceCatalog(), getEligibleJobTechs()])
-      .then(([estimateRows, clientRows, propertyRows, bundle, techRows]) => { if (active) { setEligibleTechs(techRows); setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(bundle.services);setCatalog(bundle);setMeasurements(current=>withCatalogServiceDescription(current,bundle,initialEstimate??walkthrough?.estimate)); } })
+    void Promise.all([getAvailableEstimates(), getWalkthroughClients(), getWalkthroughProperties(), getServiceCatalog(), getEligibleWalkthroughAssignees()])
+      .then(([estimateRows, clientRows, propertyRows, bundle, assigneeRows]) => { if (active) { setEligibleAssignees(assigneeRows); setEstimates(mergeById(estimateRows, initialEstimate ? [initialEstimate] : [])); setClients(mergeById(clientRows, walkthrough?.client ? [walkthrough.client] : [])); setProperties(mergeById(propertyRows, walkthrough?.property ? [walkthrough.property] : [])); setServices(bundle.services);setCatalog(bundle);setMeasurements(current=>withCatalogServiceDescription(current,bundle,initialEstimate??walkthrough?.estimate)); } })
       .catch((caught: unknown) => { console.error("Walkthrough relationship data failed to load", caught); if (active) setError(message(caught, "Estimate, client, or property information could not be loaded.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -89,7 +88,6 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   const clientProperties = properties.filter((item) => item.client_id === clientId);
   const catalogService=catalog?findCatalogService(catalog.services,division,measurements.serviceType):undefined;
   const availableAddons=catalog&&catalogService?getAvailableServiceAddons(catalog,catalogService.id,division):[];
-  const eligibleScrubTechnicians=eligibleTechs.filter(item=>item.operational_role==="Scrub Technician");
   const onSiteMethod=measurements.assessmentMethod==="On-Site Walkthrough"||measurements.assessmentMethod==="In-Person Walkthrough";
 
   function chooseEstimate(id: string) { setEstimateId(id); const found = estimates.find((item) => item.id === id); if (found) { setClientId(found.client_id ?? ""); setPropertyId(found.property_id ?? ""); setMeasurements(current=>withCatalogServiceDescription({...current,...("calculatorType" in found.result.calculatorInput?initialMeasurements(undefined,found):{}),serviceType:found.service_name??found.result.serviceName,serviceDescription:found.result.serviceDescription?.trim()??"",catalogAddons:found.result.catalogAddons??[]},catalog,found)); } }
@@ -101,7 +99,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
   async function save(nextStatus?: WalkthroughStatus) {
     if (!clientId || !propertyId) return setError("Select a valid client and property relationship.");
     if (!measurements.currentCleaningSituation) return setError("Select Yes or No for Current Cleaner / Vendor.");
-    if (!walkthrough && !assignedEmployeeId) return setError("Assign an active Scrub Technician before creating this assessment.");
+    if (!walkthrough && !assignedEmployeeId) return setError("Assign an active Manager or Crew Lead before creating this assessment.");
     if (!walkthrough && (!date || !time)) return setError("Walkthrough date and time are required before creating this assessment.");
     if ((measurements.assessmentMethod === "On-Site Walkthrough" || measurements.assessmentMethod === "In-Person Walkthrough")&&(!date || !time)) return setError("On-site walkthrough date and time are required.");
     if (mode === "estimate" && !estimateId) return setError("Select an estimate or choose Create Without Estimate.");
@@ -156,7 +154,7 @@ export function WalkthroughFormModal({ walkthrough, initialEstimate, onClose, on
         <Qualification value={measurements} set={setMeasurements} customerNotes={customerNotes} setCustomerNotes={setCustomerNotes} division={division}/>
         <div className="mt-5 border-t border-neutral-200 pt-5">
           <h4 className="font-extrabold text-[#143d1a]">Walkthrough Schedule</h4>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3"><Text label="Date" type="date" value={date} set={setDate} required /><Text label="Time" type="time" value={time} set={setTime} required /><Select label="Assigned Scrub Technician" value={assignedEmployeeId} set={id => { setAssignedEmployeeId(id); setAssignedTo(eligibleScrubTechnicians.find(item => item.employee_id === id)?.display_name ?? ""); }} options={eligibleScrubTechnicians.map(item => ({value:item.employee_id,label:item.display_name}))} placeholder="Select an active Scrub Technician" />{assignedEmployeeId && !eligibleScrubTechnicians.some(item => item.employee_id === assignedEmployeeId) && <p className="text-sm text-amber-700">The assigned Scrub Technician is unavailable. Select an active Scrub Technician.</p>}</div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3"><Text label="Date" type="date" value={date} set={setDate} required /><Text label="Time" type="time" value={time} set={setTime} required /><Select label="Assigned Field Representative" value={assignedEmployeeId} set={id => { setAssignedEmployeeId(id); setAssignedTo(eligibleAssignees.find(item => item.employee_id === id)?.display_name ?? ""); }} options={eligibleAssignees.map(item => ({value:item.employee_id,label:item.display_name}))} placeholder="Select an active Manager or Crew Lead" />{assignedEmployeeId && !eligibleAssignees.some(item => item.employee_id === assignedEmployeeId) && <p className="text-sm text-amber-700">The historical assignee is no longer eligible. Select an active Manager or Crew Lead to reassign this walkthrough.</p>}</div>
           <div className="mt-4 rounded-lg bg-[#f5f7f4] px-3 py-2 text-xs font-bold text-[#143d1a]">Workflow: {status === "Completed" || status === "Proposal Ready" ? "COMPLETED — PRICING REVIEW" : date&&time?"SCHEDULED":"QUALIFICATION"}</div>
           <label className="mt-4 block"><Label text="Internal Assessment Notes" /><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputClass} /></label>
         </div>

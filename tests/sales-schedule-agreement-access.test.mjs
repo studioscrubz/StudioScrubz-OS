@@ -11,7 +11,7 @@ const migration = readFileSync("supabase/migrations/20261002134919_sales_schedul
 
 const salesBlock = permissions.slice(permissions.indexOf("Sales: new Set"), permissions.indexOf('"Crew Lead": new Set'));
 const managerBlock = permissions.slice(permissions.indexOf("Manager: new Set"), permissions.indexOf("Sales: new Set"));
-const crewLeadBlock = permissions.slice(permissions.indexOf('"Crew Lead": new Set'), permissions.indexOf('"Scrub Technician": new Set'));
+const crewLeadPermissions = permissions.slice(permissions.indexOf("const crewLeadPermissions"), permissions.indexOf("export const ROLE_PERMISSIONS"));
 const technicianStart = permissions.indexOf('"Scrub Technician": new Set');
 const technicianBlock = permissions.slice(technicianStart, permissions.indexOf("};", technicianStart));
 
@@ -66,9 +66,9 @@ test("database policies keep Sales Agreement and occurrence access read-only", (
   assert.doesNotMatch(migration, /Agreement role (?:create|update)[\s\S]{0,180}'Sales'/);
 });
 
-test("field-role permissions remain unchanged and do not gain Agreement access", () => {
-  assert.match(crewLeadBlock, /"schedule\.view"/);
+test("field roles retain Schedule access and do not gain Agreement access", () => {
+  assert.match(crewLeadPermissions, /"schedule\.view"/);
   assert.match(technicianBlock, /"schedule\.view"/);
-  assert.doesNotMatch(crewLeadBlock, /agreements\.view|agreements\.manage|agreements\.financialSummary/);
+  assert.doesNotMatch(crewLeadPermissions, /agreements\.view|agreements\.manage|agreements\.financialSummary/);
   assert.doesNotMatch(technicianBlock, /agreements\.view|agreements\.manage|agreements\.financialSummary/);
 });

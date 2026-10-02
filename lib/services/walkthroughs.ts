@@ -8,6 +8,12 @@ import type { WalkthroughMeasurements } from "@/types/walkthrough";
 const walkthroughSelect = "*, client:clients!walkthroughs_client_id_fkey(*), property:properties!walkthroughs_property_id_fkey(*), estimate:estimates!walkthroughs_estimate_id_fkey(*)";
 const estimateSelect = "*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)";
 
+export type WalkthroughAssigneeOption = {
+  employee_id: string;
+  display_name: string;
+  operational_role: "Manager" | "Crew Lead";
+};
+
 export async function getWalkthroughs(): Promise<WalkthroughWithRelations[]> { const { data, error } = await getSupabaseClient().from("walkthroughs").select(walkthroughSelect).order("created_at", { ascending: false }); if (error) throw error; return data as WalkthroughWithRelations[]; }
 export async function getScheduledWalkthroughs(): Promise<WalkthroughWithRelations[]> { const { data, error } = await getSupabaseClient().from("walkthroughs").select(walkthroughSelect).is("archived_at", null).not("walkthrough_date", "is", null).in("status", ["New", "Scheduled"]).order("walkthrough_date").order("walkthrough_time"); if (error) throw error; return data as WalkthroughWithRelations[]; }
 export async function getWalkthroughById(id: string): Promise<WalkthroughWithRelations> { const { data, error } = await getSupabaseClient().from("walkthroughs").select(walkthroughSelect).eq("id", id).single(); if (error) throw error; return data as WalkthroughWithRelations; }
@@ -22,6 +28,7 @@ export async function getWalkthroughForEstimate(estimateId: string): Promise<Wal
 export async function getWalkthroughsForEstimates(): Promise<WalkthroughWithRelations[]> { const { data, error } = await getSupabaseClient().from("walkthroughs").select(walkthroughSelect).not("estimate_id", "is", null).is("archived_at",null); if (error) throw error; return data as WalkthroughWithRelations[]; }
 export async function getWalkthroughClients(): Promise<Client[]> { const { data, error } = await getSupabaseClient().from("clients").select("*").order("last_name"); if (error) throw error; return data; }
 export async function getWalkthroughProperties(): Promise<Property[]> { const { data, error } = await getSupabaseClient().from("properties").select("*").order("address"); if (error) throw error; return data; }
+export async function getEligibleWalkthroughAssignees(): Promise<WalkthroughAssigneeOption[]> { const { data, error } = await getSupabaseClient().rpc("get_eligible_walkthrough_assignees"); if (error) throw new Error(error.message); return data; }
 
 export async function syncQualificationRecords(input:{estimate:AvailableEstimate|null|undefined;property:Property|null|undefined;measurements:WalkthroughMeasurements;customerNotes:string}){
   const db=getSupabaseClient();
