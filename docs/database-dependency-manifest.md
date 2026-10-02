@@ -1,5 +1,7 @@
 # Database dependency manifest
 
+2026-10-02 repository refresh: the static application dependency inventory was recomputed from current tracked source and classified against Git-tracked SQL. Recent tracked coverage includes Lead Representative eligibility and self-service (`is_current_lead_representative_eligible`, `get_my_lead_representative_leads`), Sales Schedule access (`get_sales_schedule_jobs`), and Manager/Crew Lead walkthrough assignment (`get_eligible_walkthrough_assignees`).
+
 2026-09-26 Post-Construction sales-assessment additions: `assessment_history` and `transition_post_construction_assessment` are defined by `20260926031557_post_construction_sales_assessment_workflow.sql`. The migration extends the existing `walkthroughs` Assessment and secure photo-access records rather than introducing competing sales or upload systems.
 
 2026-09-25 Marketing Materials additions: `register_marketing_material_version`, `set_marketing_material_active`, `update_marketing_material_metadata`, `prepare_marketing_material_delivery`, `retry_marketing_material_delivery`, and `mark_marketing_material_delivery` are defined by `20260925131341_marketing_material_deliveries.sql`. The same migration adds the locked-down `marketing_materials`, `marketing_material_versions`, and `marketing_material_deliveries` relations plus the private `marketing-materials-private` Storage bucket.
@@ -10,7 +12,7 @@
 
 2026-09-23 forward-migration additions: `confirm_post_construction_deposit`, `refresh_post_construction_deposit_instructions`, `reverse_post_construction_deposit`, `reopen_post_construction_deposit`, and `mark_service_agreement_sent_for_delivery` are defined by `20260923200258_post_construction_deposit_workflow.sql`. The same migration adds the application relation `proposal_deposit_requirements`; `proposal_deposit_events` is its immutable database audit relation.
 
-Phase 1 static inventory, generated from the repository on 2026-09-19. This is a repository-provenance document, not evidence of the live database state. No remote or local database was queried.
+Static inventory, regenerated from the repository on 2026-10-02. This is a repository-provenance document, not evidence of the live database state. No remote or local database was queried.
 
 ## Classification
 
@@ -22,30 +24,28 @@ Phase 1 static inventory, generated from the repository on 2026-09-19. This is a
 
 The scan covers statically named `.rpc(...)`, Data API `.from(...)`, Storage bucket constants, and Realtime table registrations in `app/`, `components/`, and `lib/`. Dynamic SQL object construction was not found.
 
-## RPC inventory (112)
+## RPC inventory (129)
 
-### Tracked migration (81)
+### Tracked migration (108)
 
 `accept_service_agreement_by_token`, `acknowledge_required_announcement`, `add_change_request_item`, `add_field_discovery_media`, `add_job_evidence_media`, `add_porter_visit_photo`, `archive_sales_assessment`, `cancel_job_gps_trip`, `cancel_operational_job`, `complete_in_progress_job`, `correct_completed_job_master_time`, `create_change_request`, `create_completed_job_invoice`, `create_contractor_consolidated_invoice`, `create_direct_operational_job_v2`, `create_field_discovery`, `create_job_evidence`, `create_job_from_accepted_proposal`, `create_job_from_service_occurrence`, `create_porter_route`, `create_porter_visit_v3`, `create_post_construction_draft_agreement`, `decide_change_request_by_token`, `delete_porter_visit`, `delete_property_service_plan`, `delete_unsent_draft_service_agreement`, `finish_job_gps_trip`, `generate_due_porter_notifications`, `get_active_employee_work_sessions`, `get_active_scrub_technicians`, `get_assigned_field_walkthroughs`, `get_change_request_by_token`, `get_company_mileage_rate`, `get_contractor_invoice_eligible_jobs`, `get_eligible_job_tech_options`, `get_financially_handed_off_job_ids`, `get_invoice_by_token`, `get_job_gps_mileage`, `get_job_gps_trips`, `get_job_performance_rows`, `get_lead_representatives`, `get_my_work_session`, `get_operational_job_ids`, `get_operational_jobs`, `get_or_create_service_label`, `get_porter_assignment_options`, `get_proposal_pricing_photos`, `get_porter_routes`, `get_porter_visits`, `get_sales_job_proposal_ids`, `get_service_agreement_by_token`, `get_upcoming_client_jobs`, `initiate_job_on_my_way`, `mark_messages_read`, `master_admin_permanently_delete_cancelled_job`, `mutate_porter_route`, `mutate_porter_visit`, `remove_proposal_pricing_photo`, `save_mileage_entry_with_stops`, `save_porter_visit_issue`, `save_property_service_plan`, `send_change_request`, `send_company_announcement`, `send_direct_message`, `set_company_mileage_rate`, `set_invoice_job_photo_visibility`, `set_job_worker_assignment`, `set_operational_photos`, `set_proposal_pricing_photo_caption`, `start_direct_conversation`, `start_job_gps_trip`, `start_my_work`, `start_operational_job`, `start_or_clock_in_to_job`, `stop_my_work`, `submit_assigned_field_walkthrough`, `update_change_request_draft`, `update_field_discovery_status`, `update_operational_job`.
 
-Current migration homes are the feature migrations dated `20260827` through `20260918`. Definitions with known later untracked overrides are called out under “Overrides requiring adjudication.”
+Additional application RPCs now covered by tracked migrations: `accept_proposal_by_token`, `admin_create_user_profile`, `admin_update_user_profile`, `archive_operational_job`, `confirm_post_construction_deposit`, `get_archived_operational_jobs`, `get_eligible_walkthrough_assignees`, `get_job_applications`, `get_my_lead_representative_leads`, `get_proposal_by_token`, `get_reopenable_archived_cancelled_job_ids`, `get_sales_schedule_jobs`, `is_current_lead_representative_eligible`, `mark_marketing_material_delivery`, `mark_proposal_sent_for_delivery`, `mark_service_agreement_sent_for_delivery`, `master_admin_permanently_delete_archived_record`, `prepare_marketing_material_delivery`, `record_invoice_payment`, `record_square_invoice_payment_v2`, `refresh_post_construction_deposit_instructions`, `register_marketing_material_version`, `reopen_post_construction_deposit`, `restore_and_reopen_cancelled_job`, `retry_marketing_material_delivery`, `reverse_post_construction_deposit`, `set_marketing_material_active`, `update_job_application`, and `update_marketing_material_metadata`.
 
-### Tracked standalone only (31) — Phase 2 migration required
+Current migration homes are the feature migrations dated `20260827` through `20261002`. Definitions with known later standalone overrides are called out under “Overrides requiring adjudication.”
+
+### Tracked standalone only (21) — forward migration coverage still required
 
 | RPCs | Current source |
 | --- | --- |
-| `accept_proposal_by_token`, `get_estimate_by_token`, `get_proposal_by_token`, `mark_estimate_sent_for_delivery`, `mark_proposal_sent_for_delivery` | `supabase/estimate_proposal_delivery.sql` |
+| `get_estimate_by_token`, `mark_estimate_sent_for_delivery` | `supabase/estimate_proposal_delivery.sql` |
 | `request_estimate_walkthrough_by_token` | `supabase/estimate_walkthrough_request.sql` |
-| `add_operational_crew_member`, `admin_create_user_profile`, `admin_operational_create_employee`, `admin_operational_update_employee`, `admin_set_user_active`, `admin_update_user_profile`, `manage_operational_crew`, `remove_operational_crew_member`, `review_operational_time_entry`, `save_operational_time_entry` | `supabase/role_permissions.sql` |
-| `archive_operational_job`, `get_archived_operational_jobs`, `restore_archived_operational_job` | `supabase/job_lifecycle_operational_rpcs.sql` |
-| `get_reopenable_archived_cancelled_job_ids`, `restore_and_reopen_cancelled_job` | `supabase/migrations/20260924165201_restore_and_reopen_cancelled_job.sql` |
+| `add_operational_crew_member`, `admin_operational_create_employee`, `admin_operational_update_employee`, `admin_set_user_active`, `manage_operational_crew`, `remove_operational_crew_member`, `review_operational_time_entry`, `save_operational_time_entry` | `supabase/role_permissions.sql` |
+| `restore_archived_operational_job` | `supabase/job_lifecycle_operational_rpcs.sql` |
 | `get_business_settings_workflow`, `get_crew_directory`, `get_crew_members_directory`, `get_employee_directory`, `get_operational_time_entries` | `supabase/security_definer_hardening_phase_a.sql` |
 | `create_contract_agreement_invoice` | `supabase/weekly_biweekly_contract_billing_and_recurring_operations.sql` |
 | `get_invoice_payment_confirmation_by_token` | `supabase/public_invoice_links.sql` |
 | `get_operational_photos` | `supabase/operational_photo_storage.sql` |
-| `master_admin_permanently_delete_archived_record` | `supabase/archive_permanent_delete_rpc.sql` / `supabase/phase22_v1_hardening.sql` |
-| `record_invoice_payment` | `supabase/atomic_invoice_payments.sql` |
-| `record_square_invoice_payment_v2` | `supabase/square_invoice_tipping.sql` |
 | `add_proposal_owned_photo` | `supabase/invoice_operational_photo_snapshot_handoff.sql`; newer untracked override noted below |
 
 ### Untracked SQL only (0)
@@ -54,21 +54,19 @@ No statically referenced application RPC remains sourced only from untracked SQL
 
 ### Missing RPCs
 
-None of the 112 inventoried RPC names is missing from all repository SQL. This does not mean the migration chain can create all 112.
+None of the 129 inventoried RPC names is missing from all Git-tracked repository SQL. This does not mean the migration chain can create all 129; 21 remain standalone-only.
 
-## Data API relation inventory (73)
+## Data API and Realtime relation inventory (79)
 
 This includes tables and views used through `.from(...)` plus Realtime-only tables.
 
-### Tracked migration (44)
+### Tracked migration (79)
 
-`announcement_acknowledgments`, `assessment_photo_access`, `attention_push_checkpoints`, `attention_push_deliveries`, `authorized_vehicles_safe`, `browser_push_subscriptions`, `change_request_approvals_operational`, `change_request_items`, `change_requests`, `change_requests_operational`, `conversation_members`, `conversations`, `employee_directory_company_safe`, `employee_work_sessions`, `field_discoveries`, `field_discoveries_operational`, `field_discovery_media`, `google_calendar_connections`, `invoice_job_lines`, `invoice_job_photos`, `job_calendar_syncs`, `job_evidence`, `job_evidence_media`, `job_scope_operational_items`, `jobs_operational_safe`, `message_read_states`, `messages`, `messaging_push_deliveries`, `messaging_user_directory_safe`, `mileage_stops`, `notification_preferences`, `porter_notification_events`, `property_service_plan_areas`, `property_service_plans`, `property_service_route_stops`, `property_service_routes`, `property_service_visit_issues`, `property_service_visit_photos`, `property_service_visits`, `scope_snapshot_items`, `scope_snapshots`, `scope_snapshots_operational`, `service_label_assignments`, `service_labels`.
+`announcement_acknowledgments`, `assessment_history`, `assessment_photo_access`, `attention_item_states`, `attention_push_checkpoints`, `attention_push_deliveries`, `authorized_vehicles_safe`, `browser_push_subscriptions`, `business_settings`, `change_request_approvals_operational`, `change_request_items`, `change_requests`, `change_requests_operational`, `client_communications`, `clients`, `conversation_members`, `conversations`, `crew_members`, `crews`, `employee_directory_company_safe`, `employee_work_sessions`, `employees`, `estimates`, `expenses`, `field_discoveries`, `field_discoveries_operational`, `field_discovery_media`, `google_calendar_connections`, `invoice_job_lines`, `invoice_job_photos`, `invoices`, `job_applications`, `job_calendar_syncs`, `job_evidence`, `job_evidence_media`, `job_scope_operational_items`, `jobs`, `jobs_operational_safe`, `marketing_material_deliveries`, `marketing_material_versions`, `marketing_materials`, `message_read_states`, `messages`, `messaging_push_deliveries`, `messaging_user_directory_safe`, `mileage_entries`, `mileage_stops`, `notification_preferences`, `payments`, `porter_notification_events`, `properties`, `property_service_plan_areas`, `property_service_plans`, `property_service_route_stops`, `property_service_routes`, `property_service_visit_issues`, `property_service_visit_photos`, `property_service_visits`, `proposal_deposit_requirements`, `proposal_history`, `proposals`, `recurring_pricing_rules`, `scope_snapshot_items`, `scope_snapshots`, `scope_snapshots_operational`, `service_addon_links`, `service_addons`, `service_agreement_documents`, `service_agreements`, `service_label_assignments`, `service_labels`, `service_occurrences`, `service_price_tiers`, `services`, `square_checkout_attempts`, `time_entries`, `user_profiles`, `vehicles`, `walkthroughs`.
 
-### Tracked standalone only (29) — baseline/forward migration required
+### Tracked standalone only (0)
 
-`attention_item_states`, `business_settings`, `client_communications`, `clients`, `crew_members`, `crews`, `employees`, `estimates`, `expenses`, `invoices`, `jobs`, `mileage_entries`, `payments`, `properties`, `proposal_history`, `proposals`, `recurring_pricing_rules`, `service_addon_links`, `service_addons`, `service_agreement_documents`, `service_agreements`, `service_occurrences`, `service_price_tiers`, `services`, `square_checkout_attempts`, `time_entries`, `user_profiles`, `vehicles`, `walkthroughs`.
-
-These are not necessarily absent from production. They are absent as reproducible baseline definitions from the tracked migration chain.
+Every statically referenced Data API relation is named by at least one tracked migration.
 
 ### Untracked SQL dependency (0)
 
@@ -114,9 +112,9 @@ These files appear to contain current behavior beyond an older tracked definitio
 
 Phase 2 should not edit existing migrations. After a separately authorized read-only live comparison, create forward-only migrations for:
 
-1. The 31 standalone-only RPCs, grouped by authorization domain rather than copied wholesale from historical scripts.
+1. The 21 standalone-only RPCs, grouped by authorization domain rather than copied wholesale from historical scripts.
 2. No application RPC or Data API relation remains in the untracked-only category.
-3. Baseline definitions for the 29 standalone-only relations, or an explicitly adopted tracked baseline schema strategy.
+3. No statically referenced Data API relations remain standalone-only; keep the tracked baseline strategy current as new relations are added.
 4. The `operational-photos` and `agreement-documents` buckets and their final Storage policies.
 5. Final RLS, grants, trigger functions/triggers, and Realtime publication membership for every promoted object.
 
