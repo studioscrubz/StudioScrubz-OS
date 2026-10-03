@@ -6,6 +6,7 @@ import {
   calculateResidentialEstimate,
 } from "@/lib/pricing/estimates";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
+import { publicAddonSelections } from "@/lib/pricing/publicAddons";
 import type {
   CommercialCalculatorInput,
   Condition,
@@ -36,6 +37,8 @@ export type PublicCatalog = {
     addons: Array<{
       name: string;
       description: string | null;
+      pricingType: "Flat Price" | "Per Unit";
+      unitName: string | null;
     }>;
   }>;
 };
@@ -60,6 +63,7 @@ export type PublicRequest = {
   units?: number;
   condition: Condition;
   addons: string[];
+  addonQuantities?: Record<string, number>;
   preferredDate?: string;
   notes?: string;
   website?: string;
@@ -173,6 +177,8 @@ export function publicCatalog(
           ).map((addon) => ({
             name: addon.addon_name,
             description: addon.description,
+            pricingType: addon.pricing_config.pricing_type === "Per Unit" ? "Per Unit" as const : "Flat Price" as const,
+            unitName: String(addon.pricing_config.unit_name ?? addon.unit_label ?? "").trim() || null,
           })),
         }))
       ),
@@ -191,18 +197,20 @@ export function calculatePublicRequest(
     input.service
   );
 
-  const selected = new Set(
-    getAvailableServiceAddons(
-      catalog,
-      service.id,
-      input.division
-    ).map((x) => x.addon_name)
-  );
+  const availableAddons = getAvailableServiceAddons(catalog, service.id, input.division);
+  const selected = new Set(availableAddons.map((x) => x.addon_name));
 
   if (input.addons.some((name) => !selected.has(name))) {
     throw new PublicEstimateRequestError(
       "One or more selected add-ons are unavailable."
     );
+  }
+
+  let addonSelections;
+  try {
+    addonSelections = publicAddonSelections(input.addons, input.addonQuantities, availableAddons);
+  } catch (cause) {
+    throw new PublicEstimateRequestError(cause instanceof Error ? cause.message : "Add-on pricing is unavailable.");
   }
 
   if (input.division === "Residential") {
@@ -219,6 +227,7 @@ export function calculatePublicRequest(
       additionalDiscountPercent: 0,
       taxRatePercent: 0,
       addOns: input.addons,
+      addonSelections,
     };
 
     return withServiceDescription(
@@ -255,6 +264,7 @@ export function calculatePublicRequest(
     additionalDiscountPercent: 0,
     taxRatePercent: 0,
     additionalServices: input.addons,
+    addonSelections,
     targetProjectDays: 3,
     workdayHours: 8,
   };
@@ -622,6 +632,20 @@ function validatePricingInput(input: PublicRequest) {
     throw new PublicEstimateRequestError(
       "Invalid add-on selection."
     );
+  }
+
+  if (input.addonQuantities !== undefined && (
+    !input.addonQuantities ||
+    typeof input.addonQuantities !== "object" ||
+    Array.isArray(input.addonQuantities) ||
+    Object.entries(input.addonQuantities).some(([name, quantity]) =>
+      !input.addons.includes(name) ||
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 10000
+    )
+  )) {
+    throw new PublicEstimateRequestError("Invalid add-on quantity.");
   }
 }
 
