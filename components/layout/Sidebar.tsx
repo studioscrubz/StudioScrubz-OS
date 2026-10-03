@@ -96,18 +96,6 @@ const navItems: Array<NavLink | NavGroup> = [
 
   {
 
-    label: "Commission Payouts",
-
-    href: "/lead-commission-payouts",
-
-    marker: "$",
-
-    permission: "leadRep.payouts.manage",
-
-  },
-
-  {
-
     label: "Dashboard",
 
     href: "/",
@@ -543,6 +531,18 @@ const navItems: Array<NavLink | NavGroup> = [
         marker: "",
 
         permission: "finances.view",
+
+      },
+
+      {
+
+        label: "Commission Payouts",
+
+        href: "/lead-commission-payouts",
+
+        marker: "",
+
+        permission: "leadRep.payouts.manage",
 
       },
 
