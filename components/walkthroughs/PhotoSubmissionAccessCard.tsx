@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { sendCommunicationsEmail } from "@/lib/services/communicationsEmail";
 
 const photoRequestMessage =
   "Hello,\n\nThank you for your interest in StudioScrubz.\n\nTo help us prepare an accurate assessment, please use the secure link below to upload clear photos of each area you would like us to review.\n\nPlease include wide photos of the full space as well as closer photos of any areas that may need special attention.\n\nOnce the photos are received, our team can review the property or project and prepare the next step in your estimate process.";
@@ -16,19 +17,24 @@ type LinkResponse = {
 export function PhotoSubmissionAccessCard({
   walkthroughId,
   phone,
+  email,
   status,
   submittedAt,
 }: {
   walkthroughId: string;
   phone: string | null;
+  email: string | null;
   status?: string;
   submittedAt?: string | null;
 }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [emailBusy, setEmailBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const emailRequestId = useRef<string | null>(null);
 
   const loadExistingLink = useCallback(async () => {
     setLoading(true);
@@ -64,6 +70,8 @@ export function PhotoSubmissionAccessCard({
   }, [walkthroughId]);
 
   useEffect(() => {
+    emailRequestId.current = null;
+    setEmailSent(false);
     void loadExistingLink();
   }, [loadExistingLink]);
 
@@ -71,6 +79,7 @@ export function PhotoSubmissionAccessCard({
     setBusy(true);
     setError(null);
     setCopied(false);
+    setEmailSent(false);
 
     try {
       const response = await fetch(
@@ -108,6 +117,10 @@ export function PhotoSubmissionAccessCard({
     }
 
     return createLink();
+  }
+
+  function buildMessage(secureUrl: string) {
+    return `${photoRequestMessage}\n\n${secureUrl}\n\nIf you have any questions while uploading, feel free to contact us.\n\nNo mess. No stress.\n\nStudioScrubz`;
   }
 
   async function copy() {
@@ -150,16 +163,62 @@ export function PhotoSubmissionAccessCard({
       return;
     }
 
-    const message = `${photoRequestMessage}\n\n${secureUrl}\n\nIf you have any questions while uploading, feel free to contact us.\n\nNo mess. No stress.\n\nStudioScrubz`;
-
     try {
       window.location.href = `sms:${encodeURIComponent(
         phone,
-      )}?body=${encodeURIComponent(message)}`;
+      )}?body=${encodeURIComponent(buildMessage(secureUrl))}`;
     } catch {
       setError(
         "The messaging app could not be opened. Use Copy Link instead.",
       );
+    }
+  }
+
+  async function sendViaEmail() {
+    setError(null);
+    setEmailSent(false);
+
+    if (!email) {
+      setError(
+        "No email address is available for this customer. Use Copy Link or Send via Text instead.",
+      );
+      return;
+    }
+
+    const secureUrl = await ensureLink();
+
+    if (!secureUrl) {
+      return;
+    }
+
+    setEmailBusy(true);
+
+    try {
+      const requestId =
+        emailRequestId.current ??
+        (emailRequestId.current = crypto.randomUUID());
+
+      await sendCommunicationsEmail({
+        requestId,
+        recipientEmail: email,
+        subject: "StudioScrubz Property Assessment Photo Request",
+        messageBody: buildMessage(secureUrl),
+        communicationType: "Estimate",
+        metadata: {
+          event: "customer_photo_submission_request",
+          walkthrough_id: walkthroughId,
+        },
+      });
+
+      setEmailSent(true);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The photo request email could not be sent.",
+      );
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -206,6 +265,12 @@ export function PhotoSubmissionAccessCard({
         </p>
       )}
 
+      {emailSent && (
+        <p className="mt-3 text-sm font-bold text-[#143d1a]">
+          Photo request email sent to {email}.
+        </p>
+      )}
+
       {error && (
         <p role="alert" className="mt-3 text-sm font-bold text-red-700">
           {error}
@@ -215,7 +280,7 @@ export function PhotoSubmissionAccessCard({
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={busy || loading}
+          disabled={busy || loading || emailBusy}
           onClick={() => void copy()}
           className="rounded-lg border border-[#143d1a] bg-white px-4 py-2.5 text-sm font-bold text-[#143d1a] disabled:opacity-50"
         >
@@ -224,11 +289,24 @@ export function PhotoSubmissionAccessCard({
 
         <button
           type="button"
-          disabled={busy || loading}
+          disabled={busy || loading || emailBusy}
           onClick={() => void sendViaText()}
-          className="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="rounded-lg border border-[#143d1a] bg-white px-4 py-2.5 text-sm font-bold text-[#143d1a] disabled:opacity-50"
         >
           {busy ? "Preparing..." : "Send via Text"}
+        </button>
+
+        <button
+          type="button"
+          disabled={busy || loading || emailBusy}
+          onClick={() => void sendViaEmail()}
+          className="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        >
+          {emailBusy
+            ? "Sending Email..."
+            : busy
+              ? "Preparing..."
+              : "Send via Email"}
         </button>
       </div>
     </section>
