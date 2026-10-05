@@ -39,7 +39,7 @@ test("Deep Cleaning drafts save separately with assignment isolation and Master 
   assert.match(migration,/jsonb_set\(existing_deep, '\{fieldWalkthrough\}', deep_field, true\)/);
   assert.match(migration,/walkthrough\.assigned_employee_id is distinct from employee/);
   assert.match(migration,/get_assigned_field_walkthroughs_standard_phase_20260928\(\)/);
-  assert.match(page,/readOnly=\{masterAdmin\s*&&\s*!active\.isAssignedEmployee\}/);
+  assert.match(page,/readOnly=\{!activeCanEdit\}/);
 });
 
 test("Standard Residential and Post-Construction paths remain selected independently",()=>{

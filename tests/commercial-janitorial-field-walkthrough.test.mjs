@@ -56,7 +56,7 @@ test("Commercial and Janitorial walkthrough uses the existing secure guided arch
 
   assert.match(page, /CommercialJanitorialFieldWalkthrough/);
   assert.match(page, /commercialJanitorialCompletionIssues/);
-  assert.match(page, /readOnly=\{masterAdmin\s*&&\s*!active\.isAssignedEmployee\}/);
+  assert.match(page, /readOnly=\{!activeCanEdit\}/);
   assert.match(page, /isStandardResidential[\s\S]*isDeepCleaning[\s\S]*isMoveInOut[\s\S]*isCommercialJanitorial/);
 
   assert.match(migration, /if p_complete then/);

@@ -6,6 +6,11 @@ export async function getAssignedFieldWalkthroughs() {
   if(error) throw error;
   return data;
 }
+export async function canPerformScheduledWalkthrough(id: string): Promise<boolean> {
+  const { data, error } = await getSupabaseClient().rpc("can_perform_scheduled_walkthrough", { p_id: id });
+  if (error) throw error;
+  return data;
+}
 export async function saveAssignedFieldWalkthrough(id: string, measurements: FieldMeasurements, complete: boolean) {
   const {error} = await getSupabaseClient().rpc("submit_assigned_field_walkthrough", {p_id:id,p_measurements:measurements,p_complete:complete});
   if(error) throw error;

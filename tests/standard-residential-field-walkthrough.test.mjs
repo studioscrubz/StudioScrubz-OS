@@ -52,7 +52,7 @@ test("Master Admin can review all assignments while field staff remain assignmen
   assert.match(accessFix,/w\.assigned_employee_id is not null[\s\S]*master_admin or w\.assigned_employee_id = employee/);
   assert.match(accessFix,/not master_admin[\s\S]*'Crew Lead', 'Scrub Technician'/);
   assert.match(permissions,/permission === "walkthroughs\.field"[\s\S]*profile\.role === "Master Admin"[\s\S]*\["Manager", "Crew Lead"\]/);
-  assert.match(page,/readOnly=\{masterAdmin\s*&&\s*!active\.isAssignedEmployee\}/);
+  assert.match(page,/readOnly=\{!activeCanEdit\}/);
   assert.match(page,/Master Admin review — technician responses are read-only/);
   assert.match(page,/isPostConstruction\s*\?\s*\(\s*<PostConstructionFieldWalkthrough/);
 });

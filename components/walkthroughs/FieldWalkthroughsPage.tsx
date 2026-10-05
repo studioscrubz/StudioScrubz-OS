@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getAssignedFieldWalkthroughs, saveAssignedFieldWalkthrough } from "@/lib/services/fieldWalkthroughs";
+import { canPerformScheduledWalkthrough, getAssignedFieldWalkthroughs, saveAssignedFieldWalkthrough } from "@/lib/services/fieldWalkthroughs";
 import { createPhotoSignedUrls, getOperationalPhotos, uploadOperationalPhoto } from "@/lib/services/photoStorage";
 import { fieldTextKeys, fieldNumberKeys, type FieldMeasurements, type FieldWalkthrough } from "@/types/fieldWalkthrough";
 import type { OperationalPhotoWithUrl } from "@/types/photo";
@@ -20,6 +20,7 @@ export function FieldWalkthroughsPage() {
 
   const [rows, setRows] = useState<FieldWalkthrough[]>([]);
   const [active, setActive] = useState<FieldWalkthrough | null>(null);
+  const [activeCanEdit, setActiveCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -55,6 +56,8 @@ export function FieldWalkthroughsPage() {
       const row = fresh.find(item => item.id === id);
 
       if (row) {
+        const canEdit = await canPerformScheduledWalkthrough(row.id);
+        setActiveCanEdit(canEdit);
         setActive(row);
       } else {
         setError("This walkthrough is no longer assigned and scheduled for you.");
@@ -132,10 +135,14 @@ export function FieldWalkthroughsPage() {
         <FieldForm
           key={active.id}
           row={active}
-          readOnly={masterAdmin && !active.isAssignedEmployee}
-          close={() => setActive(null)}
+          readOnly={!activeCanEdit}
+          close={() => {
+            setActive(null);
+            setActiveCanEdit(false);
+          }}
           saved={async complete => {
             setActive(null);
+            setActiveCanEdit(false);
             setNotice(
               complete
                 ? "Walkthrough submitted and completed."

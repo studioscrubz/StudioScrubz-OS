@@ -32,6 +32,6 @@ test("drafts and nested saves preserve assignment isolation and oversight",()=>{
   assert.match(migration,/walkthrough\.assigned_employee_id is distinct from employee/);
   assert.match(migration,/get_assigned_field_walkthroughs_deep_phase_20260928\(\)/);
   assert.match(migration,/jsonb_set\(existing_move, '\{fieldWalkthrough\}', move_field, true\)/);
-  assert.match(page,/readOnly=\{masterAdmin\s*&&\s*!active\.isAssignedEmployee\}/);
+  assert.match(page,/readOnly=\{!activeCanEdit\}/);
   assert.doesNotMatch(component,/basePrice|finalPrice|laborCost|grossMargin|salesNotes|Sales \/ Internal Notes/);
 });
