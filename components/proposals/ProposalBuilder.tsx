@@ -45,6 +45,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { canManageProposalPricingPhotos } from "@/lib/auth/permissions";
 import { ProposalPricingPhotos } from "@/components/proposals/ProposalPricingPhotos";
 import { serviceFrequencyLabel } from "@/lib/scheduling/frequency";
+import { proposalAddonSnapshots, replaceProposalCatalogAddons, selectProposalCatalogAddons } from "@/lib/pricing/proposalAddons";
 
 const termsDefault: ProposalTerms = {
   paymentTerms: "Payment due upon completion of service.",
@@ -62,6 +63,8 @@ function proposalPricingFingerprint(value: {
   adjustments: ProposalAdjustment[];
   serviceName: string;
   serviceDescription: string;
+  laborHoursOverride: number | null;
+  crewSizeOverride: number | null;
 }) {
   return JSON.stringify(value);
 }
@@ -128,6 +131,12 @@ export function ProposalBuilder({
   const [additionalMaterials, setAdditionalMaterials] = useState(
     proposal?.result.additionalMaterials ?? 0,
   );
+  const [laborHoursOverride, setLaborHoursOverride] = useState<number | null>(
+    proposal?.result.laborHoursOverride ?? null,
+  );
+  const [crewSizeOverride, setCrewSizeOverride] = useState<number | null>(
+    proposal?.result.crewSizeOverride ?? null,
+  );
   const [discount, setDiscount] = useState(
     proposal
       ? (proposal.result.manualDiscount /
@@ -178,6 +187,8 @@ export function ProposalBuilder({
       adjustments: proposal?.result.adjustments ?? [],
       serviceName: proposal?.result.serviceName ?? "",
       serviceDescription: proposal?.result.serviceDescription ?? "",
+      laborHoursOverride: proposal?.result.laborHoursOverride ?? null,
+      crewSizeOverride: proposal?.result.crewSizeOverride ?? null,
     }),
   );
   const pricingFingerprint = proposalPricingFingerprint({
@@ -189,6 +200,8 @@ export function ProposalBuilder({
     adjustments,
     serviceName,
     serviceDescription,
+    laborHoursOverride,
+    crewSizeOverride,
   });
   useOperationalRealtime(
     [
@@ -286,6 +299,7 @@ export function ProposalBuilder({
     catalog && catalogService
       ? getAvailableServiceAddons(catalog, catalogService.id, proposalDivision)
       : [];
+  const selectedAddonSnapshots = proposalAddonSnapshots(adjustments, availableAddons);
   const matchingRules = catalogService
     ? matchingRecurringRules(frequency, rules, catalogService.id)
     : [];
@@ -328,6 +342,8 @@ export function ProposalBuilder({
     adjustments,
     additionalLabor,
     additionalMaterials,
+    laborHoursOverride,
+    crewSizeOverride,
     manualDiscountPercent: discount,
     scope,
     terms,
@@ -426,11 +442,14 @@ export function ProposalBuilder({
           amount:
             approvedAdjustments.find(
               (item) => item.catalogAddonId === addon.catalogAddonId,
-            )?.amount ?? addon.price,
+            )?.amount ?? addon.lineTotal ?? (addon.quantity ?? 1) * (addon.unitPrice ?? addon.price),
           catalogAddonId: addon.catalogAddonId,
           description: addon.description,
           pricingModel: addon.pricingModel,
           unitLabel: addon.unitLabel,
+          quantity: addon.quantity,
+          unitName: addon.unitName,
+          unitPrice: addon.unitPrice,
           inherited: true,
         })),
       ]);
@@ -527,36 +546,7 @@ export function ProposalBuilder({
     }
   }
   function setCatalogAddons(names: string[]) {
-    setAdjustments((current) => {
-      const existing = current.filter((item) => item.catalogAddonId);
-      const selected = names
-        .map(
-          (name) =>
-            existing.find((item) => item.label === name) ??
-            availableAddons.find((addon) => addon.addon_name === name),
-        )
-        .filter(
-          (
-            item,
-          ): item is
-            | ProposalAdjustment
-            | NonNullable<(typeof availableAddons)[number]> => Boolean(item),
-        )
-        .map((item) =>
-          "label" in item
-            ? item
-            : {
-                id: item.id,
-                label: item.addon_name,
-                amount: item.price,
-                catalogAddonId: item.id,
-                description: item.description,
-                pricingModel: item.pricing_model,
-                unitLabel: item.unit_label,
-              },
-        );
-      return [...current.filter((item) => !item.catalogAddonId), ...selected];
-    });
+    setAdjustments((current) => selectProposalCatalogAddons(current, names, availableAddons));
   }
   const list = (mode === "estimate" ? estimates : walkthroughs).filter(
     (x) =>
@@ -695,6 +685,8 @@ export function ProposalBuilder({
                   .filter((item) => item.catalogAddonId)
                   .map((item) => item.label)}
                 setSelected={setCatalogAddons}
+                snapshots={selectedAddonSnapshots}
+                setSnapshots={(snapshots) => setAdjustments((current) => replaceProposalCatalogAddons(current, snapshots, availableAddons))}
               />
             </div>
           </Panel>
@@ -720,6 +712,28 @@ export function ProposalBuilder({
               </p>
             </Panel>
           )}
+          <Panel title="Labor Planning">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LaborPlanInput
+                label="Crew Size"
+                recommended={calculatedResult.recommendedCrewSize ?? calculatedResult.crewRecommendation}
+                active={calculatedResult.crewRecommendation}
+                override={crewSizeOverride}
+                wholeNumber
+                setOverride={setCrewSizeOverride}
+              />
+              <LaborPlanInput
+                label="Labor Hours"
+                recommended={calculatedResult.recommendedLaborHours ?? calculatedResult.laborHours}
+                active={calculatedResult.laborHours}
+                override={laborHoursOverride}
+                setOverride={setLaborHoursOverride}
+              />
+            </div>
+            <p className="mt-3 text-sm text-neutral-600">
+              Labor Hours are total crew labor hours. Duration is calculated as total labor hours divided by crew size.
+            </p>
+          </Panel>
           <Panel title="Proposal Adjustments">
             <div className="grid gap-4 sm:grid-cols-3">
               <Num
@@ -1190,6 +1204,66 @@ function Num({
           className={`${input} ${currency ? "pl-7" : ""}`}
         />
       </span>
+    </label>
+  );
+}
+function LaborPlanInput({
+  label,
+  recommended,
+  active,
+  override,
+  wholeNumber = false,
+  setOverride,
+}: {
+  label: string;
+  recommended: number;
+  active: number;
+  override: number | null;
+  wholeNumber?: boolean;
+  setOverride: (value: number | null) => void;
+}) {
+  const [draft, setDraft] = useState(String(active));
+  const [validation, setValidation] = useState<string | null>(null);
+  useEffect(() => setDraft(String(active)), [active]);
+  return (
+    <label>
+      <Label t={label} />
+      <span className="mb-2 block text-xs text-neutral-500">
+        Recommended: {recommended}
+      </span>
+      <span className="block text-xs font-bold text-neutral-600">Active / Planned</span>
+      <input
+        aria-label={`Active planned ${label}`}
+        type="number"
+        min={wholeNumber ? 1 : 0.1}
+        step={wholeNumber ? 1 : 0.1}
+        value={draft}
+        onChange={(event) => {
+          const nextDraft = event.target.value;
+          setDraft(nextDraft);
+          const next = Number(nextDraft);
+          const invalid = nextDraft === "" || !Number.isFinite(next) || next <= 0 || (wholeNumber && !Number.isInteger(next));
+          if (invalid) {
+            setValidation(wholeNumber ? "Crew Size must be a positive whole number." : "Labor Hours must be greater than 0.");
+            return;
+          }
+          setValidation(null);
+          setOverride(next);
+        }}
+        className={`${input} mt-1`}
+      />
+      {validation && <span className="mt-1 block text-xs font-semibold text-red-700">{validation}</span>}
+      <button
+        type="button"
+        disabled={override === null}
+        onClick={() => {
+          setValidation(null);
+          setOverride(null);
+        }}
+        className="mt-2 text-xs font-bold text-[#9a7a17] disabled:opacity-40"
+      >
+        Reset to Recommended
+      </button>
     </label>
   );
 }

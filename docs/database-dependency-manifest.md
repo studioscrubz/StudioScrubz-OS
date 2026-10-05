@@ -1,5 +1,7 @@
 # Database dependency manifest
 
+2026-10-05 Communications recovery addition: `communications_email_provider_submissions` is defined by `20261005204522_communications_email_provider_submission_recovery.sql` as a service-role-only durable Resend acceptance journal.
+
 2026-10-02 Phase 3 refresh: Lead Representative weekly payout operations are defined by `20261002160000_lead_representative_weekly_payouts_phase_3.sql`: `get_my_lead_representative_payouts`, `get_lead_commission_payout_management`, `generate_weekly_lead_commission_payouts`, `discard_lead_commission_payout_batch`, `approve_lead_commission_payout_batch`, `mark_lead_commission_payout_paid`, `hold_lead_commission_entry`, `release_lead_commission_entry_hold`, and `create_lead_commission_payout_adjustment`.
 
 2026-10-02 repository refresh: the static application dependency inventory was recomputed from current tracked source and classified against Git-tracked SQL. Recent tracked coverage includes Lead Representative eligibility and self-service (`is_current_lead_representative_eligible`, `get_my_lead_representative_leads`, `get_my_lead_representative_commissions`), Sales Schedule access (`get_sales_schedule_jobs`), and Manager/Crew Lead walkthrough assignment (`get_eligible_walkthrough_assignees`).
@@ -58,11 +60,11 @@ No statically referenced application RPC remains sourced only from untracked SQL
 
 None of the 130 inventoried RPC names is missing from all Git-tracked repository SQL. This does not mean the migration chain can create all 130; 21 remain standalone-only.
 
-## Data API and Realtime relation inventory (79)
+## Data API and Realtime relation inventory (80)
 
 This includes tables and views used through `.from(...)` plus Realtime-only tables.
 
-### Tracked migration (79)
+### Tracked migration (80)
 
 `announcement_acknowledgments`, `assessment_history`, `assessment_photo_access`, `attention_item_states`, `attention_push_checkpoints`, `attention_push_deliveries`, `authorized_vehicles_safe`, `browser_push_subscriptions`, `business_settings`, `change_request_approvals_operational`, `change_request_items`, `change_requests`, `change_requests_operational`, `client_communications`, `clients`, `conversation_members`, `conversations`, `crew_members`, `crews`, `employee_directory_company_safe`, `employee_work_sessions`, `employees`, `estimates`, `expenses`, `field_discoveries`, `field_discoveries_operational`, `field_discovery_media`, `google_calendar_connections`, `invoice_job_lines`, `invoice_job_photos`, `invoices`, `job_applications`, `job_calendar_syncs`, `job_evidence`, `job_evidence_media`, `job_scope_operational_items`, `jobs`, `jobs_operational_safe`, `marketing_material_deliveries`, `marketing_material_versions`, `marketing_materials`, `message_read_states`, `messages`, `messaging_push_deliveries`, `messaging_user_directory_safe`, `mileage_entries`, `mileage_stops`, `notification_preferences`, `payments`, `porter_notification_events`, `properties`, `property_service_plan_areas`, `property_service_plans`, `property_service_route_stops`, `property_service_routes`, `property_service_visit_issues`, `property_service_visit_photos`, `property_service_visits`, `proposal_deposit_requirements`, `proposal_history`, `proposals`, `recurring_pricing_rules`, `scope_snapshot_items`, `scope_snapshots`, `scope_snapshots_operational`, `service_addon_links`, `service_addons`, `service_agreement_documents`, `service_agreements`, `service_label_assignments`, `service_labels`, `service_occurrences`, `service_price_tiers`, `services`, `square_checkout_attempts`, `time_entries`, `user_profiles`, `vehicles`, `walkthroughs`.
 

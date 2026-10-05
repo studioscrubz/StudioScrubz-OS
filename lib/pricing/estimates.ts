@@ -6,6 +6,7 @@ import { estimatedMonthlyTotal, estimatedVisitsPerMonth } from "@/lib/scheduling
 import { calculateUpkeepPlan } from "@/lib/pricing/upkeepPlan";
 import { calculatePostConstructionEstimate, calculatePostConstructionV2 } from "@/lib/pricing/postConstruction";
 import type { PostConstructionV2Input, PostConstructionV2Result } from "@/types/estimate";
+import { MINIMUM_WORKER_HOURLY_PAY, requireMinimumWorkerHourlyPay } from "@/lib/pricing/workerHourlyPay";
 
 export type PostConstructionEstimateInput = PostConstructionCalculatorInput & { version?: 2; projectCosting?: PostConstructionV2Input };
 export type PostConstructionV2EstimateResult = EstimateResult & { version: 2; postConstructionV2: PostConstructionV2Result };
@@ -88,7 +89,7 @@ export function calculateResidentialEstimate(input: ResidentialCalculatorInput, 
 }
 
 function calculateResidentialProductionEstimate(input:ResidentialCalculatorInput,catalog:ServiceCatalogBundle,service:ServiceCatalogBundle["services"][number]):EstimateResult{
-  const targetCompletionHours=catalogConfigNumber(service,"default_target_completion_hours"),workerHourlyPay=catalogConfigNumber(service,"default_worker_hourly_pay"),targetProfitMarginPercent=catalogConfigNumber(service,"default_target_profit_margin_percent");
+  const targetCompletionHours=catalogConfigNumber(service,"default_target_completion_hours"),workerHourlyPay=Math.max(MINIMUM_WORKER_HOURLY_PAY,catalogConfigNumber(service,"default_worker_hourly_pay")),targetProfitMarginPercent=catalogConfigNumber(service,"default_target_profit_margin_percent");
   if(targetCompletionHours<=0||workerHourlyPay<=0||targetProfitMarginPercent<=0)throw new Error(`Custom Pricing Required for ${service.service_name}: configure residential completion hours, worker pay, and target margin.`);
   const commercialInput:CommercialCalculatorInput={division:"Commercial",commercialType:input.serviceType,frequency:input.frequency,recurringPricingRuleId:input.recurringPricingRuleId,squareFeet:input.squareFeet,floors:1,restrooms:input.bathrooms,kitchens:1,stations:0,units:input.bedrooms,condition:input.condition,targetCompletionHours,workerHourlyPay,targetProfitMarginPercent,additionalDiscountPercent:input.additionalDiscountPercent,taxRatePercent:0,additionalServices:input.addOns,targetProjectDays:input.targetProjectDays??3,workdayHours:input.workdayHours??8};
   const calculated=calculateCommercialEstimate(commercialInput,catalog,service,"Residential");
@@ -96,6 +97,7 @@ function calculateResidentialProductionEstimate(input:ResidentialCalculatorInput
 }
 
 export function calculateCommercialEstimate(input: CommercialCalculatorInput, catalog: ServiceCatalogBundle, resolvedService?:ServiceCatalogBundle["services"][number], addonDivision:"Residential"|"Commercial"="Commercial"): EstimateResult {
+  const workerHourlyPay = requireMinimumWorkerHourlyPay(input.workerHourlyPay);
   const service=resolvedService??catalog.services.find(x=>x.division!=="Residential"&&x.service_name===`${input.commercialType} Cleaning`);
   if(!service)throw new Error(`No active catalog service is configured for ${input.commercialType} Cleaning.`);
   if(service.pricing_config.requires_complete_pricing_config&&(!input.targetProjectDays||input.targetProjectDays<=0||![8,10].includes(input.workdayHours??0)))throw new Error(`Custom Pricing Required for ${service.service_name}: choose valid target days and workday hours.`);
@@ -109,7 +111,7 @@ export function calculateCommercialEstimate(input: CommercialCalculatorInput, ca
   const laborHours = Math.max(input.targetCompletionHours || 0, (productionHours + fixtureHours + selectedServices.reduce((sum, item) => sum + Number(item.pricing_config.labor_hours??0), 0)) * conditionMultiplier[input.condition]);
   const availableHoursPerWorker=input.targetProjectDays&&input.workdayHours?input.targetProjectDays*input.workdayHours:input.targetCompletionHours||4;
   const crewSize = Math.max(1, Math.ceil(laborHours / Math.max(1, availableHoursPerWorker)));
-  const laborCost = laborHours * Math.max(0, input.workerHourlyPay);
+  const laborCost = laborHours * workerHourlyPay;
   const supplyCost = Math.max(configured.minimumSupplyCost, input.squareFeet * configured.supplyCostPerSquareFoot) + selectedServices.reduce((sum, item) => sum + Number(item.pricing_config.supply_cost??item.price), 0);
   const directCost = laborCost + supplyCost;
   const margin = clamp(input.targetProfitMarginPercent, 0, configured.maximumMarginPercent) / 100;

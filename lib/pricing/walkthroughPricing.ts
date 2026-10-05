@@ -1,5 +1,6 @@
 import type { CalculatorInput, CommercialCalculatorInput, Frequency, ResidentialCalculatorInput } from "@/types/estimate";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
+import { MINIMUM_WORKER_HOURLY_PAY } from "@/lib/pricing/workerHourlyPay";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import { isPostConstructionV2Estimate, type PostConstructionEstimateInput } from "@/lib/pricing/estimates";
 import { findCatalogService, isPostConstructionCatalogService } from "@/lib/services/serviceCatalog";
@@ -31,7 +32,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
     const projectCosting = {
       version: 2 as const, calculatorType: "Post-Construction" as const,
       totalSquareFeet: measurements.squareFeet ?? 0, scope: walkthrough.scope.map(item => item.label),
-      estimatedPersonHours: 0, crewSize: 1, workerHourlyPay: measurements.workerHourlyPay ?? 40,
+      estimatedPersonHours: 0, crewSize: 1, workerHourlyPay: measurements.workerHourlyPay ?? MINIMUM_WORKER_HOURLY_PAY,
       plannedProjectDays: measurements.targetProjectDays ?? 1, workdayHours: measurements.workdayHours === 10 ? 10 as const : 8 as const,
       suppliesCost: 0, equipmentRentalCost: 0, travelLogisticsCost: 0, disposalDebrisCost: 0,
       supervisionAdminCost: 0, contingencyCost: 0, desiredMarginPercent: measurements.targetProfitMarginPercent ?? 35,
@@ -85,7 +86,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
     stations: value(measurements.stations, previous?.stations, 0),
     units: value(measurements.units, previous?.units, 0),
     targetCompletionHours: value(measurements.targetCompletionHours, previous?.targetCompletionHours, configNumber(config.default_target_completion_hours, 4)),
-    workerHourlyPay: value(measurements.workerHourlyPay, previous?.workerHourlyPay, configNumber(config.default_worker_hourly_pay, 22)),
+    workerHourlyPay: value(measurements.workerHourlyPay, previous?.workerHourlyPay, Math.max(MINIMUM_WORKER_HOURLY_PAY, configNumber(config.default_worker_hourly_pay, MINIMUM_WORKER_HOURLY_PAY))),
     targetProfitMarginPercent: value(measurements.targetProfitMarginPercent, previous?.targetProfitMarginPercent, configNumber(config.default_target_profit_margin_percent, 35)),
     additionalDiscountPercent: previous?.additionalDiscountPercent ?? 0,
     taxRatePercent: 0,

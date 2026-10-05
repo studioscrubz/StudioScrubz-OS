@@ -24,8 +24,8 @@ test("frequency repricing preserves an approved upstream manual price without do
   const proposalMath=read("lib/pricing/proposals.ts");
   const helper=read("lib/pricing/authoritativePrice.ts");
   assert.match(proposalMath,/withAuthoritativeEstimatePrice\([^;]+estimate\.manualPrice\?\?null\)/s);
-  assert.match(proposalMath,/beforeDiscount = Math\.max\(0, input\.estimate\.finalPrice\) \+ additions/);
-  assert.doesNotMatch(proposalMath,/beforeDiscount = Math\.max\(0, input\.estimate\.finalPrice -/);
+  assert.match(proposalMath,/inheritedCatalogAddonTotal = input\.estimate\?\.adjustments\.reduce/);
+  assert.match(proposalMath,/beforeDiscount = Math\.max\(0, input\.estimate\.finalPrice - inheritedCatalogAddonTotal\) \+ additions/);
   assert.match(helper,/monthlyTotal: estimatedMonthlyTotal\(perVisitTotal, frequency\)/);
 });
 

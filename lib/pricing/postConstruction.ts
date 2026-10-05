@@ -1,5 +1,6 @@
 import type { Condition, EstimateResult, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
 import type { PostConstructionV2Input, PostConstructionV2Result } from "@/types/estimate";
+import { requireMinimumWorkerHourlyPay } from "@/lib/pricing/workerHourlyPay";
 
 export const POST_CONSTRUCTION_BASE_HOURS_PER_1K_SQUARE_FEET = 19;
 export const POST_CONSTRUCTION_MAX_MARGIN_PERCENT = 70;
@@ -15,6 +16,7 @@ export function calculatePostConstructionV2(input: PostConstructionV2Input): Pos
   for (const key of ["totalSquareFeet", "workerHourlyPay", ...costs] as const) {
     if (!Number.isFinite(input[key]) || input[key] < 0) throw new Error(`${key} must be zero or greater.`);
   }
+  const workerHourlyPay = requireMinimumWorkerHourlyPay(input.workerHourlyPay);
   if (!Number.isFinite(input.desiredMarginPercent) || input.desiredMarginPercent < 0 || input.desiredMarginPercent > POST_CONSTRUCTION_MAX_MARGIN_PERCENT) throw new Error("Desired margin must be between 0 and 70 percent.");
   if (input.manualProjectPriceOverride !== undefined && (!Number.isFinite(input.manualProjectPriceOverride) || input.manualProjectPriceOverride <= 0)) throw new Error("Manual project price must be greater than zero.");
   if (input.scope !== undefined && (!Array.isArray(input.scope) || input.scope.some(area => typeof area !== "string"))) throw new Error("Scope must be a list of area descriptions.");
@@ -24,7 +26,7 @@ export function calculatePostConstructionV2(input: PostConstructionV2Input): Pos
     if (!Number.isFinite(rounded)) throw new Error("Project costs exceed the supported numeric range.");
     return rounded;
   };
-  const laborCost = roundCurrency(input.estimatedPersonHours * input.workerHourlyPay);
+  const laborCost = roundCurrency(input.estimatedPersonHours * workerHourlyPay);
   const nonLaborProjectCosts = roundCurrency(costs.reduce((sum, key) => sum + input[key], 0));
   const totalEstimatedProjectCost = roundCurrency(laborCost + nonLaborProjectCosts);
   const recommendedProjectPrice = roundCurrency(totalEstimatedProjectCost / (1 - input.desiredMarginPercent / 100));
@@ -60,6 +62,7 @@ export const POST_CONSTRUCTION_SUPPLY_COSTS = {
 } as const;
 
 export function calculatePostConstructionEstimate(input: PostConstructionCalculatorInput): EstimateResult {
+  const workerHourlyPay = requireMinimumWorkerHourlyPay(input.workerHourlyPay);
   const squareFeet = nonnegative(input.squareFeet);
   const baseProductionHours = squareFeet / 1000 * POST_CONSTRUCTION_BASE_HOURS_PER_1K_SQUARE_FEET;
   const adjustments: Array<{ label: string; laborHours: number }> = [];
@@ -78,7 +81,7 @@ export function calculatePostConstructionEstimate(input: PostConstructionCalcula
   const availableCrewHoursPerWorker = targetProjectDays * workdayHours;
   const recommendedCrewSize = Math.max(1, Math.ceil(totalLaborHours / availableCrewHoursPerWorker));
   const estimatedProjectDays = totalLaborHours / (recommendedCrewSize * workdayHours);
-  const laborCost = totalLaborHours * nonnegative(input.workerHourlyPay);
+  const laborCost = totalLaborHours * workerHourlyPay;
   const supplyCost = Math.max(
     POST_CONSTRUCTION_SUPPLY_COSTS.minimum,
     squareFeet * POST_CONSTRUCTION_SUPPLY_COSTS.perSquareFoot
@@ -140,7 +143,7 @@ export function calculatePostConstructionEstimate(input: PostConstructionCalcula
       stairFlights: whole(input.stairFlights),
       targetProjectDays,
       workdayHours,
-      workerHourlyPay: nonnegative(input.workerHourlyPay),
+      workerHourlyPay,
       targetProfitMarginPercent: targetMarginPercent,
       additionalDiscountPercent,
       taxRatePercent,

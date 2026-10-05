@@ -18,6 +18,7 @@ class InputError extends Error { constructor(message: string, readonly status = 
 export async function POST(request: Request) {
   let admin: Admin | null = null;
   let communicationId: string | null = null;
+  let providerMessageId: string | null = null;
   try {
     const session = await createSupabaseServerClient();
     const { data: auth } = await session.auth.getUser();
@@ -81,19 +82,34 @@ export async function POST(request: Request) {
       communicationId = communication.id;
     }
 
+    const recoveredSubmission = await findProviderSubmission(admin, communicationId, eventKey);
+    if (recoveredSubmission) {
+      providerMessageId = recoveredSubmission.provider_message_id;
+      const finalized = await finalize(admin, communicationId, providerMessageId, null);
+      return Response.json({ communication: finalized, providerMessageId, recovered: true });
+    }
+
     const content = renderEmail(messageBody);
     const sent = await sendResendEmail({ recipientEmail, subject, ...content, ...sender, idempotencyKey: eventKey });
     if (!sent.id?.trim()) throw new Error("The email provider did not confirm delivery submission.");
-    const finalized = await finalize(admin, communicationId, sent.id, null);
-    return Response.json({ communication: finalized, providerMessageId: sent.id });
+    providerMessageId = sent.id.trim();
+    await persistProviderSubmission(admin, communicationId, eventKey, providerMessageId);
+    const finalized = await finalize(admin, communicationId, providerMessageId, null);
+    return Response.json({ communication: finalized, providerMessageId });
   } catch (cause) {
     if (cause instanceof InputError) return Response.json({ error: cause.message }, { status: cause.status });
-    console.error("Communications email delivery failed", safeLog(cause));
+    if (providerMessageId) {
+      console.error("Communications email was accepted by Resend but delivery finalization failed", {
+        communicationId, providerMessageId, error: safeLog(cause),
+      });
+      return Response.json({ error: "The email provider accepted the message, but StudioScrubz could not finish recording delivery. Retry this same send request to recover it without sending a duplicate." }, { status: 502 });
+    }
+    console.error("Communications email provider submission failed", { communicationId, error: safeLog(cause) });
     if (admin && communicationId) {
       try { await finalize(admin, communicationId, null, "Email delivery was not accepted by the provider."); }
-      catch (finalizeError) { console.error("Communications email failure could not be finalized", safeLog(finalizeError)); }
+      catch (finalizeError) { console.error("Communications email provider failure could not be finalized", { communicationId, error: safeLog(finalizeError) }); }
     }
-    return Response.json({ error: "The email could not be confirmed as sent. Please try again." }, { status: 502 });
+    return Response.json({ error: "The email provider did not accept the message. Please try again." }, { status: 502 });
   }
 }
 
@@ -136,10 +152,50 @@ async function senderProfileForCommunication(admin: Admin, type: CommunicationTy
 }
 
 async function finalize(admin: Admin, id: string, providerMessageId: string | null, failureReason: string | null) {
-  const rpc = admin.rpc as unknown as (name: "finalize_communications_resend_email", args: { p_communication_id: string; p_provider_message_id: string | null; p_failure_reason: string | null }) => Promise<{ data: ClientCommunication | null; error: { message: string } | null }>;
-  const { data, error } = await rpc("finalize_communications_resend_email", { p_communication_id: id, p_provider_message_id: providerMessageId, p_failure_reason: failureReason });
-  if (error || !data) throw new Error("Communication delivery finalization failed.");
-  return data;
+  const sent = Boolean(providerMessageId?.trim());
+  if (sent === Boolean(failureReason?.trim())) throw new Error("Communication finalization requires exactly one delivery result.");
+  const { data, error } = await admin.from("client_communications").update({
+    status: sent ? "Sent" : "Failed",
+    provider_message_id: sent ? providerMessageId!.trim() : null,
+    sent_at: sent ? new Date().toISOString() : null,
+    failure_reason: sent ? null : failureReason!.trim().slice(0, 500),
+  }).eq("id", id).select("*").single();
+  if (error || !data) throw new DeliveryFinalizationError(error);
+  return data as ClientCommunication;
+}
+
+type ProviderSubmission = { communication_id: string; event_key: string; provider: string; provider_message_id: string };
+
+async function findProviderSubmission(admin: Admin, communicationId: string, eventKey: string): Promise<ProviderSubmission | null> {
+  const { data, error } = await admin.from("communications_email_provider_submissions").select("communication_id,event_key,provider,provider_message_id").eq("communication_id", communicationId).maybeSingle();
+  if (error) throw new DeliveryFinalizationError(error);
+  if (!data) return null;
+  if (data.event_key !== eventKey || data.provider !== "resend" || !data.provider_message_id?.trim()) throw new Error("The durable email provider submission does not match this communication request.");
+  return data as ProviderSubmission;
+}
+
+async function persistProviderSubmission(admin: Admin, communicationId: string, eventKey: string, providerMessageId: string): Promise<ProviderSubmission> {
+  const receipt = { communication_id: communicationId, event_key: eventKey, provider: "resend", provider_message_id: providerMessageId };
+  const { data, error } = await admin.from("communications_email_provider_submissions").insert(receipt).select("communication_id,event_key,provider,provider_message_id").single();
+  if (!error && data) return data as ProviderSubmission;
+  if (error?.code === "23505") {
+    const existing = await findProviderSubmission(admin, communicationId, eventKey);
+    if (existing?.provider_message_id === providerMessageId) return existing;
+  }
+  throw new DeliveryFinalizationError(error);
+}
+
+class DeliveryFinalizationError extends Error {
+  readonly code: string | null;
+  readonly details: string | null;
+  readonly hint: string | null;
+  constructor(error: { message?: string; code?: string; details?: string; hint?: string } | null) {
+    super(error?.message || "Communication delivery finalization returned no record.");
+    this.name = "DeliveryFinalizationError";
+    this.code = error?.code ?? null;
+    this.details = error?.details ?? null;
+    this.hint = error?.hint ?? null;
+  }
 }
 
 function assertSameRequest(row: ClientCommunication, expected: { recipientEmail: string; subject: string; messageBody: string; communicationType: CommunicationType } & Links) {
@@ -151,4 +207,4 @@ function optionalUuid(value: unknown, label: string) { return value == null || v
 function metadataObject(value: unknown): CommunicationMetadata { if (value == null) return {}; if (typeof value !== "object" || Array.isArray(value)) throw new InputError("Communication metadata is invalid."); const encoded = JSON.stringify(value); if (encoded.length > 5000) throw new InputError("Communication metadata is too large."); return value as CommunicationMetadata; }
 function renderEmail(body: string) { return { text: body, html: `<div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;max-width:640px;margin:auto"><div style="border-bottom:3px solid #143d1a;padding:20px 0"><strong style="font-size:24px;color:#143d1a">StudioScrubz</strong><div style="color:#9a7a17">No mess. No stress.</div></div><div style="padding:28px 0;white-space:pre-wrap">${escapeHtml(body)}</div></div>` }; }
 function escapeHtml(value: string) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
-function safeLog(value: unknown) { return value instanceof Error ? { name: value.name, message: value.message.slice(0, 300) } : { name: "UnknownError" }; }
+function safeLog(value: unknown) { return value instanceof DeliveryFinalizationError ? { name: value.name, message: value.message.slice(0, 300), code: value.code, details: value.details?.slice(0, 300) ?? null, hint: value.hint?.slice(0, 300) ?? null } : value instanceof Error ? { name: value.name, message: value.message.slice(0, 300) } : { name: "UnknownError" }; }
