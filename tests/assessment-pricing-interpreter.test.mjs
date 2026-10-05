@@ -68,13 +68,13 @@ test("forward migration preserves authorization and validates only narrow pricin
   assert.doesNotMatch(submit, /insert into public\.proposals/);
 });
 
-test("UI returns to the same editable walkthrough and saves interpretations for legacy answers", () => {
+test("UI returns the same walkthrough to its assigned executor and saves legacy interpretations", () => {
   const modal = readFileSync("components/walkthroughs/WalkthroughPricingReviewModal.tsx", "utf8");
   const page = readFileSync("components/walkthroughs/WalkthroughsPage.tsx", "utf8");
   const field = readFileSync("components/walkthroughs/FieldWalkthroughsPage.tsx", "utf8");
   assert.match(modal, /Return to Assessment/);
-  assert.match(page, /returnWalkthroughPricingToAssessment\(id\)/);
-  assert.match(page, /setActive\(rows\.find\(\(item\) => item\.id === id\)/);
+  assert.match(page, /returnWalkthroughPricingToAssessment\(reviewing\.id\)/);
+  assert.match(page, /assigned executor can continue corrections from Field Walkthroughs/);
   assert.match(field, /currentInterpretation = interpretAssessmentPricing/);
   assert.match(field, /assessmentPricing: currentInterpretation/);
 });

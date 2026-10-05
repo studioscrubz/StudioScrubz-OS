@@ -20,7 +20,7 @@ export async function returnWalkthroughPricingToAssessment(id: string) {
   if (!error) return;
   console.error("Return walkthrough pricing RPC failed", { code: error.code });
   if (error.code === "42501") {
-    throw new Error("Only the active employee assigned to execute this walkthrough can return it to Assessment.");
+    throw new Error("Only an active Master Admin or Administrator can return this walkthrough to Assessment from pricing review.");
   }
   if (error.code === "23505") {
     throw new Error("This walkthrough already has an active Proposal and can no longer be returned to Assessment.");
