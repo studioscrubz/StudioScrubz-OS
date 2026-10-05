@@ -36,8 +36,8 @@ test("exactly one method is active, scheduling is enforced, and secure tokens ar
   assert.match(workflow,/An in-person walkthrough must have both a scheduled date and scheduled time/);
   assert.match(migration,/must be scheduled before it can begin/);
   assert.match(link,/existing\?\.token_value/);
-  assert.match(link,/reused:true/);
-  assert.match(link,/token_hash:hashAssessmentToken\(token\)/);
+  assert.match(link,/reused:\s*true/);
+  assert.match(link,/token_hash:\s*hashAssessmentToken\(token\)/);
   assert.match(upload,/photos=\[\.\.\./);
   assert.match(upload,/sales_stage:"Assessment In Progress"/);
 });
@@ -89,3 +89,5 @@ test("RLS and narrow RPC grants preserve role boundaries",()=>{
   assert.match(migration,/array\['Master Admin', 'Administrator', 'Manager', 'Sales'\]/);
   assert.doesNotMatch(migration,/grant (insert|update|delete).*assessment_history to authenticated/i);
 });
+
+
