@@ -210,7 +210,7 @@ export interface Database {
       delete_property_service_plan: { Args: { p_id: string }; Returns: void };
       initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
       get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
-      get_eligible_walkthrough_assignees: { Args: Record<string, never>; Returns: Array<{ employee_id: string; display_name: string; operational_role: "Manager" | "Crew Lead" }> };
+      get_eligible_walkthrough_assignees: { Args: Record<string, never>; Returns: Array<{ employee_id: string; display_name: string; operational_role: "Master Admin" | "Manager" | "Crew Lead" }> };
       archive_sales_assessment: { Args: { p_assessment_id: string }; Returns: Walkthrough };
       submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};

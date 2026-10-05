@@ -11,7 +11,7 @@ const estimateSelect = "*, client:clients!estimates_client_id_fkey(*), property:
 export type WalkthroughAssigneeOption = {
   employee_id: string;
   display_name: string;
-  operational_role: "Manager" | "Crew Lead";
+  operational_role: "Master Admin" | "Manager" | "Crew Lead";
 };
 
 export async function getWalkthroughs(): Promise<WalkthroughWithRelations[]> { const { data, error } = await getSupabaseClient().from("walkthroughs").select(walkthroughSelect).order("created_at", { ascending: false }); if (error) throw error; return data as WalkthroughWithRelations[]; }
