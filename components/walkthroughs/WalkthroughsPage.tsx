@@ -14,6 +14,7 @@ import type { ProposalWithRelations } from "@/types/proposal";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { compareWalkthroughSchedule, proposalRetiresWalkthrough } from "@/lib/walkthroughWorkflow";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { returnWalkthroughPricingToAssessment } from "@/lib/services/fieldWalkthroughs";
 
 type DivisionFilter = "All" | EstimateDivision;
 type WorkflowFilter = "All" | "New" | "Completed";
@@ -71,7 +72,7 @@ export function WalkthroughsPage() {
       <section aria-labelledby="completed-heading" className="rounded-2xl border border-[#143d1a]/10 bg-[#f5f7f4] p-4 sm:p-5"><div><p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#9a7a17]">Completed — pricing review</p><h2 id="completed-heading" className="mt-1 text-xl font-extrabold text-[#143d1a]">Awaiting Proposal Submission</h2><p className="mt-1 text-sm text-neutral-500">These stay here until their linked proposal is sent.</p></div><div className="mt-4 grid gap-3 lg:grid-cols-2">{completed.map((item) => <CompletedCard key={item.id} item={item} proposal={activeProposalByWalkthrough.get(item.id)} busy={updatingId === item.id} canArchive={canArchive} open={() => setActive(item)} review={() => setReviewing(item)} archive={() => void archiveItem(item)} />)}{completed.length === 0 && <Empty text="No completed walkthroughs are awaiting proposal submission." />}</div></section>
     </main>}
     {active && <WalkthroughFormModal walkthrough={active} onClose={() => setActive(null)} onSaved={() => { setActive(null); void refresh("Walkthrough updated successfully."); }} onArchived={() => { const archivedId = active.id; setActive(null); setWalkthroughs((current) => current.filter((item) => item.id !== archivedId)); void refresh("Assessment archived successfully."); }} />}
-    {reviewing && catalog && <WalkthroughPricingReviewModal walkthrough={reviewing} catalog={catalog} close={() => setReviewing(null)} approved={() => { setReviewing(null); void refresh("Walkthrough pricing approved."); }} />}
+    {reviewing && catalog && <WalkthroughPricingReviewModal walkthrough={reviewing} catalog={catalog} close={() => setReviewing(null)} approved={() => { setReviewing(null); void refresh("Walkthrough pricing approved."); }} returnToAssessment={async () => { const id = reviewing.id; await returnWalkthroughPricingToAssessment(id); const rows = await getWalkthroughs(); setWalkthroughs(rows); setReviewing(null); setActive(rows.find((item) => item.id === id) ?? null); setNotice("Walkthrough returned to assessment. Current answers and scope were preserved."); }} />}
   </>;
 }
 

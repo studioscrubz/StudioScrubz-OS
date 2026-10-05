@@ -9,7 +9,7 @@ import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice
 import { getAvailableServiceAddons, findCatalogService, isPostConstructionCatalogService } from "@/lib/services/serviceCatalog";
 import { assessmentReadyForPricing, residentialPostConstructionScopeError } from "@/lib/walkthroughWorkflow";
 import type { CalculatorInput, CommercialCalculatorInput, PostConstructionCalculatorInput, ResidentialCalculatorInput } from "@/types/estimate";
-import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
+import type { CatalogAddonSnapshot, ServiceCatalogBundle } from "@/types/serviceCatalog";
 import type { UserProfile } from "@/types/auth";
 import type { WalkthroughPricingReview, WalkthroughWithRelations } from "@/types/walkthrough";
 import { AUTH_SYNCHRONIZATION_MESSAGE, AuthSynchronizationError, retryJwtIssuedAtFuture } from "@/lib/supabase/retry";
@@ -131,6 +131,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Select an active Post-Construction catalog service." }, { status: 400 });
     }
     validateAddons(calculatorInput, catalog, service.id);
+    calculatorInput = withCanonicalAddonSelections(calculatorInput, catalog, service.id);
 
     const calculatedResult = isPostConstructionInput(calculatorInput)
       ? calculatePostConstructionCatalogEstimate(calculatorInput, catalog, service)
@@ -313,6 +314,7 @@ function normalizeInput(
       additionalDiscountPercent: percent(row.additionalDiscountPercent),
       taxRatePercent: 0,
       addOns: strings(row.addOns),
+      addonSelections: addonSelections(row.addonSelections),
       targetProjectDays: optionalPositive(row.targetProjectDays),
       workdayHours: workday(row.workdayHours),
     } satisfies ResidentialCalculatorInput;
@@ -340,6 +342,7 @@ function normalizeInput(
       additionalDiscountPercent: percent(row.additionalDiscountPercent),
       taxRatePercent: 0,
       additionalServices: strings(row.additionalServices),
+      addonSelections: addonSelections(row.addonSelections),
       targetProjectDays: optionalPositive(row.targetProjectDays),
       workdayHours: workday(row.workdayHours),
     } satisfies CommercialCalculatorInput;
@@ -364,6 +367,10 @@ function validateAddons(
     : input.division === "Residential"
       ? input.addOns
       : input.additionalServices;
+
+  if (new Set(selected).size !== selected.length) {
+    throw new Error("Duplicate add-ons are not allowed.");
+  }
 
   if (selected.some(item => !allowed.has(item))) {
     throw new Error("An add-on is not available for this service.");
@@ -479,4 +486,59 @@ function oneOf<T extends string>(
   }
 
   return value as T;
+}
+
+function withCanonicalAddonSelections(
+  input: CalculatorInput,
+  catalog: ServiceCatalogBundle,
+  serviceId: string
+): CalculatorInput {
+  if (isPostConstructionInput(input)) return input;
+  const selectedNames = input.division === "Residential" ? input.addOns : input.additionalServices;
+  const available = getAvailableServiceAddons(catalog, serviceId, input.division);
+  const submitted = input.addonSelections ?? [];
+  const snapshots = selectedNames.map(name => {
+    const addon = available.find(item => item.addon_name === name);
+    if (!addon) throw new Error("An add-on is not available for this service.");
+    const supplied = submitted.find(item => item.catalogAddonId === addon.id || item.name === addon.addon_name);
+    const pricingType = addon.pricing_config.pricing_type === "Per Unit" ? "Per Unit" : "Flat Price";
+    const quantity = pricingType === "Per Unit" ? positiveInteger(supplied?.quantity, `${addon.addon_name} quantity`) : 1;
+    const unitName = String(addon.pricing_config.unit_name ?? addon.unit_label ?? "").trim() || null;
+    const unitPrice = Number(addon.pricing_config.unit_price ?? addon.price);
+    return {
+      id: addon.id,
+      catalogAddonId: addon.id,
+      name: addon.addon_name,
+      description: addon.description,
+      price: addon.price,
+      pricingModel: addon.pricing_model,
+      unitLabel: addon.unit_label,
+      pricingType,
+      quantity,
+      unitName,
+      unitPrice,
+      lineTotal: pricingType === "Per Unit" ? quantity * unitPrice : addon.price,
+    } satisfies CatalogAddonSnapshot;
+  });
+  return { ...input, addonSelections: snapshots };
+}
+
+function addonSelections(value: unknown): CatalogAddonSnapshot[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("Valid add-on selections are required.");
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Valid add-on selections are required.");
+    const row = item as Record<string, unknown>;
+    const catalogAddonId = text(row.catalogAddonId, `add-on ${index + 1}`);
+    return {
+      id: catalogAddonId,
+      catalogAddonId,
+      name: typeof row.name === "string" ? row.name : "",
+      description: null,
+      price: 0,
+      pricingModel: "Flat Rate",
+      unitLabel: null,
+      ...(row.quantity === undefined ? {} : { quantity: positiveInteger(row.quantity, `add-on ${index + 1} quantity`) }),
+    };
+  });
 }

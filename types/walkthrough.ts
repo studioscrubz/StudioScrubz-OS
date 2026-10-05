@@ -11,6 +11,7 @@ import type { Property } from "@/types/property";
 import type { OperationalPhoto } from "@/types/photo";
 import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 import type { PostConstructionFieldAssessment } from "@/types/fieldWalkthrough";
+import type { AssessmentPricingInterpretation } from "@/lib/pricing/assessmentPricing";
 
 export const WALKTHROUGH_STATUSES = [
   "New",
@@ -149,6 +150,7 @@ export type WalkthroughMeasurements = {
   serviceDescription: string;
 
   catalogAddons?: CatalogAddonSnapshot[];
+  assessmentPricing?: AssessmentPricingInterpretation;
 
   requestSource: "Public Estimate" | null;
   requestedAt: string | null;

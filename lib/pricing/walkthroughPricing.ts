@@ -13,7 +13,8 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
   const frequency = measurements.frequency ?? walkthrough.estimate?.frequency ?? fallback?.frequency ?? "One-Time";
   const customIntervalDays = frequency === "Custom" ? measurements.customIntervalDays ?? fallback?.customIntervalDays ?? null : null;
   const condition = measurements.overallCondition || fallback?.condition || "Average";
-  const addons = (measurements.catalogAddons?.length ? measurements.catalogAddons : walkthrough.estimate?.result.catalogAddons ?? []).map(item => item.name);
+  const addonSelections = measurements.catalogAddons ?? walkthrough.estimate?.result.catalogAddons ?? [];
+  const addons = addonSelections.map(item => item.name);
 
   const saved = walkthrough.pricing_review?.estimateResult.calculatorInput ?? walkthrough.pricing_review?.calculatorInput;
   if (isPostConstructionCatalogService(service) || /post[- ]construction/i.test(serviceName)) {
@@ -64,6 +65,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
       additionalDiscountPercent: previous?.additionalDiscountPercent ?? 0,
       taxRatePercent: 0,
       addOns: addons,
+      addonSelections,
       targetProjectDays: measurements.targetProjectDays ?? previous?.targetProjectDays,
       workdayHours: measurements.workdayHours ?? previous?.workdayHours,
     } satisfies ResidentialCalculatorInput;
@@ -88,6 +90,7 @@ export function mapWalkthroughToCalculatorInput(walkthrough: WalkthroughWithRela
     additionalDiscountPercent: previous?.additionalDiscountPercent ?? 0,
     taxRatePercent: 0,
     additionalServices: addons,
+    addonSelections,
     targetProjectDays: measurements.targetProjectDays ?? previous?.targetProjectDays ?? 3,
     workdayHours: measurements.workdayHours ?? previous?.workdayHours ?? 8,
   } satisfies CommercialCalculatorInput;

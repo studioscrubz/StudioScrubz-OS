@@ -40,8 +40,9 @@ test("assessment answers remain controlled and hydrate from the saved walkthroug
 
   assert.match(page, /useState<FieldMeasurements>\(\{[\s\S]*\.\.\.row\.measurements/);
   assert.match(page, /measurements=\{measurements\}/);
-  assert.match(page, /onChange=\{setMeasurements\}/);
+  assert.match(page, /onChange=\{changeMeasurements\}/);
   assert.match(choice, /aria-pressed=\{isSelected\}/);
   assert.match(choice, /onClick=\{\(\) =>[\s\S]*nextGuidedWalkthroughSelection/);
-  assert.match(page, /saveAssignedFieldWalkthrough\(row\.id, measurements, complete\)/);
+  assert.match(page, /currentInterpretation = interpretAssessmentPricing/);
+  assert.match(page, /saveAssignedFieldWalkthrough\([\s\S]*assessmentPricing: currentInterpretation/);
 });

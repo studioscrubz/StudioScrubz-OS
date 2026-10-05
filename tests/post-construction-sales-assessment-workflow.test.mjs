@@ -13,7 +13,7 @@ const upload=read("app/api/public/assessments/[token]/photos/route.ts");
 const proposal=read("components/proposals/ProposalBuilder.tsx");
 const publicProposal=read("components/proposals/ProposalDocument.tsx");
 const agreement=read("supabase/migrations/20260923182045_post_construction_proposal_duration_agreement_handoff.sql");
-const assignmentOptions=read("supabase/migrations/20261002143446_manager_scrub_technician_walkthrough_permissions.sql");
+const assignmentOptions=read("supabase/migrations/20261005142308_master_admin_walkthrough_execution_access.sql");
 
 test("one authoritative Assessment preserves existing Estimate linkage and Proposal idempotency",()=>{
   assert.match(migration,/proposals_one_active_per_walkthrough/);
@@ -42,17 +42,17 @@ test("exactly one method is active, scheduling is enforced, and secure tokens ar
   assert.match(upload,/sales_stage:"Assessment In Progress"/);
 });
 
-test("new assessments require a Manager or Crew Lead assignment and use the reduced scheduling form",()=>{
+test("new assessments require an eligible walkthrough executor and use the reduced scheduling form",()=>{
   assert.match(form,/<Panel title="Schedule Walkthrough">/);
   assert.match(form,/Assigned Field Representative/);
-  assert.match(form,/Select an active Manager or Crew Lead/);
+  assert.match(form,/Select an active Master Admin, Manager, or Crew Lead/);
   assert.match(form,/getEligibleWalkthroughAssignees/);
   assert.match(form,/!walkthrough && !assignedEmployeeId/);
   assert.match(form,/assigned_employee_id: assignedEmployeeId \|\| null/);
   assert.match(assignmentOptions,/public\.has_any_role\(array\['Master Admin', 'Administrator', 'Manager', 'Sales'\]\)/);
-  assert.match(assignmentOptions,/e\.employment_status = 'Active'/);
+  assert.match(assignmentOptions,/employee\.employment_status = 'Active'/);
   assert.match(assignmentOptions,/profile\.is_active/);
-  assert.match(assignmentOptions,/profile\.role in \('Manager', 'Crew Lead'\)/);
+  assert.match(assignmentOptions,/profile\.role in \('Master Admin', 'Manager', 'Crew Lead'\)/);
   for(const removed of ["Access Restrictions","Parking / Loading","Water Access","Power Access","Security / Alarm Information","Damage Observed","Hazards Observed","Heavy Soil / Buildup"]){
     assert.doesNotMatch(form,new RegExp(`label="${removed.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}"`));
   }

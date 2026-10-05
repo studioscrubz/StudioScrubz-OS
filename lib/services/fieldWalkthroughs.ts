@@ -15,3 +15,7 @@ export async function saveAssignedFieldWalkthrough(id: string, measurements: Fie
   const {error} = await getSupabaseClient().rpc("submit_assigned_field_walkthrough", {p_id:id,p_measurements:measurements,p_complete:complete});
   if(error) throw error;
 }
+export async function returnWalkthroughPricingToAssessment(id: string) {
+  const { error } = await getSupabaseClient().rpc("return_walkthrough_pricing_to_assessment", { p_id: id });
+  if (error) throw error;
+}

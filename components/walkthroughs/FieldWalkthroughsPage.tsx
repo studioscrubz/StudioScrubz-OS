@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { canPerformScheduledWalkthrough, getAssignedFieldWalkthroughs, saveAssignedFieldWalkthrough } from "@/lib/services/fieldWalkthroughs";
 import { createPhotoSignedUrls, getOperationalPhotos, uploadOperationalPhoto } from "@/lib/services/photoStorage";
@@ -13,6 +13,13 @@ import { DeepCleaningFieldWalkthrough, deepCleaningCompletionIssues, isDeepClean
 import { isMoveInOutService, MoveInOutFieldWalkthrough, moveInOutCompletionIssues } from "@/components/walkthroughs/MoveInOutFieldWalkthrough";
 import { CommercialJanitorialFieldWalkthrough, commercialJanitorialCompletionIssues, isCommercialJanitorialService } from "@/components/walkthroughs/CommercialJanitorialFieldWalkthrough";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { getServiceCatalog, getAvailableServiceAddons, findCatalogService } from "@/lib/services/serviceCatalog";
+import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
+import { confirmedAddonSnapshot, interpretAssessmentPricing } from "@/lib/pricing/assessmentPricing";
+import { mapWalkthroughToCalculatorInput } from "@/lib/pricing/walkthroughPricing";
+import { calculateCommercialEstimate, calculatePostConstructionCatalogEstimate, calculateResidentialEstimate, isPostConstructionV2Estimate } from "@/lib/pricing/estimates";
+import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
+import type { WalkthroughWithRelations } from "@/types/walkthrough";
 
 export function FieldWalkthroughsPage() {
   const { profile } = useAuth();
@@ -24,6 +31,7 @@ export function FieldWalkthroughsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [catalog, setCatalog] = useState<ServiceCatalogBundle | null>(null);
 
   async function refresh() {
     setRows(await getAssignedFieldWalkthroughs());
@@ -32,9 +40,9 @@ export function FieldWalkthroughsPage() {
   useEffect(() => {
     let live = true;
 
-    getAssignedFieldWalkthroughs()
-      .then(data => {
-        if (live) setRows(data);
+    Promise.all([getAssignedFieldWalkthroughs(), getServiceCatalog()])
+      .then(([data, nextCatalog]) => {
+        if (live) { setRows(data); setCatalog(nextCatalog); }
       })
       .catch(() => {
         if (live) setError("Assigned walkthroughs could not be loaded.");
@@ -135,6 +143,7 @@ export function FieldWalkthroughsPage() {
         <FieldForm
           key={active.id}
           row={active}
+          catalog={catalog}
           readOnly={!activeCanEdit}
           close={() => {
             setActive(null);
@@ -163,11 +172,13 @@ export function FieldWalkthroughsPage() {
 
 function FieldForm({
   row,
+  catalog,
   readOnly,
   close,
   saved,
 }: {
   row: FieldWalkthrough;
+  catalog: ServiceCatalogBundle | null;
   readOnly: boolean;
   close: () => void;
   saved: (complete: boolean) => Promise<void>;
@@ -183,6 +194,23 @@ function FieldForm({
   const [retryPhoto, setRetryPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const service = catalog ? findCatalogService(catalog.services, row.division, row.service ?? "") : undefined;
+  const availableAddons = catalog && service ? getAvailableServiceAddons(catalog, service.id, row.division) : [];
+  const interpretation = useMemo(() => interpretAssessmentPricing(measurements, availableAddons, measurements.assessmentPricing), [availableAddons, measurements]);
+  const recommendedResult = useMemo(() => {
+    if (!catalog) return null;
+    try {
+      const walkthrough = { division: row.division, scope: row.scope, measurements: { ...measurements, overallCondition: interpretation.recommendedCondition ?? measurements.overallCondition }, estimate: null, pricing_review: null } as unknown as WalkthroughWithRelations;
+      const input = mapWalkthroughToCalculatorInput(walkthrough, catalog);
+      if ("calculatorType" in input) return isPostConstructionV2Estimate(input) ? calculatePostConstructionCatalogEstimate(input, catalog) : null;
+      return input.division === "Residential" ? calculateResidentialEstimate(input, catalog) : calculateCommercialEstimate(input, catalog);
+    } catch { return null; }
+  }, [catalog, interpretation.recommendedCondition, measurements, row.division, row.scope]);
+
+  function changeMeasurements(next: FieldMeasurements) {
+    const assessmentPricing = interpretAssessmentPricing(next, availableAddons, measurements.assessmentPricing);
+    setMeasurements({ ...next, overallCondition: assessmentPricing.recommendedCondition ?? next.overallCondition, assessmentPricing });
+  }
 
   function updatePendingPhoto(file: File | null) {
     pendingPhoto.current = file;
@@ -316,7 +344,22 @@ function FieldForm({
         throw new Error("Invalid measurement");
       }
 
-      await saveAssignedFieldWalkthrough(row.id, measurements, complete);
+      const currentInterpretation = interpretAssessmentPricing(
+        measurements,
+        availableAddons,
+        measurements.assessmentPricing
+      );
+      await saveAssignedFieldWalkthrough(
+        row.id,
+        {
+          ...measurements,
+          overallCondition:
+            currentInterpretation.recommendedCondition ??
+            measurements.overallCondition,
+          assessmentPricing: currentInterpretation,
+        },
+        complete
+      );
       await saved(complete);
     } catch {
       setError(
@@ -404,7 +447,7 @@ function FieldForm({
           {isPostConstruction ? (
             <PostConstructionFieldWalkthrough
               measurements={measurements}
-              onChange={setMeasurements}
+              onChange={changeMeasurements}
               photos={photos}
               onPhoto={(file, category, caption) =>
                 void upload(file, category, caption)
@@ -415,28 +458,28 @@ function FieldForm({
               measurements={measurements}
               context={row.standard_residential_context}
               includedAddons={row.included_addons}
-              onChange={setMeasurements}
+              onChange={changeMeasurements}
             />
           ) : isDeepCleaning ? (
             <DeepCleaningFieldWalkthrough
               measurements={measurements}
               context={row.standard_residential_context}
               includedAddons={row.included_addons}
-              onChange={setMeasurements}
+              onChange={changeMeasurements}
             />
           ) : isMoveInOut ? (
             <MoveInOutFieldWalkthrough
               measurements={measurements}
               context={row.standard_residential_context}
               includedAddons={row.included_addons}
-              onChange={setMeasurements}
+              onChange={changeMeasurements}
             />
           ) : isCommercialJanitorial ? (
             <CommercialJanitorialFieldWalkthrough
               measurements={measurements}
               context={row.standard_residential_context}
               includedAddons={row.included_addons}
-              onChange={setMeasurements}
+              onChange={changeMeasurements}
             />
           ) : (
             <>
@@ -556,6 +599,18 @@ function FieldForm({
               </div>
             </>
           )}
+          <section className="mt-6 rounded-xl border border-[#143d1a]/15 bg-[#f5f7f4] p-4">
+            <h3 className="font-extrabold text-[#143d1a]">Recommended Pricing Impact</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div><p className="text-xs font-bold text-neutral-500">Overall Condition</p><p className="font-extrabold">{interpretation.recommendedCondition ?? "Awaiting findings"}</p></div>
+              <div><p className="text-xs font-bold text-neutral-500">Labor Plan</p><p className="font-extrabold">{interpretation.laborPlan.durationLabel ?? "No duration recommendation"}</p></div>
+              <div><p className="text-xs font-bold text-neutral-500">Live Recommended Total</p><p className="font-extrabold">{recommendedResult ? money(recommendedResult.finalPrice) : "Complete pricing inputs"}</p></div>
+            </div>
+            {interpretation.conditionEvidence.length > 0 && <p className="mt-3 text-xs text-neutral-600">Condition evidence: {interpretation.conditionEvidence.map(item => `${label(item.key)} — ${item.value}`).join("; ")}</p>}
+            {interpretation.laborEvidence.length > 0 && <p className="mt-2 text-xs text-neutral-600">{interpretation.laborEvidence.join(" · ")}. Advisory only; no arbitrary labor surcharge is applied.</p>}
+            {interpretation.suggestedAddons.length > 0 && <div className="mt-4 space-y-2"><p className="text-xs font-bold text-neutral-600">Assessment add-on suggestions</p>{interpretation.suggestedAddons.map(suggestion => <div key={suggestion.catalogAddonId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white p-3 text-sm"><span><b>{suggestion.name}</b> — {suggestion.disposition}</span>{suggestion.disposition === "Pending" && <div className="flex gap-2"><button type="button" className="rounded bg-[#143d1a] px-3 py-1.5 font-bold text-white" onClick={() => { const addon=availableAddons.find(item=>item.id===suggestion.catalogAddonId); if(addon) changeMeasurements({...measurements,catalogAddons:[...(measurements.catalogAddons??[]),confirmedAddonSnapshot(addon)]}); }}>Add to Scope</button><button type="button" className="rounded border px-3 py-1.5 font-bold" onClick={() => setMeasurements({...measurements,assessmentPricing:{...interpretation,suggestedAddons:interpretation.suggestedAddons.map(item=>item.catalogAddonId===suggestion.catalogAddonId?{...item,disposition:"Not Included"}:item)}})}>Not Included</button></div>}</div>)}</div>}
+            {availableAddons.length > 0 && <div className="mt-4"><CatalogAddonPicker addons={availableAddons} selected={(measurements.catalogAddons??[]).map(item=>item.name)} setSelected={names=>changeMeasurements({...measurements,catalogAddons:(measurements.catalogAddons??[]).filter(item=>names.includes(item.name))})} snapshots={measurements.catalogAddons} setSnapshots={catalogAddons=>changeMeasurements({...measurements,catalogAddons})}/></div>}
+          </section>
         </fieldset>
 
         {error && (
@@ -623,3 +678,5 @@ const button =
 
 const input =
   "mt-1 block w-full rounded-lg border border-neutral-300 p-2";
+
+function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }

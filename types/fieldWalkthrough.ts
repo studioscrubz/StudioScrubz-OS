@@ -2,6 +2,8 @@ export const fieldTextKeys = ["overallCondition", "specialtyAreas", "accessRestr
 export const fieldNumberKeys = ["squareFeet", "bedrooms", "bathrooms", "floors", "restrooms", "kitchenAreas"] as const;
 
 export type FieldWalkthroughAnswer = "Yes" | "No" | "Unknown / Confirm Later" | "";
+import type { AssessmentPricingInterpretation } from "@/lib/pricing/assessmentPricing";
+import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 
 export type PostConstructionFieldAssessment = {
   sectionConfirmations?: Record<string, FieldWalkthroughAnswer>;
@@ -108,11 +110,24 @@ export type FieldMeasurements = Partial<
       restaurantCleaningAssessment: Record<string, unknown> & {
         fieldWalkthrough?: RestaurantCleaningFieldAssessment;
       };
+      catalogAddons: CatalogAddonSnapshot[];
+      assessmentPricing: AssessmentPricingInterpretation;
+      frequency: string;
+      customIntervalDays: number | null;
+      occupied: boolean | null;
+      stations: number | null;
+      units: number | null;
+      targetCompletionHours: number | null;
+      workerHourlyPay: number | null;
+      targetProfitMarginPercent: number | null;
+      targetProjectDays: number | null;
+      workdayHours: 8 | 10 | null;
     }
 >;
 
 export type FieldWalkthrough = {
   id: string;
+  division: "Residential" | "Commercial";
   isAssignedEmployee: boolean;
   walkthrough_date: string;
   walkthrough_time: string;

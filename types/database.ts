@@ -214,6 +214,7 @@ export interface Database {
       get_eligible_walkthrough_assignees: { Args: Record<string, never>; Returns: Array<{ employee_id: string; display_name: string; operational_role: "Master Admin" | "Manager" | "Crew Lead" }> };
       archive_sales_assessment: { Args: { p_assessment_id: string }; Returns: Walkthrough };
       submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };
+      return_walkthrough_pricing_to_assessment: { Args: { p_id: string }; Returns: undefined };
       get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
       get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
       get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};
