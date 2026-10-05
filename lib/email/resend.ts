@@ -1,7 +1,8 @@
 import "server-only";
-const FROM = "StudioScrubz <notifications@studioscrubz.com>";
+import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
+const PROVIDER_SAFETY_DEFAULT = resolveEmailSenderProfile("systemNotification");
 function escapeHtml(value: string) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
-export async function sendWithResend(input: { recipientEmail: string; subject: string; messageBody: string; publicUrl: string; documentType: "Estimate" | "Proposal" | "Service Agreement" | "Invoice"; idempotencyKey: string; replyTo: string }) {
+export async function sendWithResend(input: { recipientEmail: string; subject: string; messageBody: string; publicUrl: string; documentType: "Estimate" | "Proposal" | "Service Agreement" | "Invoice"; idempotencyKey: string; from: string; replyTo: string | null }) {
   const label = input.documentType === "Service Agreement" ? "Review & Sign Agreement" : `View ${input.documentType}`;
   return sendResendEmail({ ...input,
     text: `${input.messageBody}\n\n${label}:\n${input.publicUrl}`,
@@ -9,11 +10,11 @@ export async function sendWithResend(input: { recipientEmail: string; subject: s
   });
 }
 
-export async function sendResendEmail(input: { recipientEmail: string; subject: string; text: string; html: string; idempotencyKey: string; replyTo: string; from?: string; attachments?: Array<{ filename: string; content: string; contentType?: string }> }) {
+export async function sendResendEmail(input: { recipientEmail: string; subject: string; text: string; html: string; idempotencyKey: string; replyTo: string | null; from?: string; attachments?: Array<{ filename: string; content: string; contentType?: string }> }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": input.idempotencyKey, "User-Agent": "StudioScrubz-OS/1.0" }, body: JSON.stringify({
-    from: input.from ?? FROM, to: [input.recipientEmail], reply_to: input.replyTo, subject: input.subject,
+    from: input.from ?? PROVIDER_SAFETY_DEFAULT.from, to: [input.recipientEmail], ...(input.replyTo ? { reply_to: input.replyTo } : {}), subject: input.subject,
     text: input.text, html: input.html, attachments: input.attachments?.map(({ contentType, ...attachment }) => ({ ...attachment, content_type: contentType })),
   }) });
   const result = await response.json().catch(() => null) as { id?: string; message?: string } | null;

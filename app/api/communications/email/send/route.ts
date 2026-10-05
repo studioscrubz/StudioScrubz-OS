@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { hasPermission } from "@/lib/auth/permissions";
 import { sendResendEmail } from "@/lib/email/resend";
+import { resolveEmailSenderProfile, type EmailSenderProfileKey } from "@/lib/email/senderProfiles";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ClientCommunication, CommunicationMetadata, CommunicationType } from "@/types/clientCommunication";
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
     admin = createSupabaseAdminClient();
     await validateLinks(admin, links);
-    const replyTo = await loadReplyTo(admin);
+    const sender = resolveEmailSenderProfile(await senderProfileForCommunication(admin, communicationType, metadata));
     const eventKey = `communications-email:${profile.id}:${requestId}`;
     const expected = { recipientEmail, subject, messageBody, communicationType, ...links };
     const { data: found, error: findError } = await admin.from("client_communications").select("*").eq("event_key", eventKey).maybeSingle();
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     const content = renderEmail(messageBody);
-    const sent = await sendResendEmail({ recipientEmail, subject, ...content, replyTo, idempotencyKey: eventKey });
+    const sent = await sendResendEmail({ recipientEmail, subject, ...content, ...sender, idempotencyKey: eventKey });
     if (!sent.id?.trim()) throw new Error("The email provider did not confirm delivery submission.");
     const finalized = await finalize(admin, communicationId, sent.id, null);
     return Response.json({ communication: finalized, providerMessageId: sent.id });
@@ -117,11 +118,21 @@ async function validateLinks(admin: Admin, links: Links) {
   }
 }
 
-async function loadReplyTo(admin: Admin) {
-  const { data, error } = await admin.from("business_settings").select("business_email").single();
-  const email = data?.business_email?.trim().toLowerCase() ?? "";
-  if (error || !EMAIL_PATTERN.test(email)) throw new Error("Business email configuration is unavailable.");
-  return email;
+async function senderProfileForCommunication(admin: Admin, type: CommunicationType, metadata: CommunicationMetadata, retryDepth = 0): Promise<EmailSenderProfileKey> {
+  const retryOf = typeof metadata.retry_of_communication_id === "string" ? metadata.retry_of_communication_id : null;
+  if (retryDepth < 5 && retryOf && UUID_PATTERN.test(retryOf)) {
+    const { data, error } = await admin.from("client_communications").select("communication_type,metadata").eq("id", retryOf).maybeSingle();
+    if (error) throw new Error("The original communication sender identity could not be loaded.");
+    if (data) return senderProfileForCommunication(admin, data.communication_type as CommunicationType, (data.metadata ?? {}) as CommunicationMetadata, retryDepth + 1);
+  }
+  if (type === "Estimate") return "estimate";
+  if (type === "Proposal") return "proposal";
+  if (type === "Service Agreement") return "serviceAgreement";
+  if (type === "Invoice" || type === "Payment Reminder") return "billing";
+  if (type === "Service Reminder") return "scheduling";
+  const event = typeof metadata.event === "string" ? metadata.event : null;
+  if (event && ["service_scheduled", "team_arrived", "service_completed"].includes(event)) return "scheduling";
+  return "general";
 }
 
 async function finalize(admin: Admin, id: string, providerMessageId: string | null, failureReason: string | null) {

@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendResendEmail } from "@/lib/email/resend";
+import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
 import { modules } from "@/lib/vendorPackets/content";
 import { renderPacketEmail } from "@/lib/vendorPackets/email";
 import type { UserProfile } from "@/types/auth";
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
       propertyLabel = [property.property_name, property.address, property.address_line_2, property.city, property.state, property.zip].filter(Boolean).join(", ");
     }
     const { data: business, error: businessError } = await admin.from("business_settings").select("business_name,business_email,business_phone,website").single();
-    if (businessError || !business || !emailPattern.test(business.business_email?.trim() ?? "")) return Response.json({ error: "A valid Business Email is required in Business Settings." }, { status: 503 });
+    if (businessError || !business) return Response.json({ error: "Business Settings are unavailable." }, { status: 503 });
     const clientName = client.company_name?.trim() || [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client";
     const content = renderPacketEmail({ clientName, propertyLabel, businessName: business.business_name, contacts: [business.business_phone, business.business_email, business.website].filter((value): value is string => Boolean(value)), moduleIds, message: messageBody });
     const fingerprint = createHash("sha256").update(JSON.stringify({ clientId, propertyId, moduleIds, recipientEmail, subject, messageBody })).digest("hex").slice(0, 24);
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
     const { data: existing, error: lookupError } = await admin.from("client_communications").select("provider_message_id").eq("event_key", eventKey).maybeSingle();
     if (lookupError) throw lookupError;
     if (existing?.provider_message_id) return Response.json({ providerMessageId: existing.provider_message_id });
-    const sent = await sendResendEmail({ recipientEmail, subject, ...content, replyTo: business.business_email.trim().toLowerCase(), idempotencyKey: eventKey });
+    const sent = await sendResendEmail({ recipientEmail, subject, ...content, ...resolveEmailSenderProfile("vendor"), idempotencyKey: eventKey });
     // A Sent record is created only after the provider accepts the email.
     const { error: historyError } = await admin.from("client_communications").insert({
       communication_number: `COMM-${randomUUID()}`, client_id: clientId, property_id: propertyId,

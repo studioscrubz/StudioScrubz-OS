@@ -28,6 +28,12 @@ test("route authenticates and enforces active Communications permission", () => 
   assert.match(route, /hasPermission\(profile, "communications\.create"\).*status: 403/);
 });
 
+test("route resolves sender identity server-side without accepting browser sender input", () => {
+  assert.match(route, /resolveEmailSenderProfile\(await senderProfileForCommunication/);
+  assert.match(route, /return "general"/);
+  assert.doesNotMatch(service, /\bfrom\s*:|senderProfile/i);
+});
+
 test("route validates recipient and linked records", () => {
   assert.match(route, /EMAIL_PATTERN\.test\(recipientEmail\)/);
   assert.match(route, /eq\("client_id", links\.clientId\)/);

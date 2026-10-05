@@ -1,5 +1,6 @@
 import "server-only";
 import { sendWithResend } from "@/lib/email/resend";
+import { resolveEmailSenderProfile, type EmailSenderProfileKey } from "@/lib/email/senderProfiles";
 import { randomInt } from "node:crypto";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
     const document = await loadDocument(admin, documentType, documentId);
     assertUsableToken(document);
-    const replyTo = await loadReplyTo(admin);
+    const sender = resolveEmailSenderProfile(senderProfileFor(documentType));
     const eventKey = `resend:${documentType.toLowerCase().replaceAll(" ", "-")}:${document.id}:${requestId}`;
     const { data: existing, error: existingError } = await admin.from("client_communications").select("id,status,provider_message_id").eq("event_key", eventKey).maybeSingle();
     if (existingError) throw existingError;
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
     }
 
     const publicUrl = `${getPublicSiteUrl()}${document.publicPath}/${document.token}`;
-    const resend = await sendWithResend({ recipientEmail, subject, messageBody, publicUrl, documentType, idempotencyKey: eventKey, replyTo });
+    const resend = await sendWithResend({ recipientEmail, subject, messageBody, publicUrl, documentType, idempotencyKey: eventKey, ...sender });
     const sentAt = new Date().toISOString();
     const { error: sentError } = await admin.from("client_communications").update({ status: "Sent", sent_at: sentAt, failure_reason: null, provider_message_id: resend.id }).eq("id", communicationId).select("id").single();
     if (sentError) throw sentError;
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
       const { error: failureError } = await admin.from("client_communications").update({ status: "Failed", failure_reason: internal.slice(0, 1000) }).eq("id", communicationId);
       if (!failureError) scheduleAttentionPushAfterResponse();
     }
-    const configurationError = internal.includes("RESEND_API_KEY") || internal.includes("Reply-To") || internal.includes("Business Email");
+    const configurationError = internal.includes("RESEND_API_KEY");
     return Response.json({ error: configurationError ? internal : "Resend did not accept the customer email. Please try again." }, { status: configurationError ? 503 : 502 });
   }
 }
@@ -110,13 +111,7 @@ function assertUsableToken(document: DocumentContext) {
   if (!document.token || document.token.length < 40) throw new Error("The secure customer link was not persisted.");
   if (document.tokenExpiresAt && Date.parse(document.tokenExpiresAt) <= Date.now()) throw new Error("The secure customer link has expired.");
 }
-async function loadReplyTo(admin: ReturnType<typeof createSupabaseAdminClient>): Promise<string> {
-  const { data, error } = await admin.from("business_settings").select("business_email").single();
-  if (error) throw new Error("The StudioScrubz Reply-To setting could not be loaded.");
-  const replyTo = data.business_email?.trim().toLowerCase() ?? "";
-  if (!EMAIL_PATTERN.test(replyTo)) throw new Error("A valid Business Email is required in Business Settings before sending customer email.");
-  return replyTo;
-}
+function senderProfileFor(type: DocumentType): EmailSenderProfileKey { return type === "Estimate" ? "estimate" : type === "Proposal" ? "proposal" : type === "Service Agreement" ? "serviceAgreement" : "billing"; }
 function permissionFor(type: DocumentType): Permission { return type === "Estimate" ? "estimates.edit" : type === "Proposal" ? "proposals.send" : type === "Service Agreement" ? "agreements.manage" : "invoices.send"; }
 function documentTypeValue(value: unknown): DocumentType { if (["Estimate", "Proposal", "Service Agreement", "Invoice"].includes(String(value))) return value as DocumentType; throw new Error("A supported document type is required."); }
 function requiredText(value: unknown, label: string, max = 100) { if (typeof value !== "string" || !value.trim() || value.trim().length > max) throw new Error(`${label} is required.`); return value.trim(); }
