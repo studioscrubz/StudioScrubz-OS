@@ -32,8 +32,9 @@ begin
   if position('open_job_payroll_entry' in pg_get_functiondef('public.set_job_worker_assignment(uuid,text,uuid,uuid)'::regprocedure))>0 then
     raise exception 'assignment must not create payroll time';
   end if;
-  if position('open_job_payroll_entry' in pg_get_functiondef('public.start_operational_job(uuid)'::regprocedure))>0 then
-    raise exception 'global Job start must remain separate from payroll';
+  if position('open_job_payroll_entry' in pg_get_functiondef('public.start_operational_job(uuid)'::regprocedure))=0
+    or position('assigned_crew_id is not null' in pg_get_functiondef('public.start_operational_job(uuid)'::regprocedure))=0 then
+    raise exception 'Crew Job start must use the controlled payroll helper without changing individual Start behavior';
   end if;
   if position('open_job_payroll_entry' in pg_get_functiondef('public.start_or_clock_in_to_job(uuid)'::regprocedure))=0 then
     raise exception 'Join Job must continue creating individual payroll time';
