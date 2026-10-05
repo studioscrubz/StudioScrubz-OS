@@ -20,12 +20,13 @@ test("Estimate and Proposal authoritative prices are durable explicit overrides"
   assert.match(helper,/manualPerVisitTotal: null/);
 });
 
-test("frequency repricing preserves an approved upstream manual price without double discounts",()=>{
+test("frequency repricing preserves an approved upstream manual price and Proposal breakdown has no hidden add-on rebase",()=>{
   const proposalMath=read("lib/pricing/proposals.ts");
   const helper=read("lib/pricing/authoritativePrice.ts");
   assert.match(proposalMath,/withAuthoritativeEstimatePrice\([^;]+estimate\.manualPrice\?\?null\)/s);
-  assert.match(proposalMath,/inheritedCatalogAddonTotal = input\.estimate\?\.adjustments\.reduce/);
-  assert.match(proposalMath,/beforeDiscount = Math\.max\(0, input\.estimate\.finalPrice - inheritedCatalogAddonTotal\) \+ additions/);
+  assert.doesNotMatch(proposalMath,/inheritedCatalogAddonTotal/);
+  assert.match(proposalMath,/baseEstimateAmount = Math\.max\(0, input\.estimate\.finalPrice - taxes \+ recurringDiscount \+ inheritedManualDiscount\)/);
+  assert.match(proposalMath,/beforeDiscount = baseEstimateAmount \+ additions/);
   assert.match(helper,/monthlyTotal: estimatedMonthlyTotal\(perVisitTotal, frequency\)/);
 });
 

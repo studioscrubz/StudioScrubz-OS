@@ -62,7 +62,7 @@ test("saved quantity hydrates and removal removes the pricing contribution", () 
 
 test("changing inherited Window quantity recalculates the Proposal total without duplicate base charge", () => {
   const estimate = {
-    finalPrice: 208, adjustments: [{ label: windows.addon_name, amount: 8, catalogAddonId: windows.id }],
+    finalPrice: 200, adjustments: [{ label: windows.addon_name, amount: 8, catalogAddonId: windows.id }],
     laborHours: 0, crewSize: 1, laborCost: 0, supplyCost: 0, manualDiscount: 0,
     recurringDiscount: 0, recurringDiscountPercent: 0, recurringPricingRuleId: null, recurringPricingRuleName: null,
     calculatorInput: { frequency: "One-Time" },

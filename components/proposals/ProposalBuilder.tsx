@@ -352,7 +352,9 @@ export function ProposalBuilder({
     proposal &&
       preserveStoredPriceBaseline &&
       manualPrice === null &&
-      pricingFingerprint === initialPricingFingerprint,
+      pricingFingerprint === initialPricingFingerprint &&
+      Math.round(proposal.result.perVisitTotal * 100) ===
+        Math.round(calculatedResult.perVisitTotal * 100),
   );
   const result = preserveStoredPrice
     ? withPreservedProposalPrice(
@@ -1080,6 +1082,12 @@ function Summary({
           ],
           ["Proposal Manual Discount", `-${money(r.manualDiscount)}`],
           ...(r.taxes > 0 ? [["Taxes", money(r.taxes)]] : []),
+          ...(r.manualPerVisitTotal != null
+            ? [[
+                "Manual Final Price Adjustment",
+                money(r.perVisitTotal - (r.calculatedPerVisitTotal ?? r.perVisitTotal)),
+              ]]
+            : []),
           ["Final Per Visit", money(r.perVisitTotal)],
           [
             "Estimated Monthly",
