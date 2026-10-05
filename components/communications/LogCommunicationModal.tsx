@@ -6,9 +6,9 @@ import { createCommunication, createCommunicationOnce, getUpcomingServicesForCli
 import { hasPermission } from "@/lib/auth/permissions";
 import { getClientById } from "@/lib/services/clients";
 import { getPropertyById } from "@/lib/services/properties";
+import { sendCommunicationsEmail } from "@/lib/services/communicationsEmail";
 import type { JobWithRelations } from "@/types/job";
 import { openDeviceSmsApp } from "@/lib/deviceSms";
-import { openDeviceEmailApp } from "@/lib/deviceEmail";
 import type { Client } from "@/types/client";
 import { COMMUNICATION_CHANNELS, COMMUNICATION_DIRECTIONS, COMMUNICATION_TYPES, type ClientCommunication, type CommunicationChannel, type CommunicationComposerContext, type CommunicationDirection, type CommunicationStatus, type CommunicationType, type UpcomingClientService } from "@/types/clientCommunication";
 
@@ -30,6 +30,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
   const [upcomingError, setUpcomingError] = useState<string | null>(null);
   const [preparedSms, setPreparedSms] = useState<ClientCommunication | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [emailRequestId] = useState(() => crypto.randomUUID());
   const recordCommunication = (input: Parameters<typeof createCommunication>[0]) => eventKey
     ? createCommunicationOnce({ ...input, event_key: `${eventKey}:${input.channel}` })
     : createCommunication(input);
@@ -75,6 +76,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (channel === "Email" && direction === "Outbound") { setError("Use Send Email for outbound email delivery."); return; }
     if (status === "Failed" && !failure.trim()) { setError("Enter a failure reason."); return; }
     setSaving(true); setError(null);
     try {
@@ -117,19 +119,20 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
 
   async function emailClient() {
     if (!email.trim()) { setError("No email address is saved for this client."); return; }
+    if (!subject.trim()) { setError("Enter a subject before sending the email."); return; }
+    if (!message.trim()) { setError("Enter a message before sending the email."); return; }
     setSaving(true); setError(null); setNotice(null);
     try {
-      const record = (eventKey ? null : preparedSms) ?? await recordCommunication({
-        client_id: context?.clientId ?? links.clientId ?? null, property_id: selectedService?.propertyId ?? context?.propertyId ?? links.propertyId ?? null,
-        estimate_id: context?.estimateId ?? links.estimateId ?? null, proposal_id: context?.proposalId ?? links.proposalId ?? null,
-        agreement_id: context?.agreementId ?? links.agreementId ?? null, invoice_id: context?.invoiceId ?? links.invoiceId ?? null,
-        communication_type: type, channel: "Email", direction, status: "Prepared", provider: "mailto",
-        subject: clean(subject), message_body: clean(message), recipient_email: clean(email), recipient_phone: clean(phone),
+      const record = await sendCommunicationsEmail({
+        requestId: emailRequestId, recipientEmail: email, subject, messageBody: `${message}${context?.handoffSuffix ?? ""}`, communicationType: type,
+        clientId: context?.clientId ?? links.clientId ?? null, propertyId: selectedService?.propertyId ?? context?.propertyId ?? links.propertyId ?? null,
+        estimateId: context?.estimateId ?? links.estimateId ?? null, proposalId: context?.proposalId ?? links.proposalId ?? null,
+        agreementId: context?.agreementId ?? links.agreementId ?? null, invoiceId: context?.invoiceId ?? links.invoiceId ?? null,
         metadata: selectedService ? { source: selectedService.source, source_id: selectedService.sourceId, scheduled_date: selectedService.scheduledDate, service_name: selectedService.serviceName } : context?.metadata ?? {},
       });
-      setPreparedSms(record); onCreated(record); if (eventKey && record.status === "Sent") { setNotice("This Job communication is already recorded as sent by email."); return; } openDeviceEmailApp(email, subject, `${message}${context?.handoffSuffix ?? ""}`);
-      setNotice("Email application opened. Confirm the message was sent before marking it as sent.");
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Your device could not open an email application."); }
+      onCreated(record);
+      setNotice("Email sent through StudioScrubz.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "The email could not be sent."); }
     finally { setSaving(false); }
   }
 
@@ -154,7 +157,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
         <Field label="Communication Type"><select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>{allowedTypes.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Channel"><select value={channel} onChange={(e) => setChannel(e.target.value as CommunicationChannel)} className={inputClass}>{(context ? COMMUNICATION_CHANNELS.filter((item) => item === "Email" || item === "SMS") : COMMUNICATION_CHANNELS).map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Direction"><select value={direction} onChange={(e) => setDirection(e.target.value as CommunicationDirection)} className={inputClass}>{COMMUNICATION_DIRECTIONS.filter((item) => item !== "System").map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Status"><select value={status} disabled={Boolean(context)} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputClass}><option>Prepared</option>{!context && <><option>Sent</option><option>Failed</option></>}</select></Field>
+        <Field label="Status"><select value={channel === "Email" && direction === "Outbound" ? "Prepared" : status} disabled={Boolean(context) || (channel === "Email" && direction === "Outbound")} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputClass}><option>Prepared</option>{!context && !(channel === "Email" && direction === "Outbound") && <><option>Sent</option><option>Failed</option></>}</select></Field>
         {type === "Service Reminder" && <div className="sm:col-span-2">
           {loadingUpcoming ? <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Loading upcoming services…</p>
             : upcoming.length > 0 ? <Field label="Upcoming Service"><select value={selectedServiceId} onChange={(e) => selectUpcoming(e.target.value)} className={inputClass}>{upcoming.map((service) => <option key={`${service.source}-${service.sourceId}`} value={service.sourceId}>{serviceLabel(service)}</option>)}</select></Field>
@@ -172,9 +175,9 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
         <div className="flex flex-wrap justify-end gap-3 border-t border-neutral-100 pt-5 sm:col-span-2">
           <button type="button" onClick={onClose} disabled={saving} className="rounded-lg border border-neutral-200 px-5 py-2.5 text-sm font-bold text-neutral-600">{preparedSms ? "Close" : "Cancel"}</button>
           {channel === "SMS" && (!preparedSms || preparedSms.status === "Prepared") && <button type="button" disabled={saving || !phone.trim()} onClick={() => void textClient()} className="rounded-lg border border-[#143d1a]/20 px-5 py-2.5 text-sm font-bold text-[#143d1a] disabled:opacity-50">Text Client</button>}
-          {channel === "Email" && (!preparedSms || preparedSms.status === "Prepared") && <button type="button" disabled={saving || !email.trim()} onClick={() => void emailClient()} className="rounded-lg border border-[#143d1a]/20 px-5 py-2.5 text-sm font-bold text-[#143d1a] disabled:opacity-50">Email Client</button>}
+          {channel === "Email" && direction === "Outbound" && <button type="button" disabled={saving || !email.trim()} onClick={() => void emailClient()} className="rounded-lg bg-[#143d1a] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving ? "Sending…" : "Send Email"}</button>}
           {preparedSms?.status === "Prepared" && <><button type="button" disabled={saving} onClick={() => void confirmSms("Failed")} className="rounded-lg border border-red-200 px-5 py-2.5 text-sm font-bold text-red-700">Mark as Failed</button><button type="button" disabled={saving} onClick={() => void confirmSms("Sent")} className="rounded-lg bg-[#143d1a] px-5 py-2.5 text-sm font-bold text-white">Mark as Sent</button></>}
-          {!preparedSms && !context && <button type="submit" disabled={saving} className="rounded-lg bg-[#143d1a] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Log Communication"}</button>}
+          {!preparedSms && !context && !(channel === "Email" && direction === "Outbound") && <button type="submit" disabled={saving} className="rounded-lg bg-[#143d1a] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Log Communication"}</button>}
         </div>
       </form>
     </section>
