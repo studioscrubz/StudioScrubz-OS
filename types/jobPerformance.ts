@@ -28,6 +28,7 @@ export type JobPerformanceRow = {
   ended_business_date: string;
 
   duration_seconds: number;
+  actual_labor_hours: number | null;
 
   budgeted_labor_hours: number | null;
   budgeted_crew_size: number | null;
