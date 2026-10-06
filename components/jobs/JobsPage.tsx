@@ -16,6 +16,7 @@ import {
   jobWorkerTarget,
   displayJobStatus,
   getCurrentJobClockState,
+  getJobLiveLaborBurn,
   getArchivedJobs,
   getJobs,
   joinJob,
@@ -50,6 +51,7 @@ import {
   type EligibleJobTech,
   type JobAssignmentKind,
   type JobWorkerTarget,
+  type JobLiveLaborBurn,
 } from "@/types/job";
 import type { TimeEntryWithRelations } from "@/types/timeEntry";
 import { getJobScopeV1, type JobScopeItem, type JobScopeV1 } from "@/lib/services/jobScope";
@@ -431,15 +433,28 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrewLeadId, c
 }
 function JobCardActiveTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const [now, setNow] = useState<number | null>(null);
+  const [burn, setBurn] = useState<JobLiveLaborBurn | null>(null);
+  const [burnUnavailable, setBurnUnavailable] = useState(false);
   useEffect(() => {
-    const initial = window.setTimeout(() => setNow(Date.now()), 0);
-    const id = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => { window.clearTimeout(initial); window.clearInterval(id); };
-  }, []);
+    let active = true;
+    const refresh = async () => {
+      setNow(Date.now());
+      try {
+        const next = await getJobLiveLaborBurn(job.id);
+        if (active) { setBurn(next); setBurnUnavailable(false); }
+      } catch {
+        if (active) setBurnUnavailable(true);
+      }
+    };
+    void refresh();
+    const id = window.setInterval(() => void refresh(), 30_000);
+    return () => { active = false; window.clearInterval(id); };
+  }, [job.id]);
   const active = entries.filter((entry) => entry.status === "Open" && !entry.clock_out);
   const startedAt = job.operational_started_at;
-  return <div className={`mt-3 rounded-lg p-2 text-xs font-bold ${active.length ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}><p>IN PROGRESS · {active.length ? `${active.length} ${active.length === 1 ? "Tech" : "Techs"} On Job` : "No Techs On Job"}</p>{startedAt ? <><p className="mt-1 font-medium">Started {displayTime(startedAt)}</p><p className="font-medium">Elapsed {shortDuration((now ?? Date.parse(startedAt)) - Date.parse(startedAt))}</p></> : <p className="mt-1 font-medium">Operational start unavailable</p>}</div>;
+  return <div className={`mt-3 rounded-lg p-2 text-xs font-bold ${active.length ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}><p>IN PROGRESS · {active.length ? `${active.length} ${active.length === 1 ? "Tech" : "Techs"} On Job` : "No Techs On Job"}</p>{startedAt ? <><p className="mt-1 font-medium">Started {displayTime(startedAt)}</p><p className="font-medium">Elapsed {shortDuration((now ?? Date.parse(startedAt)) - Date.parse(startedAt))}</p></> : <p className="mt-1 font-medium">Operational start unavailable</p>}{burn && <div className="mt-2 border-t border-current/20 pt-2 font-medium"><p className="font-bold">Labor: {burn.live_performance_labor_hours.toFixed(1)} / {burn.effective_labor_hours === null ? "Unavailable" : burn.effective_labor_hours.toFixed(1)} hrs</p><p>{burn.labor_burn_percent === null ? "Labor budget unavailable" : `${burn.labor_burn_percent.toFixed(0)}% of labor budget · ${laborBurnLabel(burn.current_threshold)}`}</p><p className="mt-1 text-[10px]">Operational labor target only. Complete the work safely and to StudioScrubz quality standards.</p></div>}{burnUnavailable && !burn && <p className="mt-2 border-t border-current/20 pt-2 font-medium">Live labor target unavailable.</p>}</div>;
 }
+function laborBurnLabel(threshold: JobLiveLaborBurn["current_threshold"]){if(threshold===110)return"Labor budget exceeded";if(threshold===100)return"Labor budget reached";if(threshold===90)return"Labor budget nearly reached";if(threshold===75)return"Approaching labor budget";return"Within labor budget"}
 function JobCardCompletedTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const completedEntries = entries.filter((entry) => ["Completed", "Approved"].includes(entry.status) && Boolean(entry.clock_out));
   const totalLabor = completedEntries.reduce((sum, entry) => sum + Number(entry.total_hours || 0), 0);

@@ -8,6 +8,7 @@ import type {
   DirectJobInput,
   JobClockInResult,
   JobClockState,
+  JobLiveLaborBurn,
   JobWorkerTarget,
   EligibleJobTech,
 } from "@/types/job";
@@ -404,6 +405,21 @@ export async function joinJob(id: string): Promise<JobClockInResult> {
   await requestImmediateAttentionPush();
   return data as JobClockInResult;
 }
+export async function getJobLiveLaborBurn(jobId: string): Promise<JobLiveLaborBurn> {
+  const { data, error } = await getSupabaseClient().rpc(
+    "get_job_live_labor_burn",
+    { p_job_id: jobId },
+  );
+  if (error) throw new Error(safeDatabaseMessage(error, "Live labor burn could not be loaded."));
+  const row = data?.[0];
+  if (!row) throw new Error("Live labor burn is unavailable for this Job.");
+  return {
+    ...row,
+    effective_labor_hours: numberOrNull(row.effective_labor_hours),
+    live_performance_labor_hours: Number(row.live_performance_labor_hours),
+    labor_burn_percent: numberOrNull(row.labor_burn_percent),
+  };
+}
 export async function initiateJobOnMyWay(id: string) {
   const { data, error } = await getSupabaseClient().rpc("initiate_job_on_my_way", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "On My Way could not be initiated."));
@@ -500,6 +516,7 @@ export function displayJobStatus(status:JobStatus){return status==="Crew Assigne
 function operationalJob(row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">):JobWithRelations{return{...row,price:null,deposit:null,balance:null,labor_hours:null,recommended_crew_size:null,photos:[],financials_available:false,proposal:null,client:null,property:null}}
 function fullJob(row:Job):JobWithRelations{return{...row,financials_available:true,proposal:null,client:null,property:null}}
 function errorMessage(cause:unknown){if(cause instanceof Error)return cause.message;if(cause&&typeof cause==="object"&&"message" in cause&&typeof cause.message==="string")return cause.message;return""}
+function numberOrNull(value:number|string|null|undefined){if(value===null||value===undefined||value==="")return null;const parsed=Number(value);return Number.isFinite(parsed)?parsed:null}
 function safeDatabaseMessage(cause:unknown,fallback:string){const detail=errorMessage(cause).trim();return detail&&!/jwt|token|secret|authorization header|service[_ -]?role/i.test(detail)?detail:fallback}
 function minutes(value: string) {
   const [h, m] = value.slice(0, 5).split(":").map(Number);

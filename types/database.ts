@@ -224,6 +224,7 @@ export interface Database {
       reopen_post_construction_deposit:{Args:{p_proposal_id:string};Returns:ProposalDepositRequirement};
       mark_service_agreement_sent_for_delivery:{Args:{p_agreement_id:string;p_sent_to:string;p_sent_by:string;p_token:string;p_token_expires_at:string};Returns:ServiceAgreement};
       get_job_performance_rows:{Args:{p_start_date:string|null;p_end_date:string|null};Returns:JobPerformanceRow[]};
+      get_job_live_labor_burn:{Args:{p_job_id:string};Returns:import("@/types/job").JobLiveLaborBurn[]};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
       get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};

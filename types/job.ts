@@ -133,6 +133,14 @@ export type JobClockState = {
   timeEntryId: string | null;
   activeWorkerCount: number;
 };
+export type JobLiveLaborBurn = {
+  job_id: string;
+  effective_labor_hours: number | null;
+  live_performance_labor_hours: number;
+  labor_burn_percent: number | null;
+  current_threshold: 75 | 90 | 100 | 110 | null;
+  job_status: JobStatus;
+};
 export type JobClockInResult = {
   jobId: string;
   jobStatus: "In Progress";
