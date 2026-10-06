@@ -25,6 +25,7 @@ import {
 } from "@/types/jobPerformance";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { JobQualityPanel } from "@/components/jobs/JobQualityPanel";
+import { EmployeePerformanceManagement } from "@/components/jobs/EmployeePerformanceReviews";
 
 const input =
   "rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm";
@@ -238,6 +239,7 @@ export function JobPerformancePage() {
           Metrics use only authoritative master Job time.
         </p>
       </header>
+      {canManageQuality && <EmployeePerformanceManagement />}
 
       <section className="mt-6 rounded-2xl border bg-white p-4">
         <div className="flex flex-wrap gap-3">

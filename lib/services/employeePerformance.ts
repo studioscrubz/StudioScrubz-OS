@@ -1,0 +1,5 @@
+import{getSupabaseClient}from"@/lib/supabase/client";import type{EmployeePerformanceReview}from"@/types/employeePerformance";
+function normalize(x:EmployeePerformanceReview){return{...x,measured_points:Number(x.measured_points),measured_max_points:Number(x.measured_max_points),overall_score:x.overall_score===null?null:Number(x.overall_score)}}
+export async function calculateEmployeePerformance(employeeId:string,days:30|90,end:string){const{data,error}=await getSupabaseClient().rpc("calculate_employee_performance_review",{p_employee_id:employeeId,p_period_days:days,p_period_end:end});if(error)throw error;return normalize(data)}
+export async function finalizeEmployeePerformance(id:string){const{data,error}=await getSupabaseClient().rpc("finalize_employee_performance_review",{p_review_id:id});if(error)throw error;return normalize(data)}
+export async function getEmployeePerformanceReviews(employeeId?:string|null){const{data,error}=await getSupabaseClient().rpc("get_employee_performance_reviews",{p_employee_id:employeeId??null});if(error)throw error;return(data??[]).map(normalize)}

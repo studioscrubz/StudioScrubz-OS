@@ -43,6 +43,7 @@ import type {ProposalDepositEvent,ProposalDepositRequirement} from "@/types/prop
 import type {LeadRepresentativeLead} from "@/types/leadRepresentative";
 import type {CallbackEvent,CustomerFeedback,JobQualityEvidence,QualityCallback,QualityInspection,ScopeCompletionRecord} from "@/types/jobQuality";
 import type {ComplianceRecord,JobEmployeeParticipation,JobPerformanceEvidence,QualityEmployeeAttribution,TeamworkEvent} from "@/types/jobPerformanceEvidence";
+import type {EmployeePerformanceReview} from "@/types/employeePerformance";
 
 export interface Database {
   public: {
@@ -171,6 +172,7 @@ export interface Database {
       job_quality_employee_attributions:{Row:QualityEmployeeAttribution;Insert:never;Update:never;Relationships:[]};
       job_quality_employee_attribution_events:{Row:{id:string;attribution_id:string;event_type:"Created"|"Replaced"|"Withdrawn";operational_reason:string;actor_user_id:string;occurred_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
       job_performance_evidence_links:{Row:{id:string;job_id:string;evidence_type:"Compliance"|"Teamwork";evidence_record_id:string;job_evidence_id:string;created_by:string;created_at:string};Insert:never;Update:never;Relationships:[]};
+      employee_performance_reviews:{Row:EmployeePerformanceReview;Insert:never;Update:never;Relationships:[]};
     };
 
     Views: {
@@ -257,6 +259,9 @@ export interface Database {
       record_job_quality_employee_attribution:{Args:{p_job_id:string;p_quality_type:string;p_quality_id:string;p_target:string;p_employee_id:string|null;p_crew_id:string|null;p_reason:string;p_job_evidence_id?:string|null};Returns:string};
       withdraw_job_quality_employee_attribution:{Args:{p_attribution_id:string;p_reason:string};Returns:undefined};
       link_job_performance_evidence:{Args:{p_job_id:string;p_type:string;p_record_id:string;p_job_evidence_id:string};Returns:string};
+      calculate_employee_performance_review:{Args:{p_employee_id:string;p_period_days:number;p_period_end?:string};Returns:EmployeePerformanceReview};
+      finalize_employee_performance_review:{Args:{p_review_id:string};Returns:EmployeePerformanceReview};
+      get_employee_performance_reviews:{Args:{p_employee_id?:string|null};Returns:EmployeePerformanceReview[]};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
       get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};
