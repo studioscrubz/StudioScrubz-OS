@@ -24,6 +24,9 @@ import {
   isJobCompletionResult,
   scheduleJob,
   startOperationalJob,
+  startOperationalJobWithPresence,
+  type JobCrewPresenceInput,
+  type JobCrewPresenceStatus,
   updateJobStatus,
 } from "@/lib/services/jobs";
 import { getActiveCrews } from "@/lib/services/crews";
@@ -280,7 +283,8 @@ export function JobsPage() {
       timeEntries={timeEntries.filter((entry) => entry.job_id === job.id && !entry.archived_at && entry.entry_type === "Job")}
       employeeId={profile?.employee_id ?? null}
       role={profile?.role ?? null}
-      activeCrewLeadId={activeCrews.find((crew) => crew.id === job.assigned_crew_id)?.crew_lead_id ?? null}
+      activeCrew={activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null}
+      activeTechs={activeTechs}
       canComplete={hasPermission(profile, "jobs.complete")}
       canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
@@ -359,7 +363,8 @@ export function JobsPage() {
           canClock={Boolean(profile && ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role))}
           employeeId={profile?.employee_id ?? null}
           role={profile?.role ?? null}
-          activeCrewLeadId={activeCrews.find((crew) => crew.id === selected.assigned_crew_id)?.crew_lead_id ?? null}
+          activeCrew={activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null}
+activeTechs={activeTechs}
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
@@ -381,8 +386,10 @@ export function JobsPage() {
   );
 }
 type JobAction = (fn: () => Promise<unknown>, text: string | ((result: unknown) => string), onError?: (detail: string) => void) => void;
-function JobCard({ job, open, timeEntries, employeeId, role, activeCrewLeadId, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; role: string | null; activeCrewLeadId: string | null; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: JobAction }) {
+function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeTechs, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; role: string | null; activeCrew: CrewWithRelations | null; activeTechs: EligibleJobTech[]; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: JobAction }) {
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [showPresence, setShowPresence] = useState(false);
+  const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
   const activeEntries = timeEntries.filter((entry) => entry.status === "Open" && !entry.clock_out);
   const currentEntry = employeeId ? activeEntries.find((entry) => entry.employee_id === employeeId) ?? null : null;
   const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
@@ -417,7 +424,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrewLeadId, c
     </div>
     <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
-      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); if (!job.assigned_crew_id) await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, job.assigned_crew_id ? "Job started. Eligible crew members were clocked in." : "Job started. You were automatically joined to the Job.")} className={`${primary} w-full`}>START JOB</button>}
+      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} w-full`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
@@ -427,13 +434,23 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrewLeadId, c
     </div>
     </>
   );
-  if (job.status === "Completed")
-    return <JobInvoiceAction jobId={job.id}>{content}</JobInvoiceAction>;
-  return (
-    <article className="mb-3 rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">
-      {content}
-    </article>
-  );
+  const card = job.status === "Completed"
+    ? <JobInvoiceAction jobId={job.id}>{content}</JobInvoiceAction>
+    : <article className="mb-3 rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">{content}</article>;
+  return <>
+    {card}
+    {showPresence && activeCrew && <CrewPresenceModal
+      job={job}
+      crew={activeCrew}
+      techs={activeTechs}
+      busy={busy}
+      close={() => setShowPresence(false)}
+      start={(presence) => lifecycleAct(
+        async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJobWithPresence(job.id, presence) }),
+        "Job started. Present crew members were clocked in.",
+      )}
+    />}
+  </>;
 }
 function JobCardActiveTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const [now, setNow] = useState<number | null>(null);
@@ -477,7 +494,8 @@ function JobModal({
   canClock,
   employeeId,
   role,
-  activeCrewLeadId,
+  activeCrew,
+  activeTechs,
   canDeletePhotos,
 }: {
   job: JobWithRelations;
@@ -491,7 +509,8 @@ function JobModal({
   canClock: boolean;
   employeeId: string | null;
   role: string | null;
-  activeCrewLeadId: string | null;
+  activeCrew: CrewWithRelations | null;
+  activeTechs: EligibleJobTech[];
   canDeletePhotos: boolean;
 }) {
   const [date, setDate] = useState(job.scheduled_date ?? "");
@@ -507,6 +526,8 @@ function JobModal({
   const [clock, setClock] = useState<Awaited<ReturnType<typeof getCurrentJobClockState>> | null>(null);
   const [clockError, setClockError] = useState<string | null>(null);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [showPresence, setShowPresence] = useState(false);
+  const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
   const [tab, setTab] = useState<"Overview" | "Scope" | "Discoveries" | "Changes" | "Timeline">("Overview");
   const [changePrefill, setChangePrefill] = useState<VisibleFieldDiscovery | null>(null);
   const [discoveryPrefill, setDiscoveryPrefill] = useState<string | null>(null);
@@ -679,7 +700,7 @@ function JobModal({
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
           {clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}
-          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); if (!job.assigned_crew_id) await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, job.assigned_crew_id ? "Job started. Eligible crew members were clocked in." : "Job started. You were automatically joined to the Job.")}>START JOB</button>}
+          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }}>START JOB</button>}
           {canClock && eligibility.canJoin && !clockError && (
             <>
               <button
@@ -732,10 +753,138 @@ function JobModal({
           </button>
         )}
       </div>
+      {showPresence && activeCrew && <CrewPresenceModal
+        job={job}
+        crew={activeCrew}
+        techs={activeTechs}
+        busy={busy}
+        close={() => setShowPresence(false)}
+        start={(presence) => lifecycleAct(
+          async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJobWithPresence(job.id, presence) }),
+          "Job started. Present crew members were clocked in.",
+        )}
+      />}
       </> : tab === "Scope" ? <JobScopePanel jobId={job.id} recordDiscovery={(question) => { setDiscoveryPrefill(question); setTab("Discoveries"); }} /> : tab === "Discoveries" ? <JobDiscoveriesPanel jobId={job.id} role={role} prefillDescription={discoveryPrefill} clearPrefill={() => setDiscoveryPrefill(null)} createChange={(discovery) => { setChangePrefill(discovery); setTab("Changes"); }} /> : tab === "Changes" ? <JobChangesPanel jobId={job.id} role={role} prefill={changePrefill} clearPrefill={() => setChangePrefill(null)} /> : <JobTimelinePanel jobId={job.id} role={role} />}
     </Modal>
   );
 }
+type PresenceDraft = {
+  status: JobCrewPresenceStatus | "";
+  expectedArrivalAt: string;
+  reasonCode: string;
+  reasonDetail: string;
+};
+
+const attendanceReasons = [
+  "Approved Time Off",
+  "Non-Approved Time Off",
+  "Transportation Emergency",
+  "Other",
+] as const;
+
+function CrewPresenceModal({ job, crew, techs, busy, close, start }: {
+  job: JobWithRelations;
+  crew: CrewWithRelations;
+  techs: EligibleJobTech[];
+  busy: boolean;
+  close: () => void;
+  start: (presence: JobCrewPresenceInput[]) => void;
+}) {
+  const rosterIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const member of crew.members ?? []) ids.add(member.employee_id);
+    if (crew.crew_lead_id) ids.add(crew.crew_lead_id);
+    return [...ids];
+  }, [crew]);
+  const roster = rosterIds.map((id) => techs.find((tech) => tech.employee_id === id)).filter((tech): tech is EligibleJobTech => Boolean(tech));
+  const [drafts, setDrafts] = useState<Record<string, PresenceDraft>>(() => Object.fromEntries(rosterIds.map((id) => [id, { status: "", expectedArrivalAt: "", reasonCode: "", reasonDetail: "" }])));
+  const [validation, setValidation] = useState<string | null>(null);
+
+  function patch(employeeId: string, next: Partial<PresenceDraft>) {
+    setDrafts((current) => ({ ...current, [employeeId]: { ...current[employeeId], ...next } }));
+    setValidation(null);
+  }
+
+  function submit() {
+    if (roster.length !== rosterIds.length) {
+      setValidation("The full active crew roster could not be resolved. Refresh Jobs and try again.");
+      return;
+    }
+    const payload: JobCrewPresenceInput[] = [];
+    for (const tech of roster) {
+      const draft = drafts[tech.employee_id];
+      if (!draft?.status) {
+        setValidation(`Select a presence status for ${tech.display_name}.`);
+        return;
+      }
+      if (draft.status === "Late" && !draft.expectedArrivalAt) {
+        setValidation(`Enter an expected arrival time for ${tech.display_name}.`);
+        return;
+      }
+      if (["Absent", "Excused"].includes(draft.status) && !draft.reasonCode) {
+        setValidation(`Select an attendance reason for ${tech.display_name}.`);
+        return;
+      }
+      if (draft.status === "Excused" && draft.reasonCode === "Non-Approved Time Off") {
+        setValidation(`Non-Approved Time Off cannot be marked Excused for ${tech.display_name}.`);
+        return;
+      }
+      if (draft.status === "Absent" && ["Approved Time Off", "Transportation Emergency"].includes(draft.reasonCode)) {
+        setValidation(`${draft.reasonCode} must be marked Excused for ${tech.display_name}.`);
+        return;
+      }
+      if (draft.reasonCode === "Other" && !draft.reasonDetail.trim()) {
+        setValidation(`Explain the Other attendance reason for ${tech.display_name}.`);
+        return;
+      }
+      payload.push({
+        employeeId: tech.employee_id,
+        status: draft.status,
+        expectedArrivalAt: draft.status === "Late" ? new Date(draft.expectedArrivalAt).toISOString() : null,
+        reasonCode: ["Absent", "Excused"].includes(draft.status) ? draft.reasonCode || null : null,
+        reasonDetail: ["Absent", "Excused"].includes(draft.status) && draft.reasonCode === "Other" ? draft.reasonDetail.trim() : null,
+      });
+    }
+    start(payload);
+  }
+
+  return <div className="fixed inset-0 z-[120] grid place-items-center overflow-y-auto bg-[#07190a]/75 p-4">
+    <section role="dialog" aria-modal="true" aria-labelledby="crew-presence-title" className="my-6 w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 id="crew-presence-title" className="text-xl font-extrabold text-[#143d1a]">Confirm Crew Presence</h2>
+          <p className="mt-1 text-sm text-neutral-600">{job.job_number} · {crew.crew_name}</p>
+          <p className="mt-2 text-sm font-bold text-neutral-800">Confirm every assigned active Scrub Tech before starting the Job. Only Present crew members will be clocked in automatically.</p>
+        </div>
+        <button type="button" disabled={busy} onClick={close} className={secondary}>Close</button>
+      </div>
+      <div className="mt-5 grid gap-4">
+        {roster.map((tech) => {
+          const draft = drafts[tech.employee_id];
+          return <article key={tech.employee_id} className="rounded-xl border border-neutral-200 p-4">
+            <p className="font-extrabold text-neutral-900">{tech.display_name}</p>
+            <p className="text-xs text-neutral-500">{tech.operational_role}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(["Present", "Late", "Absent", "Excused"] as const).map((status) => <button key={status} type="button" disabled={busy} onClick={() => patch(tech.employee_id, { status, expectedArrivalAt: status === "Late" ? draft.expectedArrivalAt : "", reasonCode: ["Absent", "Excused"].includes(status) ? draft.reasonCode : "", reasonDetail: ["Absent", "Excused"].includes(status) ? draft.reasonDetail : "" })} className={`rounded-lg border px-3 py-2 text-sm font-bold ${draft.status === status ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-200 bg-white text-neutral-700"}`}>{status}</button>)}
+            </div>
+            {draft.status === "Late" && <label className="mt-3 block text-sm font-bold">Expected Arrival<input type="datetime-local" className={`${input} mt-2`} value={draft.expectedArrivalAt} onChange={(event) => patch(tech.employee_id, { expectedArrivalAt: event.target.value })}/></label>}
+            {["Absent", "Excused"].includes(draft.status) && <div className="mt-3 grid gap-3">
+              <label className="text-sm font-bold">Attendance Reason<select className={`${input} mt-2`} value={draft.reasonCode} onChange={(event) => patch(tech.employee_id, { reasonCode: event.target.value, reasonDetail: event.target.value === "Other" ? draft.reasonDetail : "" })}><option value="">Select reason</option>{attendanceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select></label>
+              {draft.reasonCode === "Other" && <label className="text-sm font-bold">Explanation<textarea className={`${input} mt-2 min-h-20 py-2`} value={draft.reasonDetail} onChange={(event) => patch(tech.employee_id, { reasonDetail: event.target.value })} placeholder="Brief attendance explanation"/></label>}
+            </div>}
+          </article>;
+        })}
+        {roster.length === 0 && <p className="rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-800">No active assigned Scrub Techs could be resolved for this crew. Refresh Jobs before starting.</p>}
+      </div>
+      {validation && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{validation}</p>}
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button type="button" disabled={busy} onClick={close} className={secondary}>Cancel</button>
+        <button type="button" disabled={busy || roster.length === 0} onClick={submit} className={primary}>{busy ? "STARTING..." : "CONFIRM & START JOB"}</button>
+      </div>
+    </section>
+  </div>;
+}
+
 function JobScopePanel({ jobId, recordDiscovery }: { jobId: string; recordDiscovery: (question: string) => void }) {
   const [scope, setScope] = useState<JobScopeV1 | null>(null);
   const [loadingScope, setLoadingScope] = useState(true);

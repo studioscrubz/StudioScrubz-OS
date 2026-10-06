@@ -438,6 +438,54 @@ export async function startOperationalJob(id: string): Promise<JobWithRelations>
   await requestImmediateAttentionPush();
   return operationalJob(data);
 }
+
+export type JobCrewPresenceStatus = "Present" | "Late" | "Absent" | "Excused";
+
+export type JobCrewPresenceInput = {
+  employeeId: string;
+  status: JobCrewPresenceStatus;
+  expectedArrivalAt?: string | null;
+  reasonCode?: string | null;
+  reasonDetail?: string | null;
+};
+
+export async function startOperationalJobWithPresence(
+  id: string,
+  presence: JobCrewPresenceInput[],
+): Promise<JobWithRelations> {
+  type CrewPresenceRpcClient = {
+    rpc: (
+      name: "start_operational_job_with_presence",
+      args: {
+        p_job_id: string;
+        p_presence: JobCrewPresenceInput[];
+      },
+    ) => Promise<{
+      data: Parameters<typeof operationalJob>[0] | null;
+      error: { message?: string } | null;
+    }>;
+  };
+
+  const { data, error } = await (
+    getSupabaseClient() as unknown as CrewPresenceRpcClient
+  ).rpc("start_operational_job_with_presence", {
+    p_job_id: id,
+    p_presence: presence,
+  });
+
+  if (error) {
+    throw new Error(
+      safeDatabaseMessage(error, "Job could not be started."),
+    );
+  }
+
+  if (!data) {
+    throw new Error("The Job start result was empty.");
+  }
+
+  await requestImmediateAttentionPush();
+  return operationalJob(data);
+}
 export async function completeInProgressJob(id: string): Promise<JobCompletionResult> {
   const { data, error } = await getSupabaseClient().rpc("complete_in_progress_job", { p_job_id: id });
   if (error) throw new Error(safeDatabaseMessage(error, "Job completion failed."));
