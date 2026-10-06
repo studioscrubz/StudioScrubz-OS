@@ -24,6 +24,7 @@ import {
   type PerformanceFilters,
 } from "@/types/jobPerformance";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { JobQualityPanel } from "@/components/jobs/JobQualityPanel";
 
 const input =
   "rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm";
@@ -209,6 +210,8 @@ export function JobPerformancePage() {
   const canEditActualTime =
     profile?.is_active === true &&
     profile.role === "Master Admin";
+  const canManageQuality = profile?.is_active === true &&
+    ["Master Admin", "Administrator", "Manager"].includes(profile.role);
 
   async function reloadRows() {
     const data = await getJobPerformanceRows(
@@ -427,6 +430,7 @@ export function JobPerformancePage() {
                 rows={history}
                 timeZone={timeZone}
                 canEdit={canEditActualTime}
+                canManageQuality={canManageQuality}
                 reload={reloadRows}
               />
             </Panel>
@@ -626,15 +630,18 @@ function History({
   rows,
   timeZone,
   canEdit,
+  canManageQuality,
   reload,
 }: {
   rows: JobPerformanceRow[];
   timeZone: string;
   canEdit: boolean;
+  canManageQuality: boolean;
   reload: () => Promise<void>;
 }) {
   const [editing, setEditing] =
     useState<JobPerformanceRow | null>(null);
+  const [quality, setQuality] = useState<JobPerformanceRow | null>(null);
 
   return (
     <>
@@ -652,7 +659,7 @@ function History({
           "Total Actual Labor",
           "Crew",
           "Budget vs Actual",
-          ...(canEdit ? ["Actions"] : []),
+          ...(canEdit || canManageQuality ? ["Actions"] : []),
         ]}
         rows={rows.map((x) => {
           const variance =
@@ -693,16 +700,9 @@ function History({
 
             laborVarianceText(variance),
 
-            ...(canEdit
+            ...(canEdit || canManageQuality
               ? [
-                  <button
-                    key={x.id}
-                    type="button"
-                    className={input}
-                    onClick={() => setEditing(x)}
-                  >
-                    Edit actual time
-                  </button>,
+                  <div key={x.id} className="flex flex-wrap gap-2">{canEdit&&<button type="button" className={input} onClick={() => setEditing(x)}>Edit actual time</button>}{canManageQuality&&<button type="button" className={input} onClick={() => setQuality(x)}>Quality</button>}</div>,
                 ]
               : []),
           ];
@@ -717,6 +717,7 @@ function History({
           reload={reload}
         />
       )}
+      {quality && <JobQualityPanel jobId={quality.id} jobNumber={quality.job_number} close={()=>setQuality(null)}/>}
     </>
   );
 }

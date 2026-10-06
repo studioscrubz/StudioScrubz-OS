@@ -41,6 +41,7 @@ import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
 import type {PorterNotificationEvent} from "@/types/porterNotification";
 import type {ProposalDepositEvent,ProposalDepositRequirement} from "@/types/proposalDeposit";
 import type {LeadRepresentativeLead} from "@/types/leadRepresentative";
+import type {CallbackEvent,CustomerFeedback,JobQualityEvidence,QualityCallback,QualityInspection,ScopeCompletionRecord} from "@/types/jobQuality";
 
 export interface Database {
   public: {
@@ -156,6 +157,13 @@ export interface Database {
       attention_push_deliveries:{Row:AttentionPushDelivery;Insert:Omit<AttentionPushDelivery,"id"|"created_at"|"updated_at"|"sent_at"|"failure_code"|"failure_message">&{id?:string;created_at?:string;updated_at?:string;sent_at?:string|null;failure_code?:string|null;failure_message?:string|null};Update:Partial<Pick<AttentionPushDelivery,"delivery_status"|"last_attempt_at"|"sent_at"|"failure_code"|"failure_message"|"updated_at">>;Relationships:[]};
       attention_push_checkpoints:{Row:AttentionPushCheckpoint;Insert:Omit<AttentionPushCheckpoint,"initialized_at">&{initialized_at?:string};Update:never;Relationships:[]};
       job_labor_threshold_events:{Row:import("@/types/job").JobLaborThresholdEvent;Insert:never;Update:never;Relationships:[]};
+      job_quality_inspections:{Row:Omit<QualityInspection,"items">;Insert:never;Update:never;Relationships:[]};
+      job_quality_inspection_items:{Row:import("@/types/jobQuality").InspectionItem;Insert:never;Update:never;Relationships:[]};
+      job_quality_callbacks:{Row:Omit<QualityCallback,"events">;Insert:never;Update:never;Relationships:[]};
+      job_quality_callback_events:{Row:CallbackEvent;Insert:never;Update:never;Relationships:[]};
+      job_scope_completion_records:{Row:ScopeCompletionRecord;Insert:never;Update:never;Relationships:[]};
+      job_customer_feedback:{Row:CustomerFeedback;Insert:never;Update:never;Relationships:[]};
+      job_quality_evidence_links:{Row:JobQualityEvidence["evidenceLinks"][number];Insert:never;Update:never;Relationships:[]};
     };
 
     Views: {
@@ -227,6 +235,13 @@ export interface Database {
       get_job_performance_rows:{Args:{p_start_date:string|null;p_end_date:string|null};Returns:JobPerformanceRow[]};
       get_job_live_labor_burn:{Args:{p_job_id:string};Returns:import("@/types/job").JobLiveLaborBurn[]};
       evaluate_job_labor_thresholds:{Args:{p_job_id:string};Returns:import("@/types/job").JobLaborThresholdEvent[]};
+      get_job_quality_evidence:{Args:{p_job_id:string};Returns:JobQualityEvidence};
+      save_job_quality_inspection:{Args:{p_job_id:string;p_inspection_id:string|null;p_overall_notes:string;p_items:Array<{category:string;result:string;severity:string|null;notes:string}>;p_finalize:boolean};Returns:string};
+      create_job_quality_callback:{Args:{p_job_id:string;p_source:string;p_severity:string;p_category:string;p_notes:string};Returns:string};
+      update_job_quality_callback:{Args:{p_callback_id:string;p_status:string;p_attribution:string;p_reason:string};Returns:undefined};
+      finalize_job_scope_completion:{Args:{p_job_id:string;p_result:string;p_attribution:string;p_explanation:string};Returns:string};
+      record_job_customer_feedback:{Args:{p_job_id:string;p_rating:number;p_feedback:string;p_source:string;p_received_at:string};Returns:string};
+      link_job_quality_evidence:{Args:{p_job_id:string;p_evidence_type:string;p_evidence_record_id:string;p_job_evidence_id:string};Returns:string};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
       get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};
