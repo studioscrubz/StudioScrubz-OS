@@ -42,6 +42,7 @@ import type {PorterNotificationEvent} from "@/types/porterNotification";
 import type {ProposalDepositEvent,ProposalDepositRequirement} from "@/types/proposalDeposit";
 import type {LeadRepresentativeLead} from "@/types/leadRepresentative";
 import type {CallbackEvent,CustomerFeedback,JobQualityEvidence,QualityCallback,QualityInspection,ScopeCompletionRecord} from "@/types/jobQuality";
+import type {ComplianceRecord,JobEmployeeParticipation,JobPerformanceEvidence,QualityEmployeeAttribution,TeamworkEvent} from "@/types/jobPerformanceEvidence";
 
 export interface Database {
   public: {
@@ -164,6 +165,12 @@ export interface Database {
       job_scope_completion_records:{Row:ScopeCompletionRecord;Insert:never;Update:never;Relationships:[]};
       job_customer_feedback:{Row:CustomerFeedback;Insert:never;Update:never;Relationships:[]};
       job_quality_evidence_links:{Row:JobQualityEvidence["evidenceLinks"][number];Insert:never;Update:never;Relationships:[]};
+      job_compliance_records:{Row:ComplianceRecord;Insert:never;Update:never;Relationships:[]};
+      employee_teamwork_events:{Row:TeamworkEvent;Insert:never;Update:never;Relationships:[]};
+      employee_teamwork_acknowledgement_events:{Row:{id:string;teamwork_event_id:string;employee_id:string;acknowledgement_state:"Acknowledged"|"Disputed";employee_note:string|null;actor_user_id:string;occurred_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
+      job_quality_employee_attributions:{Row:QualityEmployeeAttribution;Insert:never;Update:never;Relationships:[]};
+      job_quality_employee_attribution_events:{Row:{id:string;attribution_id:string;event_type:"Created"|"Replaced"|"Withdrawn";operational_reason:string;actor_user_id:string;occurred_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
+      job_performance_evidence_links:{Row:{id:string;job_id:string;evidence_type:"Compliance"|"Teamwork";evidence_record_id:string;job_evidence_id:string;created_by:string;created_at:string};Insert:never;Update:never;Relationships:[]};
     };
 
     Views: {
@@ -242,6 +249,14 @@ export interface Database {
       finalize_job_scope_completion:{Args:{p_job_id:string;p_result:string;p_attribution:string;p_explanation:string};Returns:string};
       record_job_customer_feedback:{Args:{p_job_id:string;p_rating:number;p_feedback:string;p_source:string;p_received_at:string};Returns:string};
       link_job_quality_evidence:{Args:{p_job_id:string;p_evidence_type:string;p_evidence_record_id:string;p_job_evidence_id:string};Returns:string};
+      get_job_employee_participation:{Args:{p_job_id:string};Returns:JobEmployeeParticipation[]};
+      get_job_performance_evidence:{Args:{p_job_id:string};Returns:JobPerformanceEvidence};
+      record_job_compliance:{Args:{p_job_id:string;p_employee_id:string|null;p_category:string;p_result:string;p_ownership:string;p_notes:string};Returns:string};
+      record_employee_teamwork_event:{Args:{p_job_id:string;p_employee_id:string;p_event_type:string;p_direction:string;p_notes:string;p_occurred_at:string};Returns:string};
+      acknowledge_employee_teamwork_event:{Args:{p_event_id:string;p_state:string;p_note?:string|null};Returns:undefined};
+      record_job_quality_employee_attribution:{Args:{p_job_id:string;p_quality_type:string;p_quality_id:string;p_target:string;p_employee_id:string|null;p_crew_id:string|null;p_reason:string;p_job_evidence_id?:string|null};Returns:string};
+      withdraw_job_quality_employee_attribution:{Args:{p_attribution_id:string;p_reason:string};Returns:undefined};
+      link_job_performance_evidence:{Args:{p_job_id:string;p_type:string;p_record_id:string;p_job_evidence_id:string};Returns:string};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
       get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};

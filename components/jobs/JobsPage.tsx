@@ -65,6 +65,7 @@ import { JOB_EVIDENCE_TYPES, type JobEvidenceType } from "@/types/jobEvidence";
 import type { JobScopeTimeline } from "@/types/jobScopeTimeline";
 import { checkScopeAdvisory } from "@/lib/services/scopeAdvisory";
 import type { ScopeAdvisoryResult } from "@/types/scopeAdvisory";
+import { MyTeamworkEvents } from "@/components/jobs/MyTeamworkEvents";
 
 type ScheduleFilter = "All" | "Scheduled" | "Unscheduled" | "Upcoming" | "Past";
 const activeStatuses: JobStatus[] = [
@@ -290,6 +291,7 @@ export function JobsPage() {
     <>
       {communication.composer}
       <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
+      {profile && ["Crew Lead", "Scrub Technician"].includes(profile.role) && <MyTeamworkEvents />}
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
       <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4">
