@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type {
   EligibleJobTech,
@@ -393,7 +393,7 @@ export function DirectJobModal({
             aria-label="Close Create Job"
             className="grid size-9 place-items-center rounded-lg border text-xl text-neutral-500"
           >
-            ×
+            Ã—
           </button>
         </header>
 
@@ -428,7 +428,7 @@ export function DirectJobModal({
                       {matchedClients.map((row) => (
                         <option key={row.id} value={row.id}>
                           {clientName(row)}
-                          {row.email ? ` — ${row.email}` : ""}
+                          {row.email ? ` â€” ${row.email}` : ""}
                         </option>
                       ))}
                     </select>
@@ -486,11 +486,7 @@ export function DirectJobModal({
                         setAddonNames([]);
                         setAddonSelections([]);
 
-                        setOverrideEnabled(
-                          canOverridePrice &&
-                            next?.pricing_model === "Custom",
-                        );
-
+                        setOverrideEnabled(false);
                         setOverridePrice("");
                       }}
                     >
@@ -498,7 +494,7 @@ export function DirectJobModal({
 
                       {services.map((row) => (
                         <option key={row.id} value={row.id}>
-                          {row.service_name} — {money(row.base_price)}
+                          {row.service_name} â€” {money(row.base_price)}
                         </option>
                       ))}
                     </select>
@@ -516,7 +512,7 @@ export function DirectJobModal({
                       </p>
 
                       <p className="mt-1 text-xs text-neutral-500">
-                        {service.division} · {service.pricing_model}
+                        {service.division} Â· {service.pricing_model}
                       </p>
                     </div>
                   )}
@@ -611,7 +607,7 @@ export function DirectJobModal({
                             key={row.employee_id}
                             value={row.employee_id}
                           >
-                            {row.display_name} — {row.operational_role}
+                            {row.display_name} â€” {row.operational_role}
                           </option>
                         ))}
                       </select>
@@ -796,7 +792,7 @@ export function DirectJobModal({
               onClick={() => void submit()}
               className={primary}
             >
-              {saving ? "Creating…" : "Create Job"}
+              {saving ? "Creatingâ€¦" : "Create Job"}
             </button>
           </div>
         </div>
@@ -871,7 +867,7 @@ function Price({
           strong ? "text-[#d4af37]" : "text-[#143d1a]"
         }`}
       >
-        {value == null ? "—" : money(value)}
+        {value == null ? "â€”" : money(value)}
       </p>
     </div>
   );
@@ -888,7 +884,7 @@ function clientName(row: Client) {
 function propertyLabel(row: PropertyWithClient) {
   return [row.property_name, row.address, row.city]
     .filter(Boolean)
-    .join(" · ");
+    .join(" Â· ");
 }
 
 function money(value: number) {
