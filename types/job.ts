@@ -141,6 +141,16 @@ export type JobLiveLaborBurn = {
   current_threshold: 75 | 90 | 100 | 110 | null;
   job_status: JobStatus;
 };
+export type JobLaborThresholdEvent = {
+  id: string;
+  job_id: string;
+  threshold_percent: 75 | 90 | 100 | 110;
+  labor_burn_percent_at_crossing: number;
+  performance_labor_hours_at_crossing: number;
+  effective_labor_hours_at_crossing: number;
+  crossed_at: string;
+  created_at: string;
+};
 export type JobClockInResult = {
   jobId: string;
   jobStatus: "In Progress";

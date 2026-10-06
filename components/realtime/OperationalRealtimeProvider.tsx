@@ -10,6 +10,7 @@ export const OPERATIONAL_TABLES = [
   "property_service_visits", "property_service_visit_photos", "property_service_visit_issues",
   "estimates", "walkthroughs", "proposals", "service_agreements", "jobs",
   "invoices", "attention_item_states", "client_communications", "service_occurrences",
+  "job_labor_threshold_events",
   "invoice_job_photos", "invoice_job_lines",
   "service_agreement_documents",
   "payments", "expenses", "time_entries", "employee_work_sessions", "clients", "properties", "crews", "employees",

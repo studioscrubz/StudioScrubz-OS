@@ -155,6 +155,7 @@ export interface Database {
       browser_push_subscriptions:{Row:BrowserPushSubscription;Insert:Omit<BrowserPushSubscription,"id"|"created_at"|"updated_at">&{id?:string;created_at?:string;updated_at?:string};Update:Partial<Pick<BrowserPushSubscription,"user_id"|"p256dh"|"auth"|"user_agent"|"revoked_at"|"updated_at">>;Relationships:[]};
       attention_push_deliveries:{Row:AttentionPushDelivery;Insert:Omit<AttentionPushDelivery,"id"|"created_at"|"updated_at"|"sent_at"|"failure_code"|"failure_message">&{id?:string;created_at?:string;updated_at?:string;sent_at?:string|null;failure_code?:string|null;failure_message?:string|null};Update:Partial<Pick<AttentionPushDelivery,"delivery_status"|"last_attempt_at"|"sent_at"|"failure_code"|"failure_message"|"updated_at">>;Relationships:[]};
       attention_push_checkpoints:{Row:AttentionPushCheckpoint;Insert:Omit<AttentionPushCheckpoint,"initialized_at">&{initialized_at?:string};Update:never;Relationships:[]};
+      job_labor_threshold_events:{Row:import("@/types/job").JobLaborThresholdEvent;Insert:never;Update:never;Relationships:[]};
     };
 
     Views: {
@@ -225,6 +226,7 @@ export interface Database {
       mark_service_agreement_sent_for_delivery:{Args:{p_agreement_id:string;p_sent_to:string;p_sent_by:string;p_token:string;p_token_expires_at:string};Returns:ServiceAgreement};
       get_job_performance_rows:{Args:{p_start_date:string|null;p_end_date:string|null};Returns:JobPerformanceRow[]};
       get_job_live_labor_burn:{Args:{p_job_id:string};Returns:import("@/types/job").JobLiveLaborBurn[]};
+      evaluate_job_labor_thresholds:{Args:{p_job_id:string};Returns:import("@/types/job").JobLaborThresholdEvent[]};
       get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
       get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
       get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};

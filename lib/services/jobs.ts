@@ -406,6 +406,11 @@ export async function joinJob(id: string): Promise<JobClockInResult> {
   return data as JobClockInResult;
 }
 export async function getJobLiveLaborBurn(jobId: string): Promise<JobLiveLaborBurn> {
+  const evaluation = await getSupabaseClient().rpc(
+    "evaluate_job_labor_thresholds",
+    { p_job_id: jobId },
+  );
+  if (evaluation.error) throw new Error(safeDatabaseMessage(evaluation.error, "Labor thresholds could not be evaluated."));
   const { data, error } = await getSupabaseClient().rpc(
     "get_job_live_labor_burn",
     { p_job_id: jobId },
@@ -413,6 +418,7 @@ export async function getJobLiveLaborBurn(jobId: string): Promise<JobLiveLaborBu
   if (error) throw new Error(safeDatabaseMessage(error, "Live labor burn could not be loaded."));
   const row = data?.[0];
   if (!row) throw new Error("Live labor burn is unavailable for this Job.");
+  if ((evaluation.data ?? []).length) await requestImmediateAttentionPush();
   return {
     ...row,
     effective_labor_hours: numberOrNull(row.effective_labor_hours),

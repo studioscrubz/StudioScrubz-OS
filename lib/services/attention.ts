@@ -21,6 +21,7 @@ import { canReviewFieldDiscovery } from "@/lib/services/fieldDiscoveries";
 import type { FieldDiscovery } from "@/types/fieldDiscovery";
 import type { ChangeRequest } from "@/types/changeRequest";
 import type { PorterNotificationEvent, PorterNotificationType } from "@/types/porterNotification";
+import type { JobLaborThresholdEvent } from "@/types/job";
 
 const GOOGLE_REVIEW_URL = "https://g.page/r/CT2X4ZAN1E8oEAI/review";
 
@@ -37,6 +38,7 @@ export const ATTENTION_REALTIME_TABLES = [
   "client_communications",
   "time_entries",
   "porter_notification_events",
+  "job_labor_threshold_events",
 ] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
@@ -68,6 +70,8 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   const { data: porterRows, error: porterError } = await getSupabaseClient().from("porter_notification_events").select("*").lte("available_at", new Date().toISOString()).is("cancelled_at", null);
   if (porterError) throw porterError;
   const porterNotifications = (porterRows as PorterNotificationEvent[]).filter((event) => !event.expires_at || Date.parse(event.expires_at) > Date.now());
+  const { data: laborThresholdRows, error: laborThresholdError } = await getSupabaseClient().from("job_labor_threshold_events").select("*").order("crossed_at", { ascending: false });
+  if (laborThresholdError) throw laborThresholdError;
   const canReadContractBilling = hasPermission(profile, "agreements.view") && hasPermission(profile, "invoices.view");
   const {data:contractOccurrences,error:contractOccurrenceError}=jobs.length&&canReadContractBilling?await getSupabaseClient().from("service_occurrences").select("job_id,agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type)").in("job_id",jobs.map(row=>row.id)):{data:[],error:null};
   if(contractOccurrenceError)throw contractOccurrenceError;
@@ -88,7 +92,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   if (discoveries.error) throw discoveries.error;
   if (decisions.error) throw decisions.error;
-  const input: AttentionRuleInput = { porterNotifications, fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const input: AttentionRuleInput = { porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -100,6 +104,7 @@ export type AssignedWalkthroughAttention = { id: string; employeeId: string; dat
 
 export type AttentionRuleInput = {
   porterNotifications?: PorterNotificationEvent[];
+  laborThresholdEvents?: JobLaborThresholdEvent[];
   fieldDiscoveries?: Pick<FieldDiscovery, "id" | "job_id" | "status" | "created_at">[];
   changeRequestDecisions?: Pick<ChangeRequest, "id" | "job_id" | "status" | "decided_at">[];
   assignedWalkthroughs?: AssignedWalkthroughAttention[];
@@ -134,6 +139,32 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     items.push(item(event.dedupe_key, porterAttentionType(event.event_type), event.severity, "Porter", event.title, event.description,
       event.route_id ? "Porter Route" : "Porter Visit", event.route_id ?? event.visit_id!, null, null, null, event.scheduled_date,
       event.created_at, event.action_url, event.action_label));
+  }
+
+  if (["Master Admin", "Administrator", "Manager", "Crew Lead"].includes(profile.role)) {
+    const visibleJobs = new Map(jobs.map((job) => [job.id, job]));
+    for (const event of input.laborThresholdEvents ?? []) {
+      const job = visibleJobs.get(event.job_id);
+      if (!job) continue;
+      const title = laborThresholdTitle(event.threshold_percent);
+      items.push(item(
+        `job-labor:${event.job_id}:${event.threshold_percent}`,
+        "Labor Budget Update",
+        "Attention",
+        "Jobs",
+        title,
+        `${job.job_number || "Job"}${job.client_name ? ` · ${job.client_name}` : ""}. Continue completing the required scope and quality standards. This alert is for operational awareness.`,
+        "Job",
+        job.id,
+        job.client_id,
+        job.job_number || "Job",
+        null,
+        job.scheduled_date,
+        event.crossed_at,
+        `/jobs?jobId=${job.id}`,
+        "Open Job",
+      ));
+    }
   }
 
   if (profile.is_active && hasPermission(profile, "proposals.view") && ["Sales", "Administrator", "Master Admin"].includes(profile.role)) {
@@ -303,6 +334,7 @@ function localDate(date = new Date()) { return `${date.getFullYear()}-${String(d
 function addDays(value: string, days: number) { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate() + days); return localDate(date); }
 function daysSince(value: string | null) { return value ? Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 86400000)) : 0; }
 function rank(value: AttentionItem["severity"]) { return value === "Urgent" ? 0 : value === "Attention" ? 1 : 2; }
+function laborThresholdTitle(threshold: JobLaborThresholdEvent["threshold_percent"]){if(threshold===110)return"Labor budget exceeded: 110% used.";if(threshold===100)return"Labor budget reached.";return`Labor budget update: ${threshold}% used.`}
 function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
 function effectiveState(state: AttentionStateRecord | undefined, now: Date) { if (!state) return null; if (state.state === "Snoozed" && (!state.snoozed_until || Date.parse(state.snoozed_until) <= now.getTime())) return null; return state; }
 function withinReminderWindow(date: string, time: string | null, now: Date) { const scheduled = new Date(`${date}T${time?.slice(0, 5) || "09:00"}:00`); const delta = scheduled.getTime() - now.getTime(); return delta >= 0 && delta <= 48 * 60 * 60 * 1000; }

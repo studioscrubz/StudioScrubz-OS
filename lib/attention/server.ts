@@ -14,7 +14,7 @@ type Snapshot = Omit<AttentionRuleInput, "profile" | "states" | "jobRouteIds" | 
 };
 
 export async function loadAttentionServerSnapshot(db: AdminClient, now = new Date()): Promise<Snapshot> {
-  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings, crewMembers, crews, occurrences, invoiceLines, fieldDiscoveries, changeRequestDecisions, porterNotifications] = await Promise.all([
+  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings, crewMembers, crews, occurrences, invoiceLines, fieldDiscoveries, changeRequestDecisions, porterNotifications, laborThresholdEvents] = await Promise.all([
     query(db.from("estimates").select("*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)")),
     query(db.from("jobs").select("*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)")),
     query(db.from("walkthroughs").select("*, client:clients!walkthroughs_client_id_fkey(*), property:properties!walkthroughs_property_id_fkey(*), estimate:estimates!walkthroughs_estimate_id_fkey(*)")),
@@ -32,6 +32,7 @@ export async function loadAttentionServerSnapshot(db: AdminClient, now = new Dat
     query(db.from("field_discoveries").select("id,job_id,status,created_at").eq("status", "Open")),
     query(db.from("change_requests").select("id,job_id,status,decided_at").in("status", ["Approved", "Declined"]).not("decided_at", "is", null)),
     query(db.from("porter_notification_events").select("*").lte("available_at", now.toISOString()).is("cancelled_at", null)),
+    query(db.from("job_labor_threshold_events").select("*").order("crossed_at", { ascending: false })),
   ]);
   const crewIdsByEmployee = new Map<string, Set<string>>();
   for (const member of crewMembers as Array<{ crew_id: string; employee_id: string }>) addCrew(crewIdsByEmployee, member.employee_id, member.crew_id);
@@ -41,7 +42,7 @@ export async function loadAttentionServerSnapshot(db: AdminClient, now = new Dat
     ...(invoices as Array<{ job_id: string | null; status: string }>).filter((row) => row.job_id && !["Cancelled", "Archived"].includes(row.status)).map((row) => row.job_id!),
     ...(invoiceLines as Array<{ job_id: string }>).map((row) => row.job_id), ...contractJobIds,
   ])];
-  return { porterNotifications: (porterNotifications as AttentionRuleInput["porterNotifications"])?.filter((event) => !event.expires_at || Date.parse(event.expires_at) > now.getTime()), fieldDiscoveries, changeRequestDecisions, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: (settings[0] as { timezone?: string | null } | undefined)?.timezone ?? null, agreementProposalIds: (agreements as Array<{ proposal_id: string | null }>).map((row) => row.proposal_id), contractJobIds, crewIdsByEmployee, now } as unknown as Snapshot;
+  return { porterNotifications: (porterNotifications as AttentionRuleInput["porterNotifications"])?.filter((event) => !event.expires_at || Date.parse(event.expires_at) > now.getTime()), laborThresholdEvents, fieldDiscoveries, changeRequestDecisions, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: (settings[0] as { timezone?: string | null } | undefined)?.timezone ?? null, agreementProposalIds: (agreements as Array<{ proposal_id: string | null }>).map((row) => row.proposal_id), contractJobIds, crewIdsByEmployee, now } as unknown as Snapshot;
 }
 
 export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapshot) {
@@ -54,6 +55,7 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
   const input: AttentionRuleInput = {
     profile,
     porterNotifications: (snapshot.porterNotifications ?? []).filter((event) => event.recipient_user_id === profile.id),
+    laborThresholdEvents: snapshot.laborThresholdEvents,
     assignedWalkthroughs: hasPermission(profile, "walkthroughs.field") && profile.employee_id
       ? snapshot.walkthroughs.filter(row => row.status === "Scheduled" && !row.archived_at && row.assigned_employee_id === profile.employee_id && row.walkthrough_date && row.walkthrough_time)
         .map(row => ({ id: row.id, employeeId: profile.employee_id!, date: row.walkthrough_date!, time: row.walkthrough_time }))
