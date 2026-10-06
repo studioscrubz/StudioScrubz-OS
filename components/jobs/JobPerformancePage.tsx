@@ -647,16 +647,18 @@ function History({
           "Service",
           "Actual Time",
           "Labor Budget",
-          "Actual Labor",
+          "Performance Labor",
+          "Approved Exception",
+          "Total Actual Labor",
           "Crew",
           "Budget vs Actual",
           ...(canEdit ? ["Actions"] : []),
         ]}
         rows={rows.map((x) => {
           const variance =
-            x.actual_labor_hours !== null &&
+            x.performance_labor_hours !== null &&
             x.effective_labor_hours !== null
-              ? x.actual_labor_hours -
+              ? x.performance_labor_hours -
                 x.effective_labor_hours
               : null;
 
@@ -672,6 +674,14 @@ function History({
                   x.effective_labor_hours,
                 )} hrs`
               : "—",
+
+            x.performance_labor_hours !== null
+              ? `${formatHours(x.performance_labor_hours)} hrs`
+              : "Unavailable",
+
+            x.approved_exception_hours !== null
+              ? `${formatHours(x.approved_exception_hours)} hrs`
+              : "Unavailable",
 
             x.actual_labor_hours !== null
               ? `${formatHours(x.actual_labor_hours)} hrs`

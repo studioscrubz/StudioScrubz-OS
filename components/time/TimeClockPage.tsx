@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   approveTimeEntry,
   archiveTimeEntry,
+  classifyJobTimeEntryLabor,
   createManualTimeEntry,
   getTimeEntries,
   rejectTimeEntry,
@@ -30,6 +31,9 @@ export function TimeClockPage() {
   const canViewCrews = hasPermission(profile, "crews.view");
   const canListEmployees = hasPermission(profile, "timeClock.manageAll") && hasPermission(profile, "employees.directory_view");
   const canViewTime = hasPermission(profile, "timeClock.view");
+  const canClassifyLabor =
+    profile?.is_active === true &&
+    ["Master Admin", "Administrator", "Manager"].includes(profile.role);
   const profileId = profile?.id;
   const [rows, setRows] = useState<TimeEntryWithRelations[]>([]),
     [employees, setEmployees] = useState<Employee[]>([]),
@@ -237,6 +241,7 @@ export function TimeClockPage() {
                 "Total",
                 "Gross Pay",
                 "Status",
+                "Labor Class",
                 "Actions",
               ].map((x) => (
                 <th className="p-3 text-left" key={x}>
@@ -262,8 +267,41 @@ export function TimeClockPage() {
                 <td className="p-3 font-bold">{n(x.total_hours)}</td>
                 <td className="p-3">{canReviewPayroll ? money(x.gross_pay) : "—"}</td>
                 <td className="p-3">{x.status}</td>
+                <td className="p-3">{x.labor_classification}</td>
                 <td className="p-3">
                   <div className="flex gap-1">
+                    {canClassifyLabor &&
+                      x.entry_type === "Job" &&
+                      Boolean(x.job_id) &&
+                      ["Completed", "Approved"].includes(x.status) &&
+                      !x.archived_at && (
+                        <button
+                          className={secondary}
+                          onClick={() => {
+                            const classification =
+                              x.labor_classification === "Production"
+                                ? "Approved Exception"
+                                : "Production";
+                            const reason = window.prompt(
+                              `Operational reason for ${classification} classification (do not include medical or family details)`,
+                            );
+                            if (!reason) return;
+                            void act(
+                              () =>
+                                classifyJobTimeEntryLabor(
+                                  x.id,
+                                  classification,
+                                  reason,
+                                ),
+                              `Labor classified as ${classification}.`,
+                            );
+                          }}
+                        >
+                          Mark {x.labor_classification === "Production"
+                            ? "Exception"
+                            : "Production"}
+                        </button>
+                      )}
                     {canCorrectTime && ["Open", "Completed"].includes(x.status) && (
                       <button className={secondary} onClick={() => setModal(x)}>
                         Edit

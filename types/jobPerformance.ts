@@ -29,6 +29,8 @@ export type JobPerformanceRow = {
 
   duration_seconds: number;
   actual_labor_hours: number | null;
+  performance_labor_hours: number | null;
+  approved_exception_hours: number | null;
 
   budgeted_labor_hours: number | null;
   budgeted_crew_size: number | null;

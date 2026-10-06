@@ -14,6 +14,7 @@ import type {
   TimeEntryInput,
   TimeEntryWithRelations,
   OperationalActiveTimeEntry,
+  LaborClassification,
 } from "@/types/timeEntry";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { isMasterAdmin } from "@/lib/auth/permissions";
@@ -170,6 +171,22 @@ export async function archiveTimeEntry(id: string) {
   if (error) throw error;
   await recalculateEmployeeDay(entry.employee_id, entry.work_date);
   return getById(id);
+}
+export async function classifyJobTimeEntryLabor(
+  id: string,
+  classification: LaborClassification,
+  operationalReason: string,
+) {
+  const { data, error } = await getSupabaseClient().rpc(
+    "classify_job_time_entry_labor",
+    {
+      p_time_entry_id: id,
+      p_classification: classification,
+      p_operational_reason: operationalReason,
+    },
+  );
+  if (error) throw error;
+  return operationalEntry(data);
 }
 export async function recalculateEmployeeDay(
   employeeId: string | null,

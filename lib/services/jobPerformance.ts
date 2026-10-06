@@ -20,6 +20,8 @@ export async function getJobPerformanceRows(
 
     duration_seconds: Number(row.duration_seconds),
     actual_labor_hours: numberOrNull(row.actual_labor_hours),
+    performance_labor_hours: numberOrNull(row.performance_labor_hours),
+    approved_exception_hours: numberOrNull(row.approved_exception_hours),
 
     budgeted_labor_hours: numberOrNull(row.budgeted_labor_hours),
     budgeted_crew_size: numberOrNull(row.budgeted_crew_size),
