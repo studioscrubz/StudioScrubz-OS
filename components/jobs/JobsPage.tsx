@@ -445,10 +445,16 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       techs={activeTechs}
       busy={busy}
       close={() => setShowPresence(false)}
-      start={(presence) => lifecycleAct(
-        async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJobWithPresence(job.id, presence) }),
-        "Job started. Present crew members were clocked in.",
-      )}
+     start={(presence) => {
+  setShowPresence(false);
+  lifecycleAct(
+    async () => ({
+      communicationEvent: "team_arrived" as const,
+      job: await startOperationalJobWithPresence(job.id, presence),
+    }),
+    "Job started. Present crew members were clocked in.",
+  );
+}}
     />}
   </>;
 }
@@ -759,10 +765,17 @@ function JobModal({
         techs={activeTechs}
         busy={busy}
         close={() => setShowPresence(false)}
-        start={(presence) => lifecycleAct(
-          async () => ({ communicationEvent: "team_arrived" as const, job: await startOperationalJobWithPresence(job.id, presence) }),
-          "Job started. Present crew members were clocked in.",
-        )}
+       start={(presence) => {
+  setShowPresence(false);
+  close();
+  lifecycleAct(
+    async () => ({
+      communicationEvent: "team_arrived" as const,
+      job: await startOperationalJobWithPresence(job.id, presence),
+    }),
+    "Job started. Present crew members were clocked in.",
+  );
+}}
       />}
       </> : tab === "Scope" ? <JobScopePanel jobId={job.id} recordDiscovery={(question) => { setDiscoveryPrefill(question); setTab("Discoveries"); }} /> : tab === "Discoveries" ? <JobDiscoveriesPanel jobId={job.id} role={role} prefillDescription={discoveryPrefill} clearPrefill={() => setDiscoveryPrefill(null)} createChange={(discovery) => { setChangePrefill(discovery); setTab("Changes"); }} /> : tab === "Changes" ? <JobChangesPanel jobId={job.id} role={role} prefill={changePrefill} clearPrefill={() => setChangePrefill(null)} /> : <JobTimelinePanel jobId={job.id} role={role} />}
     </Modal>
