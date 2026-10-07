@@ -159,6 +159,7 @@ export function JobsPage() {
     fn: () => Promise<unknown>,
     text: string | ((result: unknown) => string),
     onError?: (detail: string) => void,
+    onSuccess?: () => void,
   ) {
     setBusy(job.id);
     setError(null);
@@ -191,6 +192,7 @@ export function JobsPage() {
       } else {
         setNotice(typeof text === "function" ? text(result) : text);
       }
+      onSuccess?.();
     } catch (x) {
       console.error("Job mutation failed", x);
       const detail = message(x, "Job action failed.");
@@ -213,7 +215,6 @@ export function JobsPage() {
     } catch (cause) {
       console.error("Cancelled Job permanent deletion failed", cause);
       setError(message(cause, "The Cancelled Job could not be permanently deleted."));
-      setConfirmingDelete(null);
     } finally {
       setBusy(null);
     }
@@ -289,7 +290,7 @@ export function JobsPage() {
       canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
       requestDelete={() => setConfirmingDelete(job)}
-      act={(fn, text, onError) => void mutate(job, fn, text, onError)}
+      act={(fn, text, onError, onSuccess) => void mutate(job, fn, text, onError, onSuccess)}
     />
   );
   return (
@@ -355,7 +356,7 @@ export function JobsPage() {
           job={selected}
           busy={busy === selected.id}
           close={() => setSelected(null)}
-          mutate={(fn, text, onError) => void mutate(selected, fn, text, onError)}
+          mutate={(fn, text, onError, onSuccess) => void mutate(selected, fn, text, onError, onSuccess)}
           canEdit={hasPermission(profile, "jobs.edit")}
           canSchedule={hasPermission(profile, "jobs.schedule")}
           canArchive={hasPermission(profile, "jobs.archive")}
@@ -385,7 +386,7 @@ activeTechs={activeTechs}
     </>
   );
 }
-type JobAction = (fn: () => Promise<unknown>, text: string | ((result: unknown) => string), onError?: (detail: string) => void) => void;
+type JobAction = (fn: () => Promise<unknown>, text: string | ((result: unknown) => string), onError?: (detail: string) => void, onSuccess?: () => void) => void;
 function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeTechs, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; role: string | null; activeCrew: CrewWithRelations | null; activeTechs: EligibleJobTech[]; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: JobAction }) {
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [showPresence, setShowPresence] = useState(false);
@@ -395,7 +396,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
   const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
   const canCardComplete = job.status === "In Progress" && canComplete;
   const canCardEndJob = canComplete;
-  const lifecycleAct = (fn: () => Promise<unknown>, text: string) => { setLifecycleError(null); act(fn, text, setLifecycleError); };
+  const lifecycleAct = (fn: () => Promise<unknown>, text: string, onSuccess?: () => void) => { setLifecycleError(null); act(fn, text, setLifecycleError, onSuccess); };
   const content = (
     <>
     <div className="grid gap-4 text-left md:grid-cols-[7rem_minmax(0,1.4fr)_minmax(12rem,1fr)_auto] md:items-start">
@@ -446,13 +447,13 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       busy={busy}
       close={() => setShowPresence(false)}
      start={(presence) => {
-  setShowPresence(false);
   lifecycleAct(
     async () => ({
       communicationEvent: "team_arrived" as const,
       job: await startOperationalJobWithPresence(job.id, presence),
     }),
     "Job started. Present crew members were clocked in.",
+    () => setShowPresence(false),
   );
 }}
     />}
@@ -561,7 +562,7 @@ function JobModal({
   }, []);
   function status(next: JobStatus) {
     if (next === "Scheduled" && !job.scheduled_date) return;
-    mutate(() => updateJobStatus(job.id, next), `Job moved to ${next}.`);
+    mutate(() => updateJobStatus(job.id, next), `Job moved to ${next}.`, undefined, close);
   }
   async function assign() {
     const target:JobWorkerTarget=assignmentKind==="individual"?{kind:"individual",employeeId:employeeIdTarget}:assignmentKind==="crew"?{kind:"crew",crewId}:{kind:"unassigned"};
@@ -577,7 +578,7 @@ function JobModal({
   const canSupervisorComplete = canComplete;
   const showLifecycle = ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status)
     && (eligibility.showStart || (canClock && eligibility.canJoin) || (job.status === "In Progress" && canSupervisorComplete));
-  const lifecycleAct = (fn: () => Promise<unknown>, text: string) => { setLifecycleError(null); mutate(fn, text, setLifecycleError); };
+  const lifecycleAct = (fn: () => Promise<unknown>, text: string, onSuccess?: () => void) => { setLifecycleError(null); mutate(fn, text, setLifecycleError, onSuccess); };
   return (
     <Modal title={job.job_number} close={close}>
       <div className="mb-5 flex gap-2 border-b border-neutral-200" role="tablist" aria-label="Job details">
@@ -632,6 +633,8 @@ function JobModal({
               () =>
                 scheduleJob(job.id, date, time, duration || null, job.status),
               "Schedule saved.",
+              undefined,
+              close,
             )
           }
           className={primary}
@@ -666,7 +669,7 @@ function JobModal({
           )}
           <button
             disabled={busy || (assignmentKind==="crew"&&!crewId) || (assignmentKind==="individual"&&!employeeIdTarget)}
-            onClick={() => mutate(assign, "Worker assignment saved.")}
+            onClick={() => mutate(assign, "Worker assignment saved.", undefined, close)}
             className={`${primary} mt-3`}
           >
             Save Assignment
@@ -706,13 +709,13 @@ function JobModal({
         <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
           {clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}
-          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }}>START JOB</button>}
+          {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job.", close); }}>START JOB</button>}
           {canClock && eligibility.canJoin && !clockError && (
             <>
               <button
                 disabled={busy || clock === null || Boolean(clock?.clockedIn)}
                 className={`${clock?.clockedIn ? joined : primary} mt-3`}
-                onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")}
+                onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.", close)}
               >
                 {clock?.clockedIn ? "ALREADY JOINED" : "JOIN JOB"}
               </button>
@@ -722,7 +725,7 @@ function JobModal({
           {lifecycleError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{lifecycleError}</p>}
           {job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Crew members currently on Job: {clock.activeWorkerCount}</p>}
           {job.status === "In Progress" && canSupervisorComplete && clock && clock.activeWorkerCount > 0 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">END JOB will stop payroll for all {clock.activeWorkerCount} joined crew {clock.activeWorkerCount === 1 ? "member" : "members"} at the same time.</p>}
-          {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.")} className={`${primary} mt-3`}>END JOB</button>}
+          {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.", undefined, close)} className={`${primary} mt-3`}>END JOB</button>}
         </section>
       )}
       <div className="mt-6 flex flex-wrap gap-2">
@@ -742,7 +745,7 @@ function JobModal({
             disabled={busy}
             onClick={() => {
               const note = window.prompt("Cancellation note") ?? "";
-              mutate(() => cancelJob(job.id, note), "Job cancelled.");
+              mutate(() => cancelJob(job.id, note), "Job cancelled.", undefined, close);
             }}
             className={secondary}
           >
@@ -752,7 +755,7 @@ function JobModal({
         {canArchive && job.status !== "Archived" && (
           <button
             disabled={busy}
-            onClick={() => mutate(() => archiveJob(job.id), "Job archived.")}
+            onClick={() => mutate(() => archiveJob(job.id), "Job archived.", undefined, close)}
             className={secondary}
           >
             Archive
@@ -766,14 +769,13 @@ function JobModal({
         busy={busy}
         close={() => setShowPresence(false)}
        start={(presence) => {
-  setShowPresence(false);
-  close();
   lifecycleAct(
     async () => ({
       communicationEvent: "team_arrived" as const,
       job: await startOperationalJobWithPresence(job.id, presence),
     }),
     "Job started. Present crew members were clocked in.",
+    () => { setShowPresence(false); close(); },
   );
 }}
       />}
@@ -1351,4 +1353,3 @@ const secondary =
   "rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-[#143d1a] disabled:opacity-50";
 const danger =
   "rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50";
-

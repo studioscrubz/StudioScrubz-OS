@@ -61,11 +61,14 @@ test("existing authorization contract and manual Join remain unchanged", () => {
   assert.doesNotMatch(migration, /create or replace function public\.start_or_clock_in_to_job/);
 });
 
-test("both UI handlers make crew start one RPC while preserving individual Start then Join", () => {
-  const handlers = jobsPage.match(/const startedJob = await startOperationalJob\(job\.id\); if \(!job\.assigned_crew_id\) await joinJob\(job\.id\)/g) ?? [];
-  assert.equal(handlers.length, 2);
-  assert.equal((jobsPage.match(/communicationEvent: "team_arrived" as const/g) ?? []).length, 2);
-  assert.match(jobsPage, /job\.assigned_crew_id \? "Job started\. Eligible crew members were clocked in\."/);
+test("both UI handlers use presence-aware crew start while preserving individual Start then Join", () => {
+  const individualHandlers = jobsPage.match(/const startedJob = await startOperationalJob\(job\.id\); await joinJob\(job\.id\)/g) ?? [];
+  assert.equal(individualHandlers.length, 2);
+  const crewHandlers = jobsPage.match(/job: await startOperationalJobWithPresence\(job\.id, presence\)/g) ?? [];
+  assert.equal(crewHandlers.length, 2);
+  assert.equal((jobsPage.match(/communicationEvent: "team_arrived" as const/g) ?? []).length, 4);
+  assert.match(jobsPage, /\(\) => setShowPresence\(false\)/);
+  assert.match(jobsPage, /\(\) => \{ setShowPresence\(false\); close\(\); \}/);
 });
 
 console.log("Atomic crew auto-clock-in contract tests passed.");

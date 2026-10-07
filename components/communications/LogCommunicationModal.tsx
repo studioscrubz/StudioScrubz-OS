@@ -132,6 +132,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
       });
       onCreated(record);
       setNotice("Email sent through StudioScrubz.");
+      onClose();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "The email could not be sent."); }
     finally { setSaving(false); }
   }
@@ -143,7 +144,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
     setSaving(true); setError(null);
     try {
       const updated = next === "Sent" ? await markCommunicationSent(preparedSms.id) : await markCommunicationFailed(preparedSms.id, reason!);
-      setPreparedSms(updated); onCreated(updated); setNotice(next === "Sent" ? "SMS marked as sent." : "SMS marked as failed.");
+      setPreparedSms(updated); onCreated(updated); setNotice(next === "Sent" ? "SMS marked as sent." : "SMS marked as failed."); onClose();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "SMS status could not be updated."); }
     finally { setSaving(false); }
   }
