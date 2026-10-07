@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { assessmentPhotoPaths, invokePermanentAssessmentDeleteRpc } from "../lib/services/assessmentPermanentDelete.ts";
 
 const migration = readFileSync("supabase/migrations/20261007180000_master_admin_permanent_assessment_delete.sql", "utf8");
 const archiveMigration = readFileSync("supabase/migrations/20260924162216_archive_sales_assessment.sql", "utf8");
 const modal = readFileSync("components/walkthroughs/WalkthroughFormModal.tsx", "utf8");
 const service = readFileSync("lib/services/walkthroughs.ts", "utf8");
+const deleteHelper = readFileSync("lib/services/assessmentPermanentDelete.ts", "utf8");
 
 test("only an authenticated canonical Master Admin can permanently delete an Assessment", () => {
   assert.match(migration, /\(select auth\.uid\(\)\) is null or not public\.is_master_admin\(\)/);
@@ -43,5 +45,36 @@ test("the destructive UI explains retention and irreversibility before invoking 
   assert.match(modal, /Retained communication history and downstream business records will NOT be deleted/);
   assert.match(modal, /This action cannot be undone/);
   assert.match(modal, /window\.confirm/);
-  assert.match(service, /master_admin_permanently_delete_assessment/);
+  assert.match(deleteHelper, /master_admin_permanently_delete_assessment/);
+});
+
+test("RPC invocation preserves the Supabase client receiver and prevents the exact .rest crash", async () => {
+  const client = {
+    rest: { rpc: async (name, args) => ({ data: { deleted: true, name, args, photos: [] }, error: null }) },
+    rpc(name, args) { return this.rest.rpc(name, args); },
+  };
+  const detached = client.rpc;
+  assert.throws(() => detached("master_admin_permanently_delete_assessment", {}), /reading 'rest'/);
+  const result = await invokePermanentAssessmentDeleteRpc(client, "assessment-a");
+  assert.equal(result.error, null);
+  assert.equal(result.data.deleted, true);
+});
+
+test("photo cleanup metadata supports current, empty, null, missing, and legacy shapes", () => {
+  assert.deepEqual(assessmentPhotoPaths([{ storagePath: "walkthroughs/a/current.jpg" }], "a"), ["walkthroughs/a/current.jpg"]);
+  assert.deepEqual(assessmentPhotoPaths([], "a"), []);
+  assert.deepEqual(assessmentPhotoPaths(null, "a"), []);
+  assert.deepEqual(assessmentPhotoPaths(undefined, "a"), []);
+  assert.deepEqual(assessmentPhotoPaths([
+    { storage_path: "walkthroughs/a/legacy-storage.jpg" },
+    { path: "walkthroughs/a/legacy-path.jpg" },
+    "walkthroughs/a/legacy-string.jpg",
+    { unexpected: true },
+    { storagePath: "walkthroughs/another/not-owned.jpg" },
+  ], "a"), ["walkthroughs/a/legacy-storage.jpg", "walkthroughs/a/legacy-path.jpg", "walkthroughs/a/legacy-string.jpg"]);
+});
+
+test("successful database deletion remains successful when optional cleanup is malformed", () => {
+  assert.doesNotThrow(() => assessmentPhotoPaths({ malformed: true }, "a"));
+  assert.match(service, /catch\(cleanupError\)[\s\S]*return true/);
 });
