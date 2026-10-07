@@ -138,6 +138,41 @@ export type WalkthroughScopeItem = {
   label: string;
 };
 
+export type CustomerPhotoAssessmentReviewStatus =
+  | "Pending Review"
+  | "Approved for Pricing"
+  | "More Information Requested"
+  | "On-Site Assessment Required";
+
+export type CustomerPhotoAssessmentSubmission = {
+  version: 1;
+  submittedAt: string;
+  certifiedAt: string;
+  certificationAccepted: true;
+  propertyType: string;
+  areasInScope: string[];
+  bedroomQuantity: number | null;
+  bathroomQuantity: number | null;
+  otherScope: string;
+  areasExcluded: string;
+  lastProfessionallyCleaned: string;
+  conditionConcerns: string[];
+  problemAreas: string;
+  stairs: string;
+  elevator: string;
+  parkingAccess: string;
+  gateAccessInstructions: string;
+  pets: string;
+  waterAvailable: string;
+  powerAvailable: string;
+  specialItems: string[];
+  serviceAnswers: Record<string, string | boolean>;
+  reviewStatus: CustomerPhotoAssessmentReviewStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+};
+
 export type WalkthroughRecommendation = {
   id: string;
   text: string;
@@ -169,6 +204,7 @@ export type WalkthroughMeasurements = {
 
   photoSubmissionStatus?: "Not Sent" | "Sent" | "Submitted";
   photoSubmittedAt?: string | null;
+  customerPhotoAssessment?: CustomerPhotoAssessmentSubmission;
 
   estimateNumber: string | null;
 

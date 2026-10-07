@@ -38,8 +38,10 @@ test("exactly one method is active, scheduling is enforced, and secure tokens ar
   assert.match(link,/existing\?\.token_value/);
   assert.match(link,/reused:\s*true/);
   assert.match(link,/token_hash:\s*hashAssessmentToken\(token\)/);
-  assert.match(upload,/photos=\[\.\.\./);
-  assert.match(upload,/sales_stage:"Assessment In Progress"/);
+  assert.match(upload,/const photos = \[/);
+  assert.match(upload,/export async function PUT/);
+  assert.match(upload,/sales_stage:\s*"Assessment In Progress"/);
+  assert.match(upload,/customerPhotoAssessment:\s*submission/);
 });
 
 test("new assessments require an eligible walkthrough executor and use the reduced scheduling form",()=>{
