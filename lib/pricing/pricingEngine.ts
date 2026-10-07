@@ -20,10 +20,10 @@ export function findMatchingTier(
   return (
     tiers
       .filter(
-        (x) =>
-          x.is_active &&
-          (x.min_value == null || value >= x.min_value) &&
-          (x.max_value == null || value <= x.max_value),
+        (tier) =>
+          tier.is_active &&
+          (tier.min_value == null || value >= tier.min_value) &&
+          (tier.max_value == null || value <= tier.max_value),
       )
       .sort((a, b) => a.display_order - b.display_order)[0] ?? null
   );
@@ -36,10 +36,14 @@ export function calculateAddons(
   selections?: CatalogAddonSnapshot[],
 ) {
   return names.map((name) => {
-    const addon = addons.find((x) => x.addon_name === name);
+    const addon = addons.find(
+      (item) => item.addon_name === name,
+    );
 
     if (!addon) {
-      throw new Error(`Pricing is unavailable for add-on: ${name}`);
+      throw new Error(
+        `Pricing is unavailable for add-on: ${name}`,
+      );
     }
 
     const selected = selections?.find(
@@ -50,11 +54,9 @@ export function calculateAddons(
       addon.pricing_config.pricing_type ?? "Flat Price",
     );
 
-    const quantity = selected
-      ? selected.quantity
-      : pricingType === "Per Unit"
-        ? undefined
-        : 1;
+    const quantity =
+      selected?.quantity ??
+      (pricingType === "Per Unit" ? undefined : 1);
 
     const unitName =
       String(
@@ -93,34 +95,54 @@ export function calculateAddons(
       );
     }
 
-    const labor = Number(
+    const laborHours = Number(
       addon.pricing_config.labor_hours ?? 0,
     );
 
-    const rawSupply =
-      addon.pricing_config.supply_cost ?? addon.price;
+    const rawSupplyCost =
+      addon.pricing_config.supply_cost ?? 0;
 
-    const supply = Number(rawSupply);
+    const supplyCost = Number(rawSupplyCost);
 
     if (
-      addon.pricing_model === "Custom" &&
-      (rawSupply == null ||
-        !Number.isFinite(labor) ||
-        labor < 0 ||
-        !Number.isFinite(supply) ||
-        supply < 0)
+      !Number.isFinite(laborHours) ||
+      laborHours < 0 ||
+      !Number.isFinite(supplyCost) ||
+      supplyCost < 0
     ) {
       throw new Error(
-        `Configure valid custom pricing for ${addon.addon_name}.`,
+        `Configure valid labor and supply pricing for ${addon.addon_name}.`,
       );
     }
 
-    const base =
-      addon.pricing_model === "Custom"
-        ? labor * hourlyRate + supply
-        : pricingType === "Per Unit"
-          ? unitPrice * Number(quantity)
-          : unitPrice;
+    const configuredMinimum = Number(
+      addon.pricing_config.minimum_price ?? addon.price ?? 0,
+    );
+
+    const safeMinimum =
+      Number.isFinite(configuredMinimum) &&
+      configuredMinimum >= 0
+        ? configuredMinimum
+        : 0;
+
+    let base: number;
+
+    if (addon.pricing_model === "Custom") {
+      const calculatedCost =
+        laborHours * Math.max(0, hourlyRate) + supplyCost;
+
+      base = Math.max(
+        safeMinimum,
+        calculatedCost,
+      );
+    } else if (pricingType === "Per Unit") {
+      base = unitPrice * Number(quantity);
+    } else {
+      base = Math.max(
+        safeMinimum,
+        unitPrice,
+      );
+    }
 
     if (!Number.isFinite(base)) {
       throw new Error(
@@ -136,11 +158,17 @@ export function calculateAddons(
       pricingModel: addon.pricing_model,
       unitLabel: addon.unit_label,
       quantity:
-        pricingType === "Per Unit" ? quantity : undefined,
+        pricingType === "Per Unit"
+          ? Number(quantity)
+          : undefined,
       unitName:
-        pricingType === "Per Unit" ? unitName : undefined,
+        pricingType === "Per Unit"
+          ? unitName
+          : undefined,
       unitPrice:
-        pricingType === "Per Unit" ? unitPrice : undefined,
+        pricingType === "Per Unit"
+          ? unitPrice
+          : undefined,
     };
   });
 }
@@ -151,20 +179,22 @@ export function matchingRecurringRules(
   serviceId: string,
 ) {
   const specific = rules.filter(
-    (x) =>
-      x.is_active &&
-      x.frequency === frequency &&
-      x.service_id === serviceId,
+    (rule) =>
+      rule.is_active &&
+      rule.frequency === frequency &&
+      rule.service_id === serviceId,
   );
 
-  return specific.length
-    ? specific
-    : rules.filter(
-        (x) =>
-          x.is_active &&
-          x.frequency === frequency &&
-          x.service_id === null,
-      );
+  if (specific.length) {
+    return specific;
+  }
+
+  return rules.filter(
+    (rule) =>
+      rule.is_active &&
+      rule.frequency === frequency &&
+      rule.service_id === null,
+  );
 }
 
 export function applyRecurringRule(
@@ -181,7 +211,7 @@ export function applyRecurringRule(
   );
 
   const rule = ruleId
-    ? matches.find((x) => x.id === ruleId)
+    ? matches.find((item) => item.id === ruleId)
     : matches.length === 1
       ? matches[0]
       : undefined;
@@ -208,48 +238,55 @@ export function applyRecurringRule(
   }
 
   if (rule.adjustment_type === "Percentage") {
+    const percentage = clampPercent(
+      rule.adjustment_value,
+    );
+
     const discount =
-      (amount * rule.adjustment_value) / 100;
+      amount * (percentage / 100);
 
     return {
-      amount: amount - discount,
+      amount: Math.max(0, amount - discount),
       discount,
-      percent: rule.adjustment_value,
+      percent: percentage,
       rule,
     };
   }
 
   if (rule.adjustment_type === "Flat Amount") {
+    const discount = Math.min(
+      amount,
+      Math.max(0, rule.adjustment_value),
+    );
+
     return {
-      amount: Math.max(
-        0,
-        amount - rule.adjustment_value,
-      ),
-      discount: Math.min(
-        amount,
-        rule.adjustment_value,
-      ),
-      percent: amount
-        ? (rule.adjustment_value / amount) * 100
-        : 0,
+      amount: Math.max(0, amount - discount),
+      discount,
+      percent:
+        amount > 0
+          ? (discount / amount) * 100
+          : 0,
       rule,
     };
   }
 
+  const overridePrice = Math.max(
+    0,
+    rule.adjustment_value,
+  );
+
+  const discount = Math.max(
+    0,
+    amount - overridePrice,
+  );
+
   return {
-    amount: rule.adjustment_value,
-    discount: Math.max(
-      0,
-      amount - rule.adjustment_value,
-    ),
-    percent: amount
-      ? (Math.max(
-          0,
-          amount - rule.adjustment_value,
-        ) /
-          amount) *
-        100
-      : 0,
+    amount: overridePrice,
+    discount,
+    percent:
+      amount > 0
+        ? (discount / amount) * 100
+        : 0,
     rule,
   };
 }
@@ -266,7 +303,10 @@ export function calculateRecurringTotals(input: {
   taxRatePercent?: number;
   fixedTaxes?: number;
 }) {
-  const subtotal = Math.max(0, input.subtotal);
+  const subtotal = Math.max(
+    0,
+    Number(input.subtotal) || 0,
+  );
 
   const recurring = applyRecurringRule(
     subtotal,
@@ -276,13 +316,18 @@ export function calculateRecurringTotals(input: {
     input.recurringPricingRuleId,
   );
 
-  const manualDiscount =
+  const requestedManualDiscount =
     input.manualDiscountAmount ??
-    (subtotal *
-      clampPercent(
+    subtotal *
+      (clampPercent(
         input.manualDiscountPercent ?? 0,
-      )) /
-      100;
+      ) /
+        100);
+
+  const manualDiscount = Math.min(
+    recurring.amount,
+    Math.max(0, requestedManualDiscount),
+  );
 
   const taxable = Math.max(
     0,
@@ -290,10 +335,13 @@ export function calculateRecurringTotals(input: {
   );
 
   const taxes =
-    input.fixedTaxes ??
-    (taxable *
-      clampPercent(input.taxRatePercent ?? 0)) /
-      100;
+    input.fixedTaxes != null
+      ? Math.max(0, input.fixedTaxes)
+      : taxable *
+        (clampPercent(
+          input.taxRatePercent ?? 0,
+        ) /
+          100);
 
   const finalPrice =
     taxable + Math.max(0, taxes);
@@ -330,45 +378,105 @@ export function residentialCatalogPrice(
   tiers: ServicePriceTier[],
   addons: ServiceAddon[],
 ) {
-  const serviceTiers = tiers.filter(
-    (x) =>
-      x.service_id === service.id &&
-      x.is_active,
-  );
+  const serviceTiers = tiers
+    .filter(
+      (tier) =>
+        tier.service_id === service.id &&
+        tier.is_active,
+    )
+    .sort(
+      (a, b) =>
+        a.display_order - b.display_order,
+    );
 
-  const exact = serviceTiers.find(
-    (x) =>
-      x.pricing_config.bedrooms ===
+  if (!serviceTiers.length) {
+    throw new Error(
+      `No active price tiers are configured for ${service.service_name}.`,
+    );
+  }
+
+  const exactBedBath = serviceTiers.find(
+    (tier) =>
+      tier.pricing_config.bedrooms ===
         input.bedrooms &&
-      x.pricing_config.bathrooms ===
+      tier.pricing_config.bathrooms ===
         input.bathrooms,
   );
 
-  const tier =
-    exact ??
-    findMatchingTier(
-      serviceTiers,
-      Math.min(
-        Math.max(
-          Math.round(input.bedrooms),
-          0,
-        ),
-        4,
-      ),
-    );
+  const bedroomOnly = serviceTiers.find(
+    (tier) =>
+      tier.pricing_config.bedrooms ===
+        input.bedrooms &&
+      tier.pricing_config.bathrooms == null,
+  );
+
+  const numericBedroomTier = findMatchingTier(
+    serviceTiers,
+    input.bedrooms,
+  );
+
+  /*
+   * Standard and Deep are bedroom-floor services.
+   * Move-In/Move-Out prefers the exact bedroom/bathroom
+   * configuration. Unsupported larger configurations use
+   * the highest configured catalog floor, then the labor
+   * calculator raises the recommendation as necessary.
+   *
+   * This prevents an unsupported home from silently
+   * resolving to a cheaper smaller-home tier.
+   */
+  let tier =
+    exactBedBath ??
+    bedroomOnly ??
+    numericBedroomTier;
+
+  if (!tier) {
+    const configuredBedroomTiers =
+      serviceTiers.filter(
+        (item) =>
+          typeof item.pricing_config.bedrooms ===
+          "number",
+      );
+
+    const largestConfigured =
+      configuredBedroomTiers
+        .slice()
+        .sort(
+          (a, b) =>
+            Number(
+              b.pricing_config.bedrooms ?? 0,
+            ) -
+            Number(
+              a.pricing_config.bedrooms ?? 0,
+            ),
+        )[0] ?? null;
+
+    if (
+      largestConfigured &&
+      input.bedrooms >
+        Number(
+          largestConfigured.pricing_config
+            .bedrooms ?? 0,
+        )
+    ) {
+      tier = largestConfigured;
+    }
+  }
 
   if (!tier) {
     throw new Error(
-      `No active price tier matches ${input.bedrooms} bedrooms for ${service.service_name}.`,
+      `No catalog floor is configured for ${input.bedrooms} bedroom(s) / ${input.bathrooms} bathroom(s) for ${service.service_name}.`,
     );
   }
 
   return {
     basePrice: Math.max(
-      tier.price,
-      service.minimum_price,
+      Number(tier.price) || 0,
+      Number(service.minimum_price) || 0,
     ),
-    isExactConfiguration: Boolean(exact),
+    isExactConfiguration: Boolean(
+      exactBedBath || bedroomOnly,
+    ),
     addonAdjustments: calculateAddons(
       input.addOns,
       addons,
@@ -382,11 +490,14 @@ export function catalogConfigNumber(
   service: CatalogService,
   key: string,
 ) {
-  const value = Number(
-    service.pricing_config[key],
-  );
+  const raw = service.pricing_config[key];
+  const value = Number(raw);
 
-  if (!Number.isFinite(value)) {
+  if (
+    raw == null ||
+    raw === "" ||
+    !Number.isFinite(value)
+  ) {
     throw new Error(
       `Pricing configuration is missing ${key} for ${service.service_name}.`,
     );
@@ -452,7 +563,10 @@ export function commercialCatalogContext(
     ),
   };
 
-  assertProductionPricing(service, context);
+  assertProductionPricing(
+    service,
+    context,
+  );
 
   return context;
 }
@@ -486,6 +600,7 @@ export function assertProductionPricing(
 
   if (
     context.maximumMarginPercent <= 0 ||
+    context.maximumMarginPercent >= 100 ||
     context.minimumMarginDenominator <= 0
   ) {
     throw new Error(
@@ -499,47 +614,61 @@ export function calculateServicePrice(
   quantity: number,
   tiers: ServicePriceTier[],
 ) {
+  const basePrice = Number(
+    service.base_price,
+  );
+
+  const minimumPrice = Number(
+    service.minimum_price,
+  );
+
+  const safeBase =
+    Number.isFinite(basePrice)
+      ? Math.max(0, basePrice)
+      : 0;
+
+  const safeMinimum =
+    Number.isFinite(minimumPrice)
+      ? Math.max(0, minimumPrice)
+      : 0;
+
   /*
-   * A Custom service may still have a configured catalog/base price.
-   * When it does, direct Job creation should use that price
-   * automatically rather than forcing a manual override.
-   *
-   * A Custom service only requires manual pricing when there is no
-   * usable configured base price.
+   * Custom services with a real catalog floor may still
+   * auto-populate Direct Jobs. Post-Construction now has
+   * a $0 catalog anchor, so it correctly falls through to
+   * manual/calculator pricing instead.
    */
   if (service.pricing_model === "Custom") {
-    const basePrice = Number(
-      service.base_price,
+    const configuredFloor = Math.max(
+      safeBase,
+      safeMinimum,
     );
 
-    const minimumPrice = Number(
-      service.minimum_price,
-    );
-
-    if (
-      Number.isFinite(basePrice) &&
-      basePrice > 0
-    ) {
-      return Math.max(
-        basePrice,
-        Number.isFinite(minimumPrice)
-          ? minimumPrice
-          : 0,
-      );
-    }
-
-    return null;
+    return configuredFloor > 0
+      ? configuredFloor
+      : null;
   }
 
   if (service.pricing_model === "Size Tier") {
-    return (
-      findMatchingTier(
-        tiers.filter(
-          (x) =>
-            x.service_id === service.id,
-        ),
-        quantity,
-      )?.price ?? null
+    const tier = findMatchingTier(
+      tiers.filter(
+        (item) =>
+          item.service_id === service.id,
+      ),
+      quantity,
+    );
+
+    if (!tier) {
+      return null;
+    }
+
+    if (tier.pricing_config.custom_quote === true) {
+      return null;
+    }
+
+    return Math.max(
+      Number(tier.price) || 0,
+      safeMinimum,
     );
   }
 
@@ -548,19 +677,19 @@ export function calculateServicePrice(
     service.pricing_model === "Per Visit"
   ) {
     return Math.max(
-      service.base_price,
-      service.minimum_price,
+      safeBase,
+      safeMinimum,
     );
   }
 
   return Math.max(
-    service.base_price * quantity,
-    service.minimum_price,
+    safeBase * Math.max(0, quantity),
+    safeMinimum,
   );
 }
 
-const round = (n: number) =>
-  Math.round(n * 100) / 100;
+const round = (value: number) =>
+  Math.round(value * 100) / 100;
 
 const clampPercent = (value: number) =>
   Math.min(

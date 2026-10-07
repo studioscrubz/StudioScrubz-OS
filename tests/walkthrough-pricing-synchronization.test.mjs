@@ -13,6 +13,7 @@ function loadWalkthroughPricing() {
   const loadedModule = { exports: {} };
   const requireFn = (id) => {
     if (id === "@/lib/pricing/estimates") return { isPostConstructionV2Estimate: () => false };
+    if (id === "@/lib/pricing/workerHourlyPay") return { MINIMUM_WORKER_HOURLY_PAY: 30 };
     if (id === "@/lib/services/serviceCatalog") return {
       findCatalogService: () => ({ pricing_config: {}, service_code: "RES-STANDARD" }),
       isPostConstructionCatalogService: () => false,
