@@ -47,8 +47,8 @@ test("route prepares once, sends with the event key, and finalizes only with a p
   assert.match(route, /provider: "resend"/);
   assert.match(route, /event_key: eventKey/);
   assert.match(route, /sendResendEmail\([\s\S]*idempotencyKey: eventKey/);
-  assert.match(route, /if \(!sent\.id\?\.trim\(\)\) throw/);
-  assert.match(route, /providerMessageId = sent\.id\.trim\(\)/);
+  assert.match(route, /providerMessageId = confirmedProviderMessageId\(sent\.id\)/);
+  assert.match(route, /UUID_PATTERN\.test\(value\.trim\(\)\)/);
   assert.match(route, /persistProviderSubmission\(admin, communicationId, eventKey, providerMessageId\)/);
   assert.match(route, /finalize\(admin, communicationId, providerMessageId, null\)/);
   assert.match(route, /provider_message_id: sent \? providerMessageId!\.trim\(\) : null/);
@@ -59,13 +59,14 @@ test("duplicate, concurrent, and retry calls preserve one row and provider ident
   assert.match(route, /\.eq\("event_key", eventKey\)\.maybeSingle\(\)/);
   assert.match(route, /createError\?\.code === "23505"/);
   assert.match(route, /assertSameRequest/);
-  assert.match(route, /communication\.status === "Sent" && communication\.provider_message_id/);
+  assert.match(route, /findProviderSubmission\(admin, communicationId, eventKey\)/);
+  assert.match(route, /marked Sent, but no matching durable Resend acceptance receipt exists/);
 });
 
 test("provider failures are sanitized in storage and distinguished from finalization recovery", () => {
   const acceptedBranch = route.slice(route.indexOf("if (providerMessageId)"), route.indexOf('console.error("Communications email provider submission failed"'));
   assert.match(route, /Email delivery was not accepted by the provider\./);
-  assert.match(route, /The email provider did not accept the message\. Please try again\./);
+  assert.match(route, /providerFailureMessage\(cause\)/);
   assert.match(route, /if \(providerMessageId\)/);
   assert.match(route, /accepted the message, but StudioScrubz could not finish recording delivery/);
   assert.doesNotMatch(acceptedBranch, /finalize\(admin, communicationId, null/);
@@ -74,8 +75,8 @@ test("provider failures are sanitized in storage and distinguished from finaliza
 
 test("provider acceptance remains recoverable without duplicate submission", () => {
   assert.match(route, /idempotencyKey: eventKey/);
-  assert.match(route, /communication\.status === "Sent" && communication\.provider_message_id/);
-  assert.match(route, /providerMessageId = sent\.id\.trim\(\)/);
+  assert.match(route, /communication\.provider_message_id\?\.trim\(\) !== providerMessageId/);
+  assert.match(route, /providerMessageId = confirmedProviderMessageId\(sent\.id\)/);
   assert.match(route, /findProviderSubmission\(admin, communicationId, eventKey\)/);
   assert.match(route, /if \(recoveredSubmission\)[\s\S]*finalize\(admin, communicationId, providerMessageId, null\)[\s\S]*recovered: true/);
   assert.match(route, /Retry this same send request to recover it without sending a duplicate\./);
@@ -111,5 +112,22 @@ test("server-only service-role finalization retains the database delivery invari
   assert.match(route, /\.eq\("id", id\)\.select\("\*"\)\.single\(\)/);
   assert.match(migration, /new\.status is distinct from old\.status/);
   assert.match(migration, /coalesce\(auth\.role\(\), ''\) <> 'service_role'/);
-  assert.doesNotMatch(service, /provider_message_id|status:\s*"Sent"/);
+  assert.match(service, /accepted !== true/);
+  assert.match(service, /communication\.status !== "Sent"/);
+  assert.match(service, /communication\.provider_message_id\?\.trim\(\) !== providerMessageId/);
+  assert.doesNotMatch(service, /status:\s*"Sent"/);
+});
+
+test("UI success and modal close require the authoritative acceptance contract", () => {
+  const emailHandler = modal.slice(modal.indexOf("async function emailClient"), modal.indexOf("async function confirmSms"));
+  assert.match(emailHandler, /const record = await sendCommunicationsEmail/);
+  assert.match(emailHandler, /onCreated\(record\);[\s\S]*Email sent through StudioScrubz\.[\s\S]*onClose\(\)/);
+  assert.match(service, /result\?\.accepted !== true/);
+  assert.match(service, /result\.provider !== "resend"/);
+});
+
+test("sender and recipient delivery provenance is persisted with the prepared communication", () => {
+  assert.match(route, /recipient_email: recipientEmail/);
+  assert.match(route, /provider_from: sender\.from/);
+  assert.match(route, /provider_reply_to: sender\.replyTo/);
 });

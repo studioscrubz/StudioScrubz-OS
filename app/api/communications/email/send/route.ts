@@ -60,7 +60,6 @@ export async function POST(request: Request) {
     if (communication) {
       assertSameRequest(communication, expected);
       communicationId = communication.id;
-      if (communication.status === "Sent" && communication.provider_message_id) return Response.json({ communication, duplicate: true });
     } else {
       const insert = {
         communication_number: `COMM-${randomUUID()}`, client_id: links.clientId, property_id: links.propertyId,
@@ -68,7 +67,7 @@ export async function POST(request: Request) {
         communication_type: communicationType, channel: "Email" as const, direction: "Outbound" as const, status: "Prepared" as const,
         provider: "resend", recipient_email: recipientEmail, subject, message_body: messageBody,
         sent_by_user_id: profile.id, sent_by_name: profile.display_name || profile.email || profile.role,
-        metadata: { ...metadata, delivery: "communications-resend" }, event_key: eventKey,
+        metadata: { ...metadata, delivery: "communications-resend", provider_from: sender.from, provider_reply_to: sender.replyTo }, event_key: eventKey,
       };
       const { data: created, error: createError } = await admin.from("client_communications").insert(insert).select("*").single();
       if (createError?.code === "23505") {
@@ -76,7 +75,6 @@ export async function POST(request: Request) {
         if (raceError || !raced) throw raceError ?? new Error("Communication preparation failed.");
         communication = raced as ClientCommunication;
         assertSameRequest(communication, expected);
-        if (communication.status === "Sent" && communication.provider_message_id) return Response.json({ communication, duplicate: true });
       } else if (createError || !created) throw createError ?? new Error("Communication preparation failed.");
       else communication = created as ClientCommunication;
       communicationId = communication.id;
@@ -85,19 +83,21 @@ export async function POST(request: Request) {
     const recoveredSubmission = await findProviderSubmission(admin, communicationId, eventKey);
     if (recoveredSubmission) {
       providerMessageId = recoveredSubmission.provider_message_id;
+      if (communication.status === "Sent" && communication.provider_message_id?.trim() !== providerMessageId) throw new UnconfirmedProviderStateError("The saved communication does not match its durable Resend acceptance receipt.");
       const finalized = await finalize(admin, communicationId, providerMessageId, null);
-      return Response.json({ communication: finalized, providerMessageId, recovered: true });
+      return acceptedResponse(finalized, providerMessageId, { recovered: true, duplicate: communication.status === "Sent" });
     }
+    if (communication.status === "Sent" || communication.provider_message_id) throw new UnconfirmedProviderStateError("This communication is marked Sent, but no matching durable Resend acceptance receipt exists. It was not sent again.");
 
     const content = renderEmail(messageBody);
     const sent = await sendResendEmail({ recipientEmail, subject, ...content, ...sender, idempotencyKey: eventKey });
-    if (!sent.id?.trim()) throw new Error("The email provider did not confirm delivery submission.");
-    providerMessageId = sent.id.trim();
+    providerMessageId = confirmedProviderMessageId(sent.id);
     await persistProviderSubmission(admin, communicationId, eventKey, providerMessageId);
     const finalized = await finalize(admin, communicationId, providerMessageId, null);
-    return Response.json({ communication: finalized, providerMessageId });
+    return acceptedResponse(finalized, providerMessageId);
   } catch (cause) {
     if (cause instanceof InputError) return Response.json({ error: cause.message }, { status: cause.status });
+    if (cause instanceof UnconfirmedProviderStateError) return Response.json({ error: cause.message }, { status: 409 });
     if (providerMessageId) {
       console.error("Communications email was accepted by Resend but delivery finalization failed", {
         communicationId, providerMessageId, error: safeLog(cause),
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       try { await finalize(admin, communicationId, null, "Email delivery was not accepted by the provider."); }
       catch (finalizeError) { console.error("Communications email provider failure could not be finalized", { communicationId, error: safeLog(finalizeError) }); }
     }
-    return Response.json({ error: "The email provider did not accept the message. Please try again." }, { status: 502 });
+    return Response.json({ error: providerFailureMessage(cause) }, { status: 502 });
   }
 }
 
@@ -196,6 +196,27 @@ class DeliveryFinalizationError extends Error {
     this.details = error?.details ?? null;
     this.hint = error?.hint ?? null;
   }
+}
+
+class UnconfirmedProviderStateError extends Error {
+  constructor(message: string) { super(message); this.name = "UnconfirmedProviderStateError"; }
+}
+
+function confirmedProviderMessageId(value: unknown) {
+  if (typeof value !== "string" || !UUID_PATTERN.test(value.trim())) throw new Error("Resend did not return a valid provider message ID.");
+  return value.trim();
+}
+
+function acceptedResponse(communication: ClientCommunication, providerMessageId: string, extra: Record<string, boolean> = {}) {
+  return Response.json({ communication, provider: "resend", providerMessageId, accepted: true, ...extra });
+}
+
+function providerFailureMessage(cause: unknown) {
+  const detail = cause instanceof Error ? cause.message.trim() : "";
+  if (detail === "RESEND_API_KEY is not configured.") return "Email provider configuration is unavailable. Contact an administrator; the email was not sent.";
+  if (detail === "Resend did not return a valid provider message ID." || detail === "The email provider did not confirm delivery submission.") return `${detail} The email was not confirmed as sent.`;
+  if (detail && detail.length <= 300) return `Resend did not accept the email: ${detail}`;
+  return "Resend did not accept the email. Please retry after checking the provider configuration and sender domain.";
 }
 
 function assertSameRequest(row: ClientCommunication, expected: { recipientEmail: string; subject: string; messageBody: string; communicationType: CommunicationType } & Links) {
