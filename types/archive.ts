@@ -15,10 +15,17 @@ export type ArchivedRecord = {
   status: string;
   href: string;
   canRestoreAndReopen?: boolean;
+  permanentDeleteEligibility?: JobPermanentDeleteEligibility;
+};
+
+export type JobPermanentDeleteEligibility = {
+  allowed: boolean;
+  protectedHistoryReasons: string[];
 };
 
 export type ArchiveDeleteCheck = {
   allowed: boolean;
   reason: string | null;
   dependencyCount: number;
+  protectedHistoryReasons?: string[];
 };

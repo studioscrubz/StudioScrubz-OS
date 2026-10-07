@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
-import type { ArchiveDeleteCheck, ArchivedRecord, ArchiveRecordType } from "@/types/archive";
+import type { ArchiveDeleteCheck, ArchivedRecord, ArchiveRecordType, JobPermanentDeleteEligibility } from "@/types/archive";
 import { getCurrentProfile, getCurrentUser } from "@/lib/services/auth";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
@@ -54,19 +54,26 @@ const DEPENDENCIES: Partial<Record<ArchiveRecordType, Array<[string, string]>>> 
   "Service Add-Ons": [["service_addon_links", "addon_id"]],
 };
 
-export async function getArchivedRecords(): Promise<ArchivedRecord[]> {
+export async function getArchivedRecords(includeJobDeleteEligibility=false): Promise<ArchivedRecord[]> {
   const db = archiveDb();
   const groups = await Promise.all(CONFIGS.map(async (config) => {
     if (config.type === "Jobs") {
-      const [jobs, reopenableIds] = await Promise.all([getArchivedJobs(), getReopenableArchivedCancelledJobIds()]);
+      const [jobs, reopenableIds,eligibility] = await Promise.all([getArchivedJobs(), getReopenableArchivedCancelledJobIds(),includeJobDeleteEligibility?getArchivedJobPermanentDeleteEligibility():Promise.resolve(new Map<string,JobPermanentDeleteEligibility>())]);
       const reopenable = new Set(reopenableIds);
-      return jobs.map((row) => ({ ...toArchivedRecord(config, row as unknown as Record<string, unknown>), canRestoreAndReopen: reopenable.has(row.id) }));
+      return jobs.map((row) => ({ ...toArchivedRecord(config, row as unknown as Record<string, unknown>), canRestoreAndReopen: reopenable.has(row.id),permanentDeleteEligibility:eligibility.get(row.id) }));
     }
     const { data, error } = await db.from(config.table).select("*").not("archived_at", "is", null).order("archived_at", { ascending: false });
     if (error) throw new Error(`${config.type} archives could not be loaded: ${error.message}`);
     return rows(data).map((row) => toArchivedRecord(config, row));
   }));
   return groups.flat().sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+}
+
+async function getArchivedJobPermanentDeleteEligibility():Promise<Map<string,JobPermanentDeleteEligibility>>{
+  const client=getSupabaseClient() as unknown as {rpc:(name:string)=>Promise<{data:unknown;error:DbError|null}>};
+  const{data,error}=await client.rpc("get_archived_job_permanent_delete_eligibility");
+  if(error)throw new Error(`Job deletion eligibility could not be loaded: ${error.message}`);
+  return new Map(rows(data).map(row=>[text(row,"job_id"),{allowed:row.can_permanently_delete===true,protectedHistoryReasons:Array.isArray(row.protected_history_reasons)?row.protected_history_reasons.filter((reason):reason is string=>typeof reason==="string"):[]}]))
 }
 
 export async function restoreAndReopenArchivedJob(record: ArchivedRecord): Promise<void> {
