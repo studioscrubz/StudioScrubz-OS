@@ -7,10 +7,10 @@ import { useOperationalRealtime } from "@/components/realtime/OperationalRealtim
 import { archiveClient, createClient, findPotentialDuplicateClients, getClients, updateClient } from "@/lib/services/clients";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
-import { CLIENT_STATUSES, CLIENT_TYPES, type Client, type ClientInput, type ClientStatus, type ClientType } from "@/types/client";
+import { CLIENT_TYPES, type Client, type ClientInput, type ClientStatus, type ClientType } from "@/types/client";
+import { clientViewCounts, isClientView, matchesClientView, type ClientView } from "@/lib/clients/clientView";
 
 type TypeFilter = "All" | ClientType;
-type StatusFilter = "All" | ClientStatus;
 type ArchiveFilter = "Active Records" | "Archived Records" | "All Records";
 
 export function ClientsPage() {
@@ -23,8 +23,8 @@ export function ClientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<ClientView>("active");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("Active Records");
   const [formClient, setFormClient] = useState<Client | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -50,6 +50,11 @@ export function ClientsPage() {
   }, []);
 
   useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+    if (isClientView(requestedView)) setView(requestedView);
+  }, []);
+
+  useEffect(() => {
     if (!clients.length) return;
     const params = new URLSearchParams(window.location.search);
     const clientId = params.get("clientId");
@@ -72,14 +77,23 @@ export function ClientsPage() {
     leads: activeClients.filter((client) => client.status === "Lead").length,
   };
 
+  const viewCounts = useMemo(() => clientViewCounts(clients.filter((client) => archiveFilter === "All Records" || (archiveFilter === "Archived Records" ? Boolean(client.archived_at) : !client.archived_at))), [archiveFilter, clients]);
+
   const filteredClients = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     return clients.filter((client) => {
       const searchable = [client.first_name, client.last_name, client.company_name, client.phone, client.email].filter(Boolean).join(" ").toLocaleLowerCase();
       const archiveMatch = archiveFilter === "All Records" || (archiveFilter === "Archived Records" ? Boolean(client.archived_at) : !client.archived_at);
-      return (!term || searchable.includes(term)) && (typeFilter === "All" || client.client_type === typeFilter) && (statusFilter === "All" || client.status === statusFilter) && archiveMatch;
+      return matchesClientView(client, view) && (!term || searchable.includes(term)) && (typeFilter === "All" || client.client_type === typeFilter) && archiveMatch;
     });
-  }, [archiveFilter, clients, search, statusFilter, typeFilter]);
+  }, [archiveFilter, clients, search, typeFilter, view]);
+
+  function selectView(nextView: ClientView) {
+    setView(nextView);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", nextView);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   async function handleSubmit(input: ClientInput) {
     setSaving(true);
@@ -160,7 +174,7 @@ export function ClientsPage() {
       {error && <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
 
       <section aria-label="Client summary" className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-5">
-        <SummaryCard label="Total Clients" value={loading ? "—" : summary.total} />
+        <SummaryCard label="Total Records" value={loading ? "—" : summary.total} />
         <SummaryCard label="Residential" value={loading ? "—" : summary.residential} />
         <SummaryCard label="Commercial" value={loading ? "—" : summary.commercial} />
         <SummaryCard label="Contractors" value={loading ? "—" : summary.contractor} />
@@ -168,10 +182,10 @@ export function ClientsPage() {
       </section>
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
-        <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_160px_180px]">
+        <ClientViewTabs view={view} counts={viewCounts} onChange={selectView} />
+        <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_180px]">
           <label className="relative"><span className="sr-only">Search clients</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, company, phone, or email" className={filterClass} /></label>
           <Filter label="Client type" value={typeFilter} onChange={(value) => setTypeFilter(value as TypeFilter)} options={["All", ...CLIENT_TYPES]} />
-          <Filter label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={["All", ...CLIENT_STATUSES]} />
           <Filter label="Archived records" value={archiveFilter} onChange={(value) => setArchiveFilter(value as ArchiveFilter)} options={["Active Records", "Archived Records", "All Records"]} />
         </div>
 
@@ -186,11 +200,21 @@ export function ClientsPage() {
 }
 
 function PageHeaderContent() {
-  return <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#143d1a] sm:text-4xl">Clients</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">Manage StudioScrubz residential, commercial, and contractor clients.</p></div>;
+  return <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#143d1a] sm:text-4xl">Clients</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">Manage StudioScrubz leads and established residential, commercial, and contractor clients.</p></div>;
 }
 
 function SummaryCard({ label, value }: { label: string; value: number | string }) {
   return <article className="rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-[0_8px_25px_rgba(20,61,26,.045)]"><p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 sm:text-xs">{label}</p><p className="mt-5 text-3xl font-extrabold text-[#143d1a]">{value}</p></article>;
+}
+
+function ClientViewTabs({ view, counts, onChange }: { view: ClientView; counts: Record<ClientView, number>; onChange: (view: ClientView) => void }) {
+  const tabs: Array<{ value: ClientView; label: string }> = [
+    { value: "all", label: "All" },
+    { value: "leads", label: "Leads" },
+    { value: "active", label: "Active Clients" },
+    { value: "inactive", label: "Inactive Clients" },
+  ];
+  return <div className="overflow-x-auto border-b border-neutral-100 p-3 sm:p-4"><div role="tablist" aria-label="Client relationship view" className="flex min-w-max gap-1 rounded-xl bg-[#f1f4f0] p-1.5">{tabs.map((tab) => <button key={tab.value} type="button" role="tab" aria-selected={view === tab.value} onClick={() => onChange(tab.value)} className={`rounded-lg px-3 py-2 text-sm font-bold transition sm:px-4 ${view === tab.value ? "bg-white text-[#143d1a] shadow-sm" : "text-neutral-500 hover:text-[#143d1a]"}`}>{tab.label} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${view === tab.value ? "bg-[#edf4ec] text-[#143d1a]" : "bg-white/70 text-neutral-500"}`}>{counts[tab.value]}</span></button>)}</div></div>;
 }
 
 function Filter({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[] }) {
@@ -218,7 +242,8 @@ function ClientList({ clients, archivingId, onView, onEdit, onArchive }: { clien
 
 function StatusBadge({ status }: { status: ClientStatus }) {
   const style = status === "Active" ? "bg-emerald-50 text-emerald-700" : status === "Inactive" ? "bg-neutral-100 text-neutral-600" : "bg-amber-50 text-amber-700";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${style}`}>{status}</span>;
+  const label = status === "Active" ? "Active Client" : status === "Inactive" ? "Inactive Client" : "Lead";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${style}`}>{label}</span>;
 }
 
 function LoadingState() { return <div className="space-y-3 p-5" aria-label="Loading clients"><div className="h-16 animate-pulse rounded-xl bg-neutral-100" /><div className="h-16 animate-pulse rounded-xl bg-neutral-100" /><div className="h-16 animate-pulse rounded-xl bg-neutral-100" /></div>; }
