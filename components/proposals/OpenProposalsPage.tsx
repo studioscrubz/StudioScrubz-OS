@@ -25,12 +25,15 @@ import {
 import {
   approveProposal,
   archiveProposal,
+  createProposalRevision,
   expireDueProposals,
   getProposalHistory,
+  getProposalRevisionHistory,
   getProposals,
   markProposalAccepted,
   markProposalDeclined,
   markProposalSent,
+  prepareProposalDelivery,
   markProposalViewed,
   rejectProposal,
   renewProposal,
@@ -129,6 +132,7 @@ export function OpenProposalsPage() {
   const [history, setHistory] = useState<{
     p: ProposalWithRelations;
     rows: ProposalHistory[];
+    versions: ProposalWithRelations[];
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [sending, setSending] = useState<ProposalWithRelations | null>(null);
@@ -236,7 +240,8 @@ export function OpenProposalsPage() {
   };
   async function showHistory(p: ProposalWithRelations) {
     try {
-      setHistory({ p, rows: await getProposalHistory(p.id) });
+      const [historyRows,versions]=await Promise.all([getProposalHistory(p.id),getProposalRevisionHistory(p.revision_group_id)]);
+      setHistory({ p, rows: historyRows, versions });
     } catch (x) {
       setError(msg(x, "History could not be loaded."));
     }
@@ -306,6 +311,7 @@ export function OpenProposalsPage() {
             history={(p) => void showHistory(p)}
             send={setSending}
             mutate={mutate}
+            revise={async(p)=>{setBusy(p.id);setError(null);try{const revision=await createProposalRevision(p.id);await refresh(`Revision V${revision.revision_number} created.`);setEdit(revision)}catch(x){setError(msg(x,"Proposal revision could not be created."))}finally{setBusy(null)}}}
           />
         )}
       </section>{" "}
@@ -358,6 +364,7 @@ function ProposalList({
   history,
   send,
   mutate,
+  revise,
 }: {
   rows: ProposalWithRelations[];
   busy: string | null;
@@ -371,6 +378,7 @@ function ProposalList({
     fn: () => Promise<unknown>,
     text: string,
   ) => Promise<void>;
+  revise: (p: ProposalWithRelations) => Promise<void>;
 }) {
   if (rows.length === 0) return <Empty />;
   return (
@@ -411,6 +419,7 @@ function ProposalList({
                   history={() => history(proposal)}
                   openSend={() => send(proposal)}
                   mutate={(fn, text) => void mutate(proposal, fn, text)}
+                  revise={() => void revise(proposal)}
                 />
               ))}
             </div>
@@ -429,6 +438,7 @@ function Card({
   history,
   openSend,
   mutate,
+  revise,
 }: {
   p: ProposalWithRelations;
   busy: boolean;
@@ -438,10 +448,12 @@ function Card({
   history: () => void;
   openSend: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
+  revise: () => void;
 }) {
   const { profile } = useAuth();
   const canApprove = hasPermission(profile, "proposals.approve");
   const canSend = hasPermission(profile, "proposals.send");
+  const canCreate = hasPermission(profile, "proposals.create");
   function promptAction(kind: "changes" | "reject" | "decline" | "renew") {
     const value =
       window.prompt(
@@ -470,6 +482,7 @@ function Card({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-extrabold text-[#143d1a]">{p.proposal_number}</p>
+            <Badge t={`V${p.revision_number}`} />
             <StatusBadge status={p.status} />
           </div>
           <p className="mt-2 truncate text-sm font-bold text-neutral-700">
@@ -554,7 +567,7 @@ function Card({
               <Action t="Print / Save PDF" f={() => printProposal(p)} />
             </>
           )}
-        {(p.status === "Sent" || p.status === "Viewed") && (
+        {(p.status === "Sent" || p.status === "Viewed") && p.is_current_revision && (
           <>
             {canSend && <Action t="Resend Proposal" f={openSend} />}
             <Action
@@ -564,8 +577,10 @@ function Card({
             <Action t="Accept" f={accept} />
             <Action t="Decline" f={() => promptAction("decline")} />
             <Action t="Print" f={() => printProposal(p)} />
+            {canCreate && <Action t={busy?"Creating…":"Create Revision"} disabled={busy} f={revise} />}
           </>
         )}
+        {(p.status === "Sent" || p.status === "Viewed") && !p.is_current_revision && <span className="text-xs font-bold text-neutral-500">Superseded · read-only</span>}
         {p.status === "Accepted" && (
           <>
             {isRecurringFrequency(p.frequency) ||
@@ -672,6 +687,7 @@ function SendProposalModal({
     setBusy(true);
     setError(null);
     try {
+      const snapshot = proposalDeliverySnapshot(proposal);
       const result = await deliverDocument({
         documentType: "Proposal",
         documentId: proposal.id,
@@ -684,14 +700,17 @@ function SendProposalModal({
         messageBody: body.trim(),
         publicUrl: reviewUrl,
         publicLinkLabel: "Review Proposal",
+        requestId: `proposal-${proposal.id}-${token.slice(0,16)}`,
         prepare: async (channel, recipient) => {
-          await markProposalSent(proposal.id, channel, {
-            recipient,
-            sender,
+          void channel; void recipient;
+          await prepareProposalDelivery(proposal.id, {
             token,
             expiresAt,
-            snapshot: proposalDeliverySnapshot(proposal),
+            snapshot,
           });
+        },
+        complete: async (channel, recipient) => {
+          await markProposalSent(proposal.id, channel, {recipient,sender,token,expiresAt,snapshot});
         },
       });
       sent(result.message);
@@ -961,11 +980,14 @@ function HistoryModal({
   data,
   close,
 }: {
-  data: { p: ProposalWithRelations; rows: ProposalHistory[] };
+  data: { p: ProposalWithRelations; rows: ProposalHistory[]; versions: ProposalWithRelations[] };
   close: () => void;
 }) {
   return (
     <Modal title={`History — ${data.p.proposal_number}`} close={close}>
+      <div className="mb-5 grid gap-2">
+        {data.versions.map((version)=><div key={version.id} className="flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2 text-sm"><b>V{version.revision_number} · {version.proposal_number}</b><span>{version.is_current_revision?`${version.status} · Active`:version.superseded_at?"Superseded":version.status}</span></div>)}
+      </div>
       <div className="space-y-3">
         {data.rows.map((x) => (
           <div key={x.id} className="rounded-lg border p-3">

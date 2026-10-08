@@ -20,7 +20,9 @@ type DocumentDeliveryInput = {
   messageBody: string;
   publicUrl: string;
   publicLinkLabel: string;
+  requestId?: string;
   prepare: (primaryChannel: "Email" | "Text", primaryRecipient: string) => Promise<void>;
+  complete?: (primaryChannel: "Email" | "Text", primaryRecipient: string) => Promise<void>;
 };
 
 export type UnifiedDeliveryResult = {
@@ -38,7 +40,7 @@ export async function deliverDocument(input: DocumentDeliveryInput): Promise<Uni
   if (!rawEmail && !phone) throw new Error("Customer does not have an email address or phone number on file.");
   if (rawEmail && !email && !phone) throw new Error("The customer email address on file is invalid, and no usable phone number is available.");
 
-  const requestId = crypto.randomUUID();
+  const requestId = input.requestId ?? crypto.randomUUID();
   await input.prepare(email ? "Email" : "Text", email ?? phone!);
 
   let emailStatus: UnifiedDeliveryResult["email"] = rawEmail ? "Failed" : "Not available";
@@ -88,6 +90,8 @@ export async function deliverDocument(input: DocumentDeliveryInput): Promise<Uni
 
   const message = deliveryMessage(emailStatus, smsStatus);
   if (emailStatus !== "Sent" && smsStatus !== "Message opened") throw new Error(message);
+  const successfulChannel = emailStatus === "Sent" ? "Email" : "Text";
+  await input.complete?.(successfulChannel, successfulChannel === "Email" ? email! : phone!);
   return { email: emailStatus, sms: smsStatus, message };
 }
 

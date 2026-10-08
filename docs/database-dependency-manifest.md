@@ -1,5 +1,9 @@
 ﻿# Database dependency manifest
 
+2026-10-07 Job deletion eligibility addition: `get_archived_job_permanent_delete_eligibility` is defined by `20261007193000_job_permanent_delete_eligibility.sql`.
+
+2026-10-07 Proposal revision additions: `create_proposal_revision` and `prepare_proposal_delivery` are defined by the unapplied forward migration `20261007194500_proposal_revision_foundation.sql`; that migration also replaces `mark_proposal_sent_for_delivery`, `get_proposal_by_token`, and `accept_proposal_by_token` with revision-aware definitions.
+
 2026-10-06 Crew Presence Phase 0B addition: `start_operational_job_with_presence`, `confirm_job_crew_arrival`, `correct_job_crew_presence`, and `mark_job_crew_left_early` are defined by `20261006152000_job_crew_presence_phase_0b.sql`. These RPCs provide the migration-backed crew presence, arrival, correction, early-departure, and presence-aware Job Start workflow.
 
 2026-10-06 Labor Budget + Tech Performance additions: `calculate_employee_performance_review`, `finalize_employee_performance_review`, and `get_employee_performance_reviews` are defined by `20261006190000_employee_performance_scoring_engine_v1.sql`. `get_employee_performance_workflow`, `respond_to_employee_performance_review`, `create_employee_coaching_record`, and `respond_to_employee_coaching` are defined by `20261006191000_performance_review_workflow_coaching_phase_5.sql`. `job_labor_threshold_events` is defined by `20261006183000_job_labor_threshold_events_phase_2d.sql`. `employee_teamwork_events`, `get_job_employee_participation`, `get_job_performance_evidence`, and `record_job_compliance` are defined by `20261006185000_job_compliance_teamwork_attribution_phase_3def.sql`. These are part of the migration-backed Labor Budget + Tech Performance workflow.

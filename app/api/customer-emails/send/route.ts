@@ -94,7 +94,7 @@ async function loadDocument(admin: ReturnType<typeof createSupabaseAdminClient>,
   }
   if (type === "Proposal") {
     const { data, error } = await admin.from("proposals").select("id,proposal_number,client_id,property_id,client_access_token,client_access_token_expires_at,client_delivery_snapshot,archived_at,status").eq("id", id).single();
-    if (error || !data || data.archived_at || !["Sent", "Viewed"].includes(data.status) || !data.client_delivery_snapshot) throw new Error("This Proposal is unavailable for email delivery.");
+    if (error || !data || data.archived_at || !["Approved", "Sent", "Viewed"].includes(data.status) || !data.client_delivery_snapshot) throw new Error("This Proposal is unavailable for email delivery.");
     return { id: data.id, number: data.proposal_number, clientId: data.client_id, propertyId: data.property_id, token: data.client_access_token, tokenExpiresAt: data.client_access_token_expires_at, publicPath: "/proposal" };
   }
   if (type === "Service Agreement") {
