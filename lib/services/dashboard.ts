@@ -34,7 +34,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     hasPermission(profile, "attention.view") ? readSection("Attention", getOperationalAttentionItems) : Promise.resolve([]),
   ]);
 
-  // Open Estimates retires only links with both a scheduled date and time.
+  // Open Estimates excludes lifecycle-complete Converted records by status and
+  // preserves the established scheduled-walkthrough routing behavior.
   const scheduledEstimateIds = new Set(estimateLinks.filter(isScheduledWalkthrough).map(row => row.estimate_id));
   const openEstimates = estimates.filter(row => !row.archived_at && row.status === "Open" && !scheduledEstimateIds.has(row.id));
   const monthStart = new Date(`${today.slice(0, 8)}01T00:00:00`).getTime();

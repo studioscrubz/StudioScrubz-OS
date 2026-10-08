@@ -4,7 +4,7 @@ import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
-export type EstimateStatus = "Open" | "Declined" | "Archived";
+export type EstimateStatus = "Open" | "Converted" | "Superseded" | "Declined" | "Archived";
 export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Custom";
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionSeverity = "Light" | "Average" | "Heavy" | "Extreme";
@@ -215,6 +215,8 @@ export type Estimate = {
   created_at: string;
   updated_at: string;
   archived_at: string | null;
+  superseded_by_estimate_id?: string | null;
+  superseded_reason?: string | null;
 };
 
 export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at" | "declined_at" | "decline_reason" | "sent_at" | "sent_to" | "sent_by" | "client_access_token" | "client_access_token_expires_at" | "client_delivery_snapshot"> & { archived_at?: string | null; declined_at?: string | null; decline_reason?: string | null; sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; client_delivery_snapshot?: Record<string, unknown> | null };
