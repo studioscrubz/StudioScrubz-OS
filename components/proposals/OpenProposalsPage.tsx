@@ -1222,7 +1222,13 @@ function human(k: string) {
   return k.replace(/([A-Z])/g, " $1").replace(/^./, (x) => x.toUpperCase());
 }
 function msg(x: unknown, f: string) {
-  return x instanceof Error ? x.message : f;
+  if (x instanceof Error) return x.message;
+  if (x && typeof x === "object" && "message" in x) {
+    const message = (x as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim() && message.length <= 500)
+      return message.trim();
+  }
+  return f;
 }
 function escapeHtml(x: string) {
   return x.replace(
