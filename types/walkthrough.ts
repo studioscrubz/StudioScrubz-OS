@@ -99,6 +99,8 @@ export type PostConstructionAssessment = {
   nextFollowUpAt: string | null;
 
   roomsAreas: string[];
+  roomsAreaOther?: string;
+  areasExcluded?: string;
   detailedScope: string[];
   surfaceMaterials: string[];
   residues: string[];

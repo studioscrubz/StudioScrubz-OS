@@ -3,14 +3,9 @@ import type {
   WalkthroughMeasurements,
   WalkthroughScopeItem,
 } from "@/types/walkthrough";
+import { POST_CONSTRUCTION_SCOPE_OPTIONS } from "@/lib/postConstructionScope";
 
-export const CUSTOMER_SCOPE_OPTIONS = [
-  "Kitchen", "Living Room / Great Room", "Dining Room", "Bedrooms",
-  "Bathrooms", "Hallways", "Closets", "Stairways", "Laundry Room",
-  "Garage", "Office / Study", "Basement", "Attic", "Balconies / Patios",
-  "Exterior Areas", "Mechanical / Utility Rooms", "Common Areas",
-  "Entire Property", "Other",
-] as const;
+export const CUSTOMER_SCOPE_OPTIONS = POST_CONSTRUCTION_SCOPE_OPTIONS;
 
 export const CONDITION_CONCERNS = [
   "Heavy buildup", "Grease", "Soap / mineral buildup", "Heavy dust",

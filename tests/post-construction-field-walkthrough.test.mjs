@@ -46,7 +46,7 @@ const sections = [
 ];
 
 const questions = [
-  "What type of construction project is this, which areas are affected, and which areas are specifically excluded from cleaning?",
+  "What type of construction project is this, and which areas are affected?",
   "What stage is construction in, and when will StudioScrubz have exclusive access to begin cleaning?",
   "What are the property measurements, quantities, and rooms or areas included in the cleaning scope?",
   "Which cleaning level is required, and which horizontal and vertical surfaces must be cleaned?",

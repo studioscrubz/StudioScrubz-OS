@@ -1,6 +1,7 @@
 "use client";
 
 import type { PostConstructionAssessment, WalkthroughMeasurements } from "@/types/walkthrough";
+import { PostConstructionScopeFields, normalizePostConstructionScopeAreas } from "@/components/walkthroughs/PostConstructionScopeFields";
 
 const detailedScope = ["Kitchens", "Bathrooms", "Cabinets", "Closets", "Built-Ins", "Fixtures", "Baseboards", "Trim", "Doors", "Interior Glass", "Windows", "Floors", "Stairs", "Elevators"];
 const exclusions = ["Heavy Debris", "Hazardous Material", "Mold", "Asbestos", "Repairs", "Trade Work"];
@@ -11,7 +12,7 @@ export const EMPTY_POST_CONSTRUCTION_ASSESSMENT: PostConstructionAssessment = {
   projectType: "", propertyUse: "", projectPhase: "", expectedConstructionCompletionDate: null,
   desiredReadinessDate: null, occupancyStatus: "", dustLevel: "", debrisCondition: "",
   utilities: { water: false, electricity: false, restroom: false }, decisionMakerStatus: "",
-  contactStatus: "Not Contacted", nextFollowUpAt: null, roomsAreas: [], detailedScope: [],
+  contactStatus: "Not Contacted", nextFollowUpAt: null, roomsAreas: [], roomsAreaOther: "", areasExcluded: "", detailedScope: [],
   surfaceMaterials: [], residues: [], lightDebrisInScope: false, exclusions: [...exclusions],
   applianceInteriors: false, interiorCabinets: false, workingHourRestrictions: "",
   readinessBlockers: "", siteSafetyConcerns: "", customerPriorities: "", internalObservations: "",
@@ -34,8 +35,8 @@ export function PostConstructionAssessmentFields({ value, set }: { value: Walkth
       <Choice label="Decision-Maker Status" value={current.decisionMakerStatus} options={["Decision Maker","Influencer","Awaiting Decision Maker","Unknown"]} set={v=>update("decisionMakerStatus",v as PostConstructionAssessment["decisionMakerStatus"])}/>
       <Choice label="Contact Status" value={current.contactStatus} options={["Not Contacted","Attempting Contact","Contacted","Qualified","Not Qualified"]} set={v=>update("contactStatus",v as PostConstructionAssessment["contactStatus"])}/>
       <Input label="Next Follow-Up" type="datetime-local" value={current.nextFollowUpAt??""} set={v=>update("nextFollowUpAt",v||null)}/>
-      <Input label="Rooms / Areas in Scope" value={current.roomsAreas.join(", ")} set={v=>update("roomsAreas",split(v))}/>
     </div>
+    <PostConstructionScopeFields areas={normalizePostConstructionScopeAreas(current.roomsAreas)} bedrooms={value.bedrooms} bathrooms={value.bathrooms} otherArea={current.roomsAreaOther??""} areasExcluded={current.areasExcluded??""} onAreasChange={v=>update("roomsAreas",v)} onBedroomsChange={bedrooms=>set({...value,bedrooms})} onBathroomsChange={bathrooms=>set({...value,bathrooms})} onOtherAreaChange={v=>update("roomsAreaOther",v)} onAreasExcludedChange={v=>update("areasExcluded",v)}/>
     <Checks title="Utilities Available" values={Object.entries(current.utilities).filter(([,v])=>v).map(([k])=>k)} options={["water","electricity","restroom"]} set={items=>update("utilities",{water:items.includes("water"),electricity:items.includes("electricity"),restroom:items.includes("restroom")})}/>
     <Checks title="Detailed Scope" values={current.detailedScope} options={detailedScope} set={v=>update("detailedScope",v)}/>
     <Checks title="Surface / Material Considerations" values={current.surfaceMaterials} options={surfaces} set={v=>update("surfaceMaterials",v)}/>

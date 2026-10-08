@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GuidedWalkthroughChoice } from "@/components/walkthroughs/GuidedWalkthroughChoice";
+import { PostConstructionScopeFields, normalizePostConstructionScopeAreas } from "@/components/walkthroughs/PostConstructionScopeFields";
 import type { PostConstructionFieldAssessment } from "@/types/fieldWalkthrough";
 import type {
   OperationalPhotoWithUrl,
@@ -9,6 +10,8 @@ import type {
 } from "@/types/photo";
 
 type SharedPostConstructionMeasurements = {
+  bedrooms?: number | null;
+  bathrooms?: number | null;
   postConstructionAssessment?: Record<string, unknown> & {
     fieldWalkthrough?: PostConstructionFieldAssessment;
   };
@@ -38,12 +41,11 @@ export const POST_CONSTRUCTION_FIELD_SECTIONS: S[] = [
     title: "Project Overview & Boundaries",
     key: "includedAreas",
     question:
-      "What type of construction project is this, which areas are affected, and which areas are specifically excluded from cleaning?",
+      "What type of construction project is this, and which areas are affected?",
     missing: (a) => [
       ...req(a, [
         ["constructionTypes", "Select at least one construction type."],
         ["affectedAreas", "Select at least one affected area."],
-        ["excludedAreas", "Enter excluded areas or “None”."],
       ]),
       ...(arr(a.constructionTypes).includes("Other") &&
       !has(a.constructionOther)
@@ -82,6 +84,7 @@ export const POST_CONSTRUCTION_FIELD_SECTIONS: S[] = [
         ["garages", "Enter garages."],
         ["balconies", "Enter balconies."],
         ["roomsAreas", "Select rooms or areas."],
+        ["excludedAreas", "Enter excluded areas or None."],
       ]),
   },
   {
@@ -278,6 +281,13 @@ const fieldOf = (
     sectionConfirmations: {},
   };
 
+const answerFor = (field: PostConstructionFieldAssessment, section: S) => {
+  const current = parse(field.answers?.[section.key]);
+  if (section.key !== "measurementsVerified" || has(current.excludedAreas)) return current;
+  const legacy = parse(field.answers?.includedAreas);
+  return has(legacy.excludedAreas) ? { ...current, excludedAreas: legacy.excludedAreas } : current;
+};
+
 export function postConstructionCompletionIssues(
   m: SharedPostConstructionMeasurements,
   requirePhotos = true
@@ -285,7 +295,7 @@ export function postConstructionCompletionIssues(
   const f = fieldOf(m);
 
   return POST_CONSTRUCTION_FIELD_SECTIONS.flatMap((s) =>
-    s.missing(parse(f.answers?.[s.key]), requirePhotos).length
+    s.missing(answerFor(f, s), requirePhotos).length
       ? [s.title]
       : []
   );
@@ -312,7 +322,7 @@ export function PostConstructionFieldWalkthrough<
 
   const section = POST_CONSTRUCTION_FIELD_SECTIONS[current];
   const field = fieldOf(measurements);
-  const answer = parse(field.answers?.[section.key]);
+  const answer = answerFor(field, section);
 
   const requirePhotos = Boolean(onPhoto);
 
@@ -334,6 +344,10 @@ export function PostConstructionFieldWalkthrough<
 
     onChange({
       ...measurements,
+      ...(section.key === "measurementsVerified" ? {
+        ...(Object.hasOwn(patch, "bedrooms") ? { bedrooms: patch.bedrooms as number | null } : {}),
+        ...(Object.hasOwn(patch, "bathrooms") ? { bathrooms: patch.bathrooms as number | null } : {}),
+      } : {}),
       postConstructionAssessment: {
         ...assessment,
         fieldWalkthrough: {
@@ -495,11 +509,6 @@ function Fields({
           />
         )}
 
-        <Text
-          label="Excluded areas (enter None if none)"
-          value={a.excludedAreas}
-          change={(v) => setA({ excludedAreas: v })}
-        />
       </>
     );
 
@@ -541,8 +550,6 @@ function Fields({
           {[
             ["Square feet", "squareFeet"],
             ["Floors", "floors"],
-            ["Bedrooms", "bedrooms"],
-            ["Bathrooms", "bathrooms"],
             ["Kitchens", "kitchens"],
             ["Staircases", "staircases"],
             ["Garages", "garages"],
@@ -557,20 +564,7 @@ function Fields({
           ))}
         </div>
 
-        {m("Rooms and areas in scope", "roomsAreas", [
-          "Kitchen",
-          "Bathrooms",
-          "Bedrooms",
-          "Living room",
-          "Dining room",
-          "Offices",
-          "Hallways",
-          "Stairs",
-          "Laundry",
-          "Garage",
-          "Balconies",
-          "Common areas",
-        ])}
+        <PostConstructionScopeFields areas={normalizePostConstructionScopeAreas(a.roomsAreas)} bedrooms={typeof a.bedrooms==="number"?a.bedrooms:null} bathrooms={typeof a.bathrooms==="number"?a.bathrooms:null} otherArea={typeof a.roomsAreaOther==="string"?a.roomsAreaOther:""} areasExcluded={typeof a.excludedAreas==="string"?a.excludedAreas:""} onAreasChange={roomsAreas=>setA({roomsAreas})} onBedroomsChange={bedrooms=>setA({bedrooms})} onBathroomsChange={bathrooms=>setA({bathrooms})} onOtherAreaChange={roomsAreaOther=>setA({roomsAreaOther})} onAreasExcludedChange={excludedAreas=>setA({excludedAreas})}/>
       </>
     );
 
