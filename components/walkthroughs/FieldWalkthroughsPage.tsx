@@ -20,10 +20,11 @@ import { mapWalkthroughToCalculatorInput } from "@/lib/pricing/walkthroughPricin
 import { calculateCommercialEstimate, calculatePostConstructionCatalogEstimate, calculateResidentialEstimate, isPostConstructionV2Estimate } from "@/lib/pricing/estimates";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
+import { hasOperationalRecordOverride } from "@/lib/auth/permissions";
 
 export function FieldWalkthroughsPage() {
   const { profile } = useAuth();
-  const masterAdmin = profile?.role === "Master Admin";
+  const masterAdmin = hasOperationalRecordOverride(profile);
 
   const [rows, setRows] = useState<FieldWalkthrough[]>([]);
   const [active, setActive] = useState<FieldWalkthrough | null>(null);
@@ -418,7 +419,7 @@ function FieldForm({
 
         {readOnly && (
           <p className="mt-2 text-sm font-bold text-neutral-600">
-            Master Admin review — technician responses are read-only.
+            This assessment is currently read-only for your account.
           </p>
         )}
 

@@ -165,6 +165,9 @@ export function isMasterAdmin(profile: UserProfile | null): boolean {
   return profile?.is_active === true && profile.role === "Master Admin";
 }
 
+/** Assignment ownership never limits an active Master Admin's operational access. */
+export const hasOperationalRecordOverride = isMasterAdmin;
+
 export const canAccessFinances = (profile: UserProfile | null) =>
   hasPermission(profile, "finances.view");
 
