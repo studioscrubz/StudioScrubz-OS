@@ -174,6 +174,13 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     }
   }
 
+  if (profile.is_active && profile.role === "Master Admin" && hasPermission(profile, "proposals.view")) {
+    for (const proposal of proposals) {
+      if (proposal.status !== "Accepted" || !proposal.accepted || proposal.archived_at) continue;
+      items.push(item(`proposal:${proposal.id}:accepted`, "Proposal Accepted", "Urgent", "Proposals", "Proposal Accepted", `${proposal.proposal_number} was accepted and is ready for the next workflow step.`, "Proposal", proposal.id, proposal.client_id, proposal.proposal_number, null, null, proposal.accepted_at ?? proposal.updated_at, `/open-proposals?proposalId=${proposal.id}`, "Open Proposal"));
+    }
+  }
+
   if (profile.is_active && hasPermission(profile, "jobs.view")) {
     const activeJobs = new Map(jobs.filter(job => !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status)).map(job => [job.id, job]));
     if (canReviewFieldDiscovery(profile.role)) {

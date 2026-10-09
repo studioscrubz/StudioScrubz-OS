@@ -24,3 +24,4 @@ export type ProposalUpdate = Partial<Omit<Proposal, "id" | "created_at" | "updat
 export type ProposalRevisionFields = { revision_group_id: string; revision_number: number; revised_from_proposal_id: string | null; is_current_revision: boolean; superseded_at: string | null };
 export type ProposalWithRelations = Proposal & ProposalRevisionFields & { client: Client | null; property: Property | null; estimate: Estimate | null; walkthrough: Walkthrough | null };
 export type ProposalHistory = { id: string; proposal_id: string; event_type: string; previous_status: string | null; new_status: string | null; description: string | null; metadata: Record<string, string | number | boolean | null>; performed_by: string; created_at: string };
+export type ProposalActivity = ProposalHistory & { revision_number: number; proposal_number: string };

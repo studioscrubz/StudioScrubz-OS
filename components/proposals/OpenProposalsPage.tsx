@@ -18,7 +18,7 @@ import {
   APPROVAL_STATUSES,
   type ProposalAcceptanceMethod,
   type ProposalApprovalStatus,
-  type ProposalHistory,
+  type ProposalActivity,
   type ProposalStatus,
   type ProposalWithRelations,
 } from "@/types/proposal";
@@ -27,7 +27,7 @@ import {
   archiveProposal,
   createProposalRevision,
   expireDueProposals,
-  getProposalHistory,
+  getProposalFamilyHistory,
   getProposalRevisionHistory,
   getProposals,
   markProposalAccepted,
@@ -131,7 +131,7 @@ export function OpenProposalsPage() {
   );
   const [history, setHistory] = useState<{
     p: ProposalWithRelations;
-    rows: ProposalHistory[];
+    rows: ProposalActivity[];
     versions: ProposalWithRelations[];
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -240,7 +240,7 @@ export function OpenProposalsPage() {
   };
   async function showHistory(p: ProposalWithRelations) {
     try {
-      const [historyRows,versions]=await Promise.all([getProposalHistory(p.id),getProposalRevisionHistory(p.revision_group_id)]);
+      const [historyRows,versions]=await Promise.all([getProposalFamilyHistory(p.revision_group_id),getProposalRevisionHistory(p.revision_group_id)]);
       setHistory({ p, rows: historyRows, versions });
     } catch (x) {
       setError(msg(x, "History could not be loaded."));
@@ -980,7 +980,7 @@ function HistoryModal({
   data,
   close,
 }: {
-  data: { p: ProposalWithRelations; rows: ProposalHistory[]; versions: ProposalWithRelations[] };
+  data: { p: ProposalWithRelations; rows: ProposalActivity[]; versions: ProposalWithRelations[] };
   close: () => void;
 }) {
   return (
@@ -992,6 +992,7 @@ function HistoryModal({
         {data.rows.map((x) => (
           <div key={x.id} className="rounded-lg border p-3">
             <p className="font-bold text-[#143d1a]">{x.event_type}</p>
+            <p className="text-xs font-bold text-neutral-600">V{x.revision_number} · {x.proposal_number}</p>
             <p className="text-xs text-neutral-500">
               {new Date(x.created_at).toLocaleString()} · {x.performed_by}
             </p>
@@ -1134,10 +1135,17 @@ function proposalProperty(p: ProposalWithRelations): string {
     : p.property_name || "Deleted Property";
 }
 function proposalActivityDate(p: ProposalWithRelations): string {
-  if (p.sent_at) return `Sent ${formatDate(p.sent_at)}`;
+  if (p.accepted_at) return `Accepted ${formatDateTime(p.accepted_at)}`;
+  if (p.declined_at) return `Declined ${formatDateTime(p.declined_at)}`;
+  if (p.expired_at) return `Expired ${formatDateTime(p.expired_at)}`;
+  if (p.viewed_at) return `Viewed ${formatDateTime(p.viewed_at)}`;
+  if (p.sent_at) return `Sent ${formatDateTime(p.sent_at)}`;
   if (p.status === "Ready for Approval" || p.status === "Approved")
     return `Submitted ${formatDate(p.updated_at)}`;
   return `Created ${formatDate(p.created_at)}`;
+}
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
