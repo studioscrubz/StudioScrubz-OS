@@ -55,8 +55,17 @@ test("internal activity timeline spans every revision and list shows latest life
 test("Master Admin receives immediate accepted and declined proposal attention", () => {
   assert.match(attentionTypes, /"Proposal Accepted"/);
   assert.match(attention, /profile\.role === "Master Admin"[\s\S]*proposal\.status !== "Accepted"[\s\S]*"Proposal Accepted"/);
+  assert.match(attention, /proposal\.archived_at \|\| routedProposalIds\.has\(proposal\.id\)/);
+  assert.match(attention, /proposal\.accepted_at \?\? proposal\.updated_at/);
   assert.match(attention, /"Proposal Declined"/);
   assert.match(declineRoute, /scheduleAttentionPushAfterResponse\(\)/);
+});
+
+test("historical accepted proposals already routed to an agreement or job are not surfaced as new alerts", () => {
+  assert.match(attention, /const routedProposalIds = new Set\(\[\.\.\.input\.jobRouteIds, \.\.\.input\.agreementProposalIds\]/);
+  assert.match(attention, /proposal\.status !== "Accepted" \|\| !proposal\.accepted \|\| proposal\.archived_at \|\| routedProposalIds\.has\(proposal\.id\)/);
+  assert.match(attention, /proposal:\$\{proposal\.id\}:accepted/);
+  assert.doesNotMatch(attention, /notification_revision[^\n]*Proposal Accepted/);
 });
 
 test("existing acceptance and downstream financial workflow remain untouched", () => {
