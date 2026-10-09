@@ -35,7 +35,19 @@ test("delivery preparation precedes provider work and finalization follows succe
   assert.ok(delivery.indexOf("if (emailStatus !== \"Sent\"")<delivery.indexOf("await input.complete?."));
   assert.match(page,/prepareProposalDelivery/);
   assert.match(page,/complete: async/);
-  assert.match(page,/requestId: `proposal-/);
+  assert.match(page,/requestId: deliveryRequestId/);
+});
+
+test("intentional proposal resends use a new request while retries remain idempotent",()=>{
+  assert.match(page,/const deliveryRequestId = useMemo\([\s\S]*crypto\.randomUUID\(\)[\s\S]*\[proposal\.id\]/);
+  assert.match(page,/requestId: deliveryRequestId/);
+  assert.doesNotMatch(page,/requestId: `proposal-\$\{proposal\.id\}-\$\{token\.slice/);
+
+  const modal = page.slice(page.indexOf("function SendProposalModal"));
+  const submit = modal.slice(modal.indexOf("async function submit()"), modal.indexOf("return ("));
+  assert.ok(modal.indexOf("const deliveryRequestId") < modal.indexOf("async function submit()"));
+  assert.doesNotMatch(submit,/deliveryRequestId\s*=/);
+  assert.match(submit,/catch \(caught\)[\s\S]*setError\([\s\S]*setBusy\(false\)/);
 });
 
 test("superseded and accepted races are rejected server-side",()=>{

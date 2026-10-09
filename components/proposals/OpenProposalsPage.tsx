@@ -678,6 +678,10 @@ function SendProposalModal({
         : clientTokenExpiration(),
     [proposal],
   );
+  const deliveryRequestId = useMemo(
+    () => `proposal-${proposal.id}-${crypto.randomUUID()}`,
+    [proposal.id],
+  );
   const reviewUrl = `${getPublicSiteUrl()}/proposal/${token}`;
   async function submit() {
     if (!email && !phone)
@@ -700,7 +704,7 @@ function SendProposalModal({
         messageBody: body.trim(),
         publicUrl: reviewUrl,
         publicLinkLabel: "Review Proposal",
-        requestId: `proposal-${proposal.id}-${token.slice(0,16)}`,
+        requestId: deliveryRequestId,
         prepare: async (channel, recipient) => {
           void channel; void recipient;
           await prepareProposalDelivery(proposal.id, {
