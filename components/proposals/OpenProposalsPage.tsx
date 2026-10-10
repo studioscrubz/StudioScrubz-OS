@@ -193,16 +193,28 @@ export function OpenProposalsPage() {
     return () =>
       window.removeEventListener(PROPOSAL_JOB_CREATED_EVENT, handleJobCreated);
   }, []);
-  const visibleRows = useMemo(
-    () =>
-      rows.filter(
+  const visibleRows = useMemo(() => {
+    const currentRevisionByFamily = new Map<string, number>();
+    rows.forEach((proposal) => {
+      if (proposal.is_current_revision) {
+        currentRevisionByFamily.set(
+          proposal.revision_group_id,
+          proposal.revision_number,
+        );
+      }
+    });
+
+    return rows.filter(
         (p) =>
           !p.archived_at &&
+          (p.is_current_revision ||
+            (!p.superseded_at &&
+              p.revision_number >
+                (currentRevisionByFamily.get(p.revision_group_id) ?? 0))) &&
           p.status !== "Archived" &&
           (p.status !== "Accepted" || !jobProposalIds.has(p.id)),
-      ),
-    [jobProposalIds, rows],
-  );
+      );
+  }, [jobProposalIds, rows]);
   const filtered = useMemo(
     () =>
       visibleRows
@@ -454,6 +466,10 @@ function Card({
   const canApprove = hasPermission(profile, "proposals.approve");
   const canSend = hasPermission(profile, "proposals.send");
   const canCreate = hasPermission(profile, "proposals.create");
+  const actionable =
+    (p.is_current_revision || !p.superseded_at) &&
+    !p.archived_at &&
+    p.status !== "Archived";
   function promptAction(kind: "changes" | "reject" | "decline" | "renew") {
     const value =
       window.prompt(
@@ -476,7 +492,7 @@ function Card({
     <article className="rounded-xl border border-[#143d1a]/10 bg-white p-4 shadow-sm">
       <button
         type="button"
-        onClick={view}
+        onClick={actionable ? view : history}
         className="grid w-full gap-4 text-left md:grid-cols-[minmax(0,1.25fr)_minmax(180px,.9fr)_140px] md:items-center"
       >
         <div className="min-w-0">
@@ -520,8 +536,8 @@ function Card({
         </div>
       </button>
       <div className="mt-4 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
-        <Action t="Preview" f={view} />
-        {p.status === "Draft" && (
+        {actionable && <Action t="Preview" f={view} />}
+        {actionable && p.status === "Draft" && (
           <>
             <Action t="Edit" f={edit} />
             <Action
@@ -536,7 +552,7 @@ function Card({
             />
           </>
         )}
-        {canApprove &&
+        {actionable && canApprove &&
           p.status === "Ready for Approval" &&
           p.approval_status === "Pending Approval" && (
             <>
@@ -559,7 +575,7 @@ function Card({
               />
             </>
           )}
-        {canSend &&
+        {actionable && canSend &&
           p.status === "Approved" &&
           p.approval_status === "Approved" && (
             <>
@@ -567,7 +583,7 @@ function Card({
               <Action t="Print / Save PDF" f={() => printProposal(p)} />
             </>
           )}
-        {(p.status === "Sent" || p.status === "Viewed") && p.is_current_revision && (
+        {actionable && (p.status === "Sent" || p.status === "Viewed") && (
           <>
             {canSend && <Action t="Resend Proposal" f={openSend} />}
             <Action
@@ -580,8 +596,8 @@ function Card({
             {canCreate && <Action t={busy?"Creating…":"Create Revision"} disabled={busy} f={revise} />}
           </>
         )}
-        {(p.status === "Sent" || p.status === "Viewed") && !p.is_current_revision && <span className="text-xs font-bold text-neutral-500">Superseded · read-only</span>}
-        {p.status === "Accepted" && (
+        {!actionable && <span className="text-xs font-bold text-neutral-500">Superseded · read-only</span>}
+        {actionable && p.status === "Accepted" && (
           <>
             {isRecurringFrequency(p.frequency) ||
             (p.frequency === "One-Time" &&
@@ -593,11 +609,11 @@ function Card({
             <Action t="Print / Save PDF" f={() => printProposal(p)} />
           </>
         )}{" "}
-        {p.status === "Expired" && (
+        {actionable && p.status === "Expired" && (
           <Action t="Renew" f={() => promptAction("renew")} />
         )}
         <Action t="History" f={history} />
-        {p.status !== "Archived" && (
+        {actionable && (
           <Action
             t={busy ? "…" : "Archive"}
             disabled={busy}
