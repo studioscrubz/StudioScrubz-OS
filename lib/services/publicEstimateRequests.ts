@@ -72,11 +72,14 @@ export type PublicRequest = {
 export class PublicEstimateRequestError extends Error {}
 
 export async function getPublicLeadRepresentatives() {
-  const { data, error } = await createSupabaseAdminClient().from("employees")
-    .select("id,preferred_name,first_name,last_name")
-    .eq("department", "Lead Representative").eq("employment_status", "Active").is("archived_at", null);
+  const { data, error } = await createSupabaseAdminClient().rpc(
+    "get_public_lead_representatives",
+  );
   if (error) throw new Error("Representatives could not be loaded.");
-  return (data ?? []).map(row => ({ id: row.id as string, displayName: row.preferred_name?.trim() || `${row.first_name} ${row.last_name}`.trim() }))
+  return ((data ?? []) as Array<{ id: string; display_name: string }>).map(row => ({
+    id: row.id as string,
+    displayName: row.display_name as string,
+  }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
@@ -85,10 +88,13 @@ async function validatePublicLeadRepresentative(value: unknown): Promise<string 
   if (typeof value !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())) {
     throw new PublicEstimateRequestError("Select a valid StudioScrubz representative or None.");
   }
-  const { data, error } = await createSupabaseAdminClient().from("employees").select("id")
-    .eq("id", value.trim()).eq("department", "Lead Representative").eq("employment_status", "Active").is("archived_at", null).maybeSingle();
-  if (error || !data) throw new PublicEstimateRequestError("The selected representative is unavailable. Select another representative or None.");
-  return data.id;
+  const employeeId = value.trim();
+  const { data, error } = await createSupabaseAdminClient().rpc(
+    "is_public_lead_representative",
+    { p_employee_id: employeeId },
+  );
+  if (error || data !== true) throw new PublicEstimateRequestError("The selected representative is unavailable. Select another representative or None.");
+  return employeeId;
 }
 
 export async function loadAuthoritativeCatalog(): Promise<ServiceCatalogBundle> {

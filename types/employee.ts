@@ -53,7 +53,7 @@ export type ActiveScrubTechnician = {
   preferred_name: string | null;
   email: string | null;
   phone: string | null;
-  department: "Scrub Technicians";
+  department: EmployeeDepartment;
   job_title: string | null;
   employment_status: "Active";
   employment_type: EmploymentType | null;

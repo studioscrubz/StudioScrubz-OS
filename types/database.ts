@@ -206,6 +206,8 @@ export interface Database {
       set_marketing_material_active:{Args:{p_identifier:string;p_is_active:boolean};Returns:MarketingMaterial};
       update_marketing_material_metadata:{Args:{p_identifier:string;p_title:string;p_description:string;p_category:string;p_internal_notes:string|null};Returns:MarketingMaterial};
       get_lead_representatives: { Args: { p_estimate_id?: string | null }; Returns: import("@/types/employee").LeadRepresentativeOption[] };
+      get_public_lead_representatives: { Args: Record<never, never>; Returns: Array<{ id: string; display_name: string }> };
+      is_public_lead_representative: { Args: { p_employee_id: string }; Returns: boolean };
       is_current_lead_representative_eligible: { Args: Record<string, never>; Returns: boolean };
       get_my_lead_representative_leads: { Args: Record<string, never>; Returns: LeadRepresentativeLead[] };
       get_company_mileage_rate: { Args: Record<string, never>; Returns: number | null };
