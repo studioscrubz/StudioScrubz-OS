@@ -63,5 +63,29 @@ export function calculateProposal(input: { estimate: EstimateResult | null; cata
   return { serviceName: input.serviceName, serviceDescription: input.serviceDescription, customIntervalDays, estimatedCleaningDays:input.estimatedCleaningDays??null, estimatedHoursPerDay:input.estimatedHoursPerDay??null, upkeepPlan: input.estimate?.upkeepPlan ?? null, baseEstimateAmount: money(baseEstimateAmount), adjustments: input.adjustments, additionalLabor: money(input.additionalLabor), additionalMaterials: money(input.additionalMaterials), recurringPricingRuleId,recurringPricingRuleName, frequencyDiscount: money(recurringDiscount), frequencyDiscountPercent: money(recurringDiscountPercent), inheritedManualDiscount: input.estimate?.manualDiscount ?? 0, manualDiscount: money(manualDiscount), taxRate: 0, taxes: money(taxes), taxFreePricing: true, perVisitTotal: money(perVisitTotal), monthlyTotal: input.estimate?.upkeepPlan ? input.estimate.upkeepPlan.monthlyPackage : estimatedMonthlyTotal(perVisitTotal, input.frequency, customIntervalDays), recommendedLaborHours, laborHoursOverride:input.laborHoursOverride??null, laborHours: Math.round(laborHours * 10) / 10, recommendedCrewSize, crewSizeOverride:input.crewSizeOverride??null, crewRecommendation: crew, estimatedDuration: duration, estimatedProfit: money(perVisitTotal - costs), scope: input.scope, terms: input.terms };
 }
 
+export function withProposalRevisionBaseline(estimate: EstimateResult, proposal: ProposalResult): EstimateResult {
+  const recurringDiscount = proposal.frequencyDiscount ?? 0;
+  const inheritedManualDiscount = proposal.inheritedManualDiscount ?? 0;
+  const taxes = proposal.taxes ?? 0;
+  const finalPrice = money(
+    proposal.baseEstimateAmount - recurringDiscount - inheritedManualDiscount + taxes,
+  );
+
+  return {
+    ...estimate,
+    basePrice: proposal.baseEstimateAmount,
+    oneTimePrice: proposal.baseEstimateAmount,
+    calculatedFinalPrice: finalPrice,
+    manualPrice: null,
+    finalPrice,
+    recurringDiscount,
+    recurringDiscountPercent: proposal.frequencyDiscountPercent ?? 0,
+    manualDiscount: inheritedManualDiscount,
+    taxes,
+    recurringPricingRuleId: proposal.recurringPricingRuleId ?? null,
+    recurringPricingRuleName: proposal.recurringPricingRuleName ?? null,
+  };
+}
+
 function clamp(value: number): number { return Math.min(100, Math.max(0, value || 0)); }
 function money(value: number): number { return Math.round(value * 100) / 100; }

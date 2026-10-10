@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { ProposalDocument } from "@/components/proposals/ProposalDocument";
-import { acceptPublicProposal, declinePublicProposal, getPublicProposal, recordPublicProposalView } from "@/lib/services/publicProposals";
-import type { PublicProposal } from "@/types/publicProposal";
+import { compareProposalRevisions } from "@/lib/proposals/revisionComparison";
+import { acceptPublicProposal, declinePublicProposal, getPublicProposal, getPublicProposalRevisionHistory, recordPublicProposalView } from "@/lib/services/publicProposals";
+import type { PublicProposal, PublicProposalRevisionHistory } from "@/types/publicProposal";
 
 export function PublicProposalPage({ token }: { token: string }) {
   const [proposal, setProposal] = useState<PublicProposal | null>(null);
+  const [history, setHistory] = useState<PublicProposalRevisionHistory | null>(null);
+  const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -17,9 +20,13 @@ export function PublicProposalPage({ token }: { token: string }) {
 
   useEffect(() => {
     let active = true;
-    void getPublicProposal(token)
-      .then(async (loaded) => {
+    void Promise.all([getPublicProposal(token), getPublicProposalRevisionHistory(token)])
+      .then(async ([loaded, loadedHistory]) => {
         if (active) setProposal(loaded);
+        if (active) {
+          setHistory(loadedHistory);
+          setSelectedRevision(loadedHistory.current_revision_number);
+        }
         try {
           const viewed = await recordPublicProposalView(token);
           if (active) setProposal(viewed);
@@ -53,18 +60,32 @@ export function PublicProposalPage({ token }: { token: string }) {
   const accepted = proposal.status === "Accepted";
   const declined = proposal.status === "Declined";
   const deposit = proposal.deposit_instructions;
+  const selected = history?.revisions.find((item) => item.revision_number === selectedRevision);
+  const displayed = selected?.is_current_revision ? proposal : selected ?? proposal;
+  const displayedRevision = displayed.revision_number ?? history?.current_revision_number ?? 1;
+  const previous = history?.revisions.find((item) => item.revision_number === displayedRevision - 1);
+  const changes = previous && displayed.is_current_revision
+    ? compareProposalRevisions(previous, displayed)
+    : [];
+  const actionable = displayed.is_current_revision && !displayed.superseded;
 
   return <Shell>
-    <div className="px-6 pt-6 text-sm font-bold text-[#143d1a]">Proposal revision V{proposal.revision_number}</div>
-    <ProposalDocument document={proposal} />
+    <div className="px-6 pt-6 print:hidden">
+      <p className="text-sm font-bold text-[#143d1a]">Proposal revision V{displayedRevision}</p>
+      {history && history.revisions.length > 1 && <nav aria-label="Proposal revision history" className="mt-3 flex flex-wrap gap-2">
+        {history.revisions.map((revision) => <button key={revision.revision_number} type="button" onClick={() => setSelectedRevision(revision.revision_number)} className={`rounded-full border px-4 py-2 text-sm font-bold ${revision.revision_number === displayedRevision ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>R{revision.revision_number}{revision.is_current_revision ? " · Current" : " · Superseded"}</button>)}
+      </nav>}
+    </div>
+    {!actionable && <div className="mx-6 mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 print:mx-0"><b>This proposal has been superseded — read-only</b><p className="mt-1 text-sm">This version is retained for comparison and cannot be accepted or declined.</p></div>}
+    {changes.length > 0 && <section className="mx-auto mt-5 max-w-3xl px-6 print:hidden"><div className="rounded-xl border border-[#d4af37]/50 bg-[#fffdf4] p-5"><h2 className="text-lg font-bold text-[#143d1a]">What Changed from R{displayedRevision - 1}</h2><ul className="mt-3 space-y-2">{changes.map((change, index) => <li key={`${change.category}-${change.label}-${index}`} className="text-sm"><b>{change.kind}: {change.label}</b>{change.previous && change.current ? ` — ${change.previous} → ${change.current}` : change.current ? ` — ${change.current}` : change.previous ? ` — ${change.previous}` : ""}{change.amountDelta ? ` (${change.amountDelta > 0 ? "+" : ""}${money(change.amountDelta, "USD")})` : ""}</li>)}</ul></div></section>}
+    <ProposalDocument document={displayed} />
     <section className="mx-auto max-w-3xl px-6 pb-6 print:hidden">
-      {proposal.superseded && <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-900"><h3 className="font-bold">This proposal has been superseded</h3><p className="mt-1 text-sm">This historical revision remains available for reference but can no longer be accepted. Please use the newest proposal link from StudioScrubz.</p></div>}
-      {accepted ? <>
+      {actionable && accepted ? <>
         <div className="rounded-xl border border-green-300 bg-green-50 p-5"><h3 className="font-bold text-green-800">Proposal Accepted</h3><p>Accepted by <b>{proposal.accepted_by_name}</b></p><p className="text-sm">{proposal.accepted_at && new Date(proposal.accepted_at).toLocaleString()}</p></div>
         {deposit && <div className="mt-4 rounded-xl border border-[#d4af37]/50 bg-[#fffdf4] p-5"><h3 className="font-bold text-[#143d1a]">Deposit Instructions</h3><p className="mt-2"><b>Payment method:</b> {deposit.payment_method}</p><p><b>Recipient:</b> {deposit.recipient_name}</p><p><b>Phone:</b> {formatPhone(deposit.recipient_phone)}</p><p><b>Exact amount:</b> {money(deposit.required_amount, deposit.currency)}</p><p><b>Memo:</b> {deposit.rendered_memo}</p><p className="mt-3 text-sm text-neutral-600">Sending payment does not automatically confirm receipt. StudioScrubz staff will confirm the deposit after it is received.</p></div>}
-      </> : declined ?
+      </> : actionable && declined ?
         <div className="rounded-xl border border-neutral-300 bg-neutral-50 p-5"><h3 className="font-bold text-[#143d1a]">Proposal Declined</h3><p className="mt-1 text-sm text-neutral-600">StudioScrubz has been notified. This proposal remains available for your records.</p></div>
-      : !proposal.superseded && (proposal.status === "Sent" || proposal.status === "Viewed") ?
+      : actionable && (proposal.status === "Sent" || proposal.status === "Viewed") ?
         <div className="rounded-xl border bg-neutral-50 p-5">
           <h3 className="font-bold text-[#143d1a]">Accept Proposal</h3>
           <label className="mt-4 block font-semibold">Full Name<input className="mt-1 h-11 w-full rounded-lg border bg-white px-3" value={name} onChange={(event) => setName(event.target.value)} /></label>

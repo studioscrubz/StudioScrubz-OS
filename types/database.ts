@@ -340,6 +340,7 @@ export interface Database {
       get_estimate_by_token:{Args:{p_token:string};Returns:PublicEstimate};
       request_estimate_walkthrough_by_token:{Args:{p_token:string;p_client_name:string;p_email:string|null;p_phone:string|null;p_preferred_contact_method:string};Returns:import("@/types/publicEstimate").PublicEstimateWalkthroughRequestResult};
       get_proposal_by_token:{Args:{p_token:string};Returns:PublicProposal};
+      get_proposal_revision_history_by_token:{Args:{p_token:string};Returns:import("@/types/publicProposal").PublicProposalRevisionHistory};
       get_invoice_by_token:{Args:{p_token:string};Returns:import("@/types/publicInvoice").PublicInvoice};
       get_invoice_payment_confirmation_by_token:{Args:{p_token:string};Returns:string|null};
       accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};

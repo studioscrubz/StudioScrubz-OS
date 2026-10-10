@@ -23,6 +23,12 @@ test("revision creation is authorized, copied, reset, and concurrency safe",()=>
   assert.match(service,/create_proposal_revision/);
 });
 
+test("every new revision copies the immediately preceding revision pricing",()=>{
+  assert.match(migration,/source\.result,source\.photos,null,'Draft','Not Submitted'/);
+  assert.match(migration,/source\.revision_group_id,next_revision,source\.id,false,null/);
+  assert.match(service,/create_proposal_revision/);
+});
+
 test("draft revision leaves V1 active and successful send supersedes atomically",()=>{
   assert.match(migration,/source\.revision_group_id,next_revision,source\.id,false,null/);
   assert.match(migration,/set is_current_revision=false,superseded_at=sent_time/);
@@ -60,7 +66,7 @@ test("superseded and accepted races are rejected server-side",()=>{
 test("public history is readable but superseded links are not actionable",()=>{
   assert.match(migration,/'superseded',not p\.is_current_revision/);
   assert.match(publicPage,/This proposal has been superseded/);
-  assert.match(publicPage,/!proposal\.superseded/);
+  assert.match(publicPage,/const actionable = displayed\.is_current_revision && !displayed\.superseded/);
   assert.match(page,/Create Revision/);
   assert.match(page,/Superseded · read-only/);
 });

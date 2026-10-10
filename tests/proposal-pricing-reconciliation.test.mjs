@@ -22,7 +22,7 @@ vm.runInNewContext(code, {
     throw new Error(`Unexpected runtime import: ${id}`);
   },
 });
-const { calculateProposal } = target.exports;
+const { calculateProposal, withProposalRevisionBaseline } = target.exports;
 
 const estimate = (overrides = {}) => ({
   finalPrice: 639.27,
@@ -115,6 +115,56 @@ test("catalog-only recurring pricing and saved JSON retain identical arithmetic"
   const reopened = JSON.parse(JSON.stringify(result));
   assert.equal(displayedTotal(reopened), reopened.perVisitTotal);
   assert.equal(JSON.stringify(reopened), JSON.stringify(result));
+});
+
+test("R2 and R3 inherit the immediately preceding revision pricing", () => {
+  const linkedEstimate = estimate({
+    basePrice: 220,
+    oneTimePrice: 285.85,
+    finalPrice: 285.85,
+  });
+  const r1 = calculateProposal(input({
+    estimate: withProposalRevisionBaseline(linkedEstimate, {
+      ...calculateProposal(input({ estimate: linkedEstimate })),
+      baseEstimateAmount: 350,
+      perVisitTotal: 350,
+    }),
+  }));
+  const r2 = calculateProposal(input({
+    estimate: withProposalRevisionBaseline(linkedEstimate, r1),
+    adjustments: [custom("refrigerator", 50)],
+  }));
+  const r3 = calculateProposal(input({
+    estimate: withProposalRevisionBaseline(linkedEstimate, r2),
+    adjustments: r2.adjustments,
+  }));
+
+  assert.equal(r1.baseEstimateAmount, 350);
+  assert.equal(r1.perVisitTotal, 350);
+  assert.equal(r2.baseEstimateAmount, 350);
+  assert.equal(r2.perVisitTotal, 400);
+  assert.equal(r3.baseEstimateAmount, 350);
+  assert.equal(r3.perVisitTotal, 400);
+});
+
+test("an intentional revision price change is applied to the inherited baseline", () => {
+  const prior = calculateProposal(input({
+    estimate: estimate({ finalPrice: 350, oneTimePrice: 350 }),
+    adjustments: [custom("refrigerator", 50)],
+  }));
+  const revised = calculateProposal(input({
+    estimate: withProposalRevisionBaseline(estimate(), prior),
+    adjustments: [custom("refrigerator", 65)],
+  }));
+
+  assert.equal(revised.baseEstimateAmount, 350);
+  assert.equal(revised.perVisitTotal, 415);
+});
+
+test("customer-facing snapshots use the authoritative revision baseline", () => {
+  const source = readFileSync(new URL("../components/proposals/ProposalDocument.tsx", import.meta.url), "utf8");
+  assert.match(source, /base_price:p\.result\.baseEstimateAmount/);
+  assert.doesNotMatch(source, /base_price:p\.estimate\?\.result\.oneTimePrice/);
 });
 
 test("UI summary consumes result breakdown and does not preserve an unreconciled stored total", () => {

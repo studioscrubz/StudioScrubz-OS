@@ -10,6 +10,7 @@ import {
 import {
   calculateProposal,
   repriceEstimateFrequency,
+  withProposalRevisionBaseline,
 } from "@/lib/pricing/proposals";
 import {
   withAuthoritativeProposalPrice,
@@ -307,8 +308,12 @@ export function ProposalBuilder({
     selectedRuleId || (matchingRules.length === 1 ? matchingRules[0].id : "");
   const pricingRules =
     matchingRules.length > 1 && !effectiveRuleId ? [] : rules;
-  const authoritativeEstimate =
+  const sourceEstimate =
     walkthrough?.pricing_review?.estimateResult ?? estimate?.result ?? null;
+  const authoritativeEstimate =
+    proposal && sourceEstimate
+      ? withProposalRevisionBaseline(sourceEstimate, proposal.result)
+      : sourceEstimate;
   const pricingEstimate =
     authoritativeEstimate &&
     catalogService &&
