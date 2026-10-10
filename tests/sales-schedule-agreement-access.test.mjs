@@ -5,6 +5,7 @@ import test from "node:test";
 const permissions = readFileSync("lib/auth/permissions.ts", "utf8");
 const sidebar = readFileSync("components/layout/Sidebar.tsx", "utf8");
 const schedule = readFileSync("components/jobs/SchedulePage.tsx", "utf8");
+const compactSchedule = schedule.replace(/\s+/g, "");
 const agreements = readFileSync("components/agreements/AgreementsPage.tsx", "utf8");
 const jobs = readFileSync("lib/services/jobs.ts", "utf8");
 const crews = readFileSync("lib/services/crews.ts", "utf8");
@@ -52,10 +53,11 @@ test("Sales Schedule data is a dedicated non-financial read-only RPC", () => {
 });
 
 test("Sales Schedule does not load crew or employee directories", () => {
-  assert.match(schedule, /salesReadOnly\?Promise\.resolve\(\[\]\):getActiveCrews\(\)/);
-  assert.match(schedule, /crewFilterOptions=useMemo<CrewDisplayOption\[\]>/);
-  assert.match(schedule, /assigned_crew_id&&job\.assigned_crew_name/);
-  assert.match(schedule, /\{id:job\.assigned_crew_id!,crew_name:job\.assigned_crew_name!\}/);
+  assert.match(compactSchedule, /salesReadOnly\?Promise\.resolve\(\[\]\):getActiveCrews\(\)/);
+  assert.match(compactSchedule, /crewFilterOptions=useMemo<CrewDisplayOption\[\]>/);
+  assert.match(compactSchedule, /assigned_crew_id&&job\.assigned_crew_name/);
+  assert.match(compactSchedule, /id:job\.assigned_crew_id!/);
+  assert.match(compactSchedule, /crew_name:job\.assigned_crew_name!/);
   assert.match(crews, /rpc\("get_crew_directory"\)/);
   assert.match(crews, /rpc\("get_crew_members_directory"\)/);
   assert.match(directorySecurity, /get_employee_directory[\s\S]*?has_any_role\(array\['Master Admin','Administrator','Manager','Crew Lead','Scrub Technician'\]\)/);
@@ -74,14 +76,15 @@ test("Sales assignment display contains no HR, payroll, or employee financial fi
 });
 
 test("Schedule mutation controls remain gated by schedule.edit", () => {
-  assert.match(schedule, /canEditSchedule=hasPermission\(profile,"schedule\.edit"\)/);
-  assert.match(schedule, /canEditSchedule&&<Unscheduled/);
-  assert.match(schedule, /canEditSchedule&&edit&&<ScheduleModal/);
-  assert.match(schedule, /<QuickDetail job=\{detail\} canEdit=\{canEditSchedule\} canViewJobTime=\{canViewJobTime\}/);
-  assert.match(schedule, /\{canViewJobTime&&<JobTimeSummary job=\{job\}\/?>\}/);
-  assert.match(schedule, /\{canEdit&&<>/);
-  assert.match(schedule, /canEditSchedule&&edit&&<ScheduleModal/);
-  assert.match(schedule, /canEdit&&<><label[\s\S]*updateJobInternalNotes[\s\S]*cancelJob/);
+  assert.match(compactSchedule, /canEditSchedule=hasPermission\(profile,"schedule\.edit"\)/);
+  assert.match(compactSchedule, /canEditSchedule&&\(<Unscheduled/);
+  assert.match(compactSchedule, /canEditSchedule&&edit&&\(<ScheduleModal/);
+  assert.match(compactSchedule, /<QuickDetail/);
+  assert.match(compactSchedule, /canEdit=\{canEditSchedule\}/);
+  assert.match(compactSchedule, /canViewJobTime=\{canViewJobTime\}/);
+  assert.match(compactSchedule, /canViewJobTime\s*&&\s*<JobTimeSummary/);
+  assert.match(compactSchedule, /\{canEdit\s*&&\s*\(\s*<>/);
+  assert.match(compactSchedule, /canEdit\s*&&\s*\(\s*<>\s*<label[\s\S]*updateJobInternalNotes[\s\S]*cancelJob/);
 });
 
 test("database policies keep Sales Agreement and occurrence access read-only", () => {

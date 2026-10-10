@@ -1,3 +1,7 @@
+import type {
+  InternalEventAttendee,
+  InternalScheduleEvent,
+} from "@/types/internalScheduleEvent";
 import type { PorterPhoto, PorterIssue } from "@/types/porterReporting";
 import type { GpsMileageTrip, GpsMileageSummary, GpsPosition } from "@/types/gpsMileage";
 import type { PorterRoute, PorterRouteStop, PorterRouteWithStops, RouteStopInput, RouteEdit } from "@/types/porterRoute";
@@ -48,6 +52,80 @@ import type {CoachingRecord,EmployeePerformanceReview,EmployeePerformanceWorkflo
 export interface Database {
   public: {
     Tables: {
+      internal_schedule_events: {
+        Row: Omit<InternalScheduleEvent, "attendees" | "prospect">;
+        Insert: Omit<
+          InternalScheduleEvent,
+          | "id"
+          | "status"
+          | "created_at"
+          | "updated_at"
+          | "attendees"
+          | "prospect"
+        > & {
+          id?: string;
+          status?: InternalScheduleEvent["status"];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<
+            InternalScheduleEvent,
+            "id" | "created_at" | "updated_at" | "attendees" | "prospect"
+          >
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "internal_schedule_events_organizer_user_id_fkey";
+            columns: ["organizer_user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "internal_schedule_events_organizer_employee_id_fkey";
+            columns: ["organizer_employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "internal_schedule_events_prospect_id_fkey";
+            columns: ["prospect_id"];
+            isOneToOne: false;
+            referencedRelation: "prospects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      internal_schedule_event_attendees: {
+        Row: Omit<InternalEventAttendee, "employee">;
+        Insert: {
+          event_id: string;
+          employee_id: string;
+          invitation_status?: InternalEventAttendee["invitation_status"];
+          invited_at?: string;
+          responded_at?: string | null;
+        };
+        Update: Pick<InternalEventAttendee, "invitation_status">;
+        Relationships: [
+          {
+            foreignKeyName: "internal_schedule_event_attendees_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "internal_schedule_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "internal_schedule_event_attendees_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       job_mileage_trips: { Row: GpsMileageTrip; Insert: never; Update: never; Relationships: [] };
       property_service_routes: { Row: PorterRoute; Insert: never; Update: never; Relationships: [] };
       property_service_route_stops: { Row: PorterRouteStop; Insert: never; Update: never; Relationships: [] };
