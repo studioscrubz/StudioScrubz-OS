@@ -446,10 +446,6 @@ export function SchedulePage() {
         crews={crewFilterOptions}
         source={source}
         setSource={setSource}
-        completed={showCompleted}
-        setCompleted={setShowCompleted}
-        cancelled={showCancelled}
-        setCancelled={setShowCancelled}
       />
       {notice && <Alert text={notice} good />}
       {error && <Alert text={error} />}{" "}
