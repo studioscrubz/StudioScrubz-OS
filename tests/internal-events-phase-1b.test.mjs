@@ -20,7 +20,7 @@ test("internal events join all existing schedule views without replacing job wor
 test("create and mutation controls are access-aware while RLS remains authoritative", () => {
   assert.match(schedule, /internalAccess !== "None"/);
   assert.match(service, /getInternalEventAccessLevel/);
-  assert.match(service, /is_current_lead_representative_eligible/);
+  assert.match(service, /get_current_internal_schedule_access_level/);
   assert.doesNotMatch(service, /service[_-]role/i);
   assert.match(migration, /using \(private\.can_view_internal_schedule_event\(id\)\)/);
   assert.match(migration, /private\.current_internal_schedule_access_level\(\) = 'Management'/);

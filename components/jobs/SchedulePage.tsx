@@ -108,6 +108,9 @@ export function SchedulePage() {
   );
   const [internalAccess, setInternalAccess] =
     useState<InternalEventAccessLevel>("None");
+  const [internalAccessError, setInternalAccessError] = useState<string | null>(
+    null,
+  );
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,11 +153,27 @@ export function SchedulePage() {
     let active = true;
     void getInternalEventAccessLevel(profile)
       .then((level) => {
-        if (active) setInternalAccess(level);
+        if (active) {
+          setInternalAccess(level);
+          setInternalAccessError(null);
+        }
       })
       .catch((x) => {
         console.error("Internal event authorization failed", x);
-        if (active) setInternalAccess("None");
+        if (active) {
+          setInternalAccess("None");
+          if (
+            profile?.is_active &&
+            profile.employee_id &&
+            ["Master Admin", "Administrator", "Sales", "Lead Representative"].includes(
+              profile.role,
+            )
+          ) {
+            setInternalAccessError(
+              "Internal event access could not be verified. Refresh the page or contact the Master Admin.",
+            );
+          } else setInternalAccessError(null);
+        }
       });
     return () => {
       active = false;
@@ -344,6 +363,7 @@ export function SchedulePage() {
           internalAccess !== "None" ? () => setInternalEdit("new") : null
         }
       />
+      {internalAccessError && <Alert text={internalAccessError} />}
       <section className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-xl bg-[#edf1eb] p-1">
           {(["Day", "Week", "List"] as View[]).map((v) => (

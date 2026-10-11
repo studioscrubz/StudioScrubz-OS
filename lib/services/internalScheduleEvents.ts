@@ -34,18 +34,15 @@ function fail(error: { message: string } | null, fallback: string) {
 }
 
 export async function getInternalEventAccessLevel(
-  profile: UserProfile | null,
+  _profile: UserProfile | null,
 ): Promise<InternalEventAccessLevel> {
-  if (!profile?.is_active || !profile.employee_id) return "None";
-  if (profile.role === "Master Admin" || profile.role === "Administrator")
-    return "Management";
-  if (profile.role === "Sales" || profile.role === "Lead Representative")
-    return "Sales";
   const { data, error } = await client().rpc(
-    "is_current_lead_representative_eligible",
+    "get_current_internal_schedule_access_level",
   );
   if (error) throw new Error(error.message);
-  return data === true ? "Sales" : "None";
+  if (data === "Management" || data === "Sales" || data === "None")
+    return data;
+  throw new Error("Internal event authorization returned an invalid result.");
 }
 
 export async function getInternalScheduleEvents(): Promise<
@@ -60,29 +57,15 @@ export async function getInternalScheduleEvents(): Promise<
 }
 
 export async function getInternalEventFormOptions(
-  profile: UserProfile,
-  access: InternalEventAccessLevel,
+  _profile: UserProfile,
+  _access: InternalEventAccessLevel,
 ): Promise<{
   attendees: InternalEventAttendeeOption[];
   prospects: InternalEventProspectOption[];
 }> {
   const api = client();
-  const [profilesResult, employeesResult, prospectsResult] = await Promise.all([
-    api
-      .from("user_profiles")
-      .select("employee_id, role")
-      .eq("is_active", true)
-      .in("role", [
-        "Master Admin",
-        "Administrator",
-        "Sales",
-        "Lead Representative",
-      ]),
-    api
-      .from("employee_directory_company_safe")
-      .select("id, first_name, last_name, preferred_name")
-      .eq("employment_status", "Active")
-      .is("archived_at", null),
+  const [attendeesResult, prospectsResult] = await Promise.all([
+    api.rpc("get_internal_schedule_attendee_options"),
     api
       .from("prospects")
       .select("id, company_name")
@@ -90,36 +73,10 @@ export async function getInternalEventFormOptions(
       .order("company_name")
       .limit(500),
   ]);
-  fail(profilesResult.error, "Management attendees could not be loaded.");
-  fail(employeesResult.error, "Employee names could not be loaded.");
+  fail(attendeesResult.error, "Internal event attendees could not be loaded.");
   fail(prospectsResult.error, "Prospects could not be loaded.");
-
-  const allowedIds = new Set<string>([
-    ...(profilesResult.data ?? [])
-      .map((row: { employee_id: string | null }) => row.employee_id)
-      .filter(Boolean),
-    ...(access === "Sales" && profile.employee_id ? [profile.employee_id] : []),
-  ] as string[]);
-  const attendees = (employeesResult.data ?? [])
-    .filter((row: { id: string }) => allowedIds.has(row.id))
-    .map(
-      (row: {
-        id: string;
-        first_name: string;
-        last_name: string;
-        preferred_name: string | null;
-      }) => ({
-        id: row.id,
-        display_name:
-          row.preferred_name?.trim() ||
-          `${row.first_name} ${row.last_name}`.trim(),
-      }),
-    )
-    .sort((a: InternalEventAttendeeOption, b: InternalEventAttendeeOption) =>
-      a.display_name.localeCompare(b.display_name),
-    );
   return {
-    attendees,
+    attendees: (attendeesResult.data ?? []) as InternalEventAttendeeOption[],
     prospects: (prospectsResult.data ?? []) as InternalEventProspectOption[],
   };
 }

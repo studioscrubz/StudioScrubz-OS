@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const service = readFileSync("lib/services/internalScheduleEvents.ts", "utf8");
+const schedule = readFileSync("components/jobs/SchedulePage.tsx", "utf8");
+const migration = readFileSync(
+  "supabase/migrations/20261011012800_repair_internal_schedule_authorization.sql",
+  "utf8",
+);
+
+test("internal schedule access comes from the RLS authorization model", () => {
+  assert.match(service, /rpc\(\s*"get_current_internal_schedule_access_level"/);
+  assert.doesNotMatch(service, /profile\.role === "Master Admin"/);
+  assert.match(migration, /profile\.role in \('Master Admin', 'Administrator'\) then 'Management'/);
+  assert.match(migration, /profile\.role in \('Sales', 'Lead Representative'\)/);
+  assert.match(migration, /private\.is_eligible_lead_representative_employee\(profile\.employee_id\)/);
+  assert.match(migration, /employee\.employment_status = 'Active'/);
+  assert.match(migration, /employee\.archived_at is null/);
+});
+
+test("the public helpers remain authenticated and narrowly scoped", () => {
+  assert.match(migration, /revoke all on function public\.get_current_internal_schedule_access_level\(\)[\s\S]*from public, anon, authenticated, service_role;/);
+  assert.match(migration, /grant execute on function public\.get_current_internal_schedule_access_level\(\)\s+to authenticated;/);
+  assert.match(migration, /private\.internal_schedule_employee_is_authorized\(employee\.id\)/);
+  assert.doesNotMatch(migration, /grant all|to anon|disable row level security/i);
+});
+
+test("authorized users see a clear failure while the header action stays responsive", () => {
+  assert.match(schedule, /Internal event access could not be verified/);
+  assert.match(schedule, /Create Internal Event/);
+  assert.match(schedule, /flex flex-wrap items-start justify-between/);
+  assert.doesNotMatch(schedule, /authorization failed[\s\S]{0,180}setInternalAccess\("None"\);\s*\}\);/);
+});

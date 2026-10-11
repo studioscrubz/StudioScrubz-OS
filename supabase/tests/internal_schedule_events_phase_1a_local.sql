@@ -7,7 +7,9 @@ insert into auth.users(id, email, role, aud) values
   ('a1000000-0000-0000-0000-000000000001', 'internal-admin@example.test', 'authenticated', 'authenticated'),
   ('a1000000-0000-0000-0000-000000000002', 'internal-sales@example.test', 'authenticated', 'authenticated'),
   ('a1000000-0000-0000-0000-000000000003', 'internal-additive@example.test', 'authenticated', 'authenticated'),
-  ('a1000000-0000-0000-0000-000000000004', 'internal-tech@example.test', 'authenticated', 'authenticated');
+  ('a1000000-0000-0000-0000-000000000004', 'internal-tech@example.test', 'authenticated', 'authenticated'),
+  ('a1000000-0000-0000-0000-000000000005', 'internal-master@example.test', 'authenticated', 'authenticated'),
+  ('a1000000-0000-0000-0000-000000000006', 'internal-lead@example.test', 'authenticated', 'authenticated');
 
 insert into public.employees(
   id, employee_number, first_name, last_name, email, department, employment_status
@@ -15,16 +17,23 @@ insert into public.employees(
   ('a2000000-0000-0000-0000-000000000001', 'ISE-ADMIN', 'Internal', 'Admin', 'internal-admin@example.test', 'Administration', 'Active'),
   ('a2000000-0000-0000-0000-000000000002', 'ISE-SALES', 'Internal', 'Sales', 'internal-sales@example.test', 'Lead Representative', 'Active'),
   ('a2000000-0000-0000-0000-000000000003', 'ISE-ADDITIVE', 'Internal', 'Additive', 'internal-additive@example.test', 'Scrub Technicians', 'Active'),
-  ('a2000000-0000-0000-0000-000000000004', 'ISE-TECH', 'Internal', 'Tech', 'internal-tech@example.test', 'Scrub Technicians', 'Active');
+  ('a2000000-0000-0000-0000-000000000004', 'ISE-TECH', 'Internal', 'Tech', 'internal-tech@example.test', 'Scrub Technicians', 'Active'),
+  ('a2000000-0000-0000-0000-000000000005', 'ISE-MASTER', 'Internal', 'Master', 'internal-master@example.test', 'Scrub Technicians', 'Active'),
+  ('a2000000-0000-0000-0000-000000000006', 'ISE-LEAD', 'Internal', 'Lead', 'internal-lead@example.test', 'Lead Representative', 'Active');
 
 insert into public.user_profiles(id, email, display_name, role, is_active, employee_id) values
   ('a1000000-0000-0000-0000-000000000001', 'internal-admin@example.test', 'Internal Admin', 'Administrator', true, 'a2000000-0000-0000-0000-000000000001'),
   ('a1000000-0000-0000-0000-000000000002', 'internal-sales@example.test', 'Internal Sales', 'Sales', true, 'a2000000-0000-0000-0000-000000000002'),
   ('a1000000-0000-0000-0000-000000000003', 'internal-additive@example.test', 'Internal Additive', 'Master Admin', true, 'a2000000-0000-0000-0000-000000000003'),
-  ('a1000000-0000-0000-0000-000000000004', 'internal-tech@example.test', 'Internal Tech', 'Scrub Technician', true, 'a2000000-0000-0000-0000-000000000004');
+  ('a1000000-0000-0000-0000-000000000004', 'internal-tech@example.test', 'Internal Tech', 'Scrub Technician', true, 'a2000000-0000-0000-0000-000000000004'),
+  ('a1000000-0000-0000-0000-000000000005', 'internal-master@example.test', 'Internal Master', 'Master Admin', true, 'a2000000-0000-0000-0000-000000000005'),
+  ('a1000000-0000-0000-0000-000000000006', 'internal-lead@example.test', 'Internal Lead', 'Lead Representative', true, 'a2000000-0000-0000-0000-000000000006');
 
 insert into public.employee_operational_roles(employee_id, operational_role)
 values ('a2000000-0000-0000-0000-000000000003', 'Sales Representative');
+
+insert into public.employee_operational_roles(employee_id, operational_role)
+values ('a2000000-0000-0000-0000-000000000005', 'Scrub Technician');
 
 -- Exercise additive Sales with a non-management primary role.
 update public.user_profiles
@@ -35,6 +44,14 @@ set local role authenticated;
 
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000001', true);
+
+do $test$
+begin
+  if public.get_current_internal_schedule_access_level() <> 'Management' then
+    raise exception 'Administrator internal-event authorization failed.';
+  end if;
+end;
+$test$;
 
 insert into public.internal_schedule_events(
   id, title, description, category, meeting_mode, starts_at, ends_at,
@@ -56,6 +73,14 @@ end;
 $test$;
 
 select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000002', true);
+
+do $test$
+begin
+  if public.get_current_internal_schedule_access_level() <> 'Sales' then
+    raise exception 'Sales internal-event authorization failed.';
+  end if;
+end;
+$test$;
 
 do $test$
 begin
@@ -160,6 +185,9 @@ select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000004
 
 do $test$
 begin
+  if public.get_current_internal_schedule_access_level() <> 'None' then
+    raise exception 'Ordinary technician received internal-event authorization.';
+  end if;
   if exists (select 1 from public.internal_schedule_events) then
     raise exception 'Technician read internal event data.';
   end if;
@@ -173,6 +201,26 @@ begin
     raise exception 'Technician self-invited to an internal event.';
   exception when insufficient_privilege or check_violation then null;
   end;
+end;
+$test$;
+
+select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000005', true);
+
+do $test$
+begin
+  if public.get_current_internal_schedule_access_level() <> 'Management' then
+    raise exception 'Master Admin with Scrub Technician operational role was not authorized.';
+  end if;
+end;
+$test$;
+
+select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000006', true);
+
+do $test$
+begin
+  if public.get_current_internal_schedule_access_level() <> 'Sales' then
+    raise exception 'Lead Representative internal-event authorization failed.';
+  end if;
 end;
 $test$;
 
