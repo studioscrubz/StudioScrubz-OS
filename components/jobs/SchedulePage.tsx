@@ -381,7 +381,7 @@ export function SchedulePage() {
       {communication.composer}
       <Header
         createInternal={
-          internalAccess !== "None" ? () => setInternalEdit("new") : null
+          internalAccess === "Management" || internalAccess === "Sales" ? () => setInternalEdit("new") : null
         }
       />
       {internalAccessError && <Alert text={internalAccessError} />}
@@ -518,7 +518,7 @@ export function SchedulePage() {
           }}
         />
       )}
-      {internalAccess !== "None" && profile && internalEdit && (
+      {(internalAccess === "Management" || internalAccess === "Sales") && profile && internalEdit && (
         <InternalEventDialog
           event={internalEdit === "new" ? null : internalEdit}
           access={internalAccess}
