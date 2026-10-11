@@ -11,7 +11,7 @@ import {
   findCrewConflicts,
   findIndividualTechConflicts,
   getEligibleJobTechs,
-  getScheduleJobs,
+  getCalendarJobs,
   jobAssignmentLabel,
   jobWorkerTarget,
   rescheduleJob,
@@ -155,7 +155,7 @@ export function SchedulePage() {
 
   async function load() {
     const [j, w, c, i] = await Promise.all([
-      getScheduleJobs(),
+      getCalendarJobs(),
       canViewWalkthroughs ? getScheduledWalkthroughs() : Promise.resolve([]),
       salesReadOnly ? Promise.resolve([]) : getActiveCrews(),
       internalAccess !== "None"
@@ -202,7 +202,7 @@ export function SchedulePage() {
   useEffect(() => {
     let active = true;
     void Promise.all([
-      getScheduleJobs(),
+      getCalendarJobs(),
       canViewWalkthroughs ? getScheduledWalkthroughs() : Promise.resolve([]),
       salesReadOnly ? Promise.resolve([]) : getActiveCrews(),
       internalAccess !== "None"
