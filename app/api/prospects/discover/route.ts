@@ -5,6 +5,8 @@ import type { UserProfile } from "@/types/auth";
 
 const USER_AGENT="StudioScrubz Prospect Engine/1.1 (contact: support@studioscrubz.com)";
 const OVERPASS_URL=process.env.OVERPASS_API_URL||"https://overpass-api.de/api/interpreter";
+const OVERPASS_FALLBACK_URLS=["https://overpass.kumi.systems/api/interpreter","https://overpass.nchc.org.tw/api/interpreter"];
+const OVERPASS_ENDPOINTS=[...new Set([OVERPASS_URL,...OVERPASS_FALLBACK_URLS])];
 const NOMINATIM_URL=process.env.NOMINATIM_API_URL||"https://nominatim.openstreetmap.org/search";
 const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_PROVIDER_REQUESTS=48;
@@ -32,15 +34,21 @@ export async function POST(request:Request){
   for(const point of points.slice(0,MAX_PROVIDER_REQUESTS)){
    if(results.length>=DISCOVERY_MAX_RESULTS)break;
    const tileRadius=Math.min(radiusMeters,DISCOVERY_PROVIDER_TILE_RADIUS_METERS);
-   diagnostics.attemptedRequests+=1;
-   let response:Response;
-   try{response=await fetch(OVERPASS_URL,{method:"POST",headers:{"User-Agent":USER_AGENT,"Content-Type":"application/x-www-form-urlencoded","Accept":"application/json"},body:new URLSearchParams({data:buildOverpassQuery(category,point.latitude,point.longitude,tileRadius,keyword)}),signal:controller.signal,cache:"no-store"});}
-   catch(cause){if(controller.signal.aborted)throw cause;diagnostics.failedResponses+=1;continue;}
-   if(!response.ok){diagnostics.failedResponses+=1;recordHttpStatus(response.status);continue;}
-   let payload:{elements?:OsmElement[]};
-   try{payload=await response.json() as {elements?:OsmElement[]};}catch{diagnostics.failedResponses+=1;continue;}
+   let payload:{elements?:OsmElement[]}|null=null;
+   for(const endpoint of OVERPASS_ENDPOINTS){
+    if(controller.signal.aborted)break;
+    diagnostics.attemptedRequests+=1;
+    try{
+     const response=await fetch(endpoint,{method:"POST",headers:{"User-Agent":USER_AGENT,"Content-Type":"application/x-www-form-urlencoded","Accept":"application/json"},body:new URLSearchParams({data:buildOverpassQuery(category,point.latitude,point.longitude,tileRadius,keyword)}),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(12_000)]),cache:"no-store"});
+     if(!response.ok){diagnostics.failedResponses+=1;recordHttpStatus(response.status);continue;}
+     const parsed=await response.json() as {elements?:OsmElement[]};
+     if(!Array.isArray(parsed.elements)){diagnostics.failedResponses+=1;continue;}
+     payload=parsed;break;
+    }catch{diagnostics.failedResponses+=1;}
+   }
+   if(!payload)continue;
    diagnostics.successfulResponses+=1;
-   const elements=Array.isArray(payload.elements)?payload.elements:[];diagnostics.rawElements+=elements.length;
+   const elements=payload.elements??[];diagnostics.rawElements+=elements.length;
    for(const element of elements){
     if(results.length>=DISCOVERY_MAX_RESULTS)break;
     const tags=element.tags??{},lat=element.lat??element.center?.lat,lon=element.lon??element.center?.lon,name=tags.name||tags.brand||tags.operator;
