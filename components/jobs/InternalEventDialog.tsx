@@ -291,7 +291,7 @@ export function InternalEventDialog({
           Authorized Attendees
         </legend>
         {loadingOptions ? (
-          <p className="text-sm text-neutral-500">Loading attendeesÃ¢â‚¬Â¦</p>
+          <p className="text-sm text-neutral-500">Loading attendees...</p>
         ) : (
           <div>
             <input className={`${input} mb-3`} value={attendeeSearch} onChange={(e) => setAttendeeSearch(e.target.value)} placeholder="Search authorized employees" aria-label="Search authorized attendees" />
@@ -339,7 +339,7 @@ export function InternalEventDialog({
         className={`${primary} mt-5`}
         onClick={() => void submit()}
       >
-        {saving ? "SavingÃ¢â‚¬Â¦" : event ? "Save Event" : "Create Event"}
+        {saving ? "Saving..." : event ? "Save Event" : "Create Event"}
       </button>
     </Modal>
   );
@@ -396,11 +396,11 @@ export function InternalEventDetails({
       <div className="grid gap-4 sm:grid-cols-2">
         <Detail
           label="When"
-          value={`${formatDateTime(event.starts_at, event.timezone)} Ã¢â‚¬â€œ ${formatDateTime(event.ends_at, event.timezone)} (${event.timezone})`}
+          value={`${formatDateTime(event.starts_at, event.timezone)} - ${formatDateTime(event.ends_at, event.timezone)} (${event.timezone})`}
         />
         <Detail
           label="Type"
-          value={`${event.category} Ã‚Â· ${event.meeting_mode}`}
+          value={`${event.category} | ${event.meeting_mode}`}
         />
         <Detail label="Visibility" value={event.visibility} />
         <Detail label="Status" value={event.status} />
@@ -454,7 +454,7 @@ export function InternalEventDetails({
             <p key={attendee.employee_id} className="text-sm">
               {employeeName(attendee.employee)}{" "}
               <span className="text-neutral-500">
-                Ã‚Â· {attendee.invitation_status}
+                | {attendee.invitation_status}
               </span>
             </p>
           ))}
