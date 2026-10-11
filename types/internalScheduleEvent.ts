@@ -27,7 +27,7 @@ export type InternalEventVisibility =
 export type InternalEventRsvpStatus =
   (typeof INTERNAL_EVENT_RSVP_STATUSES)[number];
 export type InternalEventStatus = "Scheduled" | "Canceled";
-export type InternalEventAccessLevel = "Management" | "Sales" | "None";
+export type InternalEventAccessLevel = "Management" | "Sales" | "View" | "None";
 
 export type InternalEventAttendee = {
   event_id: string;
