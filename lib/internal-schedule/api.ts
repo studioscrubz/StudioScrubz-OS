@@ -38,7 +38,7 @@ export async function synchronizeInternalEvent(eventId: string) {
 
 export function internalEventApiError(cause: unknown) {
   return Response.json(
-    { error: cause instanceof Error ? cause.message : "Internal event operation failed." },
+    { error: cause instanceof Error ? cause.message : (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string" ? cause.message : "Internal event operation failed.") },
     { status: (cause as { status?: number }).status ?? 400 },
   );
 }
