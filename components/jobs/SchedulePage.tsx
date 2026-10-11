@@ -421,7 +421,7 @@ export function SchedulePage() {
         )}
         <p className="font-extrabold text-[#143d1a]">
           {view === "Week"
-            ? `${pretty(week[0])} – ${pretty(week[6])}`
+            ? `${pretty(week[0])} - ${pretty(week[6])}`
             : view === "Day"
               ? pretty(selectedDate)
               : "All scheduled work"}
@@ -736,10 +736,10 @@ function InternalEventCard({
       </div>
       <p className="mt-1 text-xs font-extrabold">{event.title}</p>
       <p className="truncate text-[11px] text-neutral-600">
-        {event.category} · {event.meeting_mode}
+        {event.category} | {event.meeting_mode}
       </p>
       <p className="mt-2 text-[11px] text-neutral-500">
-        {event.visibility} · {event.status}
+        {event.visibility} | {event.status}
       </p>
     </button>
   );
@@ -769,7 +769,7 @@ function WalkthroughCard({
         {walkthrough.property?.address || "Deleted Property"}
       </p>
       <p className="mt-2 text-[11px] text-neutral-500">
-        {walkthrough.division} · {walkthrough.status}
+        {walkthrough.division} | {walkthrough.status}
       </p>
     </Link>
   );
@@ -792,7 +792,7 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
         {job.property_name}
       </p>
       <p className="mt-2 text-xs">
-        {job.service_name} · {job.estimated_duration ?? 0}h
+        {job.service_name} | {job.estimated_duration ?? 0}h
       </p>
       <p className="text-[11px] text-neutral-500">{jobAssignmentLabel(job)}</p>
       <span className="mt-2 inline-block rounded-full bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">
@@ -816,7 +816,7 @@ function Unscheduled({
           <article key={j.id} className="rounded-xl bg-neutral-50 p-4">
             <b>{j.job_number}</b>
             <p className="text-sm">
-              {j.client_name} · {j.service_name}
+              {j.client_name} | {j.service_name}
             </p>
             <button className={`${primary} mt-3`} onClick={() => schedule(j)}>
               Schedule Job
@@ -989,7 +989,7 @@ function ScheduleModal({
               <option value="">Select active Tech</option>
               {techOptions.map((t) => (
                 <option key={t.employee_id} value={t.employee_id}>
-                  {t.display_name} — {t.operational_role}
+                  {t.display_name} - {t.operational_role}
                 </option>
               ))}
             </select>
@@ -1046,7 +1046,7 @@ function ScheduleModal({
           className={`${primary} mt-5`}
           onClick={() => void submit()}
         >
-          {saving ? "Saving…" : "Save Schedule"}
+          {saving ? "Saving..." : "Save Schedule"}
         </button>
       )}
     </Modal>
@@ -1068,7 +1068,7 @@ function ConflictWarning({
       </p>
       {rows.map((j) => (
         <div key={j.id} className="mt-3 text-sm">
-          <b>{j.job_number}</b> · {j.client_name} · {j.property_name}
+          <b>{j.job_number}</b> | {j.client_name} | {j.property_name}
           <br />
           {formatTime(j.start_time)} for {j.estimated_duration ?? 0} hours
         </div>
@@ -1119,9 +1119,9 @@ function QuickDetail({
       <div className="grid gap-4 sm:grid-cols-2">
         <Details
           rows={[
-            ["Client", job.client_name || "—"],
-            ["Property", job.property_name || "—"],
-            ["Service", job.service_name || "—"],
+            ["Client", job.client_name || "-"],
+            ["Property", job.property_name || "-"],
+            ["Service", job.service_name || "-"],
             ["Date", job.scheduled_date || "Unscheduled"],
             ["Time", formatTime(job.start_time)],
             ["Duration", `${job.estimated_duration ?? 0} hours`],
@@ -1133,9 +1133,9 @@ function QuickDetail({
             ["Crew", job.assigned_crew_name || "Unassigned"],
             ["Crew Lead", job.crew_lead_name || "Unassigned"],
             ["Team", job.assigned_team.join(", ") || "Unassigned"],
-            ["Proposal", job.proposal?.proposal_number ?? "—"],
-            ["Estimate", job.estimate_id || "—"],
-            ["Walkthrough", job.walkthrough_id || "—"],
+            ["Proposal", job.proposal?.proposal_number ?? "-"],
+            ["Estimate", job.estimate_id || "-"],
+            ["Walkthrough", job.walkthrough_id || "-"],
           ]}
         />
       </div>
@@ -1209,7 +1209,7 @@ function Modal({
     <div className="fixed inset-0 z-[95] grid place-items-center overflow-y-auto bg-[#07190a]/70 p-5">
       <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6">
         <button onClick={close} className="float-right text-xl">
-          ×
+          x
         </button>
         <h2 className="mb-5 text-xl font-extrabold text-[#143d1a]">{title}</h2>
         {children}
