@@ -28,6 +28,13 @@ type SalesScheduleRpcClient = {
   ) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 
+type RestoreCancelledJobRpcClient = {
+  rpc: (
+    name: "restore_non_archived_cancelled_job",
+    args: { p_job_id: string },
+  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+};
+
 export type JobCompletionResult = {
   job: JobWithRelations;
   invoice: Pick<Invoice, "id" | "invoice_number"> | null;
@@ -563,6 +570,13 @@ export async function restoreAndReopenCancelledJob(id: string): Promise<JobWithR
   if (error) throw new Error(safeDatabaseMessage(error, "The Cancelled Job could not be restored and reopened."));
   notifyAttentionRefresh();
   return operationalJob(data);
+}
+export async function restoreNonArchivedCancelledJob(id: string): Promise<JobWithRelations> {
+  const { data, error } = await (getSupabaseClient() as unknown as RestoreCancelledJobRpcClient)
+    .rpc("restore_non_archived_cancelled_job", { p_job_id: id });
+  if (error) throw new Error(safeDatabaseMessage(error, "The Cancelled Job could not be restored."));
+  notifyAttentionRefresh();
+  return operationalJob(data as Parameters<typeof operationalJob>[0]);
 }
 export function jobWorkerTarget(job:Pick<Job,"assigned_employee_id"|"assigned_crew_id">):JobWorkerTarget{return job.assigned_employee_id?{kind:"individual",employeeId:job.assigned_employee_id}:job.assigned_crew_id?{kind:"crew",crewId:job.assigned_crew_id}:{kind:"unassigned"}}
 export function jobAssignmentLabel(job:Pick<Job,"assigned_employee_name"|"assigned_crew_name">){return job.assigned_employee_name||job.assigned_crew_name||"Unassigned"}

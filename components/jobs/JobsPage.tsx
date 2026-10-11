@@ -21,6 +21,7 @@ import {
   getJobs,
   joinJob,
   permanentlyDeleteCancelledJob,
+  restoreNonArchivedCancelledJob,
   isJobCompletionResult,
   scheduleJob,
   startOperationalJob,
@@ -534,6 +535,7 @@ function JobModal({
   const [clockError, setClockError] = useState<string | null>(null);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [showPresence, setShowPresence] = useState(false);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
   const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
   const [tab, setTab] = useState<"Overview" | "Scope" | "Discoveries" | "Changes" | "Timeline">("Overview");
   const [changePrefill, setChangePrefill] = useState<VisibleFieldDiscovery | null>(null);
@@ -752,6 +754,15 @@ function JobModal({
             Cancel
           </button>
         )}
+        {canArchive && job.status === "Cancelled" && !job.archived_at && (
+          <button
+            disabled={busy}
+            onClick={() => setConfirmingRestore(true)}
+            className={primary}
+          >
+            Restore and Reopen
+          </button>
+        )}
         {canArchive && job.status !== "Archived" && (
           <button
             disabled={busy}
@@ -762,6 +773,25 @@ function JobModal({
           </button>
         )}
       </div>
+      {confirmingRestore && (
+        <div className="fixed inset-0 z-[110] grid place-items-center bg-[#07190a]/70 p-5">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="restore-cancelled-job-title" className="w-full max-w-lg rounded-2xl bg-white p-6">
+            <h2 id="restore-cancelled-job-title" className="text-xl font-extrabold text-[#143d1a]">Restore and reopen this Cancelled Job?</h2>
+            <p className="mt-3 text-sm text-neutral-700">The original Job will return to the appropriate scheduling status. Its client, service, pricing, schedule, crew assignment, team snapshot, cancellation history, and other retained records will not be replaced.</p>
+            <p className="mt-3 rounded-xl bg-[#edf1eb] p-3 font-bold text-[#143d1a]">{job.job_number} — {job.client_name || "Unnamed client"}</p>
+            <p className="mt-3 text-sm text-neutral-600">Calendar synchronization will be queued. No customer communication will be sent by this action.</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button className={secondary} onClick={() => setConfirmingRestore(false)}>Cancel</button>
+              <button disabled={busy} className={primary} onClick={() => mutate(
+                () => restoreNonArchivedCancelledJob(job.id),
+                "Job restored and reopened.",
+                undefined,
+                close,
+              )}>Confirm Restore and Reopen</button>
+            </div>
+          </section>
+        </div>
+      )}
       {showPresence && activeCrew && <CrewPresenceModal
         job={job}
         crew={activeCrew}
