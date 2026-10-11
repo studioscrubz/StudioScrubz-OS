@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { selectUpcomingServicesForClient } from "../lib/scheduling/upcomingClientService.ts";
+import { buildServiceReminderTemplate, normalizeUpcomingClientServices, selectUpcomingServicesForClient } from "../lib/scheduling/upcomingClientService.ts";
 
 const service = await readFile(new URL("../lib/services/clientCommunications.ts", import.meta.url), "utf8");
+const scheduling = await readFile(new URL("../lib/scheduling/upcomingClientService.ts", import.meta.url), "utf8");
 const modal = await readFile(new URL("../components/communications/LogCommunicationModal.tsx", import.meta.url), "utf8");
 const timeline = await readFile(new URL("../components/communications/CommunicationTimeline.tsx", import.meta.url), "utf8");
 const permissions = await readFile(new URL("../lib/auth/permissions.ts", import.meta.url), "utf8");
@@ -24,9 +25,10 @@ test("scheduled service lookup uses authoritative Jobs and exact client relation
 
 test("lookup returns correct Job, client, property, and service relationships", () => {
   assert.match(migration, /job\.id as source_id,[\s\S]*job\.client_id,[\s\S]*job\.property_id,[\s\S]*job\.service_name[\s\S]*job\.scheduled_date,[\s\S]*job\.start_time/);
-  assert.match(service, /sourceId: service\.source_id/);
-  assert.match(service, /clientId: service\.client_id/);
-  assert.match(service, /propertyId: service\.property_id/);
+  assert.match(service, /normalizeUpcomingClientServices\(data, clientId\)/);
+  assert.match(scheduling, /sourceId: requiredString\(row\.source_id/);
+  assert.match(scheduling, /clientId: requiredString\(row\.client_id/);
+  assert.match(scheduling, /propertyId: nullableString\(row\.property_id/);
 });
 
 test("recurring generated occurrences without Jobs use the same lookup", () => {
@@ -43,7 +45,7 @@ test("recurring generated occurrences without Jobs use the same lookup", () => {
 test("nearest future service wins across direct Jobs and recurring occurrences", () => {
   assert.match(migration, /union all/);
   assert.match(migration, /order by service\.scheduled_date, service\.start_time nulls last, service\.created_at, service\.source_id/);
-  assert.match(service, /selectUpcomingServicesForClient/);
+  assert.match(scheduling, /selectUpcomingServicesForClient\(services, clientId\)/);
   assert.match(modal, /const first = services\.find[\s\S]*\?\? services\[0\]/);
 });
 
@@ -60,7 +62,6 @@ test("cancelled completed archived and cross-client services cannot be selected"
   const selected = selectUpcomingServicesForClient([
     { source: "Job", sourceId: "later-direct", clientId: "client-a", propertyId: null, serviceName: "Direct", scheduledDate: "2026-10-09", startTime: "09:00:00", propertyAddress: null },
     { source: "Service Occurrence", sourceId: "recurring", clientId: "client-a", propertyId: null, serviceName: "Recurring", scheduledDate: "2026-10-08", startTime: "12:00:00", propertyAddress: null },
-    { source: "Job", sourceId: "other-client", clientId: "client-b", propertyId: null, serviceName: "Wrong Client", scheduledDate: "2026-10-07", startTime: "08:00:00", propertyAddress: null },
     { source: "Job", sourceId: "earliest-normal", clientId: "client-a", propertyId: null, serviceName: "Normal", scheduledDate: "2026-10-08", startTime: "08:00:00", propertyAddress: null },
   ], "client-a");
   assert.deepEqual(selected.map((service) => service.sourceId), ["earliest-normal", "recurring", "later-direct"]);
@@ -69,10 +70,46 @@ test("cancelled completed archived and cross-client services cannot be selected"
 
 test("an empty successful lookup remains distinct from a database failure", () => {
   assert.match(service, /if \(error\) throw new Error\(`Scheduled Job lookup failed: \$\{error\.message\}`\)/);
-  assert.match(service, /selectUpcomingServicesForClient\(\(data \?\? \[\]\)\.map/);
-  assert.match(modal, /upcomingError \? <p role="alert"/);
-  assert.match(modal, /No upcoming scheduled service was found for this client\./);
+  assert.match(service, /normalizeUpcomingClientServices\(data, clientId\)/);
+  assert.match(modal, /upcomingLookupState === "error" \|\| upcomingError/);
+  assert.match(modal, /upcomingLookupState === "success" \? <p[^>]*>No upcoming scheduled service was found for this client\./);
   assert.doesNotMatch(modal, /\{upcomingError \|\| "No upcoming scheduled service/);
+});
+
+test("exact Rose Company production rows normalize and populate the nearest reminder", () => {
+  const clientId = "fc70bf55-5b53-4890-856e-8ea7ce67894d";
+  const rows = [
+    {
+      source_type: "Job", source_id: "ec5a29a5-8229-4360-9bd4-102322bf7fdd", client_id: clientId,
+      property_id: "773c7a99-926e-4d09-bd09-1a2b67acdc6c", service_name: "Standard Cleaning",
+      scheduled_date: "2026-10-08", start_time: "15:30:00", property_address: "2554 Olive Dr., #29, Palmdale, CA 93550",
+    },
+    {
+      source_type: "Job", source_id: "1ee26a2f-3727-414d-9486-8f1db6f644da", client_id: clientId,
+      property_id: "e705eba8-7a2b-4bec-811e-a5fd54a8e87a", service_name: "Standard Cleaning",
+      scheduled_date: "2026-10-09", start_time: "13:00:00", property_address: "20235 Keswick St. #7, Winnetka, CA 91306",
+    },
+  ];
+  const upcoming = normalizeUpcomingClientServices(rows, clientId);
+  assert.equal(upcoming.length, 2);
+  assert.equal(upcoming[0].sourceId, "ec5a29a5-8229-4360-9bd4-102322bf7fdd");
+  assert.equal(upcoming[0].scheduledDate, "2026-10-08");
+  assert.equal(upcoming[0].startTime, "15:30:00");
+  const reminder = buildServiceReminderTemplate(upcoming[0], "Rose Company");
+  assert.match(reminder.subject, /Standard Cleaning.*Thursday, October 8, 2026/);
+  assert.match(reminder.message, /Hello Rose Company,/);
+  assert.match(reminder.message, /Thursday, October 8, 2026 at 3:30 PM/);
+  assert.match(reminder.message, /2554 Olive Dr\., #29, Palmdale, CA 93550/);
+  assert.doesNotMatch(reminder.message, /October 9/);
+});
+
+test("malformed or cross-client RPC rows surface contract errors instead of false empty state", () => {
+  assert.throws(() => normalizeUpcomingClientServices([{ source_type: "Job" }], "client-a"), /contract failed/);
+  assert.throws(() => normalizeUpcomingClientServices([{
+    source_type: "Job", source_id: "job-a", client_id: "client-b", property_id: null,
+    service_name: "Cleaning", scheduled_date: "2026-10-08", start_time: null, property_address: null,
+  }], "client-a"), /different client/);
+  assert.match(modal, /setUpcomingLookupState\("error"\)/);
 });
 
 test("communication errors are rendered as useful strings", () => {

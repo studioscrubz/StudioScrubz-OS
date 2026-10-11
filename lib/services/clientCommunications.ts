@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { withImmediateAttentionPush } from "@/lib/push/client";
-import { selectUpcomingServicesForClient } from "@/lib/scheduling/upcomingClientService";
+import { normalizeUpcomingClientServices } from "@/lib/scheduling/upcomingClientService";
 import type { ClientCommunication, ClientCommunicationInput, CommunicationRecordFilter, UpcomingClientService } from "@/types/clientCommunication";
 
 export async function getUpcomingServicesForClient(clientId: string): Promise<UpcomingClientService[]> {
@@ -8,16 +8,7 @@ export async function getUpcomingServicesForClient(clientId: string): Promise<Up
     p_client_id: clientId, p_days: 365,
   });
   if (error) throw new Error(`Scheduled Job lookup failed: ${error.message}`);
-  return selectUpcomingServicesForClient((data ?? []).map((service) => ({
-    source: service.source_type as UpcomingClientService["source"],
-    sourceId: service.source_id,
-    clientId: service.client_id,
-    propertyId: service.property_id,
-    serviceName: service.service_name || "Scheduled Service",
-    scheduledDate: service.scheduled_date,
-    startTime: service.start_time,
-    propertyAddress: service.property_address,
-  })), clientId);
+  return normalizeUpcomingClientServices(data, clientId);
 }
 
 export async function getClientCommunications(clientId: string, includeArchived = false): Promise<ClientCommunication[]> {

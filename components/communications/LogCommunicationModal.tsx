@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { getClientById } from "@/lib/services/clients";
 import { getPropertyById } from "@/lib/services/properties";
 import { sendCommunicationsEmail } from "@/lib/services/communicationsEmail";
+import { buildServiceReminderTemplate } from "@/lib/scheduling/upcomingClientService";
 import type { JobWithRelations } from "@/types/job";
 import { openDeviceSmsApp } from "@/lib/deviceSms";
 import type { Client } from "@/types/client";
@@ -27,6 +28,7 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
   const [upcoming, setUpcoming] = useState<UpcomingClientService[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  const [upcomingLookupState, setUpcomingLookupState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [upcomingError, setUpcomingError] = useState<string | null>(null);
   const [preparedSms, setPreparedSms] = useState<ClientCommunication | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -36,11 +38,15 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
     : createCommunication(input);
 
   useEffect(() => {
-    if (context || type !== "Service Reminder" || !links.clientId) return;
+    if (context || type !== "Service Reminder") return;
+    if (!links.clientId) {
+      setUpcoming([]); setSelectedServiceId(""); setUpcomingError("A client is required to look up upcoming services."); setUpcomingLookupState("error");
+      return;
+    }
     let active = true;
     // Reset request state before beginning the client-side lookup.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoadingUpcoming(true); setUpcomingError(null);
+    setLoadingUpcoming(true); setUpcomingLookupState("loading"); setUpcomingError(null); setUpcoming([]); setSelectedServiceId("");
     void getUpcomingServicesForClient(links.clientId)
       .then((services) => {
         if (!active) return;
@@ -48,23 +54,18 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
         const first = services.find((item) => item.sourceId === initialServiceId) ?? services[0];
         setSelectedServiceId(first?.sourceId ?? "");
         if (first) applyReminder(first);
+        setUpcomingLookupState("success");
       })
-      .catch((caught: unknown) => { console.error("Failed to load upcoming client services", caught); if (active) { setUpcoming([]); setUpcomingError(errorMessage(caught, "Upcoming services could not be loaded.")); } })
+      .catch((caught: unknown) => { console.error("Failed to load upcoming client services", caught); if (active) { setUpcoming([]); setUpcomingError(errorMessage(caught, "Upcoming services could not be loaded.")); setUpcomingLookupState("error"); } })
       .finally(() => { if (active) setLoadingUpcoming(false); });
     return () => { active = false; };
   }, [context, initialServiceId, links.clientId, type]);
 
   function applyReminder(service: UpcomingClientService) {
-    const date = friendlyDate(service.scheduledDate);
-    const time = service.startTime ? friendlyTime(service.startTime) : null;
     const greeting = client?.first_name?.trim() || clientDisplayName(client);
-    const scheduleText = time ? `${date} at ${time}` : date;
-    setSubject(`Reminder: ${service.serviceName} — ${date}`);
-    setMessage([
-      `Hello ${greeting},`, "", `This is a reminder that your ${service.serviceName} service with StudioScrubz is scheduled for ${scheduleText}.`,
-      ...(service.propertyAddress ? ["", "Service Location:", service.propertyAddress] : []),
-      "", "If you have any questions or need to make changes, please contact StudioScrubz.", "", "Thank you,", "StudioScrubz",
-    ].join("\n"));
+    const reminder = buildServiceReminderTemplate(service, greeting);
+    setSubject(reminder.subject);
+    setMessage(reminder.message);
     setEmail(client?.email ?? ""); setPhone(client?.phone ?? "");
   }
 
@@ -159,11 +160,12 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
         <Field label="Channel"><select value={channel} onChange={(e) => setChannel(e.target.value as CommunicationChannel)} className={inputClass}>{(context ? COMMUNICATION_CHANNELS.filter((item) => item === "Email" || item === "SMS") : COMMUNICATION_CHANNELS).map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Direction"><select value={direction} onChange={(e) => setDirection(e.target.value as CommunicationDirection)} className={inputClass}>{COMMUNICATION_DIRECTIONS.filter((item) => item !== "System").map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Status"><select value={channel === "Email" && direction === "Outbound" ? "Prepared" : status} disabled={Boolean(context) || (channel === "Email" && direction === "Outbound")} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputClass}><option>Prepared</option>{!context && !(channel === "Email" && direction === "Outbound") && <><option>Sent</option><option>Failed</option></>}</select></Field>
-        {type === "Service Reminder" && <div className="sm:col-span-2">
-          {loadingUpcoming ? <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Loading upcoming services…</p>
+        {!context && type === "Service Reminder" && <div className="sm:col-span-2">
+          {upcomingLookupState === "idle" || loadingUpcoming || upcomingLookupState === "loading" ? <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Loading upcoming services…</p>
             : upcoming.length > 0 ? <Field label="Upcoming Service"><select value={selectedServiceId} onChange={(e) => selectUpcoming(e.target.value)} className={inputClass}>{upcoming.map((service) => <option key={`${service.source}-${service.sourceId}`} value={service.sourceId}>{serviceLabel(service)}</option>)}</select></Field>
-            : upcomingError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{upcomingError}</p>
-            : <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">No upcoming scheduled service was found for this client.</p>}
+            : upcomingLookupState === "error" || upcomingError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{upcomingError || "Upcoming services could not be loaded."}</p>
+            : upcomingLookupState === "success" ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">No upcoming scheduled service was found for this client.</p>
+            : null}
         </div>}
         <Field label="Recipient Email"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} /></Field>
         <Field label="Recipient Phone"><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} /></Field>
