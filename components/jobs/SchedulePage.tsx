@@ -485,6 +485,7 @@ export function SchedulePage() {
           )}
         </>
       )}
+      <ScheduleOccurrences />
       {canEditSchedule && edit && (
         <ScheduleModal
           job={edit}
@@ -568,7 +569,6 @@ function Header({ createInternal }: { createInternal: (() => void) | null }) {
           </button>
         )}
       </header>
-      <ScheduleOccurrences />
     </>
   );
 }
