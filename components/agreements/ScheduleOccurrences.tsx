@@ -15,7 +15,6 @@ export function ScheduleOccurrences() {
   const { profile } = useAuth();
   const canCreateJobs = hasPermission(profile, "jobs.create");
   const [rows, setRows] = useState<ServiceOccurrenceWithRelations[]>([]);
-  const [clientSearch, setClientSearch] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -95,7 +94,6 @@ export function ScheduleOccurrences() {
     [row.agreement.client?.first_name, row.agreement.client?.last_name]
       .filter(Boolean).join(" ").trim() || "Client not listed";
   const visibleRows = [...rows]
-    .filter((row) => clientNameFor(row).toLowerCase().includes(clientSearch.trim().toLowerCase()))
     .sort((a, b) => clientNameFor(a).localeCompare(clientNameFor(b)) ||
       a.scheduled_date.localeCompare(b.scheduled_date) ||
       (a.scheduled_start_time || "").localeCompare(b.scheduled_start_time || ""));
@@ -118,11 +116,6 @@ export function ScheduleOccurrences() {
         </p>
       )}
 
-      <label className="mt-3 block text-sm font-semibold text-neutral-700" htmlFor="recurring-client-search">Find client</label>
-      <input id="recurring-client-search" type="search" value={clientSearch}
-        onChange={(event) => setClientSearch(event.target.value)}
-        placeholder="Search by client name" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" />
-      <p className="mt-2 text-xs text-neutral-500">Listed alphabetically by client, then by scheduled date.</p>
       <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {visibleRows.map((row) => {
           const clientName = clientNameFor(row);
@@ -164,9 +157,6 @@ export function ScheduleOccurrences() {
         })}
       </div>
 
-      {rows.length > 0 && visibleRows.length === 0 && (
-        <p className="mt-3 text-sm text-neutral-500">No clients match your search.</p>
-      )}
       {!rows.length && !loadError && (
         <p className="mt-3 text-sm text-neutral-500">
           No recurring occurrences are awaiting Jobs.
