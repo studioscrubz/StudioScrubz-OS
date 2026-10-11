@@ -3,6 +3,7 @@ import { useJobCommunication } from "@/components/communications/LogCommunicatio
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import type { UserProfile } from "@/types/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import {
   cancelJob,
@@ -78,6 +79,26 @@ const statuses = [
   "Completed",
   "Cancelled",
 ] as const;
+const internalEventCandidateRoles = new Set([
+  "Master Admin",
+  "Administrator",
+  "Sales",
+  "Lead Representative",
+]);
+function internalAccessDiagnostic(
+  profile: UserProfile | null,
+  level: InternalEventAccessLevel,
+) {
+  if (
+    level !== "None" ||
+    !profile?.is_active ||
+    !internalEventCandidateRoles.has(profile.role)
+  )
+    return null;
+  if (!profile.employee_id)
+    return "Internal Event access requires this account to be linked to an active employee. Ask a Master Admin to update the account's employee link.";
+  return "Internal Event access is not enabled for this account's active employee link. Ask a Master Admin to verify the employee status and assigned role.";
+}
 function byEventTime(a: ScheduleEvent, b: ScheduleEvent) {
   if (a.kind === "Job" && b.kind === "Job") return byTime(a.job, b.job);
   return (a.time ?? "99").localeCompare(b.time ?? "99");
@@ -155,7 +176,7 @@ export function SchedulePage() {
       .then((level) => {
         if (active) {
           setInternalAccess(level);
-          setInternalAccessError(null);
+          setInternalAccessError(internalAccessDiagnostic(profile, level));
         }
       })
       .catch((x) => {
@@ -165,9 +186,7 @@ export function SchedulePage() {
           if (
             profile?.is_active &&
             profile.employee_id &&
-            ["Master Admin", "Administrator", "Sales", "Lead Representative"].includes(
-              profile.role,
-            )
+            internalEventCandidateRoles.has(profile.role)
           ) {
             setInternalAccessError(
               "Internal event access could not be verified. Refresh the page or contact the Master Admin.",

@@ -28,6 +28,9 @@ test("the public helpers remain authenticated and narrowly scoped", () => {
 
 test("authorized users see a clear failure while the header action stays responsive", () => {
   assert.match(schedule, /Internal event access could not be verified/);
+  assert.match(schedule, /Internal Event access requires this account to be linked to an active employee/);
+  assert.match(schedule, /internalAccessDiagnostic\(profile, level\)/);
+  assert.match(schedule, /!internalEventCandidateRoles\.has\(profile\.role\)/);
   assert.match(schedule, /Create Internal Event/);
   assert.match(schedule, /flex flex-wrap items-start justify-between/);
   assert.doesNotMatch(schedule, /authorization failed[\s\S]{0,180}setInternalAccess\("None"\);\s*\}\);/);
