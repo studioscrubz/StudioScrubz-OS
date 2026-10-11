@@ -9,7 +9,8 @@ insert into auth.users(id, email, role, aud) values
   ('a1000000-0000-0000-0000-000000000003', 'internal-additive@example.test', 'authenticated', 'authenticated'),
   ('a1000000-0000-0000-0000-000000000004', 'internal-tech@example.test', 'authenticated', 'authenticated'),
   ('a1000000-0000-0000-0000-000000000005', 'internal-master@example.test', 'authenticated', 'authenticated'),
-  ('a1000000-0000-0000-0000-000000000006', 'internal-lead@example.test', 'authenticated', 'authenticated');
+  ('a1000000-0000-0000-0000-000000000006', 'internal-lead@example.test', 'authenticated', 'authenticated'),
+  ('a1000000-0000-0000-0000-000000000007', 'internal-master-no-employee@example.test', 'authenticated', 'authenticated');
 
 insert into public.employees(
   id, employee_number, first_name, last_name, email, department, employment_status
@@ -27,7 +28,8 @@ insert into public.user_profiles(id, email, display_name, role, is_active, emplo
   ('a1000000-0000-0000-0000-000000000003', 'internal-additive@example.test', 'Internal Additive', 'Master Admin', true, 'a2000000-0000-0000-0000-000000000003'),
   ('a1000000-0000-0000-0000-000000000004', 'internal-tech@example.test', 'Internal Tech', 'Scrub Technician', true, 'a2000000-0000-0000-0000-000000000004'),
   ('a1000000-0000-0000-0000-000000000005', 'internal-master@example.test', 'Internal Master', 'Master Admin', true, 'a2000000-0000-0000-0000-000000000005'),
-  ('a1000000-0000-0000-0000-000000000006', 'internal-lead@example.test', 'Internal Lead', 'Lead Representative', true, 'a2000000-0000-0000-0000-000000000006');
+  ('a1000000-0000-0000-0000-000000000006', 'internal-lead@example.test', 'Internal Lead', 'Lead Representative', true, 'a2000000-0000-0000-0000-000000000006'),
+  ('a1000000-0000-0000-0000-000000000007', 'internal-master-no-employee@example.test', 'Internal Master No Employee', 'Master Admin', true, null);
 
 insert into public.employee_operational_roles(employee_id, operational_role)
 values ('a2000000-0000-0000-0000-000000000003', 'Sales Representative');
@@ -223,6 +225,30 @@ begin
   end if;
 end;
 $test$;
+
+select set_config('request.jwt.claim.sub', 'a1000000-0000-0000-0000-000000000007', true);
+
+do $test$
+begin
+  if public.get_current_internal_schedule_access_level() <> 'Management' then
+    raise exception 'Employee-less Master Admin was not authorized.';
+  end if;
+end;
+$test$;
+
+insert into public.internal_schedule_events(
+  id, title, category, meeting_mode, starts_at, ends_at, timezone,
+  organizer_user_id, organizer_employee_id, visibility
+) values (
+  'a3000000-0000-0000-0000-000000000007', 'Master Admin user organized',
+  'Administrative', 'Video', now() + interval '7 days',
+  now() + interval '7 days 1 hour', 'America/Los_Angeles',
+  'a1000000-0000-0000-0000-000000000007', null, 'Management Only'
+);
+
+update public.internal_schedule_events
+set title = 'Master Admin user organized updated'
+where id = 'a3000000-0000-0000-0000-000000000007';
 
 reset role;
 rollback;

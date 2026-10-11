@@ -8,6 +8,10 @@ const migration = readFileSync(
   "supabase/migrations/20261011012800_repair_internal_schedule_authorization.sql",
   "utf8",
 );
+const masterAdminMigration = readFileSync(
+  "supabase/migrations/20261011015607_allow_master_admin_user_organized_internal_events.sql",
+  "utf8",
+);
 
 test("internal schedule access comes from the RLS authorization model", () => {
   assert.match(service, /rpc\(\s*"get_current_internal_schedule_access_level"/);
@@ -34,4 +38,19 @@ test("authorized users see a clear failure while the header action stays respons
   assert.match(schedule, /Create Internal Event/);
   assert.match(schedule, /flex flex-wrap items-start justify-between/);
   assert.doesNotMatch(schedule, /authorization failed[\s\S]{0,180}setInternalAccess\("None"\);\s*\}\);/);
+});
+
+test("active Master Admin accounts can organize events without employee linkage", () => {
+  assert.match(masterAdminMigration, /profile\.role = 'Master Admin' then 'Management'/);
+  assert.match(masterAdminMigration, /profile\.role = 'Master Admin' and p_employee_id is null/);
+  assert.match(masterAdminMigration, /alter column organizer_employee_id drop not null/);
+  assert.match(masterAdminMigration, /organizer_user_id = \(select auth\.uid\(\)\)/);
+  assert.match(service, /profile\.role !== "Master Admin"/);
+  assert.match(service, /organizer_employee_id: profile\.employee_id \?\? null/);
+});
+
+test("employee linkage remains mandatory outside Master Admin", () => {
+  assert.match(masterAdminMigration, /when employee\.id is null[\s\S]*then 'None'/);
+  assert.match(masterAdminMigration, /profile\.employee_id = p_employee_id/);
+  assert.doesNotMatch(masterAdminMigration, /Scrub Technician' then '(Management|Sales)'/);
 });

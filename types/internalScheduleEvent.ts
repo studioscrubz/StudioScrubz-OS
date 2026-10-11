@@ -49,7 +49,7 @@ export type InternalScheduleEvent = {
   ends_at: string;
   timezone: string;
   organizer_user_id: string;
-  organizer_employee_id: string;
+  organizer_employee_id: string | null;
   visibility: InternalEventVisibility;
   location: string | null;
   video_link: string | null;

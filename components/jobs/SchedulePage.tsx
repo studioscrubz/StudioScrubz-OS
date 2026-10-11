@@ -96,7 +96,9 @@ function internalAccessDiagnostic(
   )
     return null;
   if (!profile.employee_id)
-    return "Internal Event access requires this account to be linked to an active employee. Ask a Master Admin to update the account's employee link.";
+    return profile.role === "Master Admin"
+      ? "Internal Event access could not be verified for this Master Admin account. Refresh the page or contact support."
+      : "Internal Event access requires this account to be linked to an active employee. Ask a Master Admin to update the account's employee link.";
   return "Internal Event access is not enabled for this account's active employee link. Ask a Master Admin to verify the employee status and assigned role.";
 }
 function byEventTime(a: ScheduleEvent, b: ScheduleEvent) {
@@ -172,7 +174,7 @@ export function SchedulePage() {
 
   useEffect(() => {
     let active = true;
-    void getInternalEventAccessLevel(profile)
+    void getInternalEventAccessLevel()
       .then((level) => {
         if (active) {
           setInternalAccess(level);

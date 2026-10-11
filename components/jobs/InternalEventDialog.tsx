@@ -60,7 +60,7 @@ export function InternalEventDialog({
 
   useEffect(() => {
     let active = true;
-    void getInternalEventFormOptions(profile, access)
+    void getInternalEventFormOptions()
       .then((options) => {
         if (active) {
           setAttendees(options.attendees);

@@ -33,9 +33,7 @@ function fail(error: { message: string } | null, fallback: string) {
   if (error) throw new Error(error.message || fallback);
 }
 
-export async function getInternalEventAccessLevel(
-  _profile: UserProfile | null,
-): Promise<InternalEventAccessLevel> {
+export async function getInternalEventAccessLevel(): Promise<InternalEventAccessLevel> {
   const { data, error } = await client().rpc(
     "get_current_internal_schedule_access_level",
   );
@@ -56,10 +54,7 @@ export async function getInternalScheduleEvents(): Promise<
   return (data ?? []) as InternalScheduleEvent[];
 }
 
-export async function getInternalEventFormOptions(
-  _profile: UserProfile,
-  _access: InternalEventAccessLevel,
-): Promise<{
+export async function getInternalEventFormOptions(): Promise<{
   attendees: InternalEventAttendeeOption[];
   prospects: InternalEventProspectOption[];
 }> {
@@ -85,7 +80,7 @@ export async function createInternalScheduleEvent(
   input: InternalEventInput,
   profile: UserProfile,
 ): Promise<void> {
-  if (!profile.employee_id)
+  if (!profile.employee_id && profile.role !== "Master Admin")
     throw new Error("Your profile is not linked to an employee.");
   const api = client();
   const { attendee_employee_ids, ...values } = input;
@@ -94,7 +89,7 @@ export async function createInternalScheduleEvent(
     .insert({
       ...values,
       organizer_user_id: profile.id,
-      organizer_employee_id: profile.employee_id,
+      organizer_employee_id: profile.employee_id ?? null,
     })
     .select("id")
     .single();
