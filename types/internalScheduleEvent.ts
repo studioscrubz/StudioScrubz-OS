@@ -7,8 +7,9 @@ export const INTERNAL_EVENT_CATEGORIES = [
 export const INTERNAL_EVENT_MODES = ["In Person", "Video Meeting", "Phone Call"] as const;
 export const INTERNAL_EVENT_LEGACY_MODES = ["Phone", "Video"] as const;
 export const INTERNAL_EVENT_VISIBILITIES = [
-  "Management Only",
-  "Sales Visible",
+  "Authorized attendees only",
+  "Company-wide",
+  "Management only",
 ] as const;
 export const INTERNAL_EVENT_RSVP_STATUSES = [
   "Invited",

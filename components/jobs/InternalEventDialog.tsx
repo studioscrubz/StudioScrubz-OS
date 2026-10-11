@@ -170,7 +170,6 @@ export function InternalEventDialog({
         </Field>
         <Field label="Visibility">
           <select
-            disabled={sales}
             className={input}
             value={form.visibility}
             onChange={(e) =>
@@ -183,7 +182,7 @@ export function InternalEventDialog({
             {INTERNAL_EVENT_VISIBILITIES.map((value) => (
               <option
                 key={value}
-                disabled={sales && value === "Management Only"}
+                disabled={sales && value === "Management only"}
               >
                 {value}
               </option>
@@ -292,7 +291,7 @@ export function InternalEventDialog({
           Authorized Attendees
         </legend>
         {loadingOptions ? (
-          <p className="text-sm text-neutral-500">Loading attendees…</p>
+          <p className="text-sm text-neutral-500">Loading attendeesÃ¢â‚¬Â¦</p>
         ) : (
           <div>
             <input className={`${input} mb-3`} value={attendeeSearch} onChange={(e) => setAttendeeSearch(e.target.value)} placeholder="Search authorized employees" aria-label="Search authorized attendees" />
@@ -340,7 +339,7 @@ export function InternalEventDialog({
         className={`${primary} mt-5`}
         onClick={() => void submit()}
       >
-        {saving ? "Saving…" : event ? "Save Event" : "Create Event"}
+        {saving ? "SavingÃ¢â‚¬Â¦" : event ? "Save Event" : "Create Event"}
       </button>
     </Modal>
   );
@@ -397,11 +396,11 @@ export function InternalEventDetails({
       <div className="grid gap-4 sm:grid-cols-2">
         <Detail
           label="When"
-          value={`${formatDateTime(event.starts_at, event.timezone)} – ${formatDateTime(event.ends_at, event.timezone)} (${event.timezone})`}
+          value={`${formatDateTime(event.starts_at, event.timezone)} Ã¢â‚¬â€œ ${formatDateTime(event.ends_at, event.timezone)} (${event.timezone})`}
         />
         <Detail
           label="Type"
-          value={`${event.category} · ${event.meeting_mode}`}
+          value={`${event.category} Ã‚Â· ${event.meeting_mode}`}
         />
         <Detail label="Visibility" value={event.visibility} />
         <Detail label="Status" value={event.status} />
@@ -455,7 +454,7 @@ export function InternalEventDetails({
             <p key={attendee.employee_id} className="text-sm">
               {employeeName(attendee.employee)}{" "}
               <span className="text-neutral-500">
-                · {attendee.invitation_status}
+                Ã‚Â· {attendee.invitation_status}
               </span>
             </p>
           ))}
@@ -524,7 +523,7 @@ function formState(event: InternalScheduleEvent | null) {
     start,
     end,
     timezone,
-    visibility: event?.visibility ?? ("Sales Visible" as const),
+    visibility: event?.visibility ?? ("Company-wide" as const),
     location: event?.location ?? "",
     prospectId: event?.prospect_id ?? "",
     clientId: event?.client_id ?? "",
