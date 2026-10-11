@@ -4,7 +4,8 @@ export const INTERNAL_EVENT_CATEGORIES = [
   "Administrative",
   "Other",
 ] as const;
-export const INTERNAL_EVENT_MODES = ["Phone", "Video", "In Person"] as const;
+export const INTERNAL_EVENT_MODES = ["In Person", "Video Meeting", "Phone Call"] as const;
+export const INTERNAL_EVENT_LEGACY_MODES = ["Phone", "Video"] as const;
 export const INTERNAL_EVENT_VISIBILITIES = [
   "Management Only",
   "Sales Visible",
@@ -17,7 +18,9 @@ export const INTERNAL_EVENT_RSVP_STATUSES = [
 ] as const;
 
 export type InternalEventCategory = (typeof INTERNAL_EVENT_CATEGORIES)[number];
-export type InternalEventMode = (typeof INTERNAL_EVENT_MODES)[number];
+export type InternalEventMode =
+  | (typeof INTERNAL_EVENT_MODES)[number]
+  | (typeof INTERNAL_EVENT_LEGACY_MODES)[number];
 export type InternalEventVisibility =
   (typeof INTERNAL_EVENT_VISIBILITIES)[number];
 export type InternalEventRsvpStatus =
@@ -54,12 +57,29 @@ export type InternalScheduleEvent = {
   location: string | null;
   video_link: string | null;
   prospect_id: string | null;
+  client_id: string | null;
   vendor_name: string | null;
+  call_contact_name: string | null;
+  call_phone_number: string | null;
+  call_phone_extension: string | null;
   status: InternalEventStatus;
   created_at: string;
   updated_at: string;
   attendees: InternalEventAttendee[];
   prospect: { id: string; company_name: string } | null;
+  client: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    company_name: string | null;
+  } | null;
+  google_sync: {
+    calendar_id: string | null;
+    google_event_id: string | null;
+    google_meet_url: string | null;
+    sync_status: "Pending" | "Synced" | "Failed" | "Canceled" | "Not Required";
+    last_sync_error: string | null;
+  } | null;
 };
 
 export type InternalEventInput = Pick<
@@ -73,12 +93,25 @@ export type InternalEventInput = Pick<
   | "timezone"
   | "visibility"
   | "location"
-  | "video_link"
   | "prospect_id"
+  | "client_id"
   | "vendor_name"
+  | "call_contact_name"
+  | "call_phone_number"
+  | "call_phone_extension"
 > & {
   attendee_employee_ids: string[];
 };
 
 export type InternalEventAttendeeOption = { id: string; display_name: string };
-export type InternalEventProspectOption = { id: string; company_name: string };
+export type InternalEventProspectOption = { id: string; company_name: string; business_phone: string | null };
+export type InternalEventClientOption = {
+  id: string;
+  display_name: string;
+  phone: string | null;
+};
+export type InternalEventMutationResult = {
+  eventId: string;
+  google: { status: string; meetUrl: string | null };
+  warning: string | null;
+};

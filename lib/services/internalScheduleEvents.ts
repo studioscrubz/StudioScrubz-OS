@@ -3,7 +3,9 @@ import type { UserProfile } from "@/types/auth";
 import type {
   InternalEventAccessLevel,
   InternalEventAttendeeOption,
+  InternalEventClientOption,
   InternalEventInput,
+  InternalEventMutationResult,
   InternalEventProspectOption,
   InternalEventRsvpStatus,
   InternalScheduleEvent,
@@ -24,6 +26,10 @@ const eventSelection = `
     employee:employees(id, first_name, last_name, preferred_name)
   ),
   prospect:prospects(id, company_name)
+  ,client:clients(id, first_name, last_name, company_name)
+  ,google_sync:internal_schedule_event_google_syncs(
+    calendar_id, google_event_id, google_meet_url, sync_status, last_sync_error
+  )
 `;
 
 function client() {
@@ -57,105 +63,90 @@ export async function getInternalScheduleEvents(): Promise<
 export async function getInternalEventFormOptions(): Promise<{
   attendees: InternalEventAttendeeOption[];
   prospects: InternalEventProspectOption[];
+  clients: InternalEventClientOption[];
 }> {
   const api = client();
-  const [attendeesResult, prospectsResult] = await Promise.all([
+  const [attendeesResult, prospectsResult, clientsResult] = await Promise.all([
     api.rpc("get_internal_schedule_attendee_options"),
     api
       .from("prospects")
-      .select("id, company_name")
+      .select("id, company_name, business_phone")
       .is("merged_into_prospect_id", null)
+      .order("company_name")
+      .limit(500),
+    api
+      .from("clients")
+      .select("id, first_name, last_name, company_name, phone")
+      .is("archived_at", null)
       .order("company_name")
       .limit(500),
   ]);
   fail(attendeesResult.error, "Internal event attendees could not be loaded.");
   fail(prospectsResult.error, "Prospects could not be loaded.");
+  fail(clientsResult.error, "Clients could not be loaded.");
   return {
     attendees: (attendeesResult.data ?? []) as InternalEventAttendeeOption[],
     prospects: (prospectsResult.data ?? []) as InternalEventProspectOption[],
+    clients: (clientsResult.data ?? []).map((row: any) => ({
+      id: row.id,
+      display_name:
+        row.company_name?.trim() ||
+        `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim() ||
+        "Unnamed client",
+      phone: row.phone,
+    })),
   };
 }
 
 export async function createInternalScheduleEvent(
   input: InternalEventInput,
   profile: UserProfile,
-): Promise<void> {
+): Promise<InternalEventMutationResult> {
   if (!profile.employee_id && profile.role !== "Master Admin")
     throw new Error("Your profile is not linked to an employee.");
-  const api = client();
-  const { attendee_employee_ids, ...values } = input;
-  const { data, error } = await api
-    .from("internal_schedule_events")
-    .insert({
-      ...values,
-      organizer_user_id: profile.id,
-      organizer_employee_id: profile.employee_id ?? null,
-    })
-    .select("id")
-    .single();
-  fail(error, "Internal event could not be created.");
-  if (!attendee_employee_ids.length) return;
-  const { error: attendeeError } = await api
-    .from("internal_schedule_event_attendees")
-    .insert(
-      attendee_employee_ids.map((employee_id) => ({
-        event_id: data.id,
-        employee_id,
-      })),
-    );
-  if (!attendeeError) return;
-  await api.from("internal_schedule_events").delete().eq("id", data.id);
-  throw new Error(
-    attendeeError.message || "Event attendees could not be saved.",
-  );
+  return mutateInternalEvent("/api/internal-schedule-events", "POST", input);
 }
 
 export async function updateInternalScheduleEvent(
   eventId: string,
   input: InternalEventInput,
-): Promise<void> {
-  const api = client();
-  const { attendee_employee_ids, ...values } = input;
-  const { error } = await api
-    .from("internal_schedule_events")
-    .update(values)
-    .eq("id", eventId);
-  fail(error, "Internal event could not be updated.");
-  const { data: current, error: currentError } = await api
-    .from("internal_schedule_event_attendees")
-    .select("employee_id")
-    .eq("event_id", eventId);
-  fail(currentError, "Current attendees could not be loaded.");
-  const previous = new Set<string>(
-    (current ?? []).map((row: { employee_id: string }) => row.employee_id),
+): Promise<InternalEventMutationResult> {
+  return mutateInternalEvent(
+    `/api/internal-schedule-events/${encodeURIComponent(eventId)}`,
+    "PATCH",
+    input,
   );
-  const next = new Set(attendee_employee_ids);
-  const removed = [...previous].filter((id) => !next.has(id));
-  const added = [...next].filter((id) => !previous.has(id));
-  if (removed.length) {
-    const { error: removeError } = await api
-      .from("internal_schedule_event_attendees")
-      .delete()
-      .eq("event_id", eventId)
-      .in("employee_id", removed);
-    fail(removeError, "Removed attendees could not be saved.");
-  }
-  if (added.length) {
-    const { error: addError } = await api
-      .from("internal_schedule_event_attendees")
-      .insert(added.map((employee_id) => ({ event_id: eventId, employee_id })));
-    fail(addError, "New attendees could not be saved.");
-  }
 }
 
 export async function cancelInternalScheduleEvent(
   eventId: string,
-): Promise<void> {
-  const { error } = await client()
-    .from("internal_schedule_events")
-    .update({ status: "Canceled" })
-    .eq("id", eventId);
-  fail(error, "Internal event could not be canceled.");
+): Promise<InternalEventMutationResult> {
+  return mutateInternalEvent(
+    `/api/internal-schedule-events/${encodeURIComponent(eventId)}`,
+    "DELETE",
+  );
+}
+
+async function mutateInternalEvent(
+  url: string,
+  method: "POST" | "PATCH" | "DELETE",
+  input?: InternalEventInput,
+): Promise<InternalEventMutationResult> {
+  const response = await fetch(url, {
+    method,
+    headers: input ? { "content-type": "application/json" } : undefined,
+    body: input ? JSON.stringify(input) : undefined,
+  });
+  const text = await response.text();
+  let body: any = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error("The internal event server returned an invalid response.");
+  }
+  if (!response.ok)
+    throw new Error(body?.error || "The internal event operation failed.");
+  return body as InternalEventMutationResult;
 }
 
 export async function updateInternalEventRsvp(

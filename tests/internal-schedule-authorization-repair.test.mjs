@@ -12,6 +12,10 @@ const masterAdminMigration = readFileSync(
   "supabase/migrations/20261011015607_allow_master_admin_user_organized_internal_events.sql",
   "utf8",
 );
+const createEventMigration = readFileSync(
+  "supabase/migrations/20261011155011_internal_schedule_google_meet_and_related_clients.sql",
+  "utf8",
+);
 
 test("internal schedule access comes from the RLS authorization model", () => {
   assert.match(service, /rpc\(\s*"get_current_internal_schedule_access_level"/);
@@ -46,7 +50,7 @@ test("active Master Admin accounts can organize events without employee linkage"
   assert.match(masterAdminMigration, /alter column organizer_employee_id drop not null/);
   assert.match(masterAdminMigration, /organizer_user_id = \(select auth\.uid\(\)\)/);
   assert.match(service, /profile\.role !== "Master Admin"/);
-  assert.match(service, /organizer_employee_id: profile\.employee_id \?\? null/);
+  assert.match(createEventMigration, /actor_profile\.id, actor_profile\.employee_id/);
 });
 
 test("employee linkage remains mandatory outside Master Admin", () => {

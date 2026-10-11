@@ -1,53 +1,189 @@
+import type { PorterPhoto, PorterIssue } from "@/types/porterReporting";
+import type {
+  GpsMileageTrip,
+  GpsMileageSummary,
+  GpsPosition,
+} from "@/types/gpsMileage";
+import type {
+  PorterRoute,
+  PorterRouteStop,
+  PorterRouteWithStops,
+  RouteStopInput,
+  RouteEdit,
+} from "@/types/porterRoute";
+import type {
+  PorterVisit,
+  PorterVisitArea,
+  PorterVisitWithAreas,
+} from "@/types/porterVisit";
+import type {
+  PropertyServicePlan,
+  PropertyServicePlanInput,
+  PropertyServicePlanArea,
+  PropertyServicePlanAreaInput,
+  PropertyServicePlanWithAreas,
+} from "@/types/propertyServicePlan";
+import type {
+  FieldMeasurements,
+  FieldWalkthrough,
+} from "@/types/fieldWalkthrough";
+import type { Client, ClientInput } from "@/types/client";
+import type {
+  MarketingMaterial,
+  MarketingMaterialDelivery,
+  MarketingMaterialVersion,
+} from "@/types/marketingMaterial";
+import type { Property, PropertyInput } from "@/types/property";
+import type {
+  Estimate,
+  EstimateInsert,
+  EstimateUpdate,
+} from "@/types/estimate";
+import type {
+  Walkthrough,
+  WalkthroughInput,
+  WalkthroughUpdate,
+} from "@/types/walkthrough";
+import type {
+  Proposal,
+  ProposalHistory,
+  ProposalInsert,
+  ProposalResult,
+  ProposalUpdate,
+} from "@/types/proposal";
+import type { Job, JobInsert, JobUpdate } from "@/types/job";
+import type {
+  Employee,
+  EmployeeInput,
+  EmployeeUpdate,
+  PorterAssignmentOption,
+} from "@/types/employee";
+import type { Crew, CrewInput, CrewMember, CrewUpdate } from "@/types/crew";
+import type {
+  ContractorInvoiceEligibleJob,
+  Invoice,
+  InvoiceJobLine,
+  InvoiceUpdate,
+} from "@/types/invoice";
+import type { Payment, PaymentInsert } from "@/types/payment";
+import type { Expense, ExpenseInput, ExpenseUpdate } from "@/types/expense";
+import type {
+  AuthorizedVehicle,
+  Vehicle,
+  VehicleInput,
+  VehicleUpdate,
+} from "@/types/vehicle";
+import type {
+  MileageEntry,
+  MileageInput,
+  MileageStop,
+  MileageStopInput,
+  MileageUpdate,
+} from "@/types/mileage";
+import type {
+  TimeEntry,
+  TimeEntryInput,
+  TimeEntryUpdate,
+} from "@/types/timeEntry";
+import type {
+  ServiceAgreement,
+  AgreementInput,
+  AgreementUpdate,
+} from "@/types/agreement";
+import type { ServiceOccurrence } from "@/types/serviceOccurrence";
+import type {
+  AgreementDocumentInsert,
+  ServiceAgreementDocument,
+} from "@/types/agreementDocument";
+import type { UserProfile } from "@/types/auth";
+import type {
+  CatalogService,
+  RecurringPricingRule,
+  RecurringPricingRuleInput,
+  ServiceAddon,
+  ServiceAddonInput,
+  ServiceAddonLink,
+  ServiceInput,
+  ServiceLabel,
+  ServiceLabelAssignment,
+  ServicePriceTier,
+  ServicePriceTierInput,
+} from "@/types/serviceCatalog";
+import type {
+  BusinessIdentitySettings,
+  BusinessSettings,
+  BusinessSettingsUpdate,
+} from "@/types/businessSettings";
+import type {
+  ClientCommunication,
+  ClientCommunicationInput,
+} from "@/types/clientCommunication";
+import type { AttentionStateRecord } from "@/types/attention";
+import type { PublicEstimate } from "@/types/publicEstimate";
+import type { PublicProposal } from "@/types/publicProposal";
+import type { InvoiceJobPhoto } from "@/types/photo";
+import type {
+  ActiveEmployeeWorkSession,
+  EmployeeWorkSession,
+} from "@/types/workSession";
+import type { JobPerformanceRow } from "@/types/jobPerformance";
+import type {
+  AttentionPushCheckpoint,
+  AttentionPushDelivery,
+  BrowserPushSubscription,
+} from "@/types/pushNotification";
+import type {
+  AnnouncementAcknowledgment,
+  Conversation,
+  ConversationMember,
+  Message,
+  MessageReadState,
+} from "@/types/messaging";
+import type { NotificationPreferences } from "@/types/notificationPreferences";
+import type {
+  FieldDiscovery,
+  FieldDiscoveryMedia,
+  OperationalFieldDiscovery,
+} from "@/types/fieldDiscovery";
+import type {
+  ChangeRequest,
+  ChangeRequestApproval,
+  ChangeRequestItem,
+  OperationalChangeRequest,
+  PublicChangeRequest,
+} from "@/types/changeRequest";
+import type { JobEvidence, JobEvidenceMedia } from "@/types/jobEvidence";
+import type { PorterNotificationEvent } from "@/types/porterNotification";
+import type {
+  ProposalDepositEvent,
+  ProposalDepositRequirement,
+} from "@/types/proposalDeposit";
+import type { LeadRepresentativeLead } from "@/types/leadRepresentative";
+import type {
+  CallbackEvent,
+  CustomerFeedback,
+  JobQualityEvidence,
+  QualityCallback,
+  QualityInspection,
+  ScopeCompletionRecord,
+} from "@/types/jobQuality";
+import type {
+  ComplianceRecord,
+  JobEmployeeParticipation,
+  JobPerformanceEvidence,
+  QualityEmployeeAttribution,
+  TeamworkEvent,
+} from "@/types/jobPerformanceEvidence";
+import type {
+  CoachingRecord,
+  EmployeePerformanceReview,
+  EmployeePerformanceWorkflow,
+  ReviewResponse,
+} from "@/types/employeePerformance";
 import type {
   InternalEventAttendee,
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
-import type { PorterPhoto, PorterIssue } from "@/types/porterReporting";
-import type { GpsMileageTrip, GpsMileageSummary, GpsPosition } from "@/types/gpsMileage";
-import type { PorterRoute, PorterRouteStop, PorterRouteWithStops, RouteStopInput, RouteEdit } from "@/types/porterRoute";
-import type { PorterVisit, PorterVisitArea, PorterVisitWithAreas } from "@/types/porterVisit";
-import type { PropertyServicePlan, PropertyServicePlanInput, PropertyServicePlanArea, PropertyServicePlanAreaInput, PropertyServicePlanWithAreas } from "@/types/propertyServicePlan";
-import type { FieldMeasurements, FieldWalkthrough } from "@/types/fieldWalkthrough";
-import type { Client, ClientInput } from "@/types/client";
-import type { MarketingMaterial, MarketingMaterialDelivery, MarketingMaterialVersion } from "@/types/marketingMaterial";
-import type { Property, PropertyInput } from "@/types/property";
-import type { Estimate, EstimateInsert, EstimateUpdate } from "@/types/estimate";
-import type { Walkthrough, WalkthroughInput, WalkthroughUpdate } from "@/types/walkthrough";
-import type { Proposal, ProposalHistory, ProposalInsert, ProposalResult, ProposalUpdate } from "@/types/proposal";
-import type { Job, JobInsert, JobUpdate } from "@/types/job";
-import type { Employee, EmployeeInput, EmployeeUpdate, PorterAssignmentOption } from "@/types/employee";
-import type { Crew, CrewInput, CrewMember, CrewUpdate } from "@/types/crew";
-import type { ContractorInvoiceEligibleJob, Invoice, InvoiceJobLine, InvoiceUpdate } from "@/types/invoice";
-import type { Payment, PaymentInsert } from "@/types/payment";
-import type {Expense,ExpenseInput,ExpenseUpdate} from "@/types/expense";
-import type {AuthorizedVehicle,Vehicle,VehicleInput,VehicleUpdate} from "@/types/vehicle";
-import type {MileageEntry,MileageInput,MileageStop,MileageStopInput,MileageUpdate} from "@/types/mileage";
-import type {TimeEntry,TimeEntryInput,TimeEntryUpdate} from "@/types/timeEntry";
-import type {ServiceAgreement,AgreementInput,AgreementUpdate} from "@/types/agreement";
-import type {ServiceOccurrence} from "@/types/serviceOccurrence";
-import type {AgreementDocumentInsert,ServiceAgreementDocument} from "@/types/agreementDocument";
-import type {UserProfile} from "@/types/auth";
-import type {CatalogService,RecurringPricingRule,RecurringPricingRuleInput,ServiceAddon,ServiceAddonInput,ServiceAddonLink,ServiceInput,ServiceLabel,ServiceLabelAssignment,ServicePriceTier,ServicePriceTierInput} from "@/types/serviceCatalog";
-import type {BusinessIdentitySettings,BusinessSettings,BusinessSettingsUpdate} from "@/types/businessSettings";
-import type {ClientCommunication,ClientCommunicationInput} from "@/types/clientCommunication";
-import type {AttentionStateRecord} from "@/types/attention";
-import type {PublicEstimate} from "@/types/publicEstimate";
-import type {PublicProposal} from "@/types/publicProposal";
-import type {InvoiceJobPhoto} from "@/types/photo";
-import type {ActiveEmployeeWorkSession,EmployeeWorkSession} from "@/types/workSession";
-import type {JobPerformanceRow} from "@/types/jobPerformance";
-import type {AttentionPushCheckpoint,AttentionPushDelivery,BrowserPushSubscription} from "@/types/pushNotification";
-import type {AnnouncementAcknowledgment,Conversation,ConversationMember,Message,MessageReadState} from "@/types/messaging";
-import type {NotificationPreferences} from "@/types/notificationPreferences";
-import type {FieldDiscovery,FieldDiscoveryMedia,OperationalFieldDiscovery} from "@/types/fieldDiscovery";
-import type {ChangeRequest,ChangeRequestApproval,ChangeRequestItem,OperationalChangeRequest,PublicChangeRequest} from "@/types/changeRequest";
-import type {JobEvidence,JobEvidenceMedia} from "@/types/jobEvidence";
-import type {PorterNotificationEvent} from "@/types/porterNotification";
-import type {ProposalDepositEvent,ProposalDepositRequirement} from "@/types/proposalDeposit";
-import type {LeadRepresentativeLead} from "@/types/leadRepresentative";
-import type {CallbackEvent,CustomerFeedback,JobQualityEvidence,QualityCallback,QualityInspection,ScopeCompletionRecord} from "@/types/jobQuality";
-import type {ComplianceRecord,JobEmployeeParticipation,JobPerformanceEvidence,QualityEmployeeAttribution,TeamworkEvent} from "@/types/jobPerformanceEvidence";
-import type {CoachingRecord,EmployeePerformanceReview,EmployeePerformanceWorkflow,ReviewResponse} from "@/types/employeePerformance";
 
 export interface Database {
   public: {
@@ -125,321 +261,3181 @@ export interface Database {
           },
         ];
       };
-
-      job_mileage_trips: { Row: GpsMileageTrip; Insert: never; Update: never; Relationships: [] };
-      property_service_routes: { Row: PorterRoute; Insert: never; Update: never; Relationships: [] };
-      property_service_route_stops: { Row: PorterRouteStop; Insert: never; Update: never; Relationships: [] };
-      property_service_visit_photos: { Row: PorterPhoto; Insert: never; Update: never; Relationships: [] };
-      property_service_visit_issues: { Row: PorterIssue; Insert: never; Update: never; Relationships: [] };
-      property_service_visits: { Row: PorterVisit; Insert: never; Update: never; Relationships: [] };
-      employee_service_roles: { Row: { employee_id: string; service_role: "Porter Tech" | "Porter Manager"; created_at: string }; Insert: never; Update: never; Relationships: [] };
-      porter_notification_events: { Row: PorterNotificationEvent; Insert: never; Update: never; Relationships: [] };
-      property_service_visit_areas: { Row: PorterVisitArea; Insert: never; Update: never; Relationships: [] };
-      property_service_plans: { Row: PropertyServicePlan; Insert: PropertyServicePlanInput; Update: Partial<PropertyServicePlanInput>; Relationships: [] };
-      property_service_plan_areas: { Row: PropertyServicePlanArea; Insert: PropertyServicePlanAreaInput & { service_plan_id: string }; Update: Partial<PropertyServicePlanAreaInput>; Relationships: [] };
-      user_profiles:{Row:UserProfile;Insert:UserProfile;Update:Partial<Pick<UserProfile,"display_name"|"role"|"is_active"|"employee_id">>;Relationships:[{foreignKeyName:"user_profiles_employee_id_fkey";columns:["employee_id"];isOneToOne:true;referencedRelation:"employees";referencedColumns:["id"]}]};
-      notification_preferences:{Row:NotificationPreferences;Insert:Omit<NotificationPreferences,"created_at"|"updated_at">&{created_at?:string;updated_at?:string};Update:Partial<Pick<NotificationPreferences,"disabled_attention_categories"|"direct_messages_enabled"|"announcements_enabled"|"updated_at">>;Relationships:[{foreignKeyName:"notification_preferences_user_id_fkey";columns:["user_id"];isOneToOne:true;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      conversations:{Row:Conversation;Insert:Omit<Conversation,"id"|"created_at"|"updated_at"|"last_message_at"> & {id?:string;created_at?:string;updated_at?:string;last_message_at?:string};Update:Partial<Conversation>;Relationships:[]};
-      conversation_members:{Row:ConversationMember;Insert:ConversationMember;Update:Partial<ConversationMember>;Relationships:[{foreignKeyName:"conversation_members_conversation_id_fkey";columns:["conversation_id"];isOneToOne:false;referencedRelation:"conversations";referencedColumns:["id"]},{foreignKeyName:"conversation_members_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      messages:{Row:Message;Insert:Omit<Message,"id"|"created_at"|"edited_at"|"archived_at"> & {id?:string;created_at?:string;edited_at?:string|null;archived_at?:string|null};Update:Partial<Message>;Relationships:[{foreignKeyName:"messages_conversation_id_fkey";columns:["conversation_id"];isOneToOne:false;referencedRelation:"conversations";referencedColumns:["id"]},{foreignKeyName:"messages_sender_user_id_fkey";columns:["sender_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      message_read_states:{Row:MessageReadState;Insert:MessageReadState;Update:Partial<MessageReadState>;Relationships:[{foreignKeyName:"message_read_states_message_id_fkey";columns:["message_id"];isOneToOne:false;referencedRelation:"messages";referencedColumns:["id"]},{foreignKeyName:"message_read_states_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      announcement_acknowledgments:{Row:AnnouncementAcknowledgment;Insert:AnnouncementAcknowledgment;Update:Partial<AnnouncementAcknowledgment>;Relationships:[{foreignKeyName:"announcement_acknowledgments_message_id_fkey";columns:["message_id"];isOneToOne:false;referencedRelation:"messages";referencedColumns:["id"]},{foreignKeyName:"announcement_acknowledgments_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
+      job_mileage_trips: {
+        Row: GpsMileageTrip;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_routes: {
+        Row: PorterRoute;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_route_stops: {
+        Row: PorterRouteStop;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_visit_photos: {
+        Row: PorterPhoto;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_visit_issues: {
+        Row: PorterIssue;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_visits: {
+        Row: PorterVisit;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_service_roles: {
+        Row: {
+          employee_id: string;
+          service_role: "Porter Tech" | "Porter Manager";
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      porter_notification_events: {
+        Row: PorterNotificationEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_visit_areas: {
+        Row: PorterVisitArea;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      property_service_plans: {
+        Row: PropertyServicePlan;
+        Insert: PropertyServicePlanInput;
+        Update: Partial<PropertyServicePlanInput>;
+        Relationships: [];
+      };
+      property_service_plan_areas: {
+        Row: PropertyServicePlanArea;
+        Insert: PropertyServicePlanAreaInput & { service_plan_id: string };
+        Update: Partial<PropertyServicePlanAreaInput>;
+        Relationships: [];
+      };
+      user_profiles: {
+        Row: UserProfile;
+        Insert: UserProfile;
+        Update: Partial<
+          Pick<
+            UserProfile,
+            "display_name" | "role" | "is_active" | "employee_id"
+          >
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: true;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notification_preferences: {
+        Row: NotificationPreferences;
+        Insert: Omit<NotificationPreferences, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Pick<
+            NotificationPreferences,
+            | "disabled_attention_categories"
+            | "direct_messages_enabled"
+            | "announcements_enabled"
+            | "updated_at"
+          >
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      conversations: {
+        Row: Conversation;
+        Insert: Omit<
+          Conversation,
+          "id" | "created_at" | "updated_at" | "last_message_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          last_message_at?: string;
+        };
+        Update: Partial<Conversation>;
+        Relationships: [];
+      };
+      conversation_members: {
+        Row: ConversationMember;
+        Insert: ConversationMember;
+        Update: Partial<ConversationMember>;
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "conversation_members_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      messages: {
+        Row: Message;
+        Insert: Omit<
+          Message,
+          "id" | "created_at" | "edited_at" | "archived_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          edited_at?: string | null;
+          archived_at?: string | null;
+        };
+        Update: Partial<Message>;
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "messages_sender_user_id_fkey";
+            columns: ["sender_user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      message_read_states: {
+        Row: MessageReadState;
+        Insert: MessageReadState;
+        Update: Partial<MessageReadState>;
+        Relationships: [
+          {
+            foreignKeyName: "message_read_states_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: false;
+            referencedRelation: "messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "message_read_states_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      announcement_acknowledgments: {
+        Row: AnnouncementAcknowledgment;
+        Insert: AnnouncementAcknowledgment;
+        Update: Partial<AnnouncementAcknowledgment>;
+        Relationships: [
+          {
+            foreignKeyName: "announcement_acknowledgments_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: false;
+            referencedRelation: "messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "announcement_acknowledgments_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       clients: {
         Row: Client;
-        Insert: ClientInput & { id?: string; created_at?: string; updated_at?: string; archived_at?: string | null };
-        Update: Partial<ClientInput> & { updated_at?: string; archived_at?: string | null };
+        Insert: ClientInput & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: Partial<ClientInput> & {
+          updated_at?: string;
+          archived_at?: string | null;
+        };
         Relationships: [];
       };
       properties: {
         Row: Property;
-        Insert: PropertyInput & { id?: string; created_at?: string; updated_at?: string; archived_at?: string | null };
-        Update: Partial<PropertyInput> & { updated_at?: string; archived_at?: string | null };
-        Relationships: [{ foreignKeyName: "properties_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] }];
+        Insert: PropertyInput & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: Partial<PropertyInput> & {
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "properties_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       estimates: {
         Row: Estimate;
-        Insert: EstimateInsert & { id?: string; created_at?: string; updated_at?: string };
+        Insert: EstimateInsert & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
         Update: EstimateUpdate;
         Relationships: [
-          { foreignKeyName: "estimates_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-          { foreignKeyName: "estimates_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
+          {
+            foreignKeyName: "estimates_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "estimates_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
         ];
       };
       walkthroughs: {
         Row: Walkthrough;
-        Insert: WalkthroughInput & { id?: string; created_at?: string; updated_at?: string };
-        Update: WalkthroughUpdate & Partial<Pick<Walkthrough, "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by">>;
+        Insert: WalkthroughInput & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: WalkthroughUpdate &
+          Partial<
+            Pick<
+              Walkthrough,
+              "pricing_review" | "pricing_reviewed_at" | "pricing_reviewed_by"
+            >
+          >;
         Relationships: [
-          { foreignKeyName: "walkthroughs_estimate_id_fkey"; columns: ["estimate_id"]; isOneToOne: false; referencedRelation: "estimates"; referencedColumns: ["id"] },
-          { foreignKeyName: "walkthroughs_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-          { foreignKeyName: "walkthroughs_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
+          {
+            foreignKeyName: "walkthroughs_estimate_id_fkey";
+            columns: ["estimate_id"];
+            isOneToOne: false;
+            referencedRelation: "estimates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "walkthroughs_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "walkthroughs_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
         ];
       };
-      assessment_history:{Row:{id:string;walkthrough_id:string;event_type:string;from_stage:string|null;to_stage:string|null;changed_fields:string[];snapshot:Record<string,unknown>;changed_by_user_id:string|null;created_at:string};Insert:never;Update:never;Relationships:[{foreignKeyName:"assessment_history_walkthrough_id_fkey";columns:["walkthrough_id"];isOneToOne:false;referencedRelation:"walkthroughs";referencedColumns:["id"]},{foreignKeyName:"assessment_history_changed_by_user_id_fkey";columns:["changed_by_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      assessment_photo_access:{Row:{id:string;walkthrough_id:string;token_hash:string;token_value:string|null;expires_at:string;submitted_at:string|null;created_by:string|null;created_at:string;updated_at:string};Insert:{id?:string;walkthrough_id:string;token_hash:string;token_value?:string|null;expires_at:string;submitted_at?:string|null;created_by?:string|null;created_at?:string;updated_at?:string};Update:Partial<{token_hash:string;token_value:string|null;expires_at:string;submitted_at:string|null;created_by:string|null;updated_at:string}>;Relationships:[{foreignKeyName:"assessment_photo_access_walkthrough_id_fkey";columns:["walkthrough_id"];isOneToOne:true;referencedRelation:"walkthroughs";referencedColumns:["id"]}]};
-      proposals: { Row: Proposal; Insert: ProposalInsert & { id?: string; created_at?: string; updated_at?: string }; Update: ProposalUpdate; Relationships: [
-        { foreignKeyName: "proposals_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-        { foreignKeyName: "proposals_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
-        { foreignKeyName: "proposals_estimate_id_fkey"; columns: ["estimate_id"]; isOneToOne: false; referencedRelation: "estimates"; referencedColumns: ["id"] },
-        { foreignKeyName: "proposals_walkthrough_id_fkey"; columns: ["walkthrough_id"]; isOneToOne: false; referencedRelation: "walkthroughs"; referencedColumns: ["id"] },
-      ] };
-      proposal_history: { Row: ProposalHistory; Insert: Omit<ProposalHistory, "id" | "created_at"> & { id?: string; created_at?: string }; Update: never; Relationships: [{ foreignKeyName: "proposal_history_proposal_id_fkey"; columns: ["proposal_id"]; isOneToOne: false; referencedRelation: "proposals"; referencedColumns: ["id"] }] };
-      proposal_deposit_requirements:{Row:ProposalDepositRequirement;Insert:never;Update:never;Relationships:[{foreignKeyName:"proposal_deposit_requirements_proposal_id_fkey";columns:["proposal_id"];isOneToOne:true;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"proposal_deposit_requirements_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]}]};
-      proposal_deposit_events:{Row:ProposalDepositEvent;Insert:never;Update:never;Relationships:[{foreignKeyName:"proposal_deposit_events_requirement_id_fkey";columns:["requirement_id"];isOneToOne:false;referencedRelation:"proposal_deposit_requirements";referencedColumns:["id"]}]};
-      jobs: { Row: Job; Insert: JobInsert & { id?: string; created_at?: string; updated_at?: string }; Update: JobUpdate; Relationships: [
-        { foreignKeyName: "jobs_proposal_id_fkey"; columns: ["proposal_id"]; isOneToOne: false; referencedRelation: "proposals"; referencedColumns: ["id"] },
-        { foreignKeyName: "jobs_estimate_id_fkey"; columns: ["estimate_id"]; isOneToOne: false; referencedRelation: "estimates"; referencedColumns: ["id"] },
-        { foreignKeyName: "jobs_walkthrough_id_fkey"; columns: ["walkthrough_id"]; isOneToOne: false; referencedRelation: "walkthroughs"; referencedColumns: ["id"] },
-        { foreignKeyName: "jobs_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-        { foreignKeyName: "jobs_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "properties"; referencedColumns: ["id"] },
-        { foreignKeyName: "jobs_assigned_employee_id_fkey"; columns: ["assigned_employee_id"]; isOneToOne: false; referencedRelation: "employees"; referencedColumns: ["id"] },
-        { foreignKeyName: "jobs_assigned_crew_id_fkey"; columns: ["assigned_crew_id"]; isOneToOne: false; referencedRelation: "crews"; referencedColumns: ["id"] },
-      ] };
-      scope_snapshots:{Row:{id:string;job_id:string;proposal_id:string;version:number;snapshot_type:string;scope:ProposalResult["scope"];pricing:Record<string,unknown>;proposal_result:ProposalResult;proposal_notes:string|null;accepted_at:string|null;created_at:string};Insert:{id?:string;job_id:string;proposal_id:string;version?:number;snapshot_type?:string;scope?:ProposalResult["scope"];pricing?:Record<string,unknown>;proposal_result?:ProposalResult;proposal_notes?:string|null;accepted_at?:string|null;created_at?:string};Update:never;Relationships:[{foreignKeyName:"scope_snapshots_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id","job_id"]},{foreignKeyName:"scope_snapshots_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]}]};
-      scope_snapshot_items:{Row:{id:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description:string|null;quantity:number|null;unit:string|null;unit_price:number|null;line_total:number|null;metadata:Record<string,unknown>;sort_order:number;created_at:string};Insert:{id?:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description?:string|null;quantity?:number|null;unit?:string|null;unit_price?:number|null;line_total?:number|null;metadata?:Record<string,unknown>;sort_order?:number;created_at?:string};Update:never;Relationships:[{foreignKeyName:"scope_snapshot_items_snapshot_job_fkey";columns:["scope_snapshot_id","job_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id","job_id"]},{foreignKeyName:"scope_snapshot_items_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
-      field_discoveries:{Row:FieldDiscovery;Insert:never;Update:never;Relationships:[{foreignKeyName:"field_discoveries_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"field_discoveries_scope_snapshot_id_fkey";columns:["scope_snapshot_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id"]},{foreignKeyName:"field_discoveries_discovered_by_fkey";columns:["discovered_by"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      field_discovery_media:{Row:FieldDiscoveryMedia;Insert:never;Update:never;Relationships:[{foreignKeyName:"field_discovery_media_field_discovery_id_fkey";columns:["field_discovery_id"];isOneToOne:false;referencedRelation:"field_discoveries";referencedColumns:["id"]}]};
-      change_requests:{Row:ChangeRequest;Insert:never;Update:never;Relationships:[{foreignKeyName:"change_requests_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"change_requests_scope_snapshot_id_fkey";columns:["scope_snapshot_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id"]},{foreignKeyName:"change_requests_field_discovery_id_fkey";columns:["field_discovery_id"];isOneToOne:false;referencedRelation:"field_discoveries";referencedColumns:["id"]},{foreignKeyName:"change_requests_created_by_fkey";columns:["created_by"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      change_request_items:{Row:ChangeRequestItem;Insert:never;Update:never;Relationships:[{foreignKeyName:"change_request_items_change_request_id_fkey";columns:["change_request_id"];isOneToOne:false;referencedRelation:"change_requests";referencedColumns:["id"]}]};
-      change_request_approvals:{Row:ChangeRequestApproval;Insert:never;Update:never;Relationships:[{foreignKeyName:"change_request_approvals_change_request_id_fkey";columns:["change_request_id"];isOneToOne:true;referencedRelation:"change_requests";referencedColumns:["id"]}]};
-      job_evidence:{Row:JobEvidence;Insert:never;Update:never;Relationships:[{foreignKeyName:"job_evidence_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"job_evidence_scope_snapshot_id_fkey";columns:["scope_snapshot_id"];isOneToOne:false;referencedRelation:"scope_snapshots";referencedColumns:["id"]},{foreignKeyName:"job_evidence_change_request_id_fkey";columns:["change_request_id"];isOneToOne:false;referencedRelation:"change_requests";referencedColumns:["id"]},{foreignKeyName:"job_evidence_field_discovery_id_fkey";columns:["field_discovery_id"];isOneToOne:false;referencedRelation:"field_discoveries";referencedColumns:["id"]}]};
-      job_evidence_media:{Row:JobEvidenceMedia;Insert:never;Update:never;Relationships:[{foreignKeyName:"job_evidence_media_job_evidence_id_fkey";columns:["job_evidence_id"];isOneToOne:false;referencedRelation:"job_evidence";referencedColumns:["id"]}]};
-      employees:{Row:Employee;Insert:EmployeeInput&{id?:string;employee_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:EmployeeUpdate;Relationships:[]};
-      crews:{Row:Crew;Insert:CrewInput&{id?:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:CrewUpdate;Relationships:[{foreignKeyName:"crews_crew_lead_id_fkey";columns:["crew_lead_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
-      crew_members:{Row:Omit<CrewMember,"employee">;Insert:{id?:string;crew_id:string;employee_id:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"crew_members_crew_id_fkey";columns:["crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]},{foreignKeyName:"crew_members_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
-      invoices:{Row:Omit<Invoice,"job_lines">;Insert:Omit<Invoice,"job_lines"|"id"|"created_at"|"updated_at"|"archived_at"|"sent_at"|"paid_at"|"client_access_token"|"client_access_token_expires_at"|"customer_notes"|"is_consolidated">&{id?:string;created_at?:string;updated_at?:string;archived_at?:string|null;sent_at?:string|null;paid_at?:string|null;client_access_token?:string|null;client_access_token_expires_at?:string|null;customer_notes?:string|null;is_consolidated?:boolean};Update:InvoiceUpdate;Relationships:[{foreignKeyName:"invoices_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"invoices_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"invoices_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"invoices_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]}]};
-      invoice_job_lines:{Row:InvoiceJobLine;Insert:Omit<InvoiceJobLine,"id"|"created_at">&{id?:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"invoice_job_lines_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"invoice_job_lines_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"invoice_job_lines_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]}]};
-      invoice_job_photos:{Row:InvoiceJobPhoto;Insert:Omit<InvoiceJobPhoto,"id"|"created_at">&{id?:string;created_at?:string};Update:Pick<InvoiceJobPhoto,"customer_visible">;Relationships:[{foreignKeyName:"invoice_job_photos_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"invoice_job_photos_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
-      payments:{Row:Payment;Insert:PaymentInsert&{id?:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"payments_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"payments_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"payments_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
-      expenses:{Row:Expense;Insert:ExpenseInput&{id?:string;expense_number:string;status?:"Active";receipt_url?:string|null;created_at?:string;updated_at?:string;archived_at?:string|null};Update:ExpenseUpdate;Relationships:[{foreignKeyName:"expenses_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"expenses_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"expenses_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"expenses_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
-      vehicles:{Row:Vehicle;Insert:VehicleInput&{id?:string;vehicle_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:VehicleUpdate;Relationships:[{foreignKeyName:"vehicles_assigned_employee_id_fkey";columns:["assigned_employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]},{foreignKeyName:"vehicles_assigned_crew_id_fkey";columns:["assigned_crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]}]};
-      mileage_entries:{Row:MileageEntry;Insert:MileageInput&{id?:string;mileage_number:string;deductible_amount:number;status?:"Active";created_at?:string;updated_at?:string;archived_at?:string|null};Update:MileageUpdate;Relationships:[{foreignKeyName:"mileage_entries_vehicle_id_fkey";columns:["vehicle_id"];isOneToOne:false;referencedRelation:"vehicles";referencedColumns:["id"]},{foreignKeyName:"mileage_entries_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]},{foreignKeyName:"mileage_entries_crew_id_fkey";columns:["crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]},{foreignKeyName:"mileage_entries_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"mileage_entries_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"mileage_entries_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]}]};
-      mileage_stops:{Row:MileageStop;Insert:Omit<MileageStop,"id"|"created_at"|"updated_at">&{id?:string;created_at?:string;updated_at?:string};Update:Partial<Pick<MileageStop,"stop_order"|"job_id"|"property_id"|"address"|"label"|"miles_from_previous"|"updated_at">>;Relationships:[{foreignKeyName:"mileage_stops_mileage_entry_id_fkey";columns:["mileage_entry_id"];isOneToOne:false;referencedRelation:"mileage_entries";referencedColumns:["id"]},{foreignKeyName:"mileage_stops_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"mileage_stops_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]}]};
-      time_entries:{Row:TimeEntry;Insert:TimeEntryInput&{id?:string;time_entry_number:string;status?:"Open"|"Completed";regular_hours?:number;overtime_hours?:number;total_hours?:number;hourly_rate_snapshot?:number;overtime_rate_snapshot?:number;regular_pay?:number;overtime_pay?:number;gross_pay?:number;approved_at?:string|null;approved_by?:string|null;created_at?:string;updated_at?:string;archived_at?:string|null};Update:TimeEntryUpdate;Relationships:[{foreignKeyName:"time_entries_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]},{foreignKeyName:"time_entries_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]},{foreignKeyName:"time_entries_crew_id_fkey";columns:["crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]}]};
-      employee_work_sessions:{Row:EmployeeWorkSession;Insert:{id?:string;employee_id:string;clock_in?:string;clock_out?:string|null;status?:EmployeeWorkSession["status"];created_at?:string;updated_at?:string};Update:Partial<Pick<EmployeeWorkSession,"clock_out"|"status"|"updated_at">>;Relationships:[{foreignKeyName:"employee_work_sessions_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}]};
-      service_agreements:{Row:ServiceAgreement;Insert:AgreementInput&{agreement_number:string};Update:AgreementUpdate;Relationships:[{foreignKeyName:"service_agreements_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"service_agreements_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"service_agreements_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"service_agreements_assigned_crew_id_fkey";columns:["assigned_crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]}]};
-      service_agreement_documents:{Row:ServiceAgreementDocument;Insert:AgreementDocumentInsert;Update:Partial<Pick<ServiceAgreementDocument,"document_name"|"description"|"archived_at">>;Relationships:[{foreignKeyName:"service_agreement_documents_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"service_agreement_documents_uploaded_by_fkey";columns:["uploaded_by"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      service_occurrences:{Row:ServiceOccurrence;Insert:Omit<ServiceOccurrence,"id"|"job_id"|"created_at"|"updated_at"|"notes">&{job_id?:string|null;notes?:string|null};Update:Partial<ServiceOccurrence>;Relationships:[{foreignKeyName:"service_occurrences_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"service_occurrences_assigned_crew_id_fkey";columns:["assigned_crew_id"];isOneToOne:false;referencedRelation:"crews";referencedColumns:["id"]},{foreignKeyName:"service_occurrences_job_id_fkey";columns:["job_id"];isOneToOne:false;referencedRelation:"jobs";referencedColumns:["id"]}]};
-      services:{Row:CatalogService;Insert:ServiceInput;Update:Partial<ServiceInput>&{archived_at?:string|null};Relationships:[]};
-      service_price_tiers:{Row:ServicePriceTier;Insert:ServicePriceTierInput;Update:Partial<ServicePriceTierInput>;Relationships:[{foreignKeyName:"service_price_tiers_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
-      service_addons:{Row:ServiceAddon;Insert:ServiceAddonInput;Update:Partial<ServiceAddonInput>&{archived_at?:string|null};Relationships:[]};
-      service_addon_links:{Row:ServiceAddonLink;Insert:ServiceAddonLink;Update:never;Relationships:[{foreignKeyName:"service_addon_links_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]},{foreignKeyName:"service_addon_links_addon_id_fkey";columns:["addon_id"];isOneToOne:false;referencedRelation:"service_addons";referencedColumns:["id"]}]};
-      service_labels:{Row:ServiceLabel;Insert:{id?:string;name:string;created_at?:string;updated_at?:string};Update:{name?:string;updated_at?:string};Relationships:[]};
-      service_label_assignments:{Row:ServiceLabelAssignment;Insert:{service_id:string;label_id:string;created_at?:string};Update:never;Relationships:[{foreignKeyName:"service_label_assignments_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]},{foreignKeyName:"service_label_assignments_label_id_fkey";columns:["label_id"];isOneToOne:false;referencedRelation:"service_labels";referencedColumns:["id"]}]};
-      recurring_pricing_rules:{Row:RecurringPricingRule;Insert:RecurringPricingRuleInput;Update:Partial<RecurringPricingRuleInput>;Relationships:[{foreignKeyName:"recurring_pricing_rules_service_id_fkey";columns:["service_id"];isOneToOne:false;referencedRelation:"services";referencedColumns:["id"]}]};
-      business_settings:{Row:BusinessSettings;Insert:BusinessSettingsUpdate&{id?:string};Update:Partial<BusinessSettingsUpdate>;Relationships:[]};
-      client_communications:{Row:ClientCommunication;Insert:ClientCommunicationInput&{id?:string;communication_number:string;created_at?:string;updated_at?:string;archived_at?:string|null};Update:Partial<ClientCommunication>;Relationships:[{foreignKeyName:"client_communications_client_id_fkey";columns:["client_id"];isOneToOne:false;referencedRelation:"clients";referencedColumns:["id"]},{foreignKeyName:"client_communications_property_id_fkey";columns:["property_id"];isOneToOne:false;referencedRelation:"properties";referencedColumns:["id"]},{foreignKeyName:"client_communications_estimate_id_fkey";columns:["estimate_id"];isOneToOne:false;referencedRelation:"estimates";referencedColumns:["id"]},{foreignKeyName:"client_communications_proposal_id_fkey";columns:["proposal_id"];isOneToOne:false;referencedRelation:"proposals";referencedColumns:["id"]},{foreignKeyName:"client_communications_agreement_id_fkey";columns:["agreement_id"];isOneToOne:false;referencedRelation:"service_agreements";referencedColumns:["id"]},{foreignKeyName:"client_communications_invoice_id_fkey";columns:["invoice_id"];isOneToOne:false;referencedRelation:"invoices";referencedColumns:["id"]},{foreignKeyName:"client_communications_sent_by_user_id_fkey";columns:["sent_by_user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      marketing_materials:{Row:MarketingMaterial;Insert:never;Update:never;Relationships:[]};
-      marketing_material_versions:{Row:MarketingMaterialVersion;Insert:never;Update:never;Relationships:[]};
-      marketing_material_deliveries:{Row:MarketingMaterialDelivery;Insert:never;Update:never;Relationships:[]};
-      attention_item_states:{Row:AttentionStateRecord;Insert:{id?:string;user_id:string;attention_key:string;state:AttentionStateRecord["state"];snoozed_until?:string|null;dismissed_at?:string|null;created_at?:string;updated_at?:string};Update:Partial<Pick<AttentionStateRecord,"state"|"snoozed_until"|"dismissed_at">>;Relationships:[{foreignKeyName:"attention_item_states_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"user_profiles";referencedColumns:["id"]}]};
-      browser_push_subscriptions:{Row:BrowserPushSubscription;Insert:Omit<BrowserPushSubscription,"id"|"created_at"|"updated_at">&{id?:string;created_at?:string;updated_at?:string};Update:Partial<Pick<BrowserPushSubscription,"user_id"|"p256dh"|"auth"|"user_agent"|"revoked_at"|"updated_at">>;Relationships:[]};
-      attention_push_deliveries:{Row:AttentionPushDelivery;Insert:Omit<AttentionPushDelivery,"id"|"created_at"|"updated_at"|"sent_at"|"failure_code"|"failure_message">&{id?:string;created_at?:string;updated_at?:string;sent_at?:string|null;failure_code?:string|null;failure_message?:string|null};Update:Partial<Pick<AttentionPushDelivery,"delivery_status"|"last_attempt_at"|"sent_at"|"failure_code"|"failure_message"|"updated_at">>;Relationships:[]};
-      attention_push_checkpoints:{Row:AttentionPushCheckpoint;Insert:Omit<AttentionPushCheckpoint,"initialized_at">&{initialized_at?:string};Update:never;Relationships:[]};
-      job_labor_threshold_events:{Row:import("@/types/job").JobLaborThresholdEvent;Insert:never;Update:never;Relationships:[]};
-      job_quality_inspections:{Row:Omit<QualityInspection,"items">;Insert:never;Update:never;Relationships:[]};
-      job_quality_inspection_items:{Row:import("@/types/jobQuality").InspectionItem;Insert:never;Update:never;Relationships:[]};
-      job_quality_callbacks:{Row:Omit<QualityCallback,"events">;Insert:never;Update:never;Relationships:[]};
-      job_quality_callback_events:{Row:CallbackEvent;Insert:never;Update:never;Relationships:[]};
-      job_scope_completion_records:{Row:ScopeCompletionRecord;Insert:never;Update:never;Relationships:[]};
-      job_customer_feedback:{Row:CustomerFeedback;Insert:never;Update:never;Relationships:[]};
-      job_quality_evidence_links:{Row:JobQualityEvidence["evidenceLinks"][number];Insert:never;Update:never;Relationships:[]};
-      job_compliance_records:{Row:ComplianceRecord;Insert:never;Update:never;Relationships:[]};
-      employee_teamwork_events:{Row:TeamworkEvent;Insert:never;Update:never;Relationships:[]};
-      employee_teamwork_acknowledgement_events:{Row:{id:string;teamwork_event_id:string;employee_id:string;acknowledgement_state:"Acknowledged"|"Disputed";employee_note:string|null;actor_user_id:string;occurred_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
-      job_quality_employee_attributions:{Row:QualityEmployeeAttribution;Insert:never;Update:never;Relationships:[]};
-      job_quality_employee_attribution_events:{Row:{id:string;attribution_id:string;event_type:"Created"|"Replaced"|"Withdrawn";operational_reason:string;actor_user_id:string;occurred_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
-      job_performance_evidence_links:{Row:{id:string;job_id:string;evidence_type:"Compliance"|"Teamwork";evidence_record_id:string;job_evidence_id:string;created_by:string;created_at:string};Insert:never;Update:never;Relationships:[]};
-      employee_performance_reviews:{Row:EmployeePerformanceReview;Insert:never;Update:never;Relationships:[]};
-      employee_performance_review_responses:{Row:ReviewResponse;Insert:never;Update:never;Relationships:[]};
-      employee_coaching_records:{Row:CoachingRecord;Insert:never;Update:never;Relationships:[]};
-      employee_coaching_events:{Row:{id:string;coaching_id:string;event_type:"Created"|"Status Changed";previous_status:string|null;new_status:string|null;operational_reason:string;actor_user_id:string;occurred_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
-      employee_coaching_responses:{Row:{id:string;coaching_id:string;employee_id:string;response:"Acknowledged"|"Disputed";employee_comment:string|null;actor_user_id:string;responded_at:string;created_at:string};Insert:never;Update:never;Relationships:[]};
+      assessment_history: {
+        Row: {
+          id: string;
+          walkthrough_id: string;
+          event_type: string;
+          from_stage: string | null;
+          to_stage: string | null;
+          changed_fields: string[];
+          snapshot: Record<string, unknown>;
+          changed_by_user_id: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "assessment_history_walkthrough_id_fkey";
+            columns: ["walkthrough_id"];
+            isOneToOne: false;
+            referencedRelation: "walkthroughs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "assessment_history_changed_by_user_id_fkey";
+            columns: ["changed_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      assessment_photo_access: {
+        Row: {
+          id: string;
+          walkthrough_id: string;
+          token_hash: string;
+          token_value: string | null;
+          expires_at: string;
+          submitted_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          walkthrough_id: string;
+          token_hash: string;
+          token_value?: string | null;
+          expires_at: string;
+          submitted_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          token_hash: string;
+          token_value: string | null;
+          expires_at: string;
+          submitted_at: string | null;
+          created_by: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "assessment_photo_access_walkthrough_id_fkey";
+            columns: ["walkthrough_id"];
+            isOneToOne: true;
+            referencedRelation: "walkthroughs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      proposals: {
+        Row: Proposal;
+        Insert: ProposalInsert & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: ProposalUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "proposals_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "proposals_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "proposals_estimate_id_fkey";
+            columns: ["estimate_id"];
+            isOneToOne: false;
+            referencedRelation: "estimates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "proposals_walkthrough_id_fkey";
+            columns: ["walkthrough_id"];
+            isOneToOne: false;
+            referencedRelation: "walkthroughs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      proposal_history: {
+        Row: ProposalHistory;
+        Insert: Omit<ProposalHistory, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "proposal_history_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: false;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      proposal_deposit_requirements: {
+        Row: ProposalDepositRequirement;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "proposal_deposit_requirements_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: true;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "proposal_deposit_requirements_agreement_id_fkey";
+            columns: ["agreement_id"];
+            isOneToOne: false;
+            referencedRelation: "service_agreements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      proposal_deposit_events: {
+        Row: ProposalDepositEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "proposal_deposit_events_requirement_id_fkey";
+            columns: ["requirement_id"];
+            isOneToOne: false;
+            referencedRelation: "proposal_deposit_requirements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      jobs: {
+        Row: Job;
+        Insert: JobInsert & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: JobUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "jobs_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: false;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "jobs_estimate_id_fkey";
+            columns: ["estimate_id"];
+            isOneToOne: false;
+            referencedRelation: "estimates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "jobs_walkthrough_id_fkey";
+            columns: ["walkthrough_id"];
+            isOneToOne: false;
+            referencedRelation: "walkthroughs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "jobs_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "jobs_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "jobs_assigned_employee_id_fkey";
+            columns: ["assigned_employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "jobs_assigned_crew_id_fkey";
+            columns: ["assigned_crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      scope_snapshots: {
+        Row: {
+          id: string;
+          job_id: string;
+          proposal_id: string;
+          version: number;
+          snapshot_type: string;
+          scope: ProposalResult["scope"];
+          pricing: Record<string, unknown>;
+          proposal_result: ProposalResult;
+          proposal_notes: string | null;
+          accepted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          proposal_id: string;
+          version?: number;
+          snapshot_type?: string;
+          scope?: ProposalResult["scope"];
+          pricing?: Record<string, unknown>;
+          proposal_result?: ProposalResult;
+          proposal_notes?: string | null;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "scope_snapshots_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id", "job_id"];
+          },
+          {
+            foreignKeyName: "scope_snapshots_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: false;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      scope_snapshot_items: {
+        Row: {
+          id: string;
+          scope_snapshot_id: string;
+          job_id: string;
+          item_type: string;
+          name: string;
+          description: string | null;
+          quantity: number | null;
+          unit: string | null;
+          unit_price: number | null;
+          line_total: number | null;
+          metadata: Record<string, unknown>;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          scope_snapshot_id: string;
+          job_id: string;
+          item_type: string;
+          name: string;
+          description?: string | null;
+          quantity?: number | null;
+          unit?: string | null;
+          unit_price?: number | null;
+          line_total?: number | null;
+          metadata?: Record<string, unknown>;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "scope_snapshot_items_snapshot_job_fkey";
+            columns: ["scope_snapshot_id", "job_id"];
+            isOneToOne: false;
+            referencedRelation: "scope_snapshots";
+            referencedColumns: ["id", "job_id"];
+          },
+          {
+            foreignKeyName: "scope_snapshot_items_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      field_discoveries: {
+        Row: FieldDiscovery;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "field_discoveries_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "field_discoveries_scope_snapshot_id_fkey";
+            columns: ["scope_snapshot_id"];
+            isOneToOne: false;
+            referencedRelation: "scope_snapshots";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "field_discoveries_discovered_by_fkey";
+            columns: ["discovered_by"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      field_discovery_media: {
+        Row: FieldDiscoveryMedia;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "field_discovery_media_field_discovery_id_fkey";
+            columns: ["field_discovery_id"];
+            isOneToOne: false;
+            referencedRelation: "field_discoveries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      change_requests: {
+        Row: ChangeRequest;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "change_requests_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "change_requests_scope_snapshot_id_fkey";
+            columns: ["scope_snapshot_id"];
+            isOneToOne: false;
+            referencedRelation: "scope_snapshots";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "change_requests_field_discovery_id_fkey";
+            columns: ["field_discovery_id"];
+            isOneToOne: false;
+            referencedRelation: "field_discoveries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "change_requests_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      change_request_items: {
+        Row: ChangeRequestItem;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "change_request_items_change_request_id_fkey";
+            columns: ["change_request_id"];
+            isOneToOne: false;
+            referencedRelation: "change_requests";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      change_request_approvals: {
+        Row: ChangeRequestApproval;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "change_request_approvals_change_request_id_fkey";
+            columns: ["change_request_id"];
+            isOneToOne: true;
+            referencedRelation: "change_requests";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      job_evidence: {
+        Row: JobEvidence;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "job_evidence_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "job_evidence_scope_snapshot_id_fkey";
+            columns: ["scope_snapshot_id"];
+            isOneToOne: false;
+            referencedRelation: "scope_snapshots";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "job_evidence_change_request_id_fkey";
+            columns: ["change_request_id"];
+            isOneToOne: false;
+            referencedRelation: "change_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "job_evidence_field_discovery_id_fkey";
+            columns: ["field_discovery_id"];
+            isOneToOne: false;
+            referencedRelation: "field_discoveries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      job_evidence_media: {
+        Row: JobEvidenceMedia;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "job_evidence_media_job_evidence_id_fkey";
+            columns: ["job_evidence_id"];
+            isOneToOne: false;
+            referencedRelation: "job_evidence";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      employees: {
+        Row: Employee;
+        Insert: EmployeeInput & {
+          id?: string;
+          employee_number: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: EmployeeUpdate;
+        Relationships: [];
+      };
+      crews: {
+        Row: Crew;
+        Insert: CrewInput & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: CrewUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "crews_crew_lead_id_fkey";
+            columns: ["crew_lead_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      crew_members: {
+        Row: Omit<CrewMember, "employee">;
+        Insert: {
+          id?: string;
+          crew_id: string;
+          employee_id: string;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "crew_members_crew_id_fkey";
+            columns: ["crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "crew_members_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoices: {
+        Row: Omit<Invoice, "job_lines">;
+        Insert: Omit<
+          Invoice,
+          | "job_lines"
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "archived_at"
+          | "sent_at"
+          | "paid_at"
+          | "client_access_token"
+          | "client_access_token_expires_at"
+          | "customer_notes"
+          | "is_consolidated"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+          sent_at?: string | null;
+          paid_at?: string | null;
+          client_access_token?: string | null;
+          client_access_token_expires_at?: string | null;
+          customer_notes?: string | null;
+          is_consolidated?: boolean;
+        };
+        Update: InvoiceUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "invoices_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: false;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoice_job_lines: {
+        Row: InvoiceJobLine;
+        Insert: Omit<InvoiceJobLine, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "invoice_job_lines_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoice_job_lines_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoice_job_lines_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoice_job_photos: {
+        Row: InvoiceJobPhoto;
+        Insert: Omit<InvoiceJobPhoto, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Pick<InvoiceJobPhoto, "customer_visible">;
+        Relationships: [
+          {
+            foreignKeyName: "invoice_job_photos_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoice_job_photos_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      payments: {
+        Row: Payment;
+        Insert: PaymentInsert & { id?: string; created_at?: string };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expenses: {
+        Row: Expense;
+        Insert: ExpenseInput & {
+          id?: string;
+          expense_number: string;
+          status?: "Active";
+          receipt_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: ExpenseUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "expenses_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      vehicles: {
+        Row: Vehicle;
+        Insert: VehicleInput & {
+          id?: string;
+          vehicle_number: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: VehicleUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_assigned_employee_id_fkey";
+            columns: ["assigned_employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vehicles_assigned_crew_id_fkey";
+            columns: ["assigned_crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mileage_entries: {
+        Row: MileageEntry;
+        Insert: MileageInput & {
+          id?: string;
+          mileage_number: string;
+          deductible_amount: number;
+          status?: "Active";
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: MileageUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "mileage_entries_vehicle_id_fkey";
+            columns: ["vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_entries_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_entries_crew_id_fkey";
+            columns: ["crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_entries_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_entries_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_entries_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mileage_stops: {
+        Row: MileageStop;
+        Insert: Omit<MileageStop, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Pick<
+            MileageStop,
+            | "stop_order"
+            | "job_id"
+            | "property_id"
+            | "address"
+            | "label"
+            | "miles_from_previous"
+            | "updated_at"
+          >
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "mileage_stops_mileage_entry_id_fkey";
+            columns: ["mileage_entry_id"];
+            isOneToOne: false;
+            referencedRelation: "mileage_entries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_stops_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mileage_stops_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      time_entries: {
+        Row: TimeEntry;
+        Insert: TimeEntryInput & {
+          id?: string;
+          time_entry_number: string;
+          status?: "Open" | "Completed";
+          regular_hours?: number;
+          overtime_hours?: number;
+          total_hours?: number;
+          hourly_rate_snapshot?: number;
+          overtime_rate_snapshot?: number;
+          regular_pay?: number;
+          overtime_pay?: number;
+          gross_pay?: number;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: TimeEntryUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "time_entries_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "time_entries_crew_id_fkey";
+            columns: ["crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      employee_work_sessions: {
+        Row: EmployeeWorkSession;
+        Insert: {
+          id?: string;
+          employee_id: string;
+          clock_in?: string;
+          clock_out?: string | null;
+          status?: EmployeeWorkSession["status"];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Pick<EmployeeWorkSession, "clock_out" | "status" | "updated_at">
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "employee_work_sessions_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_agreements: {
+        Row: ServiceAgreement;
+        Insert: AgreementInput & { agreement_number: string };
+        Update: AgreementUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "service_agreements_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_agreements_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_agreements_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: false;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_agreements_assigned_crew_id_fkey";
+            columns: ["assigned_crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_agreement_documents: {
+        Row: ServiceAgreementDocument;
+        Insert: AgreementDocumentInsert;
+        Update: Partial<
+          Pick<
+            ServiceAgreementDocument,
+            "document_name" | "description" | "archived_at"
+          >
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "service_agreement_documents_agreement_id_fkey";
+            columns: ["agreement_id"];
+            isOneToOne: false;
+            referencedRelation: "service_agreements";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_agreement_documents_uploaded_by_fkey";
+            columns: ["uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_occurrences: {
+        Row: ServiceOccurrence;
+        Insert: Omit<
+          ServiceOccurrence,
+          "id" | "job_id" | "created_at" | "updated_at" | "notes"
+        > & { job_id?: string | null; notes?: string | null };
+        Update: Partial<ServiceOccurrence>;
+        Relationships: [
+          {
+            foreignKeyName: "service_occurrences_agreement_id_fkey";
+            columns: ["agreement_id"];
+            isOneToOne: false;
+            referencedRelation: "service_agreements";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_occurrences_assigned_crew_id_fkey";
+            columns: ["assigned_crew_id"];
+            isOneToOne: false;
+            referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_occurrences_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      services: {
+        Row: CatalogService;
+        Insert: ServiceInput;
+        Update: Partial<ServiceInput> & { archived_at?: string | null };
+        Relationships: [];
+      };
+      service_price_tiers: {
+        Row: ServicePriceTier;
+        Insert: ServicePriceTierInput;
+        Update: Partial<ServicePriceTierInput>;
+        Relationships: [
+          {
+            foreignKeyName: "service_price_tiers_service_id_fkey";
+            columns: ["service_id"];
+            isOneToOne: false;
+            referencedRelation: "services";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_addons: {
+        Row: ServiceAddon;
+        Insert: ServiceAddonInput;
+        Update: Partial<ServiceAddonInput> & { archived_at?: string | null };
+        Relationships: [];
+      };
+      service_addon_links: {
+        Row: ServiceAddonLink;
+        Insert: ServiceAddonLink;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "service_addon_links_service_id_fkey";
+            columns: ["service_id"];
+            isOneToOne: false;
+            referencedRelation: "services";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_addon_links_addon_id_fkey";
+            columns: ["addon_id"];
+            isOneToOne: false;
+            referencedRelation: "service_addons";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_labels: {
+        Row: ServiceLabel;
+        Insert: {
+          id?: string;
+          name: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: { name?: string; updated_at?: string };
+        Relationships: [];
+      };
+      service_label_assignments: {
+        Row: ServiceLabelAssignment;
+        Insert: { service_id: string; label_id: string; created_at?: string };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "service_label_assignments_service_id_fkey";
+            columns: ["service_id"];
+            isOneToOne: false;
+            referencedRelation: "services";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "service_label_assignments_label_id_fkey";
+            columns: ["label_id"];
+            isOneToOne: false;
+            referencedRelation: "service_labels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      recurring_pricing_rules: {
+        Row: RecurringPricingRule;
+        Insert: RecurringPricingRuleInput;
+        Update: Partial<RecurringPricingRuleInput>;
+        Relationships: [
+          {
+            foreignKeyName: "recurring_pricing_rules_service_id_fkey";
+            columns: ["service_id"];
+            isOneToOne: false;
+            referencedRelation: "services";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_settings: {
+        Row: BusinessSettings;
+        Insert: BusinessSettingsUpdate & { id?: string };
+        Update: Partial<BusinessSettingsUpdate>;
+        Relationships: [];
+      };
+      client_communications: {
+        Row: ClientCommunication;
+        Insert: ClientCommunicationInput & {
+          id?: string;
+          communication_number: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        Update: Partial<ClientCommunication>;
+        Relationships: [
+          {
+            foreignKeyName: "client_communications_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_communications_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_communications_estimate_id_fkey";
+            columns: ["estimate_id"];
+            isOneToOne: false;
+            referencedRelation: "estimates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_communications_proposal_id_fkey";
+            columns: ["proposal_id"];
+            isOneToOne: false;
+            referencedRelation: "proposals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_communications_agreement_id_fkey";
+            columns: ["agreement_id"];
+            isOneToOne: false;
+            referencedRelation: "service_agreements";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_communications_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_communications_sent_by_user_id_fkey";
+            columns: ["sent_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      marketing_materials: {
+        Row: MarketingMaterial;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      marketing_material_versions: {
+        Row: MarketingMaterialVersion;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      marketing_material_deliveries: {
+        Row: MarketingMaterialDelivery;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      attention_item_states: {
+        Row: AttentionStateRecord;
+        Insert: {
+          id?: string;
+          user_id: string;
+          attention_key: string;
+          state: AttentionStateRecord["state"];
+          snoozed_until?: string | null;
+          dismissed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Pick<AttentionStateRecord, "state" | "snoozed_until" | "dismissed_at">
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "attention_item_states_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      browser_push_subscriptions: {
+        Row: BrowserPushSubscription;
+        Insert: Omit<
+          BrowserPushSubscription,
+          "id" | "created_at" | "updated_at"
+        > & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<
+          Pick<
+            BrowserPushSubscription,
+            | "user_id"
+            | "p256dh"
+            | "auth"
+            | "user_agent"
+            | "revoked_at"
+            | "updated_at"
+          >
+        >;
+        Relationships: [];
+      };
+      attention_push_deliveries: {
+        Row: AttentionPushDelivery;
+        Insert: Omit<
+          AttentionPushDelivery,
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "sent_at"
+          | "failure_code"
+          | "failure_message"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          sent_at?: string | null;
+          failure_code?: string | null;
+          failure_message?: string | null;
+        };
+        Update: Partial<
+          Pick<
+            AttentionPushDelivery,
+            | "delivery_status"
+            | "last_attempt_at"
+            | "sent_at"
+            | "failure_code"
+            | "failure_message"
+            | "updated_at"
+          >
+        >;
+        Relationships: [];
+      };
+      attention_push_checkpoints: {
+        Row: AttentionPushCheckpoint;
+        Insert: Omit<AttentionPushCheckpoint, "initialized_at"> & {
+          initialized_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      job_labor_threshold_events: {
+        Row: import("@/types/job").JobLaborThresholdEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_inspections: {
+        Row: Omit<QualityInspection, "items">;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_inspection_items: {
+        Row: import("@/types/jobQuality").InspectionItem;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_callbacks: {
+        Row: Omit<QualityCallback, "events">;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_callback_events: {
+        Row: CallbackEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_scope_completion_records: {
+        Row: ScopeCompletionRecord;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_customer_feedback: {
+        Row: CustomerFeedback;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_evidence_links: {
+        Row: JobQualityEvidence["evidenceLinks"][number];
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_compliance_records: {
+        Row: ComplianceRecord;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_teamwork_events: {
+        Row: TeamworkEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_teamwork_acknowledgement_events: {
+        Row: {
+          id: string;
+          teamwork_event_id: string;
+          employee_id: string;
+          acknowledgement_state: "Acknowledged" | "Disputed";
+          employee_note: string | null;
+          actor_user_id: string;
+          occurred_at: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_employee_attributions: {
+        Row: QualityEmployeeAttribution;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_quality_employee_attribution_events: {
+        Row: {
+          id: string;
+          attribution_id: string;
+          event_type: "Created" | "Replaced" | "Withdrawn";
+          operational_reason: string;
+          actor_user_id: string;
+          occurred_at: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      job_performance_evidence_links: {
+        Row: {
+          id: string;
+          job_id: string;
+          evidence_type: "Compliance" | "Teamwork";
+          evidence_record_id: string;
+          job_evidence_id: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_performance_reviews: {
+        Row: EmployeePerformanceReview;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_performance_review_responses: {
+        Row: ReviewResponse;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_coaching_records: {
+        Row: CoachingRecord;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_coaching_events: {
+        Row: {
+          id: string;
+          coaching_id: string;
+          event_type: "Created" | "Status Changed";
+          previous_status: string | null;
+          new_status: string | null;
+          operational_reason: string;
+          actor_user_id: string;
+          occurred_at: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      employee_coaching_responses: {
+        Row: {
+          id: string;
+          coaching_id: string;
+          employee_id: string;
+          response: "Acknowledged" | "Disputed";
+          employee_comment: string | null;
+          actor_user_id: string;
+          responded_at: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
 
     Views: {
-      job_scope_operational_items:{Row:{id:string;scope_snapshot_id:string;job_id:string;item_type:string;name:string;description:string|null;quantity:number|null;unit:string|null;sort_order:number;created_at:string};Relationships:[]};
-      field_discoveries_operational:{Row:OperationalFieldDiscovery;Relationships:[]};
-      change_requests_operational:{Row:OperationalChangeRequest;Relationships:[]};
-      scope_snapshots_operational:{Row:{id:string;job_id:string;version:number;snapshot_type:string;accepted_at:string|null;created_at:string};Relationships:[]};
-      change_request_approvals_operational:{Row:Pick<ChangeRequestApproval,"id"|"change_request_id"|"decision"|"decided_at">;Relationships:[]};
-      jobs_operational_safe:{Row:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">;Relationships:[]};
-      employee_directory_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">;Relationships:[]};
-      employee_directory_sales_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate"|"hire_date"|"notes">;Relationships:[]};
-      employee_directory_company_safe:{Row:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate"|"hire_date"|"notes">;Relationships:[]};
-      messaging_user_directory_safe:{Row:{id:string;employee_id:string|null;display_name:string|null;email:string|null;role:string};Relationships:[]};
-      authorized_vehicles_safe:{Row:AuthorizedVehicle;Relationships:[]};
-      time_entries_operational_safe:{Row:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null};Relationships:[]};
-      crew_directory_safe:{Row:Crew;Relationships:[]};
-      crew_members_directory_safe:{Row:{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null};Relationships:[]};
-      business_settings_public:{Row:BusinessIdentitySettings;Relationships:[]};
-      business_settings_workflow:{Row:BusinessSettings;Relationships:[]};
+      job_scope_operational_items: {
+        Row: {
+          id: string;
+          scope_snapshot_id: string;
+          job_id: string;
+          item_type: string;
+          name: string;
+          description: string | null;
+          quantity: number | null;
+          unit: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Relationships: [];
+      };
+      field_discoveries_operational: {
+        Row: OperationalFieldDiscovery;
+        Relationships: [];
+      };
+      change_requests_operational: {
+        Row: OperationalChangeRequest;
+        Relationships: [];
+      };
+      scope_snapshots_operational: {
+        Row: {
+          id: string;
+          job_id: string;
+          version: number;
+          snapshot_type: string;
+          accepted_at: string | null;
+          created_at: string;
+        };
+        Relationships: [];
+      };
+      change_request_approvals_operational: {
+        Row: Pick<
+          ChangeRequestApproval,
+          "id" | "change_request_id" | "decision" | "decided_at"
+        >;
+        Relationships: [];
+      };
+      jobs_operational_safe: {
+        Row: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+        Relationships: [];
+      };
+      employee_directory_safe: {
+        Row: Omit<
+          Employee,
+          "hourly_rate" | "overtime_rate" | "commission_rate"
+        >;
+        Relationships: [];
+      };
+      employee_directory_sales_safe: {
+        Row: Omit<
+          Employee,
+          | "hourly_rate"
+          | "overtime_rate"
+          | "commission_rate"
+          | "hire_date"
+          | "notes"
+        >;
+        Relationships: [];
+      };
+      employee_directory_company_safe: {
+        Row: Omit<
+          Employee,
+          | "hourly_rate"
+          | "overtime_rate"
+          | "commission_rate"
+          | "hire_date"
+          | "notes"
+        >;
+        Relationships: [];
+      };
+      messaging_user_directory_safe: {
+        Row: {
+          id: string;
+          employee_id: string | null;
+          display_name: string | null;
+          email: string | null;
+          role: string;
+        };
+        Relationships: [];
+      };
+      authorized_vehicles_safe: { Row: AuthorizedVehicle; Relationships: [] };
+      time_entries_operational_safe: {
+        Row: Omit<
+          TimeEntry,
+          | "hourly_rate_snapshot"
+          | "overtime_rate_snapshot"
+          | "regular_pay"
+          | "overtime_pay"
+          | "gross_pay"
+        > & {
+          employee_number: string;
+          employee_name: string;
+          job_number: string | null;
+          crew_name: string | null;
+        };
+        Relationships: [];
+      };
+      crew_directory_safe: { Row: Crew; Relationships: [] };
+      crew_members_directory_safe: {
+        Row: {
+          id: string;
+          crew_id: string;
+          employee_id: string;
+          created_at: string;
+          employee_number: string;
+          first_name: string;
+          last_name: string;
+          preferred_name: string | null;
+          email: string | null;
+          phone: string | null;
+          department: string;
+          job_title: string | null;
+          employment_status: string;
+          employment_type: string | null;
+          hire_date: string | null;
+          notes: string | null;
+          employee_created_at: string;
+          employee_updated_at: string;
+          employee_archived_at: string | null;
+        };
+        Relationships: [];
+      };
+      business_settings_public: {
+        Row: BusinessIdentitySettings;
+        Relationships: [];
+      };
+      business_settings_workflow: { Row: BusinessSettings; Relationships: [] };
     };
 
     Functions: {
-      prepare_marketing_material_delivery:{Args:{p_id:string;p_material_identifier:string;p_recipient_kind:string;p_client_id:string|null;p_recipient_name:string;p_recipient_company:string|null;p_recipient_email:string;p_recipient_phone:string|null;p_subject:string;p_message_body:string};Returns:MarketingMaterialDelivery};
-      retry_marketing_material_delivery:{Args:{p_id:string};Returns:MarketingMaterialDelivery};
-      mark_marketing_material_delivery:{Args:{p_id:string;p_status:string;p_provider_message_id?:string|null;p_failure_reason?:string|null};Returns:MarketingMaterialDelivery};
-      register_marketing_material_version:{Args:{p_identifier:string;p_title:string;p_description:string;p_category:string;p_internal_notes:string|null;p_version_id:string;p_storage_path:string;p_original_filename:string;p_media_type:string;p_size_bytes:number};Returns:{material:MarketingMaterial;version:MarketingMaterialVersion}};
-      set_marketing_material_active:{Args:{p_identifier:string;p_is_active:boolean};Returns:MarketingMaterial};
-      update_marketing_material_metadata:{Args:{p_identifier:string;p_title:string;p_description:string;p_category:string;p_internal_notes:string|null};Returns:MarketingMaterial};
-      get_lead_representatives: { Args: { p_estimate_id?: string | null }; Returns: import("@/types/employee").LeadRepresentativeOption[] };
-      get_public_lead_representatives: { Args: Record<never, never>; Returns: Array<{ id: string; display_name: string }> };
-      is_public_lead_representative: { Args: { p_employee_id: string }; Returns: boolean };
-      is_current_lead_representative_eligible: { Args: Record<string, never>; Returns: boolean };
-      get_my_lead_representative_leads: { Args: Record<string, never>; Returns: LeadRepresentativeLead[] };
-      get_company_mileage_rate: { Args: Record<string, never>; Returns: number | null };
-      set_company_mileage_rate: { Args: { p_rate: number | null }; Returns: undefined };
-      get_job_gps_trips: { Args: { p_job_id: string }; Returns: GpsMileageTrip[] };
-      start_job_gps_trip: { Args: { p_job_id: string; p_vehicle_id: string; p_position: GpsPosition }; Returns: { trip: GpsMileageTrip; initiated: boolean } };
-      finish_job_gps_trip: { Args: { p_id: string; p_position: GpsPosition }; Returns: GpsMileageTrip };
+      prepare_marketing_material_delivery: {
+        Args: {
+          p_id: string;
+          p_material_identifier: string;
+          p_recipient_kind: string;
+          p_client_id: string | null;
+          p_recipient_name: string;
+          p_recipient_company: string | null;
+          p_recipient_email: string;
+          p_recipient_phone: string | null;
+          p_subject: string;
+          p_message_body: string;
+        };
+        Returns: MarketingMaterialDelivery;
+      };
+      retry_marketing_material_delivery: {
+        Args: { p_id: string };
+        Returns: MarketingMaterialDelivery;
+      };
+      mark_marketing_material_delivery: {
+        Args: {
+          p_id: string;
+          p_status: string;
+          p_provider_message_id?: string | null;
+          p_failure_reason?: string | null;
+        };
+        Returns: MarketingMaterialDelivery;
+      };
+      register_marketing_material_version: {
+        Args: {
+          p_identifier: string;
+          p_title: string;
+          p_description: string;
+          p_category: string;
+          p_internal_notes: string | null;
+          p_version_id: string;
+          p_storage_path: string;
+          p_original_filename: string;
+          p_media_type: string;
+          p_size_bytes: number;
+        };
+        Returns: {
+          material: MarketingMaterial;
+          version: MarketingMaterialVersion;
+        };
+      };
+      set_marketing_material_active: {
+        Args: { p_identifier: string; p_is_active: boolean };
+        Returns: MarketingMaterial;
+      };
+      update_marketing_material_metadata: {
+        Args: {
+          p_identifier: string;
+          p_title: string;
+          p_description: string;
+          p_category: string;
+          p_internal_notes: string | null;
+        };
+        Returns: MarketingMaterial;
+      };
+      get_lead_representatives: {
+        Args: { p_estimate_id?: string | null };
+        Returns: import("@/types/employee").LeadRepresentativeOption[];
+      };
+      get_public_lead_representatives: {
+        Args: Record<never, never>;
+        Returns: Array<{ id: string; display_name: string }>;
+      };
+      is_public_lead_representative: {
+        Args: { p_employee_id: string };
+        Returns: boolean;
+      };
+      is_current_lead_representative_eligible: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      get_my_lead_representative_leads: {
+        Args: Record<string, never>;
+        Returns: LeadRepresentativeLead[];
+      };
+      get_company_mileage_rate: {
+        Args: Record<string, never>;
+        Returns: number | null;
+      };
+      set_company_mileage_rate: {
+        Args: { p_rate: number | null };
+        Returns: undefined;
+      };
+      get_job_gps_trips: {
+        Args: { p_job_id: string };
+        Returns: GpsMileageTrip[];
+      };
+      start_job_gps_trip: {
+        Args: {
+          p_job_id: string;
+          p_vehicle_id: string;
+          p_position: GpsPosition;
+        };
+        Returns: { trip: GpsMileageTrip; initiated: boolean };
+      };
+      finish_job_gps_trip: {
+        Args: { p_id: string; p_position: GpsPosition };
+        Returns: GpsMileageTrip;
+      };
       cancel_job_gps_trip: { Args: { p_id: string }; Returns: GpsMileageTrip };
-      get_job_gps_mileage: { Args: { p_job_id: string }; Returns: GpsMileageSummary[] };
-      add_porter_visit_photo: { Args: { p_visit_id: string; p_visit_area_id: string | null; p_issue_id: string | null; p_storage_path: string; p_file_name: string; p_caption: string | null }; Returns: string };
-      save_porter_visit_issue: { Args: { p_visit_id: string; p_issue_id: string | null; p_expected_updated_at: string | null; p_action: string; p_data: Record<string, string | null> }; Returns: string };
-      get_porter_routes: { Args: { p_id?: string }; Returns: PorterRouteWithStops[] };
-      create_porter_route: { Args: { p_route_date: string; p_crew_id: string; p_name: string | null; p_notes: string | null; p_stops: RouteStopInput[] }; Returns: string };
-      mutate_porter_route: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: RouteEdit | Record<string, never> }; Returns: string };
-      get_porter_visits: { Args: { p_id?: string }; Returns: PorterVisitWithAreas[] };
-      create_porter_visit: { Args: { p_plan_id: string; p_scheduled_date: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
-      create_porter_visit_v2: { Args: { p_plan_id: string; p_scheduled_date: string; p_scheduled_start_time: string; p_assigned_crew_id: string | null; p_notes: string | null }; Returns: string };
-      create_porter_visit_v3: { Args: { p_plan_id: string; p_scheduled_date: string; p_scheduled_start_time: string; p_assigned_worker_employee_id: string | null; p_assigned_worker_crew_id: string | null; p_assigned_manager_employee_id: string | null; p_notes: string | null }; Returns: string };
-      get_porter_assignment_options: { Args: Record<string, never>; Returns: PorterAssignmentOption[] };
-      generate_due_porter_notifications: { Args: { p_now?: string }; Returns: number };
-      mutate_porter_visit: { Args: { p_id: string; p_expected_updated_at: string; p_action: string; p_data: Record<string, string | null> }; Returns: string };
+      get_job_gps_mileage: {
+        Args: { p_job_id: string };
+        Returns: GpsMileageSummary[];
+      };
+      add_porter_visit_photo: {
+        Args: {
+          p_visit_id: string;
+          p_visit_area_id: string | null;
+          p_issue_id: string | null;
+          p_storage_path: string;
+          p_file_name: string;
+          p_caption: string | null;
+        };
+        Returns: string;
+      };
+      save_porter_visit_issue: {
+        Args: {
+          p_visit_id: string;
+          p_issue_id: string | null;
+          p_expected_updated_at: string | null;
+          p_action: string;
+          p_data: Record<string, string | null>;
+        };
+        Returns: string;
+      };
+      get_porter_routes: {
+        Args: { p_id?: string };
+        Returns: PorterRouteWithStops[];
+      };
+      create_porter_route: {
+        Args: {
+          p_route_date: string;
+          p_crew_id: string;
+          p_name: string | null;
+          p_notes: string | null;
+          p_stops: RouteStopInput[];
+        };
+        Returns: string;
+      };
+      mutate_porter_route: {
+        Args: {
+          p_id: string;
+          p_expected_updated_at: string;
+          p_action: string;
+          p_data: RouteEdit | Record<string, never>;
+        };
+        Returns: string;
+      };
+      get_porter_visits: {
+        Args: { p_id?: string };
+        Returns: PorterVisitWithAreas[];
+      };
+      create_porter_visit: {
+        Args: {
+          p_plan_id: string;
+          p_scheduled_date: string;
+          p_assigned_crew_id: string | null;
+          p_notes: string | null;
+        };
+        Returns: string;
+      };
+      create_porter_visit_v2: {
+        Args: {
+          p_plan_id: string;
+          p_scheduled_date: string;
+          p_scheduled_start_time: string;
+          p_assigned_crew_id: string | null;
+          p_notes: string | null;
+        };
+        Returns: string;
+      };
+      create_porter_visit_v3: {
+        Args: {
+          p_plan_id: string;
+          p_scheduled_date: string;
+          p_scheduled_start_time: string;
+          p_assigned_worker_employee_id: string | null;
+          p_assigned_worker_crew_id: string | null;
+          p_assigned_manager_employee_id: string | null;
+          p_notes: string | null;
+        };
+        Returns: string;
+      };
+      get_porter_assignment_options: {
+        Args: Record<string, never>;
+        Returns: PorterAssignmentOption[];
+      };
+      generate_due_porter_notifications: {
+        Args: { p_now?: string };
+        Returns: number;
+      };
+      mutate_porter_visit: {
+        Args: {
+          p_id: string;
+          p_expected_updated_at: string;
+          p_action: string;
+          p_data: Record<string, string | null>;
+        };
+        Returns: string;
+      };
       delete_porter_visit: { Args: { p_id: string }; Returns: void };
-      save_property_service_plan: { Args: { p_id: string | null; p_plan: PropertyServicePlanInput; p_areas: PropertyServicePlanAreaInput[]; p_expected_updated_at: string | null; p_archive: boolean }; Returns: PropertyServicePlanWithAreas };
+      save_property_service_plan: {
+        Args: {
+          p_id: string | null;
+          p_plan: PropertyServicePlanInput;
+          p_areas: PropertyServicePlanAreaInput[];
+          p_expected_updated_at: string | null;
+          p_archive: boolean;
+        };
+        Returns: PropertyServicePlanWithAreas;
+      };
       delete_property_service_plan: { Args: { p_id: string }; Returns: void };
-      initiate_job_on_my_way: { Args: { p_job_id: string }; Returns: { initiated: boolean; initiated_at: string } };
-      get_assigned_field_walkthroughs: { Args: Record<string, never>; Returns: FieldWalkthrough[] };
-      can_perform_scheduled_walkthrough: { Args: { p_id: string }; Returns: boolean };
-      get_eligible_walkthrough_assignees: { Args: Record<string, never>; Returns: Array<{ employee_id: string; display_name: string; operational_role: "Master Admin" | "Manager" | "Crew Lead" }> };
-      archive_sales_assessment: { Args: { p_assessment_id: string }; Returns: Walkthrough };
-      submit_assigned_field_walkthrough: { Args: { p_id: string; p_measurements: FieldMeasurements; p_complete: boolean }; Returns: undefined };
-      return_walkthrough_pricing_to_assessment: { Args: { p_id: string }; Returns: undefined };
-      get_or_create_service_label:{Args:{p_name:string};Returns:ServiceLabel};
-      get_business_settings_public:{Args:Record<string,never>;Returns:BusinessIdentitySettings[]};
-      get_business_settings_workflow:{Args:Record<string,never>;Returns:BusinessSettings[]};
-      confirm_post_construction_deposit:{Args:{p_proposal_id:string;p_received_date:string;p_reference_number?:string|null;p_notes?:string|null};Returns:ProposalDepositRequirement};
-      refresh_post_construction_deposit_instructions:{Args:{p_proposal_id:string};Returns:ProposalDepositRequirement};
-      reverse_post_construction_deposit:{Args:{p_proposal_id:string;p_reason:string};Returns:ProposalDepositRequirement};
-      reopen_post_construction_deposit:{Args:{p_proposal_id:string};Returns:ProposalDepositRequirement};
-      mark_service_agreement_sent_for_delivery:{Args:{p_agreement_id:string;p_sent_to:string;p_sent_by:string;p_token:string;p_token_expires_at:string};Returns:ServiceAgreement};
-      get_job_performance_rows:{Args:{p_start_date:string|null;p_end_date:string|null};Returns:JobPerformanceRow[]};
-      get_job_live_labor_burn:{Args:{p_job_id:string};Returns:import("@/types/job").JobLiveLaborBurn[]};
-      evaluate_job_labor_thresholds:{Args:{p_job_id:string};Returns:import("@/types/job").JobLaborThresholdEvent[]};
-      get_job_quality_evidence:{Args:{p_job_id:string};Returns:JobQualityEvidence};
-      save_job_quality_inspection:{Args:{p_job_id:string;p_inspection_id:string|null;p_overall_notes:string;p_items:Array<{category:string;result:string;severity:string|null;notes:string}>;p_finalize:boolean};Returns:string};
-      create_job_quality_callback:{Args:{p_job_id:string;p_source:string;p_severity:string;p_category:string;p_notes:string};Returns:string};
-      update_job_quality_callback:{Args:{p_callback_id:string;p_status:string;p_attribution:string;p_reason:string};Returns:undefined};
-      finalize_job_scope_completion:{Args:{p_job_id:string;p_result:string;p_attribution:string;p_explanation:string};Returns:string};
-      record_job_customer_feedback:{Args:{p_job_id:string;p_rating:number;p_feedback:string;p_source:string;p_received_at:string};Returns:string};
-      link_job_quality_evidence:{Args:{p_job_id:string;p_evidence_type:string;p_evidence_record_id:string;p_job_evidence_id:string};Returns:string};
-      get_job_employee_participation:{Args:{p_job_id:string};Returns:JobEmployeeParticipation[]};
-      get_job_performance_evidence:{Args:{p_job_id:string};Returns:JobPerformanceEvidence};
-      record_job_compliance:{Args:{p_job_id:string;p_employee_id:string|null;p_category:string;p_result:string;p_ownership:string;p_notes:string};Returns:string};
-      record_employee_teamwork_event:{Args:{p_job_id:string;p_employee_id:string;p_event_type:string;p_direction:string;p_notes:string;p_occurred_at:string};Returns:string};
-      acknowledge_employee_teamwork_event:{Args:{p_event_id:string;p_state:string;p_note?:string|null};Returns:undefined};
-      record_job_quality_employee_attribution:{Args:{p_job_id:string;p_quality_type:string;p_quality_id:string;p_target:string;p_employee_id:string|null;p_crew_id:string|null;p_reason:string;p_job_evidence_id?:string|null};Returns:string};
-      withdraw_job_quality_employee_attribution:{Args:{p_attribution_id:string;p_reason:string};Returns:undefined};
-      link_job_performance_evidence:{Args:{p_job_id:string;p_type:string;p_record_id:string;p_job_evidence_id:string};Returns:string};
-      calculate_employee_performance_review:{Args:{p_employee_id:string;p_period_days:number;p_period_end?:string};Returns:EmployeePerformanceReview};
-      finalize_employee_performance_review:{Args:{p_review_id:string};Returns:EmployeePerformanceReview};
-      get_employee_performance_reviews:{Args:{p_employee_id?:string|null};Returns:EmployeePerformanceReview[]};
-      respond_to_employee_performance_review:{Args:{p_review_id:string;p_response:string;p_comment?:string|null};Returns:string};
-      create_employee_coaching_record:{Args:{p_employee_id:string;p_review_id:string|null;p_type:string;p_category:string;p_summary:string;p_expectations:string;p_evidence_context:string;p_start_date:string;p_follow_up_date:string|null;p_target_review_date:string|null};Returns:string};
-      update_employee_coaching_status:{Args:{p_coaching_id:string;p_status:string;p_reason:string};Returns:undefined};
-      respond_to_employee_coaching:{Args:{p_coaching_id:string;p_response:string;p_comment?:string|null};Returns:string};
-      get_employee_performance_workflow:{Args:{p_employee_id?:string|null};Returns:EmployeePerformanceWorkflow};
-      get_employee_directory:{Args:Record<string,never>;Returns:Array<Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">>};
-      get_crew_directory:{Args:Record<string,never>;Returns:Crew[]};
-      get_crew_members_directory:{Args:Record<string,never>;Returns:Array<{id:string;crew_id:string;employee_id:string;created_at:string;employee_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;phone:string|null;department:string;job_title:string|null;employment_status:string;employment_type:string|null;hire_date:string|null;notes:string|null;employee_created_at:string;employee_updated_at:string;employee_archived_at:string|null}>};
-      get_operational_time_entries:{Args:Record<string,never>;Returns:Array<Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}>};
-      start_my_work:{Args:Record<string,never>;Returns:EmployeeWorkSession};
-      stop_my_work:{Args:Record<string,never>;Returns:EmployeeWorkSession};
-      get_my_work_session:{Args:Record<string,never>;Returns:EmployeeWorkSession|null};
-      get_active_employee_work_sessions:{Args:Record<string,never>;Returns:ActiveEmployeeWorkSession[]};
-      admin_create_user_profile:{Args:{p_auth_user_id:string;p_email:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
-      admin_update_user_profile:{Args:{p_profile_id:string;p_display_name:string;p_role:string;p_employee_id:string|null;p_is_active:boolean};Returns:UserProfile};
-      admin_set_user_active:{Args:{p_profile_id:string;p_is_active:boolean};Returns:UserProfile};
-      get_sales_job_proposal_ids:{Args:Record<string,never>;Returns:Array<{proposal_id:string}>};
-      get_upcoming_client_jobs:{Args:{p_client_id:string;p_days?:number};Returns:Array<{source_type:"Job"|"Service Occurrence";source_id:string;client_id:string;property_id:string|null;service_name:string;scheduled_date:string;start_time:string|null;property_address:string|null}>};
-      get_operational_jobs:{Args:{p_start?:string|null;p_end?:string|null};Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
-      get_operational_job_ids:{Args:{p_start?:string|null;p_end?:string|null};Returns:string[]};
-      save_mileage_entry_with_stops:{Args:{p_entry_id:string|null;p_entry:Record<string,unknown>;p_stops:MileageStopInput[]};Returns:MileageEntry};
-      get_financially_handed_off_job_ids:{Args:Record<string,never>;Returns:string[]};
-      create_job_from_accepted_proposal:{Args:{p_proposal_id:string};Returns:Job};
-      create_field_discovery:{Args:{p_job_id:string;p_area?:string|null;p_description?:string|null;p_estimated_extra_minutes?:number|null;p_estimated_extra_amount?:number|null};Returns:string};
-      update_field_discovery_status:{Args:{p_field_discovery_id:string;p_status:string};Returns:undefined};
-      add_field_discovery_media:{Args:{p_field_discovery_id:string;p_storage_path:string;p_media_type?:string|null};Returns:FieldDiscoveryMedia};
-      create_change_request:{Args:{p_job_id:string;p_field_discovery_id?:string|null;p_title?:string|null;p_description?:string|null;p_area?:string|null;p_price_impact?:number;p_time_impact_minutes?:number};Returns:string};
-      update_change_request_draft:{Args:{p_change_request_id:string;p_title:string;p_description:string;p_area:string|null;p_price_impact:number;p_time_impact_minutes:number};Returns:undefined};
-      add_change_request_item:{Args:{p_change_request_id:string;p_description:string;p_quantity?:number|null;p_unit?:string|null;p_unit_price?:number|null;p_line_total?:number|null};Returns:string};
-      send_change_request:{Args:{p_change_request_id:string};Returns:ChangeRequest};
-      get_change_request_by_token:{Args:{p_token:string};Returns:PublicChangeRequest|null};
-      decide_change_request_by_token:{Args:{p_token:string;p_client_name:string;p_consent:boolean;p_decision:string};Returns:PublicChangeRequest};
-      create_job_evidence:{Args:{p_job_id:string;p_evidence_type:string;p_area?:string|null;p_description?:string|null;p_change_request_id?:string|null;p_field_discovery_id?:string|null};Returns:string};
-      add_job_evidence_media:{Args:{p_job_evidence_id:string;p_storage_path:string;p_media_type?:string|null};Returns:JobEvidenceMedia};
-      create_direct_operational_job:{Args:{p_client_id:string;p_property_id:string;p_service_id:string;p_addon_ids?:string[];p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_labor_hours?:number;p_access_instructions?:string|null;p_internal_notes?:string|null;p_master_price_override?:number|null;p_addon_quantities?:Array<{addonId:string;quantity:number}>};Returns:Job};
-      create_direct_operational_job_v2:{Args:{p_client_id:string;p_property_id:string;p_service_id:string;p_addon_ids?:string[];p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assignment_kind?:import("@/types/job").JobAssignmentKind;p_assigned_employee_id?:string|null;p_assigned_crew_id?:string|null;p_labor_hours?:number;p_access_instructions?:string|null;p_internal_notes?:string|null;p_master_price_override?:number|null;p_addon_quantities?:Array<{addonId:string;quantity:number}>};Returns:Job};
-      get_eligible_job_tech_options:{Args:Record<string,never>;Returns:import("@/types/job").EligibleJobTech[]};
-      set_job_worker_assignment:{Args:{p_job_id:string;p_assignment_kind:import("@/types/job").JobAssignmentKind;p_employee_id?:string|null;p_crew_id?:string|null};Returns:Job};
-      archive_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      get_archived_operational_jobs:{Args:Record<string,never>;Returns:Array<Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">>};
-      restore_archived_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      get_reopenable_archived_cancelled_job_ids:{Args:Record<string,never>;Returns:string[]};
-      restore_and_reopen_cancelled_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      start_operational_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      start_or_clock_in_to_job:{Args:{p_job_id:string};Returns:import("@/types/job").JobClockInResult};
-      complete_in_progress_job:{Args:{p_job_id:string};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      correct_completed_job_master_time:{Args:{p_job_id:string;p_start_date:string;p_start_time:string;p_end_date:string|null;p_end_time:string|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      cancel_operational_job:{Args:{p_job_id:string;p_note?:string|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      update_operational_job:{Args:{p_job_id:string;p_scheduled_date?:string|null;p_start_time?:string|null;p_estimated_duration?:number|null;p_assigned_crew_id?:string|null;p_internal_notes?:string|null;p_status?:string|null};Returns:Omit<Job,"price"|"deposit"|"balance"|"labor_hours"|"recommended_crew_size"|"photos">};
-      create_completed_job_invoice:{Args:{p_job_id:string};Returns:{invoice_id:string|null;invoice_number:string|null;created:boolean;skipped:boolean;financially_resolved?:boolean}};
-      get_contractor_invoice_eligible_jobs:{Args:{p_client_id:string};Returns:ContractorInvoiceEligibleJob[]};
-      create_contractor_consolidated_invoice:{Args:{p_client_id:string;p_job_ids:string[];p_issue_date:string;p_due_date?:string|null};Returns:{invoice_id:string;invoice_number:string;created:boolean}};
-      create_contract_agreement_invoice:{Args:{p_agreement_id:string;p_billing_period_start?:string|null;p_flat_contract_amount?:number|null};Returns:Invoice};
-      create_job_from_service_occurrence:{Args:{p_occurrence_id:string};Returns:Job};
-      record_invoice_payment:{Args:{p_invoice_id:string;p_amount:number;p_payment_date:string;p_payment_method:string;p_reference_number?:string|null;p_notes?:string|null};Returns:Payment};
-      clock_in_operational:{Args:{p_employee_id:string;p_job_id:string|null;p_crew_id:string|null;p_entry_type:string;p_clock_in:string;p_notes:string|null};Returns:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}};
-      clock_out_operational:{Args:{p_time_entry_id:string;p_clock_out:string;p_break_minutes:number};Returns:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}};
-      save_operational_time_entry:{Args:{p_time_entry_id:string|null;p_employee_id:string;p_job_id:string|null;p_crew_id:string|null;p_entry_type:string;p_clock_in:string;p_clock_out:string|null;p_break_minutes:number;p_notes:string|null};Returns:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}};
-      review_operational_time_entry:{Args:{p_time_entry_id:string;p_status:string;p_notes?:string|null};Returns:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}};
-      classify_job_time_entry_labor:{Args:{p_time_entry_id:string;p_classification:string;p_operational_reason:string};Returns:Omit<TimeEntry,"hourly_rate_snapshot"|"overtime_rate_snapshot"|"regular_pay"|"overtime_pay"|"gross_pay">&{employee_number:string;employee_name:string;job_number:string|null;crew_name:string|null}};
-      admin_operational_create_employee:{Args:{p_employee_number:string;p_first_name:string;p_last_name:string;p_preferred_name:string|null;p_email:string|null;p_phone:string|null;p_department:string;p_job_title:string|null;p_employment_status:string;p_employment_type:string|null;p_hire_date:string|null;p_notes:string|null};Returns:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">};
-      admin_operational_update_employee:{Args:{p_employee_id:string;p_first_name:string;p_last_name:string;p_preferred_name:string|null;p_email:string|null;p_phone:string|null;p_department:string;p_job_title:string|null;p_employment_status:string;p_employment_type:string|null;p_hire_date:string|null;p_notes:string|null;p_archive?:boolean};Returns:Omit<Employee,"hourly_rate"|"overtime_rate"|"commission_rate">};
-      manage_operational_crew:{Args:{p_crew_id:string|null;p_crew_name:string;p_crew_lead_id:string|null;p_status:string;p_notes:string|null;p_archive?:boolean};Returns:Crew};
-      add_operational_crew_member:{Args:{p_crew_id:string;p_employee_id:string};Returns:string};
-      remove_operational_crew_member:{Args:{p_member_id:string};Returns:undefined};
-      master_admin_permanently_delete_archived_record:{Args:{p_record_type:string;p_record_id:string};Returns:string};
-      master_admin_permanently_delete_cancelled_job:{Args:{p_job_id:string};Returns:string};
-      get_service_agreement_by_token:{Args:{p_token:string};Returns:import("@/types/publicAgreement").PublicAgreement};
-      accept_service_agreement_by_token:{Args:{p_token:string;p_signed_name:string;p_signature:string;p_consent:boolean};Returns:import("@/types/publicAgreement").PublicAgreement};
-      get_estimate_by_token:{Args:{p_token:string};Returns:PublicEstimate};
-      request_estimate_walkthrough_by_token:{Args:{p_token:string;p_client_name:string;p_email:string|null;p_phone:string|null;p_preferred_contact_method:string};Returns:import("@/types/publicEstimate").PublicEstimateWalkthroughRequestResult};
-      get_proposal_by_token:{Args:{p_token:string};Returns:PublicProposal};
-      get_proposal_revision_history_by_token:{Args:{p_token:string};Returns:import("@/types/publicProposal").PublicProposalRevisionHistory};
-      get_invoice_by_token:{Args:{p_token:string};Returns:import("@/types/publicInvoice").PublicInvoice};
-      get_invoice_payment_confirmation_by_token:{Args:{p_token:string};Returns:string|null};
-      accept_proposal_by_token:{Args:{p_token:string;p_accepted_by_name:string;p_consent:boolean};Returns:PublicProposal};
-      create_post_construction_draft_agreement:{Args:{p_proposal_id:string};Returns:string};
-      delete_unsent_draft_service_agreement:{Args:{p_agreement_id:string};Returns:string};
-      mark_estimate_sent_for_delivery:{Args:{p_estimate_id:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
-      mark_proposal_sent_for_delivery:{Args:{p_proposal_id:string;p_via:string;p_recipient:string;p_sender:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{sent_at:string}};
-      prepare_proposal_delivery:{Args:{p_proposal_id:string;p_token:string;p_token_expires_at:string;p_snapshot:Record<string,unknown>};Returns:{prepared:boolean;snapshot:Record<string,unknown>}};
-      create_proposal_revision:{Args:{p_proposal_id:string};Returns:import("@/types/proposal").Proposal};
-      get_operational_photos:{Args:{p_record_type:string;p_record_id:string};Returns:import("@/types/photo").OperationalPhoto[]};
-      set_operational_photos:{Args:{p_record_type:string;p_record_id:string;p_photos:import("@/types/photo").OperationalPhoto[]};Returns:import("@/types/photo").OperationalPhoto[]};
-      get_proposal_pricing_photos:{Args:{p_proposal_id:string};Returns:import("@/types/proposal").ProposalPricingPhoto[]};
-      add_proposal_owned_photo:{Args:{p_proposal_id:string;p_photo_id:string;p_storage_path:string;p_original_filename:string;p_caption:string;p_source:"camera"|"library"};Returns:import("@/types/proposal").ProposalPricingPhoto};
-      set_proposal_pricing_photo_caption:{Args:{p_proposal_id:string;p_photo_id:string;p_caption:string};Returns:import("@/types/proposal").ProposalPricingPhoto[]};
-      remove_proposal_pricing_photo:{Args:{p_proposal_id:string;p_photo_id:string};Returns:import("@/types/proposal").ProposalPricingPhotoRemoval};
-      set_invoice_job_photo_visibility:{Args:{p_invoice_id:string;p_photo_id:string;p_customer_visible:boolean};Returns:InvoiceJobPhoto};
-      start_direct_conversation:{Args:{p_other_user_id:string};Returns:Conversation};
-      send_direct_message:{Args:{p_conversation_id:string;p_body:string};Returns:Message};
-      mark_messages_read:{Args:{p_conversation_id:string;p_message_ids?:string[]|null};Returns:number};
-      send_company_announcement:{Args:{p_title:string;p_body:string;p_priority?:string};Returns:Message};
-      acknowledge_required_announcement:{Args:{p_message_id:string};Returns:AnnouncementAcknowledgment};
+      initiate_job_on_my_way: {
+        Args: { p_job_id: string };
+        Returns: { initiated: boolean; initiated_at: string };
+      };
+      get_assigned_field_walkthroughs: {
+        Args: Record<string, never>;
+        Returns: FieldWalkthrough[];
+      };
+      can_perform_scheduled_walkthrough: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
+      get_eligible_walkthrough_assignees: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          employee_id: string;
+          display_name: string;
+          operational_role: "Master Admin" | "Manager" | "Crew Lead";
+        }>;
+      };
+      archive_sales_assessment: {
+        Args: { p_assessment_id: string };
+        Returns: Walkthrough;
+      };
+      submit_assigned_field_walkthrough: {
+        Args: {
+          p_id: string;
+          p_measurements: FieldMeasurements;
+          p_complete: boolean;
+        };
+        Returns: undefined;
+      };
+      return_walkthrough_pricing_to_assessment: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
+      get_or_create_service_label: {
+        Args: { p_name: string };
+        Returns: ServiceLabel;
+      };
+      get_business_settings_public: {
+        Args: Record<string, never>;
+        Returns: BusinessIdentitySettings[];
+      };
+      get_business_settings_workflow: {
+        Args: Record<string, never>;
+        Returns: BusinessSettings[];
+      };
+      confirm_post_construction_deposit: {
+        Args: {
+          p_proposal_id: string;
+          p_received_date: string;
+          p_reference_number?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: ProposalDepositRequirement;
+      };
+      refresh_post_construction_deposit_instructions: {
+        Args: { p_proposal_id: string };
+        Returns: ProposalDepositRequirement;
+      };
+      reverse_post_construction_deposit: {
+        Args: { p_proposal_id: string; p_reason: string };
+        Returns: ProposalDepositRequirement;
+      };
+      reopen_post_construction_deposit: {
+        Args: { p_proposal_id: string };
+        Returns: ProposalDepositRequirement;
+      };
+      mark_service_agreement_sent_for_delivery: {
+        Args: {
+          p_agreement_id: string;
+          p_sent_to: string;
+          p_sent_by: string;
+          p_token: string;
+          p_token_expires_at: string;
+        };
+        Returns: ServiceAgreement;
+      };
+      get_job_performance_rows: {
+        Args: { p_start_date: string | null; p_end_date: string | null };
+        Returns: JobPerformanceRow[];
+      };
+      get_job_live_labor_burn: {
+        Args: { p_job_id: string };
+        Returns: import("@/types/job").JobLiveLaborBurn[];
+      };
+      evaluate_job_labor_thresholds: {
+        Args: { p_job_id: string };
+        Returns: import("@/types/job").JobLaborThresholdEvent[];
+      };
+      get_job_quality_evidence: {
+        Args: { p_job_id: string };
+        Returns: JobQualityEvidence;
+      };
+      save_job_quality_inspection: {
+        Args: {
+          p_job_id: string;
+          p_inspection_id: string | null;
+          p_overall_notes: string;
+          p_items: Array<{
+            category: string;
+            result: string;
+            severity: string | null;
+            notes: string;
+          }>;
+          p_finalize: boolean;
+        };
+        Returns: string;
+      };
+      create_job_quality_callback: {
+        Args: {
+          p_job_id: string;
+          p_source: string;
+          p_severity: string;
+          p_category: string;
+          p_notes: string;
+        };
+        Returns: string;
+      };
+      update_job_quality_callback: {
+        Args: {
+          p_callback_id: string;
+          p_status: string;
+          p_attribution: string;
+          p_reason: string;
+        };
+        Returns: undefined;
+      };
+      finalize_job_scope_completion: {
+        Args: {
+          p_job_id: string;
+          p_result: string;
+          p_attribution: string;
+          p_explanation: string;
+        };
+        Returns: string;
+      };
+      record_job_customer_feedback: {
+        Args: {
+          p_job_id: string;
+          p_rating: number;
+          p_feedback: string;
+          p_source: string;
+          p_received_at: string;
+        };
+        Returns: string;
+      };
+      link_job_quality_evidence: {
+        Args: {
+          p_job_id: string;
+          p_evidence_type: string;
+          p_evidence_record_id: string;
+          p_job_evidence_id: string;
+        };
+        Returns: string;
+      };
+      get_job_employee_participation: {
+        Args: { p_job_id: string };
+        Returns: JobEmployeeParticipation[];
+      };
+      get_job_performance_evidence: {
+        Args: { p_job_id: string };
+        Returns: JobPerformanceEvidence;
+      };
+      record_job_compliance: {
+        Args: {
+          p_job_id: string;
+          p_employee_id: string | null;
+          p_category: string;
+          p_result: string;
+          p_ownership: string;
+          p_notes: string;
+        };
+        Returns: string;
+      };
+      record_employee_teamwork_event: {
+        Args: {
+          p_job_id: string;
+          p_employee_id: string;
+          p_event_type: string;
+          p_direction: string;
+          p_notes: string;
+          p_occurred_at: string;
+        };
+        Returns: string;
+      };
+      acknowledge_employee_teamwork_event: {
+        Args: { p_event_id: string; p_state: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      record_job_quality_employee_attribution: {
+        Args: {
+          p_job_id: string;
+          p_quality_type: string;
+          p_quality_id: string;
+          p_target: string;
+          p_employee_id: string | null;
+          p_crew_id: string | null;
+          p_reason: string;
+          p_job_evidence_id?: string | null;
+        };
+        Returns: string;
+      };
+      withdraw_job_quality_employee_attribution: {
+        Args: { p_attribution_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      link_job_performance_evidence: {
+        Args: {
+          p_job_id: string;
+          p_type: string;
+          p_record_id: string;
+          p_job_evidence_id: string;
+        };
+        Returns: string;
+      };
+      calculate_employee_performance_review: {
+        Args: {
+          p_employee_id: string;
+          p_period_days: number;
+          p_period_end?: string;
+        };
+        Returns: EmployeePerformanceReview;
+      };
+      finalize_employee_performance_review: {
+        Args: { p_review_id: string };
+        Returns: EmployeePerformanceReview;
+      };
+      get_employee_performance_reviews: {
+        Args: { p_employee_id?: string | null };
+        Returns: EmployeePerformanceReview[];
+      };
+      respond_to_employee_performance_review: {
+        Args: {
+          p_review_id: string;
+          p_response: string;
+          p_comment?: string | null;
+        };
+        Returns: string;
+      };
+      create_employee_coaching_record: {
+        Args: {
+          p_employee_id: string;
+          p_review_id: string | null;
+          p_type: string;
+          p_category: string;
+          p_summary: string;
+          p_expectations: string;
+          p_evidence_context: string;
+          p_start_date: string;
+          p_follow_up_date: string | null;
+          p_target_review_date: string | null;
+        };
+        Returns: string;
+      };
+      update_employee_coaching_status: {
+        Args: { p_coaching_id: string; p_status: string; p_reason: string };
+        Returns: undefined;
+      };
+      respond_to_employee_coaching: {
+        Args: {
+          p_coaching_id: string;
+          p_response: string;
+          p_comment?: string | null;
+        };
+        Returns: string;
+      };
+      get_employee_performance_workflow: {
+        Args: { p_employee_id?: string | null };
+        Returns: EmployeePerformanceWorkflow;
+      };
+      get_employee_directory: {
+        Args: Record<string, never>;
+        Returns: Array<
+          Omit<Employee, "hourly_rate" | "overtime_rate" | "commission_rate">
+        >;
+      };
+      get_crew_directory: { Args: Record<string, never>; Returns: Crew[] };
+      get_crew_members_directory: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          id: string;
+          crew_id: string;
+          employee_id: string;
+          created_at: string;
+          employee_number: string;
+          first_name: string;
+          last_name: string;
+          preferred_name: string | null;
+          email: string | null;
+          phone: string | null;
+          department: string;
+          job_title: string | null;
+          employment_status: string;
+          employment_type: string | null;
+          hire_date: string | null;
+          notes: string | null;
+          employee_created_at: string;
+          employee_updated_at: string;
+          employee_archived_at: string | null;
+        }>;
+      };
+      get_operational_time_entries: {
+        Args: Record<string, never>;
+        Returns: Array<
+          Omit<
+            TimeEntry,
+            | "hourly_rate_snapshot"
+            | "overtime_rate_snapshot"
+            | "regular_pay"
+            | "overtime_pay"
+            | "gross_pay"
+          > & {
+            employee_number: string;
+            employee_name: string;
+            job_number: string | null;
+            crew_name: string | null;
+          }
+        >;
+      };
+      start_my_work: {
+        Args: Record<string, never>;
+        Returns: EmployeeWorkSession;
+      };
+      stop_my_work: {
+        Args: Record<string, never>;
+        Returns: EmployeeWorkSession;
+      };
+      get_my_work_session: {
+        Args: Record<string, never>;
+        Returns: EmployeeWorkSession | null;
+      };
+      get_active_employee_work_sessions: {
+        Args: Record<string, never>;
+        Returns: ActiveEmployeeWorkSession[];
+      };
+      admin_create_user_profile: {
+        Args: {
+          p_auth_user_id: string;
+          p_email: string;
+          p_display_name: string;
+          p_role: string;
+          p_employee_id: string | null;
+          p_is_active: boolean;
+        };
+        Returns: UserProfile;
+      };
+      admin_update_user_profile: {
+        Args: {
+          p_profile_id: string;
+          p_display_name: string;
+          p_role: string;
+          p_employee_id: string | null;
+          p_is_active: boolean;
+        };
+        Returns: UserProfile;
+      };
+      admin_set_user_active: {
+        Args: { p_profile_id: string; p_is_active: boolean };
+        Returns: UserProfile;
+      };
+      get_sales_job_proposal_ids: {
+        Args: Record<string, never>;
+        Returns: Array<{ proposal_id: string }>;
+      };
+      get_upcoming_client_jobs: {
+        Args: { p_client_id: string; p_days?: number };
+        Returns: Array<{
+          source_type: "Job" | "Service Occurrence";
+          source_id: string;
+          client_id: string;
+          property_id: string | null;
+          service_name: string;
+          scheduled_date: string;
+          start_time: string | null;
+          property_address: string | null;
+        }>;
+      };
+      get_operational_jobs: {
+        Args: { p_start?: string | null; p_end?: string | null };
+        Returns: Array<
+          Omit<
+            Job,
+            | "price"
+            | "deposit"
+            | "balance"
+            | "labor_hours"
+            | "recommended_crew_size"
+            | "photos"
+          >
+        >;
+      };
+      get_operational_job_ids: {
+        Args: { p_start?: string | null; p_end?: string | null };
+        Returns: string[];
+      };
+      save_mileage_entry_with_stops: {
+        Args: {
+          p_entry_id: string | null;
+          p_entry: Record<string, unknown>;
+          p_stops: MileageStopInput[];
+        };
+        Returns: MileageEntry;
+      };
+      get_financially_handed_off_job_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
+      };
+      create_job_from_accepted_proposal: {
+        Args: { p_proposal_id: string };
+        Returns: Job;
+      };
+      create_field_discovery: {
+        Args: {
+          p_job_id: string;
+          p_area?: string | null;
+          p_description?: string | null;
+          p_estimated_extra_minutes?: number | null;
+          p_estimated_extra_amount?: number | null;
+        };
+        Returns: string;
+      };
+      update_field_discovery_status: {
+        Args: { p_field_discovery_id: string; p_status: string };
+        Returns: undefined;
+      };
+      add_field_discovery_media: {
+        Args: {
+          p_field_discovery_id: string;
+          p_storage_path: string;
+          p_media_type?: string | null;
+        };
+        Returns: FieldDiscoveryMedia;
+      };
+      create_change_request: {
+        Args: {
+          p_job_id: string;
+          p_field_discovery_id?: string | null;
+          p_title?: string | null;
+          p_description?: string | null;
+          p_area?: string | null;
+          p_price_impact?: number;
+          p_time_impact_minutes?: number;
+        };
+        Returns: string;
+      };
+      update_change_request_draft: {
+        Args: {
+          p_change_request_id: string;
+          p_title: string;
+          p_description: string;
+          p_area: string | null;
+          p_price_impact: number;
+          p_time_impact_minutes: number;
+        };
+        Returns: undefined;
+      };
+      add_change_request_item: {
+        Args: {
+          p_change_request_id: string;
+          p_description: string;
+          p_quantity?: number | null;
+          p_unit?: string | null;
+          p_unit_price?: number | null;
+          p_line_total?: number | null;
+        };
+        Returns: string;
+      };
+      send_change_request: {
+        Args: { p_change_request_id: string };
+        Returns: ChangeRequest;
+      };
+      get_change_request_by_token: {
+        Args: { p_token: string };
+        Returns: PublicChangeRequest | null;
+      };
+      decide_change_request_by_token: {
+        Args: {
+          p_token: string;
+          p_client_name: string;
+          p_consent: boolean;
+          p_decision: string;
+        };
+        Returns: PublicChangeRequest;
+      };
+      create_job_evidence: {
+        Args: {
+          p_job_id: string;
+          p_evidence_type: string;
+          p_area?: string | null;
+          p_description?: string | null;
+          p_change_request_id?: string | null;
+          p_field_discovery_id?: string | null;
+        };
+        Returns: string;
+      };
+      add_job_evidence_media: {
+        Args: {
+          p_job_evidence_id: string;
+          p_storage_path: string;
+          p_media_type?: string | null;
+        };
+        Returns: JobEvidenceMedia;
+      };
+      create_direct_operational_job: {
+        Args: {
+          p_client_id: string;
+          p_property_id: string;
+          p_service_id: string;
+          p_addon_ids?: string[];
+          p_scheduled_date?: string | null;
+          p_start_time?: string | null;
+          p_estimated_duration?: number | null;
+          p_assigned_crew_id?: string | null;
+          p_labor_hours?: number;
+          p_access_instructions?: string | null;
+          p_internal_notes?: string | null;
+          p_master_price_override?: number | null;
+          p_addon_quantities?: Array<{ addonId: string; quantity: number }>;
+        };
+        Returns: Job;
+      };
+      create_direct_operational_job_v2: {
+        Args: {
+          p_client_id: string;
+          p_property_id: string;
+          p_service_id: string;
+          p_addon_ids?: string[];
+          p_scheduled_date?: string | null;
+          p_start_time?: string | null;
+          p_estimated_duration?: number | null;
+          p_assignment_kind?: import("@/types/job").JobAssignmentKind;
+          p_assigned_employee_id?: string | null;
+          p_assigned_crew_id?: string | null;
+          p_labor_hours?: number;
+          p_access_instructions?: string | null;
+          p_internal_notes?: string | null;
+          p_master_price_override?: number | null;
+          p_addon_quantities?: Array<{ addonId: string; quantity: number }>;
+        };
+        Returns: Job;
+      };
+      get_eligible_job_tech_options: {
+        Args: Record<string, never>;
+        Returns: import("@/types/job").EligibleJobTech[];
+      };
+      set_job_worker_assignment: {
+        Args: {
+          p_job_id: string;
+          p_assignment_kind: import("@/types/job").JobAssignmentKind;
+          p_employee_id?: string | null;
+          p_crew_id?: string | null;
+        };
+        Returns: Job;
+      };
+      archive_operational_job: {
+        Args: { p_job_id: string };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      get_archived_operational_jobs: {
+        Args: Record<string, never>;
+        Returns: Array<
+          Omit<
+            Job,
+            | "price"
+            | "deposit"
+            | "balance"
+            | "labor_hours"
+            | "recommended_crew_size"
+            | "photos"
+          >
+        >;
+      };
+      restore_archived_operational_job: {
+        Args: { p_job_id: string };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      get_reopenable_archived_cancelled_job_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
+      };
+      restore_and_reopen_cancelled_job: {
+        Args: { p_job_id: string };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      start_operational_job: {
+        Args: { p_job_id: string };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      start_or_clock_in_to_job: {
+        Args: { p_job_id: string };
+        Returns: import("@/types/job").JobClockInResult;
+      };
+      complete_in_progress_job: {
+        Args: { p_job_id: string };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      correct_completed_job_master_time: {
+        Args: {
+          p_job_id: string;
+          p_start_date: string;
+          p_start_time: string;
+          p_end_date: string | null;
+          p_end_time: string | null;
+        };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      cancel_operational_job: {
+        Args: { p_job_id: string; p_note?: string | null };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      update_operational_job: {
+        Args: {
+          p_job_id: string;
+          p_scheduled_date?: string | null;
+          p_start_time?: string | null;
+          p_estimated_duration?: number | null;
+          p_assigned_crew_id?: string | null;
+          p_internal_notes?: string | null;
+          p_status?: string | null;
+        };
+        Returns: Omit<
+          Job,
+          | "price"
+          | "deposit"
+          | "balance"
+          | "labor_hours"
+          | "recommended_crew_size"
+          | "photos"
+        >;
+      };
+      create_completed_job_invoice: {
+        Args: { p_job_id: string };
+        Returns: {
+          invoice_id: string | null;
+          invoice_number: string | null;
+          created: boolean;
+          skipped: boolean;
+          financially_resolved?: boolean;
+        };
+      };
+      get_contractor_invoice_eligible_jobs: {
+        Args: { p_client_id: string };
+        Returns: ContractorInvoiceEligibleJob[];
+      };
+      create_contractor_consolidated_invoice: {
+        Args: {
+          p_client_id: string;
+          p_job_ids: string[];
+          p_issue_date: string;
+          p_due_date?: string | null;
+        };
+        Returns: {
+          invoice_id: string;
+          invoice_number: string;
+          created: boolean;
+        };
+      };
+      create_contract_agreement_invoice: {
+        Args: {
+          p_agreement_id: string;
+          p_billing_period_start?: string | null;
+          p_flat_contract_amount?: number | null;
+        };
+        Returns: Invoice;
+      };
+      create_job_from_service_occurrence: {
+        Args: { p_occurrence_id: string };
+        Returns: Job;
+      };
+      record_invoice_payment: {
+        Args: {
+          p_invoice_id: string;
+          p_amount: number;
+          p_payment_date: string;
+          p_payment_method: string;
+          p_reference_number?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Payment;
+      };
+      clock_in_operational: {
+        Args: {
+          p_employee_id: string;
+          p_job_id: string | null;
+          p_crew_id: string | null;
+          p_entry_type: string;
+          p_clock_in: string;
+          p_notes: string | null;
+        };
+        Returns: Omit<
+          TimeEntry,
+          | "hourly_rate_snapshot"
+          | "overtime_rate_snapshot"
+          | "regular_pay"
+          | "overtime_pay"
+          | "gross_pay"
+        > & {
+          employee_number: string;
+          employee_name: string;
+          job_number: string | null;
+          crew_name: string | null;
+        };
+      };
+      clock_out_operational: {
+        Args: {
+          p_time_entry_id: string;
+          p_clock_out: string;
+          p_break_minutes: number;
+        };
+        Returns: Omit<
+          TimeEntry,
+          | "hourly_rate_snapshot"
+          | "overtime_rate_snapshot"
+          | "regular_pay"
+          | "overtime_pay"
+          | "gross_pay"
+        > & {
+          employee_number: string;
+          employee_name: string;
+          job_number: string | null;
+          crew_name: string | null;
+        };
+      };
+      save_operational_time_entry: {
+        Args: {
+          p_time_entry_id: string | null;
+          p_employee_id: string;
+          p_job_id: string | null;
+          p_crew_id: string | null;
+          p_entry_type: string;
+          p_clock_in: string;
+          p_clock_out: string | null;
+          p_break_minutes: number;
+          p_notes: string | null;
+        };
+        Returns: Omit<
+          TimeEntry,
+          | "hourly_rate_snapshot"
+          | "overtime_rate_snapshot"
+          | "regular_pay"
+          | "overtime_pay"
+          | "gross_pay"
+        > & {
+          employee_number: string;
+          employee_name: string;
+          job_number: string | null;
+          crew_name: string | null;
+        };
+      };
+      review_operational_time_entry: {
+        Args: {
+          p_time_entry_id: string;
+          p_status: string;
+          p_notes?: string | null;
+        };
+        Returns: Omit<
+          TimeEntry,
+          | "hourly_rate_snapshot"
+          | "overtime_rate_snapshot"
+          | "regular_pay"
+          | "overtime_pay"
+          | "gross_pay"
+        > & {
+          employee_number: string;
+          employee_name: string;
+          job_number: string | null;
+          crew_name: string | null;
+        };
+      };
+      classify_job_time_entry_labor: {
+        Args: {
+          p_time_entry_id: string;
+          p_classification: string;
+          p_operational_reason: string;
+        };
+        Returns: Omit<
+          TimeEntry,
+          | "hourly_rate_snapshot"
+          | "overtime_rate_snapshot"
+          | "regular_pay"
+          | "overtime_pay"
+          | "gross_pay"
+        > & {
+          employee_number: string;
+          employee_name: string;
+          job_number: string | null;
+          crew_name: string | null;
+        };
+      };
+      admin_operational_create_employee: {
+        Args: {
+          p_employee_number: string;
+          p_first_name: string;
+          p_last_name: string;
+          p_preferred_name: string | null;
+          p_email: string | null;
+          p_phone: string | null;
+          p_department: string;
+          p_job_title: string | null;
+          p_employment_status: string;
+          p_employment_type: string | null;
+          p_hire_date: string | null;
+          p_notes: string | null;
+        };
+        Returns: Omit<
+          Employee,
+          "hourly_rate" | "overtime_rate" | "commission_rate"
+        >;
+      };
+      admin_operational_update_employee: {
+        Args: {
+          p_employee_id: string;
+          p_first_name: string;
+          p_last_name: string;
+          p_preferred_name: string | null;
+          p_email: string | null;
+          p_phone: string | null;
+          p_department: string;
+          p_job_title: string | null;
+          p_employment_status: string;
+          p_employment_type: string | null;
+          p_hire_date: string | null;
+          p_notes: string | null;
+          p_archive?: boolean;
+        };
+        Returns: Omit<
+          Employee,
+          "hourly_rate" | "overtime_rate" | "commission_rate"
+        >;
+      };
+      manage_operational_crew: {
+        Args: {
+          p_crew_id: string | null;
+          p_crew_name: string;
+          p_crew_lead_id: string | null;
+          p_status: string;
+          p_notes: string | null;
+          p_archive?: boolean;
+        };
+        Returns: Crew;
+      };
+      add_operational_crew_member: {
+        Args: { p_crew_id: string; p_employee_id: string };
+        Returns: string;
+      };
+      remove_operational_crew_member: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      master_admin_permanently_delete_archived_record: {
+        Args: { p_record_type: string; p_record_id: string };
+        Returns: string;
+      };
+      master_admin_permanently_delete_cancelled_job: {
+        Args: { p_job_id: string };
+        Returns: string;
+      };
+      get_service_agreement_by_token: {
+        Args: { p_token: string };
+        Returns: import("@/types/publicAgreement").PublicAgreement;
+      };
+      accept_service_agreement_by_token: {
+        Args: {
+          p_token: string;
+          p_signed_name: string;
+          p_signature: string;
+          p_consent: boolean;
+        };
+        Returns: import("@/types/publicAgreement").PublicAgreement;
+      };
+      get_estimate_by_token: {
+        Args: { p_token: string };
+        Returns: PublicEstimate;
+      };
+      request_estimate_walkthrough_by_token: {
+        Args: {
+          p_token: string;
+          p_client_name: string;
+          p_email: string | null;
+          p_phone: string | null;
+          p_preferred_contact_method: string;
+        };
+        Returns: import("@/types/publicEstimate").PublicEstimateWalkthroughRequestResult;
+      };
+      get_proposal_by_token: {
+        Args: { p_token: string };
+        Returns: PublicProposal;
+      };
+      get_proposal_revision_history_by_token: {
+        Args: { p_token: string };
+        Returns: import("@/types/publicProposal").PublicProposalRevisionHistory;
+      };
+      get_invoice_by_token: {
+        Args: { p_token: string };
+        Returns: import("@/types/publicInvoice").PublicInvoice;
+      };
+      get_invoice_payment_confirmation_by_token: {
+        Args: { p_token: string };
+        Returns: string | null;
+      };
+      accept_proposal_by_token: {
+        Args: {
+          p_token: string;
+          p_accepted_by_name: string;
+          p_consent: boolean;
+        };
+        Returns: PublicProposal;
+      };
+      create_post_construction_draft_agreement: {
+        Args: { p_proposal_id: string };
+        Returns: string;
+      };
+      delete_unsent_draft_service_agreement: {
+        Args: { p_agreement_id: string };
+        Returns: string;
+      };
+      mark_estimate_sent_for_delivery: {
+        Args: {
+          p_estimate_id: string;
+          p_recipient: string;
+          p_sender: string;
+          p_token: string;
+          p_token_expires_at: string;
+          p_snapshot: Record<string, unknown>;
+        };
+        Returns: { sent_at: string };
+      };
+      mark_proposal_sent_for_delivery: {
+        Args: {
+          p_proposal_id: string;
+          p_via: string;
+          p_recipient: string;
+          p_sender: string;
+          p_token: string;
+          p_token_expires_at: string;
+          p_snapshot: Record<string, unknown>;
+        };
+        Returns: { sent_at: string };
+      };
+      prepare_proposal_delivery: {
+        Args: {
+          p_proposal_id: string;
+          p_token: string;
+          p_token_expires_at: string;
+          p_snapshot: Record<string, unknown>;
+        };
+        Returns: { prepared: boolean; snapshot: Record<string, unknown> };
+      };
+      create_proposal_revision: {
+        Args: { p_proposal_id: string };
+        Returns: import("@/types/proposal").Proposal;
+      };
+      get_operational_photos: {
+        Args: { p_record_type: string; p_record_id: string };
+        Returns: import("@/types/photo").OperationalPhoto[];
+      };
+      set_operational_photos: {
+        Args: {
+          p_record_type: string;
+          p_record_id: string;
+          p_photos: import("@/types/photo").OperationalPhoto[];
+        };
+        Returns: import("@/types/photo").OperationalPhoto[];
+      };
+      get_proposal_pricing_photos: {
+        Args: { p_proposal_id: string };
+        Returns: import("@/types/proposal").ProposalPricingPhoto[];
+      };
+      add_proposal_owned_photo: {
+        Args: {
+          p_proposal_id: string;
+          p_photo_id: string;
+          p_storage_path: string;
+          p_original_filename: string;
+          p_caption: string;
+          p_source: "camera" | "library";
+        };
+        Returns: import("@/types/proposal").ProposalPricingPhoto;
+      };
+      set_proposal_pricing_photo_caption: {
+        Args: { p_proposal_id: string; p_photo_id: string; p_caption: string };
+        Returns: import("@/types/proposal").ProposalPricingPhoto[];
+      };
+      remove_proposal_pricing_photo: {
+        Args: { p_proposal_id: string; p_photo_id: string };
+        Returns: import("@/types/proposal").ProposalPricingPhotoRemoval;
+      };
+      set_invoice_job_photo_visibility: {
+        Args: {
+          p_invoice_id: string;
+          p_photo_id: string;
+          p_customer_visible: boolean;
+        };
+        Returns: InvoiceJobPhoto;
+      };
+      start_direct_conversation: {
+        Args: { p_other_user_id: string };
+        Returns: Conversation;
+      };
+      send_direct_message: {
+        Args: { p_conversation_id: string; p_body: string };
+        Returns: Message;
+      };
+      mark_messages_read: {
+        Args: { p_conversation_id: string; p_message_ids?: string[] | null };
+        Returns: number;
+      };
+      send_company_announcement: {
+        Args: { p_title: string; p_body: string; p_priority?: string };
+        Returns: Message;
+      };
+      acknowledge_required_announcement: {
+        Args: { p_message_id: string };
+        Returns: AnnouncementAcknowledgment;
+      };
     };
 
     Enums: Record<string, never>;

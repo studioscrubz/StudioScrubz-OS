@@ -27,8 +27,8 @@ test("create and mutation controls are access-aware while RLS remains authoritat
   assert.match(migration, /private\.current_internal_schedule_access_level\(\) = 'Sales'/);
 });
 
-test("event editor covers Phase 1B fields, cancellation, and invitee-only RSVP", () => {
-  for (const field of ["Title", "Description", "Category", "Meeting Mode", "Start", "End", "Timezone", "Visibility", "Location", "Video Link", "Vendor Name", "Existing Prospect", "Authorized Attendees"]) {
+test("event editor covers event, relationship, meeting, cancellation, and RSVP fields", () => {
+  for (const field of ["Title", "Description", "Category", "Meeting Mode", "Start", "End", "Timezone", "Visibility", "Physical Location", "Vendor Name", "Existing Prospect", "Existing Client", "Phone Number", "Authorized Attendees"]) {
     assert.match(dialog, new RegExp(field));
   }
   assert.match(dialog, /cancelInternalScheduleEvent/);

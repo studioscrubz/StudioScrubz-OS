@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { UserProfile } from "@/types/auth";
 import {
   INTERNAL_EVENT_CATEGORIES,
+  INTERNAL_EVENT_LEGACY_MODES,
   INTERNAL_EVENT_MODES,
   INTERNAL_EVENT_RSVP_STATUSES,
   INTERNAL_EVENT_VISIBILITIES,
@@ -54,6 +55,10 @@ export function InternalEventDialog({
   const [form, setForm] = useState(initial);
   const [attendees, setAttendees] = useState<InternalEventAttendeeOption[]>([]);
   const [prospects, setProspects] = useState<InternalEventProspectOption[]>([]);
+  const [clients, setClients] = useState<Awaited<ReturnType<typeof getInternalEventFormOptions>>["clients"]>([]);
+  const [prospectSearch, setProspectSearch] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [attendeeSearch, setAttendeeSearch] = useState("");
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +70,7 @@ export function InternalEventDialog({
         if (active) {
           setAttendees(options.attendees);
           setProspects(options.prospects);
+          setClients(options.clients);
         }
       })
       .catch((cause: unknown) => {
@@ -85,10 +91,16 @@ export function InternalEventDialog({
       const values = toInput(form);
       if (new Date(values.ends_at) <= new Date(values.starts_at))
         throw new Error("End time must be after start time.");
-      if (event) await updateInternalScheduleEvent(event.id, values);
-      else await createInternalScheduleEvent(values, profile);
+      const result = event
+        ? await updateInternalScheduleEvent(event.id, values)
+        : await createInternalScheduleEvent(values, profile);
       await saved(
-        event ? "Internal event updated." : "Internal event created.",
+        result.warning ??
+          (result.google.meetUrl
+            ? `${event ? "Internal event updated" : "Internal event created"} with Google Meet.`
+            : event
+              ? "Internal event updated."
+              : "Internal event created."),
       );
     } catch (cause) {
       setError(message(cause));
@@ -97,12 +109,21 @@ export function InternalEventDialog({
   }
 
   const sales = access === "Sales";
+  const filteredProspects = prospects.filter((prospect) =>
+    prospect.company_name.toLowerCase().includes(prospectSearch.toLowerCase()),
+  );
+  const filteredClients = clients.filter((client) =>
+    client.display_name.toLowerCase().includes(clientSearch.toLowerCase()),
+  );
+  const filteredAttendees = attendees.filter((attendee) =>
+    attendee.display_name.toLowerCase().includes(attendeeSearch.toLowerCase()),
+  );
   return (
     <Modal
       title={event ? "Edit Internal Event" : "Create Internal Event"}
       close={close}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FormSection title="Event Details">
         <Field label="Title">
           <input
             required
@@ -139,6 +160,9 @@ export function InternalEventDialog({
               })
             }
           >
+            {event && INTERNAL_EVENT_LEGACY_MODES.includes(event.meeting_mode as any) && (
+              <option value={event.meeting_mode}>Legacy: {event.meeting_mode}</option>
+            )}
             {INTERNAL_EVENT_MODES.map((value) => (
               <option key={value}>{value}</option>
             ))}
@@ -193,6 +217,11 @@ export function InternalEventDialog({
             ))}
           </select>
         </Field>
+      </FormSection>
+      <FormSection title="Related Records">
+        <Field label="Search Prospects">
+          <input className={input} value={prospectSearch} onChange={(e) => setProspectSearch(e.target.value)} placeholder="Search by company name" />
+        </Field>
         <Field label="Existing Prospect (optional)">
           <select
             className={input}
@@ -200,29 +229,21 @@ export function InternalEventDialog({
             onChange={(e) => setForm({ ...form, prospectId: e.target.value })}
           >
             <option value="">None</option>
-            {prospects.map((prospect) => (
+            {filteredProspects.map((prospect) => (
               <option key={prospect.id} value={prospect.id}>
                 {prospect.company_name}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Location (optional)">
-          <input
-            maxLength={500}
-            className={input}
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-          />
+        <Field label="Search Clients">
+          <input className={input} value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} placeholder="Search clients" />
         </Field>
-        <Field label="Video Link (optional)">
-          <input
-            type="url"
-            maxLength={2000}
-            className={input}
-            value={form.videoLink}
-            onChange={(e) => setForm({ ...form, videoLink: e.target.value })}
-          />
+        <Field label="Existing Client (optional)">
+          <select className={input} value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            <option value="">None</option>
+            {filteredClients.map((client) => <option key={client.id} value={client.id}>{client.display_name}</option>)}
+          </select>
         </Field>
         <Field label="Vendor Name (optional)">
           <input
@@ -232,6 +253,31 @@ export function InternalEventDialog({
             onChange={(e) => setForm({ ...form, vendorName: e.target.value })}
           />
         </Field>
+      </FormSection>
+      <FormSection title="Meeting Details">
+        {form.meetingMode === "In Person" && <Field label="Physical Location (required)">
+          <input required maxLength={500} className={input} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+        </Field>}
+        {form.meetingMode === "Video Meeting" && <div className="sm:col-span-2 rounded-lg bg-emerald-50 p-3 text-sm text-[#143d1a]">A real Google Meet link will be created through the connected company Google Calendar. External linked records are not invited.</div>}
+        {form.meetingMode === "Phone Call" && <>
+          <Field label="Call Contact">
+            <select className={input} value={form.callContactRef} onChange={(e) => {
+              const value = e.target.value;
+              const [kind, id] = value.split(":");
+              const prospect = kind === "prospect" ? prospects.find((item) => item.id === id) : null;
+              const client = kind === "client" ? clients.find((item) => item.id === id) : null;
+              setForm({ ...form, callContactRef: value, callContactName: prospect?.company_name ?? client?.display_name ?? (kind === "vendor" ? form.vendorName : form.callContactName), callPhoneNumber: prospect?.business_phone ?? client?.phone ?? form.callPhoneNumber });
+            }}>
+              <option value="">Manual contact</option>
+              {prospects.map((item) => <option key={`p-${item.id}`} value={`prospect:${item.id}`}>{item.company_name} (Prospect)</option>)}
+              {clients.map((item) => <option key={`c-${item.id}`} value={`client:${item.id}`}>{item.display_name} (Client)</option>)}
+              {form.vendorName && <option value="vendor:name">{form.vendorName} (Vendor)</option>}
+            </select>
+          </Field>
+          <Field label="Call Contact Name (required)"><input required maxLength={300} className={input} value={form.callContactName} onChange={(e) => setForm({ ...form, callContactName: e.target.value })} /></Field>
+          <Field label="Phone Number (required)"><input required type="tel" maxLength={50} className={input} value={form.callPhoneNumber} onChange={(e) => setForm({ ...form, callPhoneNumber: e.target.value })} /></Field>
+          <Field label="Extension (optional)"><input maxLength={20} className={input} value={form.callPhoneExtension} onChange={(e) => setForm({ ...form, callPhoneExtension: e.target.value })} /></Field>
+        </>}
         <Field label="Description">
           <textarea
             rows={4}
@@ -240,7 +286,7 @@ export function InternalEventDialog({
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
         </Field>
-      </div>
+      </FormSection>
       <fieldset className="mt-5 rounded-xl border p-4">
         <legend className="px-2 text-sm font-extrabold text-[#143d1a]">
           Authorized Attendees
@@ -248,8 +294,10 @@ export function InternalEventDialog({
         {loadingOptions ? (
           <p className="text-sm text-neutral-500">Loading attendees…</p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {attendees.map((attendee) => (
+          <div>
+            <input className={`${input} mb-3`} value={attendeeSearch} onChange={(e) => setAttendeeSearch(e.target.value)} placeholder="Search authorized employees" aria-label="Search authorized attendees" />
+            <div className="grid gap-2 sm:grid-cols-2">
+            {filteredAttendees.map((attendee) => (
               <label
                 key={attendee.id}
                 className="flex items-center gap-2 text-sm"
@@ -274,6 +322,7 @@ export function InternalEventDialog({
                 No eligible attendees found.
               </p>
             )}
+            </div>
           </div>
         )}
       </fieldset>
@@ -285,6 +334,8 @@ export function InternalEventDialog({
           !form.title.trim() ||
           !form.start ||
           !form.end
+          || (form.meetingMode === "In Person" && !form.location.trim())
+          || (form.meetingMode === "Phone Call" && (!form.callContactName.trim() || !form.callPhoneNumber.trim()))
         }
         className={`${primary} mt-5`}
         onClick={() => void submit()}
@@ -322,8 +373,8 @@ export function InternalEventDetails({
     setBusy(true);
     setError(null);
     try {
-      await cancelInternalScheduleEvent(event.id);
-      await saved("Internal event canceled.");
+      const result = await cancelInternalScheduleEvent(event.id);
+      await saved(result.warning ?? "Internal event canceled.");
     } catch (cause) {
       setError(message(cause));
       setBusy(false);
@@ -363,20 +414,30 @@ export function InternalEventDetails({
         {event.prospect && (
           <Detail label="Prospect" value={event.prospect.company_name} />
         )}{" "}
-        {event.video_link && (
+        {(event.google_sync?.google_meet_url || event.video_link) && (
           <div>
             <p className="text-xs font-bold uppercase text-neutral-500">
               Video
             </p>
             <a
               className="text-sm font-bold text-[#143d1a] underline"
-              href={event.video_link}
+              href={event.google_sync?.google_meet_url || event.video_link || undefined}
               target="_blank"
               rel="noreferrer"
             >
               Join meeting
             </a>
           </div>
+        )}
+        {event.meeting_mode === "Phone Call" && event.call_phone_number && (
+          <div>
+            <p className="text-xs font-bold uppercase text-neutral-500">Call</p>
+            <p className="text-sm">{event.call_contact_name}</p>
+            <a className="text-sm font-bold text-[#143d1a] underline" href={`tel:${event.call_phone_number}${event.call_phone_extension ? `,${event.call_phone_extension}` : ""}`}>{event.call_phone_number}{event.call_phone_extension ? ` ext. ${event.call_phone_extension}` : ""}</a>
+          </div>
+        )}
+        {event.meeting_mode === "Video Meeting" && (
+          <Detail label="Google Meet Status" value={event.google_sync?.sync_status ?? "Pending"} />
         )}
       </div>
       {event.description && (
@@ -459,15 +520,19 @@ function formState(event: InternalScheduleEvent | null) {
     title: event?.title ?? "",
     description: event?.description ?? "",
     category: event?.category ?? ("Administrative" as const),
-    meetingMode: event?.meeting_mode ?? ("Video" as const),
+    meetingMode: event?.meeting_mode ?? ("In Person" as const),
     start,
     end,
     timezone,
     visibility: event?.visibility ?? ("Sales Visible" as const),
     location: event?.location ?? "",
-    videoLink: event?.video_link ?? "",
     prospectId: event?.prospect_id ?? "",
+    clientId: event?.client_id ?? "",
     vendorName: event?.vendor_name ?? "",
+    callContactRef: "",
+    callContactName: event?.call_contact_name ?? "",
+    callPhoneNumber: event?.call_phone_number ?? "",
+    callPhoneExtension: event?.call_phone_extension ?? "",
     attendeeIds: event?.attendees.map((attendee) => attendee.employee_id) ?? [],
   };
 }
@@ -482,9 +547,12 @@ function toInput(form: FormState): InternalEventInput {
     timezone: form.timezone,
     visibility: form.visibility,
     location: empty(form.location),
-    video_link: empty(form.videoLink),
     prospect_id: form.prospectId || null,
+    client_id: form.clientId || null,
     vendor_name: empty(form.vendorName),
+    call_contact_name: form.meetingMode === "Phone Call" ? empty(form.callContactName) : null,
+    call_phone_number: form.meetingMode === "Phone Call" ? empty(form.callPhoneNumber) : null,
+    call_phone_extension: form.meetingMode === "Phone Call" ? empty(form.callPhoneExtension) : null,
     attendee_employee_ids: form.attendeeIds,
   };
 }
@@ -563,6 +631,14 @@ function Field({
       {label}
       {children}
     </label>
+  );
+}
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="mt-5 rounded-xl border p-4 first:mt-0">
+      <legend className="px-2 text-sm font-extrabold text-[#143d1a]">{title}</legend>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </fieldset>
   );
 }
 function Detail({ label, value }: { label: string; value: string }) {
