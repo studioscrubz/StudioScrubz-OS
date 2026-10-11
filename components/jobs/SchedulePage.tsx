@@ -45,7 +45,7 @@ import type {
   InternalEventAccessLevel,
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
-type View = "Day" | "Week" | "List";
+type View = "Day" | "Week" | "Month" | "List";
 type EventSource = "All Events" | "Jobs" | "Walkthroughs" | "Internal Events";
 type CrewDisplayOption = { id: string; crew_name: string };
 type ScheduleEvent =
@@ -366,13 +366,22 @@ export function SchedulePage() {
     [filteredInternalEvents, filteredJobs, filteredWalkthroughs],
   );
   const week = weekDates(selectedDate);
+  const monthStart = `${selectedDate.slice(0, 7)}-01`;
+  const monthOffset = new Date(`${monthStart}T12:00:00`).getDay();
+  const monthCells = Array.from({ length: Math.ceil((monthOffset + new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)), 0).getDate()) / 7) * 7 }, (_, index) => addDays(monthStart, index - monthOffset));
   const dated = events.filter((event) => event.date);
   const unscheduled = filteredJobs.filter(
     (job) => !job.scheduled_date || job.status === "Ready to Schedule",
   );
   function move(direction: number) {
+    if (view === "Month") {
+      const [year, month] = selectedDate.split("-").map(Number);
+      const target = new Date(year, month - 1 + direction, 1);
+      setSelectedDate(`${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-01`);
+      return;
+    }
     setSelectedDate(
-      addDays(selectedDate, direction * (view === "Week" ? 7 : 1)),
+      addDays(selectedDate, direction * (view === "Month" ? 0 : view === "Week" ? 7 : 1)),
     );
   }
 
@@ -387,7 +396,7 @@ export function SchedulePage() {
       {internalAccessError && <Alert text={internalAccessError} />}
       <section className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-xl bg-[#edf1eb] p-1">
-          {(["Day", "Week", "List"] as View[]).map((v) => (
+          {(["Day", "Week", "Month", "List"] as View[]).map((v) => (
             <button
               type="button"
               key={v}
@@ -405,22 +414,24 @@ export function SchedulePage() {
               className={secondary}
               onClick={() => move(-1)}
             >
-              Previous{view === "Week" ? " Week" : ""}
+              Previous{view === "Week" ? " Week" : view === "Month" ? " Month" : ""}
             </button>
             <button
               type="button"
               className={secondary}
               onClick={() => setSelectedDate(today())}
             >
-              {view === "Week" ? "This Week" : "Today"}
+              {view === "Week" ? "This Week" : view === "Month" ? "This Month" : "Today"}
             </button>
             <button type="button" className={secondary} onClick={() => move(1)}>
-              Next{view === "Week" ? " Week" : ""}
+              Next{view === "Week" ? " Week" : view === "Month" ? " Month" : ""}
             </button>
           </div>
         )}
         <p className="font-extrabold text-[#143d1a]">
-          {view === "Week"
+          {view === "Month"
+            ? new Date(`${monthStart}T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+            : view === "Week"
             ? `${pretty(week[0])} - ${pretty(week[6])}`
             : view === "Day"
               ? pretty(selectedDate)
@@ -470,6 +481,30 @@ export function SchedulePage() {
                     openInternal={setInternalDetail}
                   />
                 ))}
+              </div>
+            </div>
+          )}
+          {view === "Month" && (
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-[#143d1a]/20">
+              <div className="grid min-w-[700px] grid-cols-7 bg-[#143d1a] text-center text-xs font-bold text-white">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div key={day} className="p-3">{day}</div>)}
+              </div>
+              <div className="grid min-w-[700px] grid-cols-7">
+                {monthCells.map((date) => {
+                  const dayEvents = dated.filter((event) => event.date === date).sort(byEventTime);
+                  const inMonth = date.slice(0, 7) === selectedDate.slice(0, 7);
+                  return (
+                    <div key={date} className={`min-h-32 border-b border-r p-2 ${inMonth ? "bg-white" : "bg-neutral-100"}`}>
+                      <button type="button" onClick={() => { setSelectedDate(date); setView("Day"); }} className={`mb-2 rounded-full px-2 py-1 text-sm font-bold hover:bg-[#edf4ec] ${date === today() ? "bg-[#143d1a] text-white hover:text-[#143d1a]" : inMonth ? "text-[#143d1a]" : "text-neutral-400"}`} aria-label={`View ${pretty(date)}`}>{Number(date.slice(8))}</button>
+                      <div className="space-y-1">
+                        {dayEvents.slice(0, 3).map((event) => (
+                          <button key={`${event.kind}-${event.id}`} type="button" onClick={() => { if (event.kind === "Job") setDetail(event.job); else if (event.kind === "Internal Event") setInternalDetail(event.internalEvent); else { setSelectedDate(date); setView("Day"); } }} className="block w-full truncate rounded bg-[#edf4ec] px-2 py-1 text-left text-[11px] text-[#143d1a]" title={event.kind === "Job" ? event.job.client_name : event.kind === "Internal Event" ? event.internalEvent.title : walkthroughClient(event.walkthrough)}>{event.time ? `${event.time.slice(0, 5)} ` : ""}{event.kind === "Job" ? event.job.client_name : event.kind === "Internal Event" ? event.internalEvent.title : walkthroughClient(event.walkthrough)}</button>
+                        ))}
+                        {dayEvents.length > 3 && <button type="button" onClick={() => { setSelectedDate(date); setView("Day"); }} className="text-xs font-semibold text-[#143d1a]">+${dayEvents.length - 3} more</button>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
