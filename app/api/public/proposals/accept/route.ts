@@ -1,6 +1,6 @@
 import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { sendPostConstructionDepositInstructions } from "@/lib/email/postConstructionDeposit";
+import { schedulePostConstructionDepositInstructionsAfterResponse } from "@/lib/email/postConstructionDeposit";
 
 type AcceptanceRequest = { token?: string; acceptedName?: string; consent?: boolean };
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       p_consent: body.consent ?? false,
     });
     if (error) throw error;
-    try { await sendPostConstructionDepositInstructions({ proposalToken: body.token }); } catch (deliveryError) { console.error("Deposit instruction email failed after successful Proposal acceptance", deliveryError); }
+    schedulePostConstructionDepositInstructionsAfterResponse({ proposalToken: body.token });
     scheduleAttentionPushAfterResponse();
     return Response.json(data);
   } catch (error) {

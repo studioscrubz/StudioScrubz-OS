@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendResendEmail } from "@/lib/email/resend";
 import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
@@ -22,6 +23,12 @@ export async function sendPostConstructionDepositInstructions(input:{proposalTok
   if(!communicationId){const{data:created,error}=await admin.from("client_communications").insert({communication_number:`COM-${Date.now()}-${crypto.randomUUID().slice(0,8)}`,client_id:proposal.client_id,property_id:proposal.property_id,proposal_id:proposal.id,communication_type:"Proposal",channel:"Email",direction:"Outbound",subject,message_body:message,recipient_email:recipient,status:"Prepared",provider:"Resend",metadata:{purpose:"deposit-instructions",instruction_version:d.instruction_version},event_key:eventKey}).select("id").single();if(error&&error.code!=="23505")throw error;communicationId=created?.id;if(!communicationId){const{data:race,error:raceError}=await admin.from("client_communications").select("id,status").eq("event_key",eventKey).single();if(raceError||!race)throw raceError??new Error("Communication history could not be prepared.");if(race.status==="Sent")return{sent:false,reason:"Already sent"};communicationId=race.id;}}
   try{const response=await sendResendEmail({recipientEmail:recipient,subject,text:`${message}\n\nView accepted Proposal:\n${getPublicSiteUrl()}/proposal/${proposal.client_access_token}`,html:`<div style="font-family:Arial,sans-serif;line-height:1.6"><h2 style="color:#143d1a">StudioScrubz Deposit Instructions</h2>${message.split("\n").map(line=>`<div>${escapeHtml(line)||"&nbsp;"}</div>`).join("")}<p><a href="${getPublicSiteUrl()}/proposal/${proposal.client_access_token}">View accepted Proposal</a></p></div>`,idempotencyKey:eventKey,...resolveEmailSenderProfile("postConstructionDeposit")});await admin.from("client_communications").update({status:"Sent",sent_at:new Date().toISOString(),provider_message_id:response.id,failure_reason:null}).eq("id",communicationId);return{sent:true};}
   catch(error){await admin.from("client_communications").update({status:"Failed",failure_reason:error instanceof Error?error.message:"Email delivery failed"}).eq("id",communicationId);throw error;}
+}
+export function schedulePostConstructionDepositInstructionsAfterResponse(input:{proposalToken?:string;proposalId?:string}):void {
+  after(async()=>{
+    try { await sendPostConstructionDepositInstructions(input); }
+    catch(error) { console.error("Post-construction deposit instructions failed after Proposal acceptance.",error); }
+  });
 }
 const formatPhone=(value:string)=>value.length===10?`(${value.slice(0,3)}) ${value.slice(3,6)}-${value.slice(6)}`:value;
 const escapeHtml=(value:string)=>value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");

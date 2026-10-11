@@ -82,8 +82,11 @@ test("completed Job invoice stays full price and applies the deposit once",()=>{
   assert.match(invoice,/'Applied To Invoice'/);assert.match(migration,/one_active_payment_per_deposit_requirement/);
 });
 
-test("acceptance email is failure-isolated, idempotent, and email-only",()=>{
-  assert.match(acceptance,/try \{ await sendPostConstructionDepositInstructions/);
+test("acceptance email is post-response, failure-isolated, idempotent, and email-only",()=>{
+  assert.match(acceptance,/schedulePostConstructionDepositInstructionsAfterResponse/);
+  assert.doesNotMatch(acceptance,/await sendPostConstructionDepositInstructions/);
+  assert.match(email,/after\(async\(\)=>/);
+  assert.match(email,/try[\s\S]*await sendPostConstructionDepositInstructions[\s\S]*catch/);
   assert.match(email,/proposal:\$\{proposal\.id\}:deposit-instructions:\$\{d\.instruction_version\}/);
   assert.match(email,/status:"Prepared"/);assert.match(email,/status:"Sent"/);assert.match(email,/status:"Failed"/);
   assert.doesNotMatch(email,/channel:\s*["']SMS["']/);
