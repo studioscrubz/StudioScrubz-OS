@@ -87,15 +87,6 @@ export function DashboardPage() {
       {profile?.role !== "Sales" && <DashboardTimeClockControl employeeId={profile?.employee_id ?? null} />}
       {data && (
         <>
-          <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-6">
-            {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
-              <Metric
-                key={kpi.label}
-                label={kpi.label}
-                value={kpi.value}
-              />
-            ))}
-          </section>
           {hasPermission(profile, "jobs.view") && <Panel title="Today's Operations" className="mt-6">
             {data.todaysJobs.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
@@ -107,6 +98,11 @@ export function DashboardPage() {
               <Empty text="No jobs scheduled today." />
             )}
           </Panel>}
+          <section className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-6">
+            {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
+              <Metric key={kpi.label} label={kpi.label} value={kpi.value} />
+            ))}
+          </section>
         </>
       )}
       <DashboardActiveEmployeesMonitor />
