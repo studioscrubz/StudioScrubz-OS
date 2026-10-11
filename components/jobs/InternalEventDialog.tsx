@@ -366,7 +366,7 @@ export function InternalEventDetails({
     (attendee) => attendee.employee_id === profile.employee_id,
   );
   const canManage =
-    access === "Management" || event.organizer_user_id === profile.id;
+    profile.role === "Master Admin" || ((access === "Management" || access === "Sales") && event.organizer_user_id === profile.id);
   async function cancel() {
     if (!window.confirm("Cancel this internal event?")) return;
     setBusy(true);
