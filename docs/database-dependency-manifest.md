@@ -180,3 +180,5 @@ Generated using the same source roots, Prospect exclusion, file extensions, and 
 2026-10-11 Internal Schedule Events: `save_internal_schedule_event` is introduced by migration `20261011155011_internal_schedule_google_meet_and_related_clients.sql`.
 
 2026-10-11 Internal Schedule Events: `internal_schedule_event_google_syncs` is introduced by migration `20261011155011_internal_schedule_google_meet_and_related_clients.sql`.
+
+2026-10-11 Calendar Completed History: `get_calendar_completed_history` is defined by migration `20261011210000_calendar_completed_history.sql`.
