@@ -14,9 +14,9 @@ import {
   hasPermission,
 } from "@/lib/auth/permissions";
 import {
-  ACCEPTANCE_METHODS,
+  MANUAL_ACCEPTANCE_METHODS,
   APPROVAL_STATUSES,
-  type ProposalAcceptanceMethod,
+  type ManualProposalAcceptanceMethod,
   type ProposalApprovalStatus,
   type ProposalActivity,
   type ProposalStatus,
@@ -30,11 +30,12 @@ import {
   getProposalFamilyHistory,
   getProposalRevisionHistory,
   getProposals,
-  markProposalAccepted,
+  canRecordManualProposalAcceptance,
   markProposalDeclined,
   markProposalSent,
   prepareProposalDelivery,
   markProposalViewed,
+  recordManualProposalAcceptance,
   rejectProposal,
   renewProposal,
   requestProposalChanges,
@@ -136,13 +137,26 @@ export function OpenProposalsPage() {
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [sending, setSending] = useState<ProposalWithRelations | null>(null);
+  const [canRecordManualAcceptance, setCanRecordManualAcceptance] = useState(false);
   useEffect(() => {
     let active = true;
-    void loadPageData()
-      .then(({ proposals, proposalIds }) => {
+    void Promise.all([
+      loadPageData(),
+      canRecordManualProposalAcceptance().catch((cause: unknown) => {
+        console.error("Manual Proposal acceptance authorization failed", cause);
+        if (active) {
+          setError(
+            "Manual acceptance authorization could not be verified. Refresh the page or contact an administrator.",
+          );
+        }
+        return false;
+      }),
+    ])
+      .then(([{ proposals, proposalIds }, manualAccess]) => {
         if (active) {
           setRows(proposals);
           setJobProposalIds(new Set(proposalIds));
+          setCanRecordManualAcceptance(manualAccess);
         }
       })
       .catch((x: unknown) => {
@@ -324,6 +338,7 @@ export function OpenProposalsPage() {
             send={setSending}
             mutate={mutate}
             revise={async(p)=>{setBusy(p.id);setError(null);try{const revision=await createProposalRevision(p.id);await refresh(`Revision V${revision.revision_number} created.`);setEdit(revision)}catch(x){setError(msg(x,"Proposal revision could not be created."))}finally{setBusy(null)}}}
+            canRecordManualAcceptance={canRecordManualAcceptance}
           />
         )}
       </section>{" "}
@@ -377,6 +392,7 @@ function ProposalList({
   send,
   mutate,
   revise,
+  canRecordManualAcceptance,
 }: {
   rows: ProposalWithRelations[];
   busy: string | null;
@@ -391,6 +407,7 @@ function ProposalList({
     text: string,
   ) => Promise<void>;
   revise: (p: ProposalWithRelations) => Promise<void>;
+  canRecordManualAcceptance: boolean;
 }) {
   if (rows.length === 0) return <Empty />;
   return (
@@ -432,6 +449,7 @@ function ProposalList({
                   openSend={() => send(proposal)}
                   mutate={(fn, text) => void mutate(proposal, fn, text)}
                   revise={() => void revise(proposal)}
+                  canRecordManualAcceptance={canRecordManualAcceptance}
                 />
               ))}
             </div>
@@ -451,6 +469,7 @@ function Card({
   openSend,
   mutate,
   revise,
+  canRecordManualAcceptance,
 }: {
   p: ProposalWithRelations;
   busy: boolean;
@@ -461,6 +480,7 @@ function Card({
   openSend: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
   revise: () => void;
+  canRecordManualAcceptance: boolean;
 }) {
   const { profile } = useAuth();
   const canApprove = hasPermission(profile, "proposals.approve");
@@ -590,7 +610,9 @@ function Card({
               t="Viewed"
               f={() => mutate(() => markProposalViewed(p.id), "Marked viewed.")}
             />
-            <Action t="Accept" f={accept} />
+            {canRecordManualAcceptance && (
+              <Action t="Record Manual Acceptance" f={accept} />
+            )}
             <Action t="Decline" f={() => promptAction("decline")} />
             <Action t="Print" f={() => printProposal(p)} />
             {canCreate && <Action t={busy?"Creating…":"Create Revision"} disabled={busy} f={revise} />}
@@ -892,24 +914,25 @@ function AcceptanceModal({
   close: () => void;
   saved: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [method, setMethod] =
-    useState<(typeof ACCEPTANCE_METHODS)[number]>("Text Message");
-  const [other, setOther] = useState("");
+  const [method, setMethod] = useState<ManualProposalAcceptanceMethod>("Phone");
+  const [acceptedAt, setAcceptedAt] = useState(() => localDateTimeValue(new Date()));
+  const [notes, setNotes] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit() {
-    if (!name.trim()) return setError("Accepted By Name is required.");
-    if (method === "Other" && !other.trim())
-      return setError(
-        "Describe Confirmation Method is required when Other is selected.",
-      );
-    const acceptanceMethod: ProposalAcceptanceMethod =
-      method === "Other" ? `Other: ${other.trim()}` : method;
+    if (!acceptedAt) return setError("The actual acceptance date and time is required.");
+    if (!notes.trim()) return setError("Notes or an evidence reference is required.");
+    if (!confirmed) return setError("Confirm the client authorized acceptance of this exact proposal revision.");
     setSaving(true);
     setError(null);
     try {
-      await markProposalAccepted(proposal.id, name.trim(), acceptanceMethod);
+      await recordManualProposalAcceptance(proposal.id, {
+        method,
+        acceptedAt: new Date(acceptedAt).toISOString(),
+        notes: notes.trim(),
+        authorizationConfirmed: confirmed,
+      });
       saved();
     } catch (x) {
       console.error("Proposal acceptance failed", x);
@@ -918,41 +941,40 @@ function AcceptanceModal({
     }
   }
   return (
-    <Modal title="Mark Proposal Accepted" close={close}>
+    <Modal title="Record Manual Acceptance" close={close}>
       <div className="space-y-4">
-        <label className="block text-sm font-bold text-neutral-700">
-          Accepted By Name
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={`${input} mt-2`}
-            autoFocus
-          />
-        </label>
+        <div className="rounded-xl bg-[#edf4ec] p-4 text-sm text-[#143d1a]">
+          <p className="font-extrabold">Client</p>
+          <p className="mt-1">{proposal.client_name || "Client name unavailable"}</p>
+          <p className="mt-2 text-xs">Proposal {proposal.proposal_number} · Revision V{proposal.revision_number}</p>
+        </div>
         <label className="block text-sm font-bold text-neutral-700">
           How was confirmation received?
           <select
             value={method}
             onChange={(e) =>
-              setMethod(e.target.value as (typeof ACCEPTANCE_METHODS)[number])
+              setMethod(e.target.value as ManualProposalAcceptanceMethod)
             }
             className={`${input} mt-2`}
           >
-            {ACCEPTANCE_METHODS.map((option) => (
+            {MANUAL_ACCEPTANCE_METHODS.map((option) => (
               <option key={option}>{option}</option>
             ))}
           </select>
         </label>
-        {method === "Other" && (
-          <label className="block text-sm font-bold text-neutral-700">
-            Describe Confirmation Method
-            <input
-              value={other}
-              onChange={(e) => setOther(e.target.value)}
-              className={`${input} mt-2`}
-            />
-          </label>
-        )}
+        <label className="block text-sm font-bold text-neutral-700">
+          Actual date and time accepted
+          <input type="datetime-local" value={acceptedAt} max={localDateTimeValue(new Date())} onChange={(e) => setAcceptedAt(e.target.value)} className={`${input} mt-2`} />
+        </label>
+        <label className="block text-sm font-bold text-neutral-700">
+          Notes or evidence reference
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} maxLength={2000} className={`${input} mt-2`} placeholder="Record where the authorization can be verified." />
+        </label>
+        <label className="flex items-start gap-3 rounded-xl border border-[#143d1a]/15 p-4 text-sm font-bold text-neutral-700">
+          <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 size-4" />
+          <span>I confirm the client explicitly authorized acceptance of this exact proposal revision.</span>
+        </label>
+        <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">This records acceptance and creates any required agreement and deposit records. It does not send deposit instructions or impersonate the client.</p>
         {error && <Alert text={error} />}
         <div className="flex justify-end gap-2">
           <button
@@ -969,7 +991,7 @@ function AcceptanceModal({
             onClick={() => void submit()}
             className="rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Mark Accepted"}
+            {saving ? "Saving…" : "Record Acceptance"}
           </button>
         </div>
       </div>
@@ -1245,6 +1267,10 @@ function money(v: number) {
     style: "currency",
     currency: "USD",
   }).format(v);
+}
+function localDateTimeValue(value: Date) {
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 function human(k: string) {
   return k.replace(/([A-Z])/g, " $1").replace(/^./, (x) => x.toUpperCase());
