@@ -56,4 +56,7 @@ begin
  return new;
 end;
 $fn$;
+create or replace function public.get_current_internal_schedule_access_level() returns text language sql stable security definer set search_path='' as $fn$
+ select case when auth.uid() is null then 'None' when private.internal_schedule_access_level(auth.uid()) in ('Management','Sales') then private.internal_schedule_access_level(auth.uid()) when private.internal_schedule_active_os_user(auth.uid()) then 'View' else 'None' end;
+$fn$;
 commit;
