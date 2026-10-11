@@ -480,9 +480,6 @@ export function SchedulePage() {
               openInternal={setInternalDetail}
             />
           )}{" "}
-          {canEditSchedule && (
-            <Unscheduled jobs={unscheduled} schedule={setEdit} />
-          )}
         </>
       )}
       <ScheduleOccurrences />
