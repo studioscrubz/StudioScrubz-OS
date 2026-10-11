@@ -62,6 +62,19 @@ export async function getJobs(): Promise<JobWithRelations[]> {
   if (jobsResult.error) throw jobsResult.error;
   return jobsResult.data as JobWithRelations[];
 }
+export async function getCalendarJobs(): Promise<JobWithRelations[]> {
+  const [current, historyResult] = await Promise.all([
+    getScheduleJobs(),
+    getSupabaseClient().rpc("get_calendar_completed_history"),
+  ]);
+  if (historyResult.error) throw new Error(safeDatabaseMessage(historyResult.error, "Calendar history could not be loaded."));
+  const byId = new Map(current.map((job) => [job.id, job]));
+  for (const row of historyResult.data ?? []) {
+    const job = operationalJob(row as Parameters<typeof operationalJob>[0]);
+    if (!byId.has(job.id)) byId.set(job.id, job);
+  }
+  return [...byId.values()];
+}
 export async function getScheduleJobs(): Promise<JobWithRelations[]> {
   const profile = await getCurrentProfile();
   if (profile?.role !== "Sales") return getJobs();
