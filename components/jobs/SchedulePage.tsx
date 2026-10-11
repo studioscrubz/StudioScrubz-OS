@@ -145,8 +145,6 @@ export function SchedulePage() {
   const [division, setDivision] = useState("All");
   const [crew, setCrew] = useState("All");
   const [source, setSource] = useState<EventSource>("All Events");
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [showCancelled, setShowCancelled] = useState(false);
   const [edit, setEdit] = useState<JobWithRelations | null>(null);
   const [detail, setDetail] = useState<JobWithRelations | null>(null);
   const [internalDetail, setInternalDetail] =
@@ -272,8 +270,8 @@ export function SchedulePage() {
           (status === "All" || j.status === status) &&
           (division === "All" || j.division === division) &&
           (crew === "All" || j.assigned_crew_id === crew) &&
-          (showCompleted || j.status !== "Completed") &&
-          (showCancelled || j.status !== "Cancelled")
+          j.status !== "Cancelled" &&
+          j.status !== "Archived"
         );
       }),
     [
@@ -281,8 +279,6 @@ export function SchedulePage() {
       division,
       jobs,
       search,
-      showCancelled,
-      showCompleted,
       source,
       status,
     ],
@@ -334,10 +330,10 @@ export function SchedulePage() {
           (status === "All" ||
             (status === "Scheduled" && event.status === "Scheduled") ||
             (status === "Cancelled" && event.status === "Canceled")) &&
-          (showCancelled || event.status !== "Canceled")
+          event.status !== "Canceled"
         );
       }),
-    [internalEvents, search, showCancelled, source, status],
+    [internalEvents, search, source, status],
   );
   const events = useMemo<ScheduleEvent[]>(
     () => [
@@ -616,10 +612,6 @@ function Filters(p: {
   crews: CrewDisplayOption[];
   source: EventSource;
   setSource: (v: EventSource) => void;
-  completed: boolean;
-  setCompleted: (v: boolean) => void;
-  cancelled: boolean;
-  setCancelled: (v: boolean) => void;
 }) {
   return (
     <section className="mt-5 rounded-2xl border bg-white p-4">
@@ -678,24 +670,6 @@ function Filters(p: {
             </option>
           ))}
         </select>
-      </div>
-      <div className="mt-3 flex gap-5 text-sm">
-        <label>
-          <input
-            type="checkbox"
-            checked={p.completed}
-            onChange={(e) => p.setCompleted(e.target.checked)}
-          />{" "}
-          Show Completed
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={p.cancelled}
-            onChange={(e) => p.setCancelled(e.target.checked)}
-          />{" "}
-          Show Cancelled
-        </label>
       </div>
     </section>
   );
