@@ -29,6 +29,28 @@ export function proposalAgreementPricing(proposal: ProposalWithRelations): Agree
   });
 }
 
+export function agreementPricingWithAdditionalDiscount(pricing: AgreementPricingSnapshot, additionalDiscount: number): AgreementPricingSnapshot {
+  if (!Number.isFinite(additionalDiscount) || additionalDiscount < 0) throw new Error("Enter a valid non-negative agreement discount.");
+  const discount = Math.round(additionalDiscount * 100) / 100;
+  const allocation = pricing.accepted_pricing_allocation;
+  const maxDiscount = allocation ? allocation.baseServiceAmount : pricing.final_per_visit_price;
+  if (discount >= maxDiscount && discount > 0) throw new Error("The agreement discount must be less than the base service price.");
+  const final = Math.round((pricing.final_per_visit_price - discount) * 100) / 100;
+  return {
+    ...pricing,
+    custom_discount_amount: Math.round((pricing.custom_discount_amount + discount) * 100) / 100,
+    final_per_visit_price: final,
+    estimated_monthly_total: pricing.estimated_monthly_total === null || pricing.final_per_visit_price <= 0
+      ? pricing.estimated_monthly_total
+      : Math.round((pricing.estimated_monthly_total - discount * pricing.estimated_monthly_total / pricing.final_per_visit_price) * 100) / 100,
+    accepted_pricing_allocation: allocation ? {
+      ...allocation,
+      baseServiceAmount: Math.round((allocation.baseServiceAmount - discount) * 100) / 100,
+      totalAmount: final,
+    } : allocation,
+  };
+}
+
 export function catalogAgreementPricing(input: { standardPrice:number; frequency:AgreementFrequency; serviceId:string; rules:RecurringPricingRule[]; recurringPricingRuleId?:string|null;customDiscount?:number; serviceDescription?:string|null }): AgreementPricingSnapshot {
   const pricing=calculateRecurringTotals({subtotal:input.standardPrice,frequency:input.frequency,rules:input.rules,serviceId:input.serviceId,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountAmount:Math.max(0,input.customDiscount??0)});
   return make({ source:"Service Catalog", serviceDescription:input.serviceDescription?.trim()||null, standard:input.standardPrice, frequency:input.frequency, recurringRuleId:pricing.recurringPricingRuleId,recurringRuleName:pricing.recurringPricingRuleName,frequencyDiscount:pricing.recurringDiscountAmount, frequencyPercent:pricing.recurringDiscountPercent, customDiscount:pricing.manualDiscount, taxes:pricing.taxes, final:pricing.finalPrice, monthly:pricing.monthlyPrice });
