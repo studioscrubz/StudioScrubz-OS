@@ -23,7 +23,7 @@ import {
 } from "@/lib/services/jobs";
 import {
   calculateAddons,
-  calculateServicePrice,
+  calculateDirectJobServicePrice,
 } from "@/lib/pricing/pricingEngine";
 import { formatTime12Hour } from "@/lib/formatTime";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -206,12 +206,10 @@ export function DirectJobModal({
    */
   const basePrice =
     service && catalog
-      ? calculateServicePrice(
-          service,
-          property?.square_feet || 1,
-          catalog.tiers,
-        )
+      ? calculateDirectJobServicePrice(service, property, catalog.tiers)
       : null;
+
+  const needsResidentialTierDetails = Boolean(service && catalog && service.pricing_model === "Size Tier" && catalog.tiers.some(tier => tier.service_id === service.id && tier.is_active && tier.unit_label === "Bedrooms") && (property?.bedrooms == null || property?.bathrooms == null));
 
   const addonPricing = useMemo(() => {
     try {
@@ -311,7 +309,7 @@ export function DirectJobModal({
       return setError(
         canOverridePrice
           ? "Enter an Override Job Price for this custom-priced Service."
-          : "The selected Service does not have usable catalog pricing for a direct Job.",
+          : "This service needs a matching property bedroom/bathroom tier or configured pricing before a direct Job can be created.",
       );
     }
 
@@ -494,7 +492,7 @@ export function DirectJobModal({
 
                       {services.map((row) => (
                         <option key={row.id} value={row.id}>
-                          {row.service_name} - {catalog ? (() => { const price = calculateServicePrice(row, property?.square_feet || 1, catalog.tiers); return price === null ? "Custom pricing" : money(price); })() : "Pricing unavailable"}
+                          {row.service_name} - {catalog ? (() => { const price = calculateDirectJobServicePrice(row, property, catalog.tiers); return price === null ? "Price requires property details / quote" : money(price); })() : "Pricing unavailable"}
                         </option>
                       ))}
                     </select>
@@ -528,6 +526,8 @@ export function DirectJobModal({
                   </div>
                 </div>
               </Section>
+
+              {needsResidentialTierDetails && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">This service is priced by bedrooms and bathrooms. Add both values to the selected Property before creating the Job.</p>}
 
               <Section title="Schedule and Worker Assignment">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
