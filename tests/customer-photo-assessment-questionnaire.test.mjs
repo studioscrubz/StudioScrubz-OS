@@ -6,9 +6,9 @@ import ts from "typescript";
 function source(path) { return readFileSync(resolve(path), "utf8"); }
 function load(path) {
   const output=ts.transpileModule(source(path),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  const module={exports:{}};
-  new Function("exports","module","require",output)(module.exports,module,()=>({}));
-  return module.exports;
+  const loadedModule={exports:{}};
+  new Function("exports","module","require",output)(loadedModule.exports,loadedModule,()=>({}));
+  return loadedModule.exports;
 }
 
 const questionnaire=load("lib/customerPhotoAssessment.ts");

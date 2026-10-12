@@ -17,7 +17,7 @@ export function LeadCommissionPayoutManagementPage() {
   const [data,setData]=useState<LeadPayoutManagement|null>(null),[error,setError]=useState<string|null>(null),[busy,setBusy]=useState(false);
   const [periodEnd,setPeriodEnd]=useState(""),[rep,setRep]=useState(""),[amount,setAmount]=useState(""),[reason,setReason]=useState("");
   const load=useCallback(async()=>{try{setData(await getLeadCommissionPayoutManagement());setError(null)}catch(cause){setError(cause instanceof Error?cause.message:"Payout management could not be loaded.")}},[]);
-  useEffect(()=>{void load()},[load]);
+  useEffect(()=>{queueMicrotask(()=>void load())},[load]);
   async function act(task:()=>Promise<unknown>){setBusy(true);setError(null);try{await task();await load()}catch(cause){setError(cause instanceof Error?cause.message:"The payout action failed.")}finally{setBusy(false)}}
   return <>
     <header className="border-b pb-7"><p className="text-sm font-extrabold uppercase tracking-[.2em] text-[#9a7a16]">Lead Representative Commissions</p><h1 className="mt-2 text-3xl font-extrabold text-[#143d1a]">Weekly Payouts</h1><p className="mt-3 text-neutral-600">Generate, approve, and record external payments using {data?.businessTimezone??"the business timezone"}.</p></header>

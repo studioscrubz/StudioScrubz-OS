@@ -51,7 +51,7 @@ export function ClientsPage() {
 
   useEffect(() => {
     const requestedView = new URLSearchParams(window.location.search).get("view");
-    if (isClientView(requestedView)) setView(requestedView);
+    if (isClientView(requestedView)) queueMicrotask(() => setView(requestedView));
   }, []);
 
   useEffect(() => {

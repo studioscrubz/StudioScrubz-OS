@@ -57,8 +57,8 @@ const recurringRules = [
 ];
 assert.deepEqual(pricingEngine.matchingRecurringRules("Twice Monthly", recurringRules, "service").map((rule) => rule.id), ["twice-active"]);
 const pricingEngineSource = readFileSync(resolve("lib/pricing/pricingEngine.ts"), "utf8");
-assert.match(pricingEngineSource, /x\.frequency===frequency/);
-assert.match(pricingEngineSource, /x\.is_active/);
+assert.match(pricingEngineSource, /rule\.frequency\s*===\s*frequency/);
+assert.match(pricingEngineSource, /rule\.is_active/);
 
 for (const path of [
   "types/estimate.ts",

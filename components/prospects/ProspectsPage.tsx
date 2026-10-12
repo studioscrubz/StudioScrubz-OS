@@ -25,8 +25,8 @@ export function ProspectsPage() {
   const selected=rows.find(row=>row.id===selectedId)??null;
 
   async function load() { setLoading(true); setError(null); try { const [prospects,nextAssignees]=await Promise.all([getProspects(),canManageAll?getProspectAssignees():Promise.resolve(profile?[{id:profile.id,display_name:profile.display_name||profile.email||"Sales User"}]:[])]); setRows(prospects);setAssignees(nextAssignees);setSelectedId(current=>current&&prospects.some(row=>row.id===current)?current:null); } catch(cause){setError(message(cause));} finally{setLoading(false);} }
-  useEffect(()=>{void load();},[]); // RLS remains the source of truth; route access already requires an active profile.
-  useEffect(()=>{if(!selectedId){setEvents([]);return;}void getProspectEvents(selectedId).then(setEvents).catch(cause=>setError(message(cause)));},[selectedId,rows]);
+  useEffect(()=>{queueMicrotask(()=>void load());},[]); // RLS remains the source of truth; route access already requires an active profile.
+  useEffect(()=>{if(!selectedId){queueMicrotask(()=>setEvents([]));return;}void getProspectEvents(selectedId).then(setEvents).catch(cause=>setError(message(cause)));},[selectedId,rows]);
 
   const activeRows=useMemo(()=>rows.filter(row=>!row.merged_into_prospect_id),[rows]);
   const visible=useMemo(()=>activeRows.filter(row=>{const term=search.trim().toLocaleLowerCase();const haystack=[row.company_name,row.contact_name,row.contact_title,row.contact_phone,row.industry,row.company_type,row.website,row.business_email,row.business_phone,row.city,row.state,row.territory].filter(Boolean).join(" ").toLocaleLowerCase();return(!term||haystack.includes(term))&&(status==="All"||row.status===status)&&(territory==="All"||row.territory===territory)&&(assignee==="All"||row.assigned_user_id===assignee);}),[activeRows,search,status,territory,assignee]);

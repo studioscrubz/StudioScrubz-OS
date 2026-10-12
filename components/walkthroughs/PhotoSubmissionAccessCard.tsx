@@ -71,8 +71,10 @@ export function PhotoSubmissionAccessCard({
 
   useEffect(() => {
     emailRequestId.current = null;
-    setEmailSent(false);
-    void loadExistingLink();
+    queueMicrotask(() => {
+      setEmailSent(false);
+      void loadExistingLink();
+    });
   }, [loadExistingLink]);
 
   async function createLink() {

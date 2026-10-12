@@ -56,7 +56,7 @@ export class EnrichmentOrchestrator{
     const context=internalProviderContext(crypto.randomUUID(),this.planner.policy.mode==="allow-paid");
     const subject:EnrichmentSubject={...input};
     const baseline:ProviderCandidate[]=[];
-    let candidates:ProviderCandidate[]=[];
+    const candidates:ProviderCandidate[]=[];
     const attemptedFingerprints=new Set<string>();
     const executedBaselineProviders=new Set<string>();
     let providerCalls=0,creditsUsed=0,costMinorUnits=0;

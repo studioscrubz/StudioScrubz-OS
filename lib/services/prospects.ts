@@ -49,7 +49,9 @@ export async function importDiscoveryResults(runId:string,results:DiscoveryResul
 
 // These tables are introduced by the pending forward-only migration, so the
 // hand-maintained generated schema cannot expose them until that migration runs.
-function prospectClient() { return getSupabaseClient() as unknown as { from: (table: string) => any; rpc: (name: string, args?: Record<string,unknown>) => Promise<{data:unknown;error:{message:string}|null}> }; }
+type LooseResult={data:unknown;error:{message:string}|null};
+type LooseQuery=PromiseLike<LooseResult>&{select:(columns?:string)=>LooseQuery;order:(column:string,options?:Record<string,unknown>)=>LooseQuery;insert:(values:unknown)=>LooseQuery;update:(values:unknown)=>LooseQuery;eq:(column:string,value:unknown)=>LooseQuery;single:()=>LooseQuery};
+function prospectClient() { return getSupabaseClient() as unknown as { from: (table:string)=>LooseQuery; rpc: (name: string, args?: Record<string,unknown>) => Promise<LooseResult> }; }
 
 export async function saveEnrichmentDecisions(runId:string,decisions:Array<{fieldId:string;decision:Exclude<EnrichmentDecision,"Pending">}>):Promise<void>{const{error}=await prospectClient().rpc("save_prospect_enrichment_decisions",{p_run_id:runId,p_decisions:decisions});if(error)throw new Error(error.message)}
 export async function getEnrichmentReview(runId:string):Promise<EnrichmentReviewItem[]>{const{data,error}=await prospectClient().rpc("get_prospect_enrichment_review",{p_run_id:runId});if(error)throw new Error(error.message);return groupEnrichmentReview(data as EnrichmentReviewItem[])}

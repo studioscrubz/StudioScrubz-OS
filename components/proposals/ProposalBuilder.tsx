@@ -1237,7 +1237,7 @@ function LaborPlanInput({
 }) {
   const [draft, setDraft] = useState(String(active));
   const [validation, setValidation] = useState<string | null>(null);
-  useEffect(() => setDraft(String(active)), [active]);
+  useEffect(() => { queueMicrotask(() => setDraft(String(active))); }, [active]);
   return (
     <label>
       <Label t={label} />

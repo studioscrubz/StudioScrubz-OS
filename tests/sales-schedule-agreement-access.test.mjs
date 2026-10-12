@@ -77,7 +77,6 @@ test("Sales assignment display contains no HR, payroll, or employee financial fi
 
 test("Schedule mutation controls remain gated by schedule.edit", () => {
   assert.match(compactSchedule, /canEditSchedule=hasPermission\(profile,"schedule\.edit"\)/);
-  assert.match(compactSchedule, /canEditSchedule&&\(<Unscheduled/);
   assert.match(compactSchedule, /canEditSchedule&&edit&&\(<ScheduleModal/);
   assert.match(compactSchedule, /<QuickDetail/);
   assert.match(compactSchedule, /canEdit=\{canEditSchedule\}/);

@@ -3,6 +3,16 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { decryptToken } from "./crypto";
 
 type GoogleError = Error & { status?: number };
+type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+type GoogleEvent = {
+  hangoutLink?: string;
+  conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string }> };
+};
+type InternalEventSync = {
+  connection_id?: string | null;
+  calendar_id?: string | null;
+  google_event_id?: string | null;
+};
 type InternalEventRow = {
   id: string;
   title: string;
@@ -82,10 +92,12 @@ function eventPayload(event: InternalEventRow, requestId: string) {
   };
 }
 
-function meetUrl(remote: any): string | null {
+function meetUrl(remote: unknown): string | null {
+  if (!remote || typeof remote !== "object") return null;
+  const event = remote as GoogleEvent;
   return (
-    remote?.hangoutLink ??
-    remote?.conferenceData?.entryPoints?.find(
+    event.hangoutLink ??
+    event.conferenceData?.entryPoints?.find(
       (entry: { entryPointType?: string }) => entry.entryPointType === "video",
     )?.uri ??
     null
@@ -93,7 +105,7 @@ function meetUrl(remote: any): string | null {
 }
 
 export async function syncInternalScheduleEventGoogle(eventId: string) {
-  const db = createSupabaseAdminClient() as any;
+  const db = createSupabaseAdminClient();
   const [{ data: event, error: eventError }, { data: sync, error: syncError }] =
     await Promise.all([
       db.from("internal_schedule_events").select("id,title,description,meeting_mode,starts_at,ends_at,timezone,location,status").eq("id", eventId).single(),
@@ -158,7 +170,7 @@ export async function syncInternalScheduleEventGoogle(eventId: string) {
     }
 
     const payload = eventPayload(event, conferenceRequestId(eventId));
-    let remote: any;
+    let remote: unknown;
     if (sync?.google_event_id) {
       try {
         remote = await google(
@@ -209,9 +221,9 @@ export async function syncInternalScheduleEventGoogle(eventId: string) {
 }
 
 async function recordFailure(
-  db: any,
+  db: AdminClient,
   eventId: string,
-  sync: any,
+  sync: InternalEventSync | null,
   cause: unknown,
   now: string,
   connection?: { id: string; calendar_id: string },

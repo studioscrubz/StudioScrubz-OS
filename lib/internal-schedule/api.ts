@@ -1,7 +1,7 @@
 import "server-only";
 import { syncInternalScheduleEventGoogle } from "@/lib/google-calendar/internal-events";
 
-export function internalEventRpcArgs(input: any, eventId: string | null) {
+export function internalEventRpcArgs(input: Record<string, unknown>, eventId: string | null) {
   return {
     p_event_id: eventId,
     p_title: input.title,

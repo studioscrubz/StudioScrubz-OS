@@ -12,6 +12,8 @@ const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const MAX_PROVIDER_REQUESTS=48;
 function optionalUuid(value:unknown){if(value===null||value===undefined)return null;if(typeof value!=="string")throw new Error("Invalid assignee.");const normalized=value.trim();if(!normalized)return null;if(!UUID_PATTERN.test(normalized))throw new Error("Invalid assignee.");return normalized;}
 type OsmElement={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
+type ProspectRpcData=Record<string,unknown>&Array<Record<string,unknown>>;
+type ProspectRpcClient={rpc:(name:string,args?:Record<string,unknown>)=>Promise<{data:ProspectRpcData|null;error:{message:string}|null}>};
 export async function POST(request:Request){
  const server=await createSupabaseServerClient();const{data:{user}}=await server.auth.getUser();if(!user)return NextResponse.json({error:"Authentication required."},{status:401});
  const{data:rawProfile}=await server.from("user_profiles").select("*").eq("id",user.id).single();const profile=rawProfile as UserProfile|null;if(!profile?.is_active||!["Master Admin","Administrator","Manager","Sales"].includes(profile.role))return NextResponse.json({error:"Prospect discovery denied."},{status:403});
@@ -19,8 +21,8 @@ export async function POST(request:Request){
  const location=body.location?.trim()??"",radiusMiles=Number(body.radiusMiles),category=body.category??"",keyword=body.keyword?.trim()??"",radiusMeters=milesToMeters(radiusMiles);
  if(location.length<2||location.length>120||!Number.isFinite(radiusMiles)||radiusMiles<DISCOVERY_MIN_RADIUS_MILES||radiusMiles>DISCOVERY_MAX_RADIUS_MILES||radiusMeters<DISCOVERY_MIN_RADIUS_METERS||radiusMeters>DISCOVERY_MAX_RADIUS_METERS||!isDiscoveryCategory(category)||keyword.length>80)return NextResponse.json({error:"Invalid location, radius, category, or keyword."},{status:400});
  let assigned:string|null;try{assigned=profile.role==="Sales"?user.id:optionalUuid(body.assignedUserId);}catch{return NextResponse.json({error:"Invalid assignee."},{status:400});}
- const db=server as any;const{data:started,error:startError}=await db.rpc("begin_prospect_discovery",{p_request_id:body.requestId??crypto.randomUUID(),p_location:location,p_radius_meters:radiusMeters,p_category:category,p_keyword:keyword,p_assigned_user_id:assigned});
- if(startError)return NextResponse.json({error:startError.message},{status:startError.message.includes("rate limit")?429:400});const runId=started.runId as string;
+ const db=server as unknown as ProspectRpcClient;const{data:started,error:startError}=await db.rpc("begin_prospect_discovery",{p_request_id:body.requestId??crypto.randomUUID(),p_location:location,p_radius_meters:radiusMeters,p_category:category,p_keyword:keyword,p_assigned_user_id:assigned});
+ if(startError)return NextResponse.json({error:startError.message},{status:startError.message.includes("rate limit")?429:400});if(!started)return NextResponse.json({error:"Discovery could not be started."},{status:500});const runId=String(started.runId);
  if(started.cached){const{data,error}=await db.rpc("get_prospect_discovery_results",{p_run_id:runId});return NextResponse.json(error?{error:error.message}:{runId,cached:true,results:data??[]},{status:error?500:200});}
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),55_000);
  const diagnostics={attemptedRequests:0,successfulResponses:0,failedResponses:0,httpStatuses:[] as number[],rawElements:0,rejectedMissingName:0,rejectedMissingCoordinate:0,rejectedOutsideRadius:0,duplicates:0,finalUsable:0};

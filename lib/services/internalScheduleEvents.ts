@@ -11,8 +11,18 @@ import type {
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
 
+type LooseResult = { data: unknown; error: { message: string } | null };
+type LooseQuery = PromiseLike<LooseResult> & {
+  select: (columns?: string) => LooseQuery;
+  order: (column: string, options?: Record<string, unknown>) => LooseQuery;
+  is: (column: string, value: unknown) => LooseQuery;
+  limit: (count: number) => LooseQuery;
+  update: (values: Record<string, unknown>) => LooseQuery;
+  eq: (column: string, value: unknown) => LooseQuery;
+  single: () => LooseQuery;
+};
 type LooseClient = {
-  from: (table: string) => any;
+  from: (table: string) => LooseQuery;
   rpc: (
     name: string,
     args?: Record<string, unknown>,
@@ -57,7 +67,7 @@ export async function getInternalScheduleEvents(): Promise<
     .select(eventSelection)
     .order("starts_at");
   fail(error, "Internal events could not be loaded.");
-  return (data ?? []) as InternalScheduleEvent[];
+  return (data ?? []) as unknown as InternalScheduleEvent[];
 }
 
 export async function getInternalEventFormOptions(): Promise<{
@@ -86,8 +96,14 @@ export async function getInternalEventFormOptions(): Promise<{
   fail(clientsResult.error, "Clients could not be loaded.");
   return {
     attendees: (attendeesResult.data ?? []) as InternalEventAttendeeOption[],
-    prospects: (prospectsResult.data ?? []) as InternalEventProspectOption[],
-    clients: (clientsResult.data ?? []).map((row: any) => ({
+    prospects: (prospectsResult.data ?? []) as unknown as InternalEventProspectOption[],
+    clients: ((clientsResult.data ?? []) as Array<{
+      id: string;
+      company_name: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      phone: string | null;
+    }>).map((row) => ({
       id: row.id,
       display_name:
         row.company_name?.trim() ||
@@ -138,14 +154,18 @@ async function mutateInternalEvent(
     body: input ? JSON.stringify(input) : undefined,
   });
   const text = await response.text();
-  let body: any = null;
+  let body: unknown = null;
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
     throw new Error("The internal event server returned an invalid response.");
   }
   if (!response.ok)
-    throw new Error(body?.error || "The internal event operation failed.");
+    throw new Error(
+      typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+        ? body.error
+        : "The internal event operation failed.",
+    );
   return body as InternalEventMutationResult;
 }
 

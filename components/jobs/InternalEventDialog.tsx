@@ -160,7 +160,7 @@ export function InternalEventDialog({
               })
             }
           >
-            {event && INTERNAL_EVENT_LEGACY_MODES.includes(event.meeting_mode as any) && (
+            {event && INTERNAL_EVENT_LEGACY_MODES.includes(event.meeting_mode as (typeof INTERNAL_EVENT_LEGACY_MODES)[number]) && (
               <option value={event.meeting_mode}>Legacy: {event.meeting_mode}</option>
             )}
             {INTERNAL_EVENT_MODES.map((value) => (

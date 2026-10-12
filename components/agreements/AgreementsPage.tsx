@@ -126,7 +126,7 @@ export function AgreementsPage() {
     (agreementCategory === "One-Time" ? agreement.frequency === "One-Time" : agreement.frequency !== "One-Time") &&
     (status === "All" || agreement.status === status) &&
     (!query || [agreement.agreement_number, agreement.agreement_name, agreement.service_name, clientName(agreement), agreement.property?.address]
-      .filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase()))).sort((a, b) => clientName(a).localeCompare(clientName(b)) || a.agreement_number.localeCompare(b.agreement_number)), [agreements, query, status]);
+      .filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase()))).sort((a, b) => clientName(a).localeCompare(clientName(b)) || a.agreement_number.localeCompare(b.agreement_number)), [agreementCategory, agreements, query, status]);
   const today = dateOnly();
   // Once an occurrence has become a Job, the operational Job is the authoritative
   // schedule. Preserve the original recurrence row in storage for audit/history.

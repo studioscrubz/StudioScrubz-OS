@@ -40,7 +40,9 @@ export function LogCommunicationModal({ links, client, context, initialType, ini
   useEffect(() => {
     if (context || type !== "Service Reminder") return;
     if (!links.clientId) {
-      setUpcoming([]); setSelectedServiceId(""); setUpcomingError("A client is required to look up upcoming services."); setUpcomingLookupState("error");
+      queueMicrotask(() => {
+        setUpcoming([]); setSelectedServiceId(""); setUpcomingError("A client is required to look up upcoming services."); setUpcomingLookupState("error");
+      });
       return;
     }
     let active = true;
