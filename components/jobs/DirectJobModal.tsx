@@ -494,7 +494,7 @@ export function DirectJobModal({
 
                       {services.map((row) => (
                         <option key={row.id} value={row.id}>
-                          {row.service_name} - {money(row.base_price)}
+                          {row.service_name} - {catalog ? (() => { const price = calculateServicePrice(row, property?.square_feet || 1, catalog.tiers); return price === null ? "Custom pricing" : money(price); })() : "Pricing unavailable"}
                         </option>
                       ))}
                     </select>
