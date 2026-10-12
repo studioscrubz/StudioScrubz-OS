@@ -39,6 +39,16 @@ export function floorDetailTierPrice(squareFeet: number): number {
   return 650;
 }
 
+export function interiorWindowsTierPrice(quantity: number): number {
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new Error("Enter a whole-number Interior Windows quantity of at least 1.");
+  }
+  if (quantity <= 5) return 75;
+  if (quantity <= 10) return quantity * 12;
+  if (quantity <= 20) return quantity * 10;
+  return quantity * 8;
+}
+
 export function calculateAddons(
   names: string[],
   addons: ServiceAddon[],
@@ -139,6 +149,8 @@ export function calculateAddons(
 
     if (addon.addon_code === "COM-FLOOR") {
       base = floorDetailTierPrice(Number(selected?.quantity));
+    } else if (addon.addon_code === "COM-WINDOWS") {
+      base = interiorWindowsTierPrice(Number(selected?.quantity));
     } else if (addon.pricing_model === "Custom") {
       const calculatedCost =
         laborHours * Math.max(0, hourlyRate) + supplyCost;
