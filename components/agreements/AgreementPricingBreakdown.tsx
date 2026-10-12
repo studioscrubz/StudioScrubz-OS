@@ -2,14 +2,19 @@ import type { AgreementPricingSnapshot } from "@/types/agreement";
 
 export function AgreementPricingBreakdown({ pricing }: { pricing: AgreementPricingSnapshot | null }) {
   if (!pricing) return null;
+  const extras = pricing.catalog_addons ?? [];
+  const addonTotal = extras.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const proposalDiscount = Math.max(0, pricing.custom_discount_amount - (pricing.additional_agreement_discount_amount ?? 0));
   const rows: Array<[string, string]> = [
     ["Standard Service Price", money(pricing.standard_service_price)],
     ["Frequency", pricing.frequency],
     [pricing.frequency_discount_label, `${number(pricing.frequency_discount_percent)}%`],
     ["Frequency Discount", `-${money(pricing.frequency_discount_amount)}`],
     ["Price After Frequency Discount", money(pricing.price_after_frequency_discount)],
-    ["Custom Discount", `-${money(pricing.custom_discount_amount)}`],
-    ...(pricing.taxes > 0 ? [["Taxes", money(pricing.taxes)] as [string, string]] : []),
+    ...(proposalDiscount > 0 ? [["Proposal / Custom Discount", `-${money(proposalDiscount)}`] as [string,string]] : []),
+    ...((pricing.additional_agreement_discount_amount ?? 0) > 0 ? [["Additional Agreement Discount", `-${money(pricing.additional_agreement_discount_amount ?? 0)}`] as [string,string]] : []),
+    ...(extras.length ? [["Purchased Add-Ons Total", money(addonTotal)] as [string,string]] : []),
+    ...(pricing.taxes > 0 ? [["Taxes", money(pricing.taxes)] as [string,string]] : []),
     ["Final Per-Visit Price", money(pricing.final_per_visit_price)],
     ["Estimated Monthly Total", pricing.estimated_monthly_total === null ? "Not applicable" : money(pricing.estimated_monthly_total)],
   ];
