@@ -23,6 +23,7 @@ export type AgreementPricingSnapshot = {
   frequency_discount_amount: number;
   price_after_frequency_discount: number;
   custom_discount_amount: number;
+  additional_agreement_discount_amount?: number;
   taxes: number;
   final_per_visit_price: number;
   estimated_monthly_total: number | null;
