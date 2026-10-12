@@ -19,7 +19,7 @@ import { getActiveCrews } from "@/lib/services/crews";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
 import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
 import { matchingRecurringRules } from "@/lib/pricing/pricingEngine";
-import { getProposalById } from "@/lib/services/proposals";
+import { getProposalById, getProposals } from "@/lib/services/proposals";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import { formatTime12Hour } from "@/lib/formatTime";
 import { serviceFrequencyLabel } from "@/lib/scheduling/frequency";
@@ -52,6 +52,8 @@ export function AgreementsPage() {
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [form, setForm] = useState<AgreementWithRelations | null | "new">(null);
   const [proposalSource, setProposalSource] = useState<ProposalWithRelations | null>(null);
+  const [linkableProposals, setLinkableProposals] = useState<ProposalWithRelations[]>([]);
+  const [linkingProposal, setLinkingProposal] = useState(false);
   const [preview, setPreview] = useState<AgreementWithRelations | null>(null);
   const [send, setSend] = useState<AgreementWithRelations | null>(null);
   const [documents, setDocuments] = useState<AgreementWithRelations | null>(null);
@@ -90,6 +92,23 @@ export function AgreementsPage() {
       })
       .catch((cause) => setError(message(cause)));
   }, []);
+  async function openProposalLinker() {
+    setError(null);
+    setLinkingProposal(true);
+    try {
+      const proposals = await getProposals();
+      const linked = new Set(agreements.filter(row => !row.archived_at && !["Cancelled", "Archived"].includes(row.status)).map(row => row.proposal_id));
+      setLinkableProposals(proposals.filter(row => row.status === "Accepted" && Boolean(row.accepted) && ["Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Every 4 Weeks", "Multiple Days Per Week", "Custom"].includes(row.frequency) && !linked.has(row.id)));
+    } catch (cause) {
+      setError(message(cause));
+      setLinkingProposal(false);
+    }
+  }
+  function chooseProposal(proposal: ProposalWithRelations) {
+    setProposalSource(proposal);
+    setForm("new");
+    setLinkingProposal(false);
+  }
   async function act(operation: () => Promise<unknown>, success: string) {
     setError(null); setNotice(null);
     try { await operation(); await load(); setNotice(success); }
@@ -136,7 +155,8 @@ export function AgreementsPage() {
   }
 
   return <>
-    <header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Service Agreements</h1><p className="mt-3 text-neutral-600">Manage recurring StudioScrubz service contracts and scheduled services.</p>{canManage && <button disabled={loading||!settings} className={`${primary} mt-5 disabled:opacity-50`} onClick={() => setForm("new")}>New Agreement</button>}</header>
+    <header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Service Agreements</h1><p className="mt-3 text-neutral-600">Manage recurring StudioScrubz service contracts and scheduled services.</p>{canManage && <button disabled={loading||!settings} className={`${primary} mt-5 disabled:opacity-50`} onClick={() => setForm("new")}>New Agreement</button><button disabled={loading||!settings} className={`${primary} ml-2 mt-5 disabled:opacity-50`} onClick={() => void openProposalLinker()}>Link Accepted Proposal</button>}</header>
+    {linkingProposal && <Modal close={() => setLinkingProposal(false)}><h2 className="mb-3 text-xl font-bold text-[#143d1a]">Link an Accepted Proposal</h2><p className="mb-4 text-sm text-neutral-600">Choose an accepted recurring proposal to create its linked service agreement with the accepted scope and pricing. Proposals already linked to active agreements are excluded.</p><div className="max-h-96 space-y-2 overflow-y-auto">{linkableProposals.map(row => <button key={row.id} type="button" className="w-full rounded-lg border p-3 text-left hover:bg-[#f5f8f4]" onClick={() => chooseProposal(row)}><span className="block font-semibold">{row.proposal_number} — {row.result.serviceName}</span><span className="text-sm text-neutral-600">{row.client?.client_name || "Client"} · {row.frequency} · {money(row.result.perVisitTotal)}</span></button>)}{linkableProposals.length===0 && <p className="rounded-lg border p-4 text-sm">No unlinked accepted recurring proposals were found.</p>}</div></Modal>}
     {error && <Alert text={error}/>} {notice && <Alert text={notice} good/>}
     <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-5">{metrics.map(([label, value]) => <Card key={label} label={label} value={loading ? "—" : value}/>)}</div>
     <div className="mt-6 flex gap-3 rounded-xl border bg-white p-4"><input className={input} placeholder="Search agreements" value={query} onChange={(event) => setQuery(event.target.value)}/><select className={input} value={status} onChange={(event) => setStatus(event.target.value)}><option>All</option>{AGREEMENT_STATUSES.map((value) => <option key={value}>{value}</option>)}</select></div>
