@@ -338,21 +338,21 @@ const navItems: Array<NavLink | NavGroup> = [
 
     label: "Invoices",
 
-    href: "/invoices",
-
     marker: "I",
 
-    permission: "invoices.view",
-
-  },
-
-  {
-
-    label: "Accounts",
-
-    marker: "A",
-
     children: [
+
+      {
+
+        label: "Invoices",
+
+        href: "/invoices",
+
+        marker: "I",
+
+        permission: "invoices.view",
+
+      },
 
       {
 
@@ -365,6 +365,18 @@ const navItems: Array<NavLink | NavGroup> = [
         permission: "agreements.view",
 
       },
+
+    ],
+
+  },
+
+  {
+
+    label: "Accounts",
+
+    marker: "A",
+
+    children: [
 
       {
 
