@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { addProposalHistory, getProposalById } from "@/lib/services/proposals";
-import { catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
+import { agreementPricingWithAdditionalDiscount, catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
 import { validAcceptedPricingAllocation } from "@/lib/pricing/acceptedPricingAllocation";
 import { getServiceCatalog } from "@/lib/services/serviceCatalog";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
@@ -108,6 +108,7 @@ export async function createAgreement(input: AgreementInput) {
   throw new Error("A unique agreement number could not be generated.");
 }
 export type ProposalAgreementReview = {
+  additionalDiscount?: number;
   startDate: string;
   endDate: string | null;
   daysOfWeek: (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
@@ -161,9 +162,9 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
   if (!review.startDate) throw new Error("Confirm the Agreement Start Date.");
   if (!AGREEMENT_BILLING_TYPES.includes(review.billingType)) throw new Error("Select a Billing Type.");
   if (p.result.serviceName === "StudioScrubz Upkeep Plan" && review.billingType !== "Monthly") throw new Error("Upkeep Plan agreements must use Monthly billing so the package is billed once per month.");
-  const pricing = { ...proposalAgreementPricing(p), service_description: agreementServiceDescriptionFromProposal(p, catalog.services) };
+  const pricing = agreementPricingWithAdditionalDiscount({ ...proposalAgreementPricing(p), service_description: agreementServiceDescriptionFromProposal(p, catalog.services) }, review.additionalDiscount ?? 0);
   const billingAmount = review.billingType === "Per Visit" ? pricing.final_per_visit_price : Number(review.billingAmount);
-  if (review.billingType === "Per Visit" && p.result.acceptedPricingAllocation && !validAcceptedPricingAllocation(p.result.acceptedPricingAllocation, billingAmount)) throw new Error("The accepted Proposal pricing allocation does not match its authoritative per-visit price.");
+  if (review.billingType === "Per Visit" && pricing.accepted_pricing_allocation && !validAcceptedPricingAllocation(pricing.accepted_pricing_allocation, billingAmount)) throw new Error("The accepted Proposal pricing allocation does not match its authoritative per-visit price.");
   if (!Number.isFinite(billingAmount) || billingAmount <= 0)
     throw new Error(`Enter the ${review.billingType === "Weekly" ? "Weekly Contract Amount" : review.billingType === "Biweekly" ? "Biweekly Contract Amount" : review.billingType === "Monthly" ? "Monthly Contract Amount" : review.billingType === "Flat Contract" ? "Contract Value" : "Billing Amount"}.`);
   const frequency = p.frequency as AgreementFrequency;
