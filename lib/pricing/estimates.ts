@@ -661,7 +661,10 @@ export function calculateCommercialEstimate(
     catalog.tiers,
   );
 
-  const oneTimePrice = Math.max(serviceFloor, profitabilityPrice);
+  const floorDetailAdjustment = configured.addonAdjustments
+    .filter(item => item.label === "Floor Detail")
+    .reduce((total, item) => total + item.amount, 0);
+  const oneTimePrice = Math.max(serviceFloor, profitabilityPrice) + floorDetailAdjustment;
 
   const pricing = calculateRecurringTotals({
     subtotal: oneTimePrice,
