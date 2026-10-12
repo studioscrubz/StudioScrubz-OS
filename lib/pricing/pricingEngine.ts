@@ -609,6 +609,30 @@ export function assertProductionPricing(
   }
 }
 
+/** Direct Job residential bedroom tiers require the actual property configuration. */
+export function calculateDirectJobServicePrice(
+  service: CatalogService,
+  property: { square_feet: number | null; bedrooms: number | null; bathrooms: number | null } | null,
+  tiers: ServicePriceTier[],
+): number | null {
+  if (!property) return null;
+  const serviceTiers = tiers.filter(tier => tier.service_id === service.id && tier.is_active);
+  if (service.pricing_model === "Size Tier" && serviceTiers.some(tier => tier.unit_label === "Bedrooms")) {
+    if (property.bedrooms == null || property.bathrooms == null) return null;
+    const matching = serviceTiers.find(tier =>
+      Number(tier.pricing_config.bedrooms) === property.bedrooms &&
+      tier.pricing_config.bathrooms != null &&
+      Number(tier.pricing_config.bathrooms) === property.bathrooms,
+    ) ?? serviceTiers.find(tier =>
+      Number(tier.pricing_config.bedrooms) === property.bedrooms &&
+      tier.pricing_config.bathrooms == null,
+    );
+    if (!matching || matching.pricing_config.custom_quote === true) return null;
+    return Math.max(Number(matching.price) || 0, Number(service.minimum_price) || 0);
+  }
+  return calculateServicePrice(service, property.square_feet || 1, tiers);
+}
+
 export function calculateServicePrice(
   service: CatalogService,
   quantity: number,
