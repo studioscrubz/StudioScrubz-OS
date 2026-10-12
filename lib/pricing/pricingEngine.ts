@@ -29,6 +29,16 @@ export function findMatchingTier(
   );
 }
 
+export function floorDetailTierPrice(squareFeet: number): number {
+  if (!Number.isInteger(squareFeet) || squareFeet < 1) throw new Error("Enter a whole-number Floor Detail area of at least 1 sq. ft.");
+  if (squareFeet > 5000) throw new Error("Floor Detail over 5,000 sq. ft. requires a custom quote.");
+  if (squareFeet <= 500) return 150;
+  if (squareFeet <= 1000) return 225;
+  if (squareFeet <= 2000) return 350;
+  if (squareFeet <= 3000) return 475;
+  return 650;
+}
+
 export function calculateAddons(
   names: string[],
   addons: ServiceAddon[],
@@ -127,7 +137,9 @@ export function calculateAddons(
 
     let base: number;
 
-    if (addon.pricing_model === "Custom") {
+    if (addon.addon_code === "COM-FLOOR") {
+      base = floorDetailTierPrice(Number(selected?.quantity));
+    } else if (addon.pricing_model === "Custom") {
       const calculatedCost =
         laborHours * Math.max(0, hourlyRate) + supplyCost;
 
