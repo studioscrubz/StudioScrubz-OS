@@ -13,10 +13,10 @@ vm.runInNewContext(code, {
   exports: target.exports,
   require: (id) => {
     if (id === "@/lib/scheduling/frequency") return { estimatedMonthlyTotal: (amount) => amount };
-    if (id === "@/lib/pricing/pricingEngine") return { calculateRecurringTotals: ({ subtotal, manualDiscountPercent = 0 }) => {
-      const recurringDiscountAmount = subtotal * 0.1;
-      const manualDiscount = subtotal * manualDiscountPercent / 100;
-      return { manualDiscount, taxes: 0, finalPrice: subtotal - recurringDiscountAmount - manualDiscount, recurringDiscountAmount, recurringDiscountPercent: 10, recurringPricingRuleId: "rule", recurringPricingRuleName: "10%" };
+    if (id === "@/lib/pricing/pricingEngine") return { calculateRecurringTotals: ({ subtotal, baseServiceAmount = subtotal, addonTotal = 0, manualDiscountPercent = 0 }) => {
+      const recurringDiscountAmount = baseServiceAmount * 0.1;
+      const manualDiscount = (baseServiceAmount - recurringDiscountAmount) * manualDiscountPercent / 100;
+      return { manualDiscount, taxes: 0, finalPrice: baseServiceAmount - recurringDiscountAmount - manualDiscount + addonTotal, recurringDiscountAmount, recurringDiscountPercent: 10, recurringPricingRuleId: "rule", recurringPricingRuleName: "10%" };
     } };
     if (id === "@/lib/pricing/authoritativePrice") return { withAuthoritativeEstimatePrice: (value) => value };
     throw new Error(`Unexpected runtime import: ${id}`);
@@ -94,24 +94,24 @@ test("zero, flat, multiple, custom, and proposal-only adjustments use one breakd
 });
 
 test("inherited add-on is charged once and supports unchanged, changed, and removed quantity", () => {
-  const inheritedEstimate = estimate({ finalPrice: 200, adjustments: [addon("windows", 8)] });
+  const inheritedEstimate = estimate({ finalPrice: 200, oneTimePrice: 200, adjustments: [addon("windows", 8)] });
   assert.equal(calculateProposal(input({ estimate: inheritedEstimate, adjustments: [addon("windows", 8, { quantity: 1, unitPrice: 8 })] })).perVisitTotal, 208);
   assert.equal(calculateProposal(input({ estimate: inheritedEstimate, adjustments: [addon("windows", 64, { quantity: 8, unitPrice: 8 })] })).perVisitTotal, 264);
   assert.equal(calculateProposal(input({ estimate: inheritedEstimate, adjustments: [] })).perVisitTotal, 200);
 });
 
-test("inherited and Proposal discounts reconcile in displayed ordering", () => {
-  const inherited = estimate({ finalPrice: 850, recurringDiscount: 100, recurringDiscountPercent: 10, manualDiscount: 50 });
+test("inherited and Proposal discounts apply only to service before add-ons", () => {
+  const inherited = estimate({ oneTimePrice: 1000, finalPrice: 850, recurringDiscount: 100, recurringDiscountPercent: 10, manualDiscount: 50 });
   const result = calculateProposal(input({ estimate: inherited, adjustments: [addon("flat", 20)], manualDiscountPercent: 10 }));
   assert.equal(result.baseEstimateAmount, 1000);
-  assert.equal(result.manualDiscount, 102);
-  assert.equal(result.perVisitTotal, 768);
+  assert.equal(result.manualDiscount, 85);
+  assert.equal(result.perVisitTotal, 785);
   assert.equal(displayedTotal(result), result.perVisitTotal);
 });
 
 test("catalog-only recurring pricing and saved JSON retain identical arithmetic", () => {
   const result = calculateProposal(input({ estimate: null, catalogBasePrice: 500, adjustments: [addon("flat", 50)], manualDiscountPercent: 5 }));
-  assert.equal(result.perVisitTotal, 467.5);
+  assert.equal(result.perVisitTotal, 477.5);
   const reopened = JSON.parse(JSON.stringify(result));
   assert.equal(displayedTotal(reopened), reopened.perVisitTotal);
   assert.equal(JSON.stringify(reopened), JSON.stringify(result));

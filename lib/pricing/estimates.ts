@@ -393,6 +393,8 @@ export function calculateResidentialEstimate(
 
   const pricing = calculateRecurringTotals({
     subtotal: oneTimePrice,
+    baseServiceAmount: calculatedServicePrice,
+    addonTotal,
     frequency: input.frequency,
     customIntervalDays: input.customIntervalDays,
     rules: catalog.recurringRules,
@@ -665,6 +667,11 @@ export function calculateCommercialEstimate(
 
   const pricing = calculateRecurringTotals({
     subtotal: oneTimePrice,
+    baseServiceAmount: Math.max(
+      0,
+      oneTimePrice - configured.addonAdjustments.reduce((sum, item) => sum + item.amount, 0),
+    ),
+    addonTotal: configured.addonAdjustments.reduce((sum, item) => sum + item.amount, 0),
     frequency: input.frequency,
     customIntervalDays: input.customIntervalDays,
     rules: catalog.recurringRules,

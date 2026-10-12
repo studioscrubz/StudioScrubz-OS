@@ -20,13 +20,14 @@ test("Estimate and Proposal authoritative prices are durable explicit overrides"
   assert.match(helper,/manualPerVisitTotal: null/);
 });
 
-test("frequency repricing preserves an approved upstream manual price and Proposal breakdown has no hidden add-on rebase",()=>{
+test("frequency repricing preserves an approved upstream manual price and separates purchased add-ons",()=>{
   const proposalMath=read("lib/pricing/proposals.ts");
   const helper=read("lib/pricing/authoritativePrice.ts");
   assert.match(proposalMath,/withAuthoritativeEstimatePrice\([^;]+estimate\.manualPrice\?\?null\)/s);
-  assert.doesNotMatch(proposalMath,/inheritedCatalogAddonTotal/);
-  assert.match(proposalMath,/baseEstimateAmount = Math\.max\(0, input\.estimate\.finalPrice - taxes \+ recurringDiscount \+ inheritedManualDiscount\)/);
-  assert.match(proposalMath,/beforeDiscount = baseEstimateAmount \+ additions/);
+  assert.match(proposalMath,/const inheritedAddonTotal = catalogAddonTotal\(input\.estimate\)/);
+  assert.match(proposalMath,/baseEstimateAmount = inheritedBase/);
+  assert.match(proposalMath,/serviceAfterInheritedDiscounts = Math\.max\(0, baseEstimateAmount \+ nonAddonAdditions - recurringDiscount - inheritedManualDiscount\)/);
+  assert.match(proposalMath,/serviceAfterInheritedDiscounts - manualDiscount \+ proposalAddonTotal \+ taxes/);
   assert.match(helper,/monthlyTotal: estimatedMonthlyTotal\(perVisitTotal, frequency\)/);
 });
 
@@ -37,7 +38,7 @@ test("Walkthrough reviewed pricing is separate from the historical Estimate and 
   assert.match(modal,/The original Estimate is not changed/);
   assert.match(route,/withAuthoritativeEstimatePrice\(\s*calculatedResult,\s*manualPrice\s*\)/);
   assert.match(route,/finalReviewedPrice: estimateResult\.finalPrice/);
-  assert.match(proposals,/input\.estimate\.finalPrice/);
+  assert.match(proposals,/estimateSubtotal\(input\.estimate\)/);
 });
 
 test("Proposal edit routes reuse ProposalBuilder and updates do not create duplicates", () => {

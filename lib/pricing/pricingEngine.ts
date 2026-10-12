@@ -293,6 +293,10 @@ export function applyRecurringRule(
 
 export function calculateRecurringTotals(input: {
   subtotal: number;
+  /** Portion of subtotal eligible for service discounts. Defaults to subtotal for legacy callers. */
+  baseServiceAmount?: number;
+  /** Purchased add-ons are added after all service discounts. */
+  addonTotal?: number;
   frequency: string;
   customIntervalDays?: number | null;
   rules: RecurringPricingRule[];
@@ -308,8 +312,22 @@ export function calculateRecurringTotals(input: {
     Number(input.subtotal) || 0,
   );
 
-  const recurring = applyRecurringRule(
+  const addonTotal = Math.min(
     subtotal,
+    Math.max(0, Number(input.addonTotal) || 0),
+  );
+  const baseServiceAmount = Math.min(
+    subtotal - addonTotal,
+    Math.max(
+      0,
+      input.baseServiceAmount == null
+        ? subtotal - addonTotal
+        : Number(input.baseServiceAmount) || 0,
+    ),
+  );
+
+  const recurring = applyRecurringRule(
+    baseServiceAmount,
     input.frequency,
     input.rules,
     input.serviceId,
@@ -318,7 +336,7 @@ export function calculateRecurringTotals(input: {
 
   const requestedManualDiscount =
     input.manualDiscountAmount ??
-    subtotal *
+    recurring.amount *
       (clampPercent(
         input.manualDiscountPercent ?? 0,
       ) /
@@ -329,10 +347,11 @@ export function calculateRecurringTotals(input: {
     Math.max(0, requestedManualDiscount),
   );
 
-  const taxable = Math.max(
+  const discountedService = Math.max(
     0,
     recurring.amount - manualDiscount,
   );
+  const taxable = discountedService + addonTotal;
 
   const taxes =
     input.fixedTaxes != null
@@ -348,6 +367,8 @@ export function calculateRecurringTotals(input: {
 
   return {
     subtotal: round(subtotal),
+    baseServiceAmount: round(baseServiceAmount),
+    addonTotal: round(addonTotal),
     recurringPricingRuleId:
       recurring.rule?.id ?? null,
     recurringPricingRuleName:
@@ -362,6 +383,8 @@ export function calculateRecurringTotals(input: {
       recurring.amount,
     ),
     manualDiscount: round(manualDiscount),
+    discountedServiceAmount: round(discountedService),
+    preTaxTotal: round(taxable),
     taxes: round(taxes),
     finalPrice: round(finalPrice),
     monthlyPrice: estimatedMonthlyTotal(

@@ -7,7 +7,9 @@ import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice
 
 export function repriceEstimateFrequency(estimate: EstimateResult, frequency: Frequency, rules: RecurringPricingRule[], serviceId: string, recurringPricingRuleId?:string|null, customIntervalDays?: number | null): EstimateResult {
   const interval = frequency === "Custom" ? customIntervalDays ?? estimate.calculatorInput.customIntervalDays ?? null : null;
-  const pricing = calculateRecurringTotals({ subtotal: estimate.oneTimePrice, frequency, customIntervalDays: interval, rules, serviceId, recurringPricingRuleId, manualDiscountAmount: estimate.manualDiscount });
+  const addonTotal = catalogAddonTotal(estimate);
+  const subtotal = estimateSubtotal(estimate);
+  const pricing = calculateRecurringTotals({ subtotal, baseServiceAmount: Math.max(0, subtotal - addonTotal), addonTotal, frequency, customIntervalDays: interval, rules, serviceId, recurringPricingRuleId, manualDiscountAmount: estimate.manualDiscount });
   return withAuthoritativeEstimatePrice({ ...estimate, calculatedFinalPrice:pricing.finalPrice, recurringPricingRuleId:pricing.recurringPricingRuleId,recurringPricingRuleName:pricing.recurringPricingRuleName, recurringDiscount: pricing.recurringDiscountAmount, recurringDiscountPercent: pricing.recurringDiscountPercent, totalDiscount: money(pricing.recurringDiscountAmount + pricing.manualDiscount), taxes: pricing.taxes, finalPrice: pricing.finalPrice, monthlyPrice: pricing.monthlyPrice, calculatorInput: { ...estimate.calculatorInput, frequency,customIntervalDays:interval,recurringPricingRuleId:pricing.recurringPricingRuleId } },estimate.manualPrice??null);
 }
 
@@ -15,7 +17,6 @@ export function calculateProposal(input: { estimate: EstimateResult | null; cata
   const customIntervalDays = input.frequency === "Custom" ? input.customIntervalDays ?? input.estimate?.calculatorInput.customIntervalDays ?? null : null;
   const adjustmentTotal = input.adjustments.reduce((sum, item) => sum + item.amount, 0);
   const additions = adjustmentTotal + input.additionalLabor + input.additionalMaterials;
-  let beforeDiscount: number;
   let recurringDiscount: number;
   let recurringDiscountPercent: number;
   let manualDiscount: number;
@@ -26,20 +27,25 @@ export function calculateProposal(input: { estimate: EstimateResult | null; cata
   let baseEstimateAmount:number;
 
   if (input.estimate) {
+    const inheritedAddonTotal = catalogAddonTotal(input.estimate);
+    const proposalAddonTotal = input.adjustments.filter(item => Boolean(item.catalogAddonId)).reduce((sum, item) => sum + item.amount, 0);
+    const nonAddonAdditions = additions - proposalAddonTotal;
     recurringDiscount = input.estimate.recurringDiscount ?? 0;
     recurringDiscountPercent = input.estimate.recurringDiscountPercent ?? 0;
     const inheritedManualDiscount = input.estimate.manualDiscount ?? 0;
     taxes = input.estimate.taxes ?? 0;
-    baseEstimateAmount = Math.max(0, input.estimate.finalPrice - taxes + recurringDiscount + inheritedManualDiscount);
-    beforeDiscount = baseEstimateAmount + additions;
-    manualDiscount = beforeDiscount * clamp(input.manualDiscountPercent) / 100;
-    perVisitTotal = Math.max(0, beforeDiscount - recurringDiscount - inheritedManualDiscount - manualDiscount + taxes);
+    const inheritedBase = Math.max(0, estimateSubtotal(input.estimate) - inheritedAddonTotal);
+    baseEstimateAmount = inheritedBase;
+    const serviceAfterInheritedDiscounts = Math.max(0, baseEstimateAmount + nonAddonAdditions - recurringDiscount - inheritedManualDiscount);
+    manualDiscount = serviceAfterInheritedDiscounts * clamp(input.manualDiscountPercent) / 100;
+    perVisitTotal = Math.max(0, serviceAfterInheritedDiscounts - manualDiscount + proposalAddonTotal + taxes);
     recurringPricingRuleId=input.estimate.recurringPricingRuleId??null;
     recurringPricingRuleName=input.estimate.recurringPricingRuleName??null;
   } else {
-    const subtotal = Math.max(0, input.catalogBasePrice ?? 0) + additions;
-    const pricing = calculateRecurringTotals({ subtotal, frequency: input.frequency, customIntervalDays, rules: input.recurringRules, serviceId: input.serviceId ?? "", recurringPricingRuleId:input.recurringPricingRuleId, manualDiscountPercent: input.manualDiscountPercent });
-    beforeDiscount = subtotal;
+    const addonTotal = input.adjustments.filter(item => Boolean(item.catalogAddonId)).reduce((sum, item) => sum + item.amount, 0);
+    const baseServiceAmount = Math.max(0, input.catalogBasePrice ?? 0) + additions - addonTotal;
+    const subtotal = baseServiceAmount + addonTotal;
+    const pricing = calculateRecurringTotals({ subtotal, baseServiceAmount, addonTotal, frequency: input.frequency, customIntervalDays, rules: input.recurringRules, serviceId: input.serviceId ?? "", recurringPricingRuleId:input.recurringPricingRuleId, manualDiscountPercent: input.manualDiscountPercent });
     manualDiscount = pricing.manualDiscount;
     taxes = pricing.taxes;
     perVisitTotal = pricing.finalPrice;
@@ -89,3 +95,10 @@ export function withProposalRevisionBaseline(estimate: EstimateResult, proposal:
 
 function clamp(value: number): number { return Math.min(100, Math.max(0, value || 0)); }
 function money(value: number): number { return Math.round(value * 100) / 100; }
+function catalogAddonTotal(estimate: EstimateResult): number {
+  return money((estimate.catalogAddons ?? []).reduce((sum, item) => sum + Number(item.lineTotal ?? item.price ?? 0), 0));
+}
+function estimateSubtotal(estimate: EstimateResult): number {
+  if (Number.isFinite(estimate.oneTimePrice)) return Math.max(0, estimate.oneTimePrice);
+  return Math.max(0, estimate.finalPrice - (estimate.taxes ?? 0) + (estimate.recurringDiscount ?? 0) + (estimate.manualDiscount ?? 0));
+}

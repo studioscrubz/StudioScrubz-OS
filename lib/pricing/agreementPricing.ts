@@ -5,10 +5,16 @@ import type { RecurringPricingRule } from "@/types/serviceCatalog";
 
 export function proposalAgreementPricing(proposal: ProposalWithRelations): AgreementPricingSnapshot {
   const estimate = proposal.estimate?.result;
+  const serviceAdjustments = proposal.result.adjustments
+    .filter((item) => !item.catalogAddonId)
+    .reduce((sum, item) => sum + item.amount, 0) +
+    proposal.result.additionalLabor + proposal.result.additionalMaterials;
   return make({
     source: "Accepted Proposal",
     serviceDescription: proposal.result.serviceDescription?.trim() || proposal.walkthrough?.measurements.serviceDescription?.trim() || proposal.estimate?.result.serviceDescription?.trim() || null,
-    standard: estimate?.oneTimePrice ?? proposal.result.baseEstimateAmount,
+    // Proposal results now separate the discount-eligible service from purchased add-ons.
+    // The accepted final and allocation remain authoritative for older accepted proposals.
+    standard: proposal.result.baseEstimateAmount + serviceAdjustments,
     frequency: proposal.frequency,
     recurringRuleId:proposal.result.recurringPricingRuleId??null,
     recurringRuleName:proposal.result.recurringPricingRuleName??null,
@@ -25,7 +31,7 @@ export function proposalAgreementPricing(proposal: ProposalWithRelations): Agree
     // Preserve every explicitly purchased proposal add-on in the immutable
     // agreement pricing snapshot. The legacy property name also holds custom
     // add-ons; labor/material inputs remain separate internal pricing inputs.
-    catalogAddons:proposal.result.adjustments,
+    catalogAddons:proposal.result.adjustments.filter((item) => Boolean(item.catalogAddonId)),
   });
 }
 

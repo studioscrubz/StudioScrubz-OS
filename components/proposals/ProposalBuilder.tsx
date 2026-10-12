@@ -1049,6 +1049,17 @@ function Summary({
   save: () => Promise<void>;
   editing: boolean;
 }) {
+  const purchasedAddonTotal = r.adjustments
+    .filter((item) => Boolean(item.catalogAddonId))
+    .reduce((sum, item) => sum + item.amount, 0);
+  const customServiceAdjustments = r.adjustments
+    .filter((item) => !item.catalogAddonId)
+    .reduce((sum, item) => sum + item.amount, 0) + r.additionalLabor + r.additionalMaterials;
+  const discountedService = Math.max(
+    0,
+    r.baseEstimateAmount + customServiceAdjustments -
+      (r.frequencyDiscount ?? 0) - (r.inheritedManualDiscount ?? 0) - r.manualDiscount,
+  );
   return (
     <aside className="sticky top-6 rounded-2xl bg-[#143d1a] p-6 text-white">
       <p className="text-xs font-bold uppercase tracking-widest text-[#d4af37]">
@@ -1066,18 +1077,9 @@ function Summary({
       <dl className="mt-5 divide-y divide-white/10">
         {[
           ["Base Service Price", money(r.baseEstimateAmount)],
-          ...r.adjustments
-            .filter((x) => x.catalogAddonId)
-            .map((x) => [`Add-On: ${x.label}`, money(x.amount)]),
           [
-            "Custom Add-Ons / Adjustments",
-            money(
-              r.adjustments
-                .filter((x) => !x.catalogAddonId)
-                .reduce((s, x) => s + x.amount, 0) +
-                r.additionalLabor +
-                r.additionalMaterials,
-            ),
+            "Custom Service Adjustments",
+            money(customServiceAdjustments),
           ],
           ["Recurring Discount %", `${r.frequencyDiscountPercent ?? 0}%`],
           ["Recurring Discount", `-${money(r.frequencyDiscount ?? 0)}`],
@@ -1086,6 +1088,11 @@ function Summary({
             `-${money(r.inheritedManualDiscount ?? 0)}`,
           ],
           ["Proposal Manual Discount", `-${money(r.manualDiscount)}`],
+          ["Discounted Service", money(discountedService)],
+          ...r.adjustments
+            .filter((x) => x.catalogAddonId)
+            .map((x) => [`Add-On: ${x.label}`, money(x.amount)]),
+          ["Subtotal", money(discountedService + purchasedAddonTotal)],
           ...(r.taxes > 0 ? [["Taxes", money(r.taxes)]] : []),
           ...(r.manualPerVisitTotal != null
             ? [[
