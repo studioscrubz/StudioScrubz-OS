@@ -114,7 +114,13 @@ export function AgreementsPage() {
     (!query || [agreement.agreement_number, agreement.agreement_name, agreement.service_name, clientName(agreement), agreement.property?.address]
       .filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase()))).sort((a, b) => clientName(a).localeCompare(clientName(b)) || a.agreement_number.localeCompare(b.agreement_number)), [agreements, query, status]);
   const today = dateOnly();
-  const visibleOccurrences = occurrences.filter((row) => !isDeletedOccurrence(row));
+  // Once an occurrence has become a Job, the operational Job is the authoritative
+  // schedule. Preserve the original recurrence row in storage for audit/history.
+  const visibleOccurrences = occurrences.filter((row) => !isDeletedOccurrence(row)).map((row) =>
+    row.job && row.job_id
+      ? { ...row, scheduled_date: row.job.scheduled_date ?? row.scheduled_date, scheduled_start_time: row.job.start_time ?? row.scheduled_start_time }
+      : row
+  );
   const active = agreements.filter((agreement) => agreement.status === "Active" && !agreement.archived_at);
   const metrics = [
     ["Active Agreements", String(active.length)],
