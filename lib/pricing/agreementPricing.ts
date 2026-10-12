@@ -39,6 +39,7 @@ export function agreementPricingWithAdditionalDiscount(pricing: AgreementPricing
   return {
     ...pricing,
     custom_discount_amount: Math.round((pricing.custom_discount_amount + discount) * 100) / 100,
+    additional_agreement_discount_amount: Math.round(((pricing.additional_agreement_discount_amount ?? 0) + discount) * 100) / 100,
     final_per_visit_price: final,
     estimated_monthly_total: pricing.estimated_monthly_total === null || pricing.final_per_visit_price <= 0
       ? pricing.estimated_monthly_total
