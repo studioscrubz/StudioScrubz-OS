@@ -30,6 +30,8 @@ import type {
 } from "@/types/job";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import { ScheduleOccurrences } from "@/components/agreements/ScheduleOccurrences";
+import { getUpcomingOccurrences, isDeletedOccurrence } from "@/lib/services/serviceOccurrences";
+import type { ServiceOccurrenceWithRelations } from "@/types/serviceOccurrence";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
@@ -46,9 +48,10 @@ import type {
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
 type View = "Day" | "Week" | "Month" | "List";
-type EventSource = "All Events" | "Jobs" | "Walkthroughs" | "Internal Events";
+type EventSource = "All Events" | "Jobs" | "Recurring Services" | "Walkthroughs" | "Internal Events";
 type CrewDisplayOption = { id: string; crew_name: string };
 type ScheduleEvent =
+  | { kind: "Recurring Service"; id: string; date: string; time: string | null; occurrence: ServiceOccurrenceWithRelations }
   | {
       kind: "Job";
       id: string;
@@ -123,6 +126,7 @@ export function SchedulePage() {
   const canViewJobTime = hasPermission(profile, "jobs.view");
   const salesReadOnly = profile?.role === "Sales";
   const [jobs, setJobs] = useState<JobWithRelations[]>([]);
+  const [occurrences, setOccurrences] = useState<ServiceOccurrenceWithRelations[]>([]);
   const [walkthroughs, setWalkthroughs] = useState<WalkthroughWithRelations[]>(
     [],
   );
@@ -154,21 +158,23 @@ export function SchedulePage() {
   >(null);
 
   async function load() {
-    const [j, w, c, i] = await Promise.all([
+    const [j, w, c, i, o] = await Promise.all([
       getCalendarJobs(),
       canViewWalkthroughs ? getScheduledWalkthroughs() : Promise.resolve([]),
       salesReadOnly ? Promise.resolve([]) : getActiveCrews(),
       internalAccess !== "None"
         ? getInternalScheduleEvents()
         : Promise.resolve([]),
+      getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
     ]);
     setJobs(j.filter((x) => !x.archived_at));
+    setOccurrences(o);
     setWalkthroughs(w);
     setCrews(c);
     setInternalEvents(i);
   }
 
-  useOperationalRealtime(["jobs", "walkthroughs", "crews", "employees"], load);
+  useOperationalRealtime(["jobs", "walkthroughs", "crews", "employees", "service_occurrences", "service_agreements"], load);
 
   useEffect(() => {
     let active = true;
@@ -208,10 +214,12 @@ export function SchedulePage() {
       internalAccess !== "None"
         ? getInternalScheduleEvents()
         : Promise.resolve([]),
+      getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
     ])
-      .then(([j, w, c, i]) => {
+      .then(([j, w, c, i, o]) => {
         if (active) {
           setJobs(j.filter((x) => !x.archived_at));
+          setOccurrences(o);
           setWalkthroughs(w);
           setCrews(c);
           setInternalEvents(i);
@@ -265,6 +273,7 @@ export function SchedulePage() {
           .toLowerCase();
         return (
           source !== "Walkthroughs" &&
+          source !== "Recurring Services" &&
           source !== "Internal Events" &&
           (!search || hay.includes(search.toLowerCase())) &&
           (status === "All" || j.status === status) &&
@@ -298,6 +307,7 @@ export function SchedulePage() {
           .toLowerCase();
         return (
           source !== "Jobs" &&
+          source !== "Recurring Services" &&
           source !== "Internal Events" &&
           (!search || hay.includes(search.toLowerCase())) &&
           (status === "All" || status === "Scheduled") &&
@@ -325,6 +335,7 @@ export function SchedulePage() {
           .toLowerCase();
         return (
           source !== "Jobs" &&
+          source !== "Recurring Services" &&
           source !== "Walkthroughs" &&
           (!search || hay.includes(search.toLowerCase())) &&
           (status === "All" ||
@@ -335,8 +346,10 @@ export function SchedulePage() {
       }),
     [internalEvents, search, source, status],
   );
+  const filteredOccurrences = useMemo(() => occurrences.filter(row => !isDeletedOccurrence(row) && !row.job_id && row.status === "Scheduled" && row.agreement.status === "Active" && (source === "All Events" || source === "Recurring Services") && (status === "All" || status === "Scheduled") && (division === "All" || row.agreement.division === division) && (crew === "All" || row.assigned_crew_id === crew) && (!search || [row.agreement.service_name, row.agreement.agreement_number, row.agreement.client?.company_name, row.agreement.client?.first_name, row.agreement.client?.last_name].filter(Boolean).join(" ").toLowerCase().includes(search.toLowerCase()))), [occurrences, source, status, division, crew, search]);
   const events = useMemo<ScheduleEvent[]>(
     () => [
+      ...filteredOccurrences.map((occurrence) => ({ kind: "Recurring Service" as const, id: occurrence.id, date: occurrence.scheduled_date, time: occurrence.scheduled_start_time, occurrence })),
       ...filteredJobs.map((job) => ({
         kind: "Job" as const,
         id: job.id,
@@ -359,7 +372,7 @@ export function SchedulePage() {
         internalEvent,
       })),
     ],
-    [filteredInternalEvents, filteredJobs, filteredWalkthroughs],
+    [filteredInternalEvents, filteredJobs, filteredWalkthroughs, filteredOccurrences],
   );
   const week = weekDates(selectedDate);
   const monthStart = `${selectedDate.slice(0, 7)}-01`;
@@ -627,6 +640,7 @@ function Filters(p: {
             [
               "All Events",
               "Jobs",
+              "Recurring Services",
               "Walkthroughs",
               "Internal Events",
             ] as EventSource[]
@@ -706,6 +720,7 @@ function EventCard({
   openJob: (job: JobWithRelations) => void;
   openInternal: (event: InternalScheduleEvent) => void;
 }) {
+  if (event.kind === "Recurring Service") return <Link href="/agreements" className="block w-full rounded-xl border-l-4 border-emerald-600 bg-emerald-50 p-3 text-left shadow-sm"><b className="text-[#143d1a]">{event.time || "Time not set"}</b><p className="mt-1 text-xs font-extrabold">{event.occurrence.agreement.client?.company_name || [event.occurrence.agreement.client?.first_name, event.occurrence.agreement.client?.last_name].filter(Boolean).join(" ") || "Client"}</p><p className="text-xs">{event.occurrence.agreement.service_name}</p><p className="text-[11px] text-neutral-600">Recurring service · Awaiting Job creation</p></Link>;
   if (event.kind === "Job")
     return <JobCard job={event.job} open={() => openJob(event.job)} />;
   if (event.kind === "Walkthrough")
