@@ -64,6 +64,7 @@ export function AgreementsPage() {
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All");
+  const [agreementCategory, setAgreementCategory] = useState<"Recurring" | "One-Time">("Recurring");
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -122,6 +123,7 @@ export function AgreementsPage() {
     catch(cause){setError(message(cause))}
   }
   const shown = useMemo(() => agreements.filter((agreement) =>
+    (agreementCategory === "One-Time" ? agreement.frequency === "One-Time" : agreement.frequency !== "One-Time") &&
     (status === "All" || agreement.status === status) &&
     (!query || [agreement.agreement_number, agreement.agreement_name, agreement.service_name, clientName(agreement), agreement.property?.address]
       .filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase()))).sort((a, b) => clientName(a).localeCompare(clientName(b)) || a.agreement_number.localeCompare(b.agreement_number)), [agreements, query, status]);
@@ -148,10 +150,12 @@ export function AgreementsPage() {
   }
 
   return <>
-    <header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Service Agreements</h1><p className="mt-3 text-neutral-600">Manage recurring StudioScrubz service contracts and scheduled services.</p>{canManage && <><button disabled={loading||!settings} className={`${primary} mt-5 disabled:opacity-50`} onClick={() => void openNewAgreement()}>New Agreement</button></>}</header>
+    <header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Service Agreements</h1><p className="mt-3 text-neutral-600">Manage recurring service contracts and one-time service agreements in separate views.</p>{canManage && <><button disabled={loading||!settings} className={`${primary} mt-5 disabled:opacity-50`} onClick={() => void openNewAgreement()}>New Agreement</button></>}</header>
     {error && <Alert text={error}/>} {notice && <Alert text={notice} good/>}
     <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-5">{metrics.map(([label, value]) => <Card key={label} label={label} value={loading ? "—" : value}/>)}</div>
+    <div className="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Agreement type">{(["Recurring", "One-Time"] as const).map(category => <button key={category} type="button" role="tab" aria-selected={agreementCategory===category} onClick={()=>setAgreementCategory(category)} className={`rounded-lg border px-4 py-2 text-sm font-bold transition-colors ${agreementCategory===category?"border-[#143d1a] bg-[#143d1a] text-white":"border-neutral-300 bg-white text-[#143d1a] hover:bg-neutral-50"}`}>{category==="Recurring"?"Recurring Agreements":"One-Time Agreements"} ({agreements.filter(row=>category==="One-Time"?row.frequency==="One-Time":row.frequency!=="One-Time").length})</button>)}</div>
     <div className="mt-6 flex gap-3 rounded-xl border bg-white p-4"><input className={input} placeholder="Search agreements" value={query} onChange={(event) => setQuery(event.target.value)}/><select className={input} value={status} onChange={(event) => setStatus(event.target.value)}><option>All</option>{AGREEMENT_STATUSES.map((value) => <option key={value}>{value}</option>)}</select></div>
+    {!loading && shown.length===0 && <p className="mt-6 rounded-xl border bg-white p-6 text-sm text-neutral-600">No {agreementCategory==="One-Time"?"one-time":"recurring"} agreements match your current search and status filters.</p>}
     <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{shown.map((agreement) => <article className="rounded-xl border bg-white p-5" key={agreement.id}>
       <h2 className="font-bold text-[#143d1a]">{clientName(agreement)}</h2><b className="text-sm text-neutral-600">{agreement.agreement_number}</b><p>{agreement.agreement_name}</p>
       <p className="text-sm font-semibold text-[#34633c]">{agreement.division}</p>
