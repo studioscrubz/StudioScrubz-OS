@@ -43,13 +43,17 @@ begin
     raise exception 'Only prepared prospect deliveries can be linked.';
   end if;
 
-  -- RLS-aware lookup: staff may link only prospects they can read.
+  -- SECURITY DEFINER bypasses RLS: enforce Sales assignment explicitly.
   select * into prospect
   from public.prospects
   where id = p_prospect_id
     and merged_into_prospect_id is null;
 
   if not found then
+    raise exception 'Prospect unavailable or access denied.' using errcode = '42501';
+  end if;
+
+  if not management and prospect.assigned_user_id is distinct from auth.uid() then
     raise exception 'Prospect unavailable or access denied.' using errcode = '42501';
   end if;
 
