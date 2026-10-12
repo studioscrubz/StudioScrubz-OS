@@ -5,6 +5,11 @@ export interface Prospect {
   id: string;
   company_name: string;
   contact_name: string | null;
+  contact_title: string | null;
+  contact_phone: string | null;
+  contact_location: string | null;
+  contact_linkedin: string | null;
+  additional_contact_info: Record<string,string>;
   industry: string | null;
   company_type: string | null;
   website: string | null;
@@ -44,7 +49,7 @@ export interface Prospect {
 }
 
 export type ProspectInput = Pick<Prospect,
-  "company_name" | "contact_name" | "industry" | "company_type" | "website" | "business_email" |
+  "company_name" | "contact_name" | "contact_title" | "contact_phone" | "contact_location" | "contact_linkedin" | "additional_contact_info" | "industry" | "company_type" | "website" | "business_email" |
   "business_phone" | "address" | "city" | "state" | "zip" | "territory" |
   "services" | "recurring_potential" | "estimated_value" | "source_type" |
   "source_url" | "discovered_at" | "verified_at" | "verification_status" |
@@ -74,7 +79,7 @@ export interface ProspectAssignee { id: string; display_name: string }
 
 export type ProspectDuplicateClass = "New" | "Exact duplicate" | "Possible duplicate" | "Invalid";
 export type ProspectImportDecision = "Skip" | "Import Separately" | "Merge";
-export type ProspectCsvField = "company_name" | "contact_name" | "business_email" | "business_phone" | "website" | "address" | "city" | "state" | "zip" | "industry" | "notes" | "source";
-export type ProspectCsvValues = Partial<Record<ProspectCsvField,string>>;
+export type ProspectCsvField = "company_name" | "contact_name" | "contact_title" | "contact_phone" | "contact_location" | "contact_linkedin" | "business_email" | "business_phone" | "website" | "address" | "city" | "state" | "zip" | "industry" | "notes" | "source";
+export type ProspectCsvValues = Partial<Record<ProspectCsvField,string>> & {additional_contact_info?:Record<string,string>};
 export interface ProspectImportPreviewRow { rowNumber:number; fingerprint:string; values:ProspectCsvValues; classification:ProspectDuplicateClass; decision:ProspectImportDecision|""; matchedProspectId:string|null; error:string|null }
 export interface ProspectImportResult { imported:number; skipped:number; failed:number; processed:number }
