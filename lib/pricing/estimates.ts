@@ -662,7 +662,7 @@ export function calculateCommercialEstimate(
   );
 
   const floorDetailAdjustment = configured.addonAdjustments
-    .filter(item => item.label === "Floor Detail")
+    .filter(item => item.label === "Floor Detail" || item.label === "Interior Windows")
     .reduce((total, item) => total + item.amount, 0);
   const oneTimePrice = Math.max(serviceFloor, profitabilityPrice) + floorDetailAdjustment;
 
