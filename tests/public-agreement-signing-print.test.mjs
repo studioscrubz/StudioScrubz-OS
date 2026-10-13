@@ -76,7 +76,11 @@ test("standard public agreements use an isolated two-page US Letter print plan",
   assert.match(css, /@page public-agreement \{ size: Letter portrait; margin: 0\.36in 0\.42in; \}/);
   assert.match(css, /#public-agreement\.document-print-root \{ page: public-agreement;/);
   assert.match(css, /#public-agreement \.agreement-print-page-two \{ break-before: page; \}/);
-  assert.match(css, /#public-agreement \.agreement-print-signature \{ break-inside: avoid-page; \}/);
+  assert.match(css, /#public-agreement \.agreement-print-page \{ display: block; \}/);
+  assert.match(css, /#public-agreement section \{ margin-top: 0\.1in; break-inside: auto; \}/);
+  assert.match(css, /#public-agreement section > h3 \{ break-after: avoid-page; \}/);
+  assert.match(css, /#public-agreement header, #public-agreement dl, #public-agreement \.agreement-print-signature \{ break-inside: avoid-page; \}/);
+  assert.doesNotMatch(css, /#public-agreement \.agreement-print-page \{ display: flow-root/);
   assert.doesNotMatch(css, /#public-agreement[^}]*overflow: hidden/);
 });
 

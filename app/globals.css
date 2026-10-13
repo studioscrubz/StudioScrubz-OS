@@ -136,7 +136,7 @@ a:focus-visible {
   .document-print-root section, .document-print-root dl, .document-print-root header { break-inside: avoid-page; }
   .document-print-root p { orphans: 3; widows: 3; }
   #public-agreement.document-print-root { page: public-agreement; font-size: 9pt; line-height: 1.25; }
-  #public-agreement .agreement-print-page { display: flow-root; }
+  #public-agreement .agreement-print-page { display: block; }
   #public-agreement .agreement-print-page-two { break-before: page; }
   #public-agreement header { gap: 0.2in; padding-bottom: 0.09in; }
   #public-agreement header img { width: 0.7in; height: auto; }
@@ -144,9 +144,10 @@ a:focus-visible {
   #public-agreement h2 { margin-top: 0.11in; font-size: 14pt; line-height: 1.1; }
   #public-agreement h3 { font-size: 10pt; line-height: 1.15; }
   #public-agreement .agreement-print-page-one > div { margin-top: 0.1in; gap: 0.08in 0.18in; }
-  #public-agreement section { margin-top: 0.1in; }
+  #public-agreement section { margin-top: 0.1in; break-inside: auto; }
+  #public-agreement section > h3 { break-after: avoid-page; }
   #public-agreement section.rounded-xl { padding: 0.1in; }
   #public-agreement dl { margin-top: 0.04in; }
   #public-agreement dl > div { padding-top: 0.025in; padding-bottom: 0.025in; }
-  #public-agreement .agreement-print-signature { break-inside: avoid-page; }
+  #public-agreement header, #public-agreement dl, #public-agreement .agreement-print-signature { break-inside: avoid-page; }
 }
