@@ -125,6 +125,7 @@ a:focus-visible {
 }
 
 @media print {
+  @page public-agreement { size: Letter portrait; margin: 0.36in 0.42in; }
   :root, :root[data-theme="dark"] { --canvas: #fff; --surface: #fff; --surface-elevated: #fff; --ink: #18201a; --muted: #626b64; --border: #dfe4df; --input-background: #fff; color-scheme: light; }
   body { background: #fff; color: #18201a; }
   :root[data-theme="dark"] .workspace-shell .document-print-root,
@@ -134,4 +135,18 @@ a:focus-visible {
   .document-print-root { position: static; width: 100%; overflow: visible; }
   .document-print-root section, .document-print-root dl, .document-print-root header { break-inside: avoid-page; }
   .document-print-root p { orphans: 3; widows: 3; }
+  #public-agreement.document-print-root { page: public-agreement; font-size: 9pt; line-height: 1.25; }
+  #public-agreement .agreement-print-page { display: flow-root; }
+  #public-agreement .agreement-print-page-two { break-before: page; }
+  #public-agreement header { gap: 0.2in; padding-bottom: 0.09in; }
+  #public-agreement header img { width: 0.7in; height: auto; }
+  #public-agreement h1 { font-size: 17pt; line-height: 1.05; }
+  #public-agreement h2 { margin-top: 0.11in; font-size: 14pt; line-height: 1.1; }
+  #public-agreement h3 { font-size: 10pt; line-height: 1.15; }
+  #public-agreement .agreement-print-page-one > div { margin-top: 0.1in; gap: 0.08in 0.18in; }
+  #public-agreement section { margin-top: 0.1in; }
+  #public-agreement section.rounded-xl { padding: 0.1in; }
+  #public-agreement dl { margin-top: 0.04in; }
+  #public-agreement dl > div { padding-top: 0.025in; padding-bottom: 0.025in; }
+  #public-agreement .agreement-print-signature { break-inside: avoid-page; }
 }

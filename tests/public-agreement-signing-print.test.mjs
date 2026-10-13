@@ -68,6 +68,18 @@ test("unsigned and signed agreements print real multipage document content witho
   assert.doesNotMatch(css, /\.document-print-root \{ position: absolute/);
 });
 
+test("standard public agreements use an isolated two-page US Letter print plan", () => {
+  const page = read("components/agreements/PublicAgreementPage.tsx");
+  const css = read("app/globals.css");
+  assert.match(page, /agreement-print-page agreement-print-page-one/);
+  assert.match(page, /agreement-print-page agreement-print-page-two/);
+  assert.match(css, /@page public-agreement \{ size: Letter portrait; margin: 0\.36in 0\.42in; \}/);
+  assert.match(css, /#public-agreement\.document-print-root \{ page: public-agreement;/);
+  assert.match(css, /#public-agreement \.agreement-print-page-two \{ break-before: page; \}/);
+  assert.match(css, /#public-agreement \.agreement-print-signature \{ break-inside: avoid-page; \}/);
+  assert.doesNotMatch(css, /#public-agreement[^}]*overflow: hidden/);
+});
+
 test("acceptance route serializes the response before best-effort post-response work", () => {
   const route = read("app/api/public/agreements/accept/route.ts");
   assert.match(route, /if \(!data \|\| typeof data !== "object"\)/);
