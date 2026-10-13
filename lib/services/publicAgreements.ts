@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { parsePublicJsonResponse } from "@/lib/services/publicJsonResponse";
 import type { PublicAgreement } from "@/types/publicAgreement";
 
 export async function getPublicAgreement(token: string): Promise<PublicAgreement> {
@@ -18,7 +19,8 @@ export async function acceptPublicAgreement(token: string, signedName: string, c
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ token, signedName: name, consent }),
   });
-  const result = await response.json() as PublicAgreement & { error?: string };
-  if (!response.ok) throw new Error(result.error || "The agreement could not be signed.");
-  return result;
+  return parsePublicJsonResponse<PublicAgreement>(
+    response,
+    "The agreement could not be signed. Refresh this page to confirm its current status before trying again.",
+  );
 }

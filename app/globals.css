@@ -131,5 +131,7 @@ a:focus-visible {
   :root[data-theme="dark"] .workspace-shell .document-print-root * { background-color: revert; border-color: revert; color: revert; }
   body * { visibility: hidden; }
   .document-print-root, .document-print-root * { visibility: visible; }
-  .document-print-root { position: absolute; inset: 0; width: 100%; }
+  .document-print-root { position: static; width: 100%; overflow: visible; }
+  .document-print-root section, .document-print-root dl, .document-print-root header { break-inside: avoid-page; }
+  .document-print-root p { orphans: 3; widows: 3; }
 }

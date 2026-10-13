@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
 import { AgreementPricingBreakdown } from "@/components/agreements/AgreementPricingBreakdown";
 import { acceptPublicAgreement, getPublicAgreement } from "@/lib/services/publicAgreements";
@@ -11,15 +11,16 @@ import type { PublicAgreement } from "@/types/publicAgreement";
 
 export function PublicAgreementPage({ token }: { token:string }) {
   const [agreement,setAgreement]=useState<PublicAgreement|null>(null),[name,setName]=useState(""),[consent,setConsent]=useState(false),[loading,setLoading]=useState(true),[signing,setSigning]=useState(false),[error,setError]=useState<string|null>(null);
+  const signingRef=useRef(false);
   useEffect(()=>{void getPublicAgreement(token).then(setAgreement).catch((cause)=>setError(safeMessage(cause))).finally(()=>setLoading(false));},[token]);
-  async function sign(){if(!consent){setError("You must review and agree to the Service Agreement before signing.");return}setSigning(true);setError(null);try{setAgreement(await acceptPublicAgreement(token,name,consent))}catch(cause){setError(safeMessage(cause))}finally{setSigning(false)}}
+  async function sign(){if(signingRef.current||agreement?.client_signed_at)return;if(!consent){setError("You must review and agree to the Service Agreement before signing.");return}signingRef.current=true;setSigning(true);setError(null);try{setAgreement(await acceptPublicAgreement(token,name,consent))}catch(cause){try{const current=await getPublicAgreement(token);setAgreement(current);if(!current.client_signed_at)setError(signingMessage(cause))}catch{setError(signingMessage(cause))}}finally{signingRef.current=false;setSigning(false)}}
   if(loading)return <PublicShell><p className="text-center font-semibold">Loading your Service Agreement…</p></PublicShell>;
   if(error&&!agreement)return <PublicShell><h1 className="text-2xl font-bold text-[#143d1a]">Agreement unavailable</h1><p className="mt-3 text-neutral-600">{error}</p></PublicShell>;
   if(!agreement)return null;
   const schedule=["Weekly","Biweekly","Every 4 Weeks","Multiple Days Per Week"].includes(agreement.frequency)&&agreement.days_of_week.length?agreement.days_of_week.map((day)=>["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][day]).join(", "):agreement.frequency==="Twice Monthly"&&agreement.day_of_month&&agreement.second_day_of_month?`Days ${agreement.day_of_month} and ${agreement.second_day_of_month} of each month`:agreement.frequency==="Monthly"&&agreement.day_of_month?`Day ${agreement.day_of_month} of each month`:agreement.frequency==="Custom"&&agreement.custom_interval_days?`Every ${agreement.custom_interval_days} days`:agreement.frequency;
   const included=includedServiceDetails(agreement.scope.split(/\r?\n/),agreement.service_name,agreement.pricing_snapshot?.catalog_addons??[]);
   const signed=Boolean(agreement.client_signed_at),canSign=agreement.status==="Sent"&&!signed;
-  return <PublicShell><article id="public-agreement" className="rounded-2xl border bg-white p-6 shadow-sm print:border-0 print:p-0 print:shadow-none">
+  return <PublicShell><article id="public-agreement" className="document-print-root rounded-2xl border bg-white p-6 shadow-sm print:border-0 print:p-0 print:shadow-none">
     <header className="flex flex-col items-center gap-4 border-b-2 border-[#143d1a] pb-5 text-center sm:flex-row sm:text-left"><StudioScrubzLogo size={112} priority/><div><h1 className="text-3xl font-extrabold text-[#143d1a]">{agreement.business_name}</h1>{agreement.tagline&&<p>{agreement.tagline}</p>}<p className="mt-1 text-sm text-neutral-600">{[agreement.business_email,agreement.business_phone,agreement.website].filter(Boolean).join(" · ")}</p><p className="text-sm text-neutral-600">{[agreement.address,agreement.city,agreement.state,agreement.zip].filter(Boolean).join(", ")}</p></div></header>
     <h2 className="mt-6 text-2xl font-bold">Service Agreement</h2><p className="font-semibold">{agreement.agreement_number}</p>
     <div className="mt-6 grid gap-4 sm:grid-cols-2"><Detail label="Company / Client" value={agreement.client_name}/><Detail label="Property / Site" value={agreement.property_location}/><Detail label="Service" value={agreement.service_name}/><Detail label="Frequency" value={serviceFrequencyLabel(agreement.frequency)}/><Detail label="Service Days" value={schedule}/><Detail label="Service Time" value={formatTime12Hour(agreement.default_start_time)}/><Detail label="Start Date" value={agreement.start_date}/>{agreement.end_date&&<Detail label="End Date" value={agreement.end_date}/>}<Detail label={billingLabel(agreement.billing_type)} value={money(agreement.billing_amount)}/><Detail label="Billing Type" value={agreement.billing_type}/></div>
@@ -36,3 +37,4 @@ function Section({label,value}:{label:string;value:string|null}){return <section
 function money(value:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value)}
 function billingLabel(type:string){return type==="Per Visit"?"Per Visit Amount":type==="Weekly"?"Weekly Contract Amount":type==="Biweekly"?"Biweekly Contract Amount":type==="Monthly"?"Monthly Contract Amount":"Contract Value"}
 function safeMessage(cause:unknown){console.error(cause);return cause instanceof Error?cause.message:"This agreement could not be loaded."}
+function signingMessage(cause:unknown){console.error(cause);return cause instanceof Error&&cause.message?cause.message:"We could not confirm your signature. Refresh this page to check the agreement status before trying again."}

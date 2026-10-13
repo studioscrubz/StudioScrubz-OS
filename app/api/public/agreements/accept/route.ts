@@ -14,8 +14,12 @@ export async function POST(request: Request) {
       p_consent: body.consent ?? false,
     });
     if (error) throw error;
+    if (!data || typeof data !== "object") {
+      throw new Error("The signed agreement could not be reloaded.");
+    }
+    const response = Response.json(data);
     scheduleAttentionPushAfterResponse();
-    return Response.json(data);
+    return response;
   } catch (error) {
     return Response.json({ error: error instanceof Error && error.message ? error.message : "The agreement could not be signed." }, { status: 400 });
   }
