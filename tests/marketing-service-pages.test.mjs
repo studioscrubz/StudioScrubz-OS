@@ -51,3 +51,21 @@ test("related public pages link contextually to the new destinations", async () 
   assert.match(residential, /\["Airbnb \/ Short-Term Rental Cleaning", "\/airbnb-cleaning"\]/);
   assert.match(postConstruction, /\["Property Management Cleaning", "\/property-management"\]/);
 });
+
+test("Residential page includes the authentic refrigerator deep-cleaning results gallery", async () => {
+  const [page, gallery] = await Promise.all([
+    read("app/site/residential/page.tsx"),
+    read("components/site/RefrigeratorResults.tsx"),
+  ]);
+
+  assert.match(page, /<RefrigeratorResults \/>/);
+  assert.match(gallery, /Refrigerator Deep Cleaning — Real StudioScrubz Results/);
+  assert.match(gallery, /Freezer/);
+  assert.match(gallery, /Refrigerator Interior/);
+  assert.match(gallery, /Stainless-Steel Exterior/);
+  assert.match(gallery, /Request a Free Estimate/);
+  assert.match(gallery, /label="Before"/);
+  assert.match(gallery, /label="After"/);
+  assert.equal((gallery.match(/beforeAlt:/g) ?? []).length, 3);
+  assert.equal((gallery.match(/afterAlt:/g) ?? []).length, 3);
+});
