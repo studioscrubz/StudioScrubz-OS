@@ -256,8 +256,8 @@ export async function saveAgreementEdits(id: string, input: AgreementUpdate) {
     agreement_terms: current.agreement_terms,
     cancellation_terms: current.cancellation_terms,
     status: current.status,
-    service_name: current.client_signed_at ? current.service_name : input.service_name,
-    scope: current.client_signed_at ? current.scope : input.scope,
+    service_name: current.signing_method || current.client_signed_at ? current.service_name : input.service_name,
+    scope: current.signing_method || current.client_signed_at ? current.scope : input.scope,
   };
   const candidate = { ...current, ...operationalUpdate } as ServiceAgreement;
   const catalog = await getServiceCatalog();
