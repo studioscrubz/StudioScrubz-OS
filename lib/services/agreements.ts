@@ -215,6 +215,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
 }
 
 function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_week" | "interval_weeks" | "day_of_month" | "second_day_of_month" | "custom_interval_days" | "start_date" | "end_date">) {
+  if (!input.start_date) return "Start date is required.";
   if (input.end_date && input.end_date < input.start_date) return "End date must be on or after the start date.";
   if (["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(input.frequency) && !input.days_of_week.length)
     return `Select at least one service day for ${input.frequency}.`;
