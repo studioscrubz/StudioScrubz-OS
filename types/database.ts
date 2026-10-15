@@ -2886,6 +2886,27 @@ export interface Database {
         };
         Returns: Job;
       };
+      create_direct_operational_job_with_custom_scope: {
+        Args: {
+          p_client_id: string;
+          p_property_id: string;
+          p_service_id: string;
+          p_addon_ids?: string[];
+          p_scheduled_date?: string | null;
+          p_start_time?: string | null;
+          p_estimated_duration?: number | null;
+          p_assignment_kind?: import("@/types/job").JobAssignmentKind;
+          p_assigned_employee_id?: string | null;
+          p_assigned_crew_id?: string | null;
+          p_labor_hours?: number;
+          p_access_instructions?: string | null;
+          p_internal_notes?: string | null;
+          p_master_price_override?: number | null;
+          p_addon_quantities?: Array<{ addonId: string; quantity: number }>;
+          p_custom_scope_description: string;
+        };
+        Returns: Job;
+      };
       create_direct_operational_job_v2: {
         Args: {
           p_client_id: string;
