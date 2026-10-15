@@ -197,7 +197,7 @@ export async function createJobFromProposal(
 }
 export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
   const customScope = input.custom_scope_description?.trim() || null;
-  const { data, error } = await getSupabaseClient().rpc(customScope ? "create_direct_operational_job_with_custom_scope" : "create_direct_operational_job_v2", {
+  const args = {
     p_client_id: input.client_id,
     p_property_id: input.property_id,
     p_service_id: input.service_id,
@@ -213,8 +213,13 @@ export async function createDirectJob(input: DirectJobInput): Promise<JobWithRel
     p_access_instructions: input.access_instructions,
     p_internal_notes: input.internal_notes,
     p_master_price_override: input.price_override ?? null,
-    ...(customScope ? { p_custom_scope_description: customScope } : {}),
-  });
+  };
+  const { data, error } = customScope
+    ? await getSupabaseClient().rpc("create_direct_operational_job_with_custom_scope", {
+        ...args,
+        p_custom_scope_description: customScope,
+      })
+    : await getSupabaseClient().rpc("create_direct_operational_job_v2", args);
   if (error) throw new Error(safeDatabaseMessage(error, "Job could not be created."));
   if (!data) throw new Error("The Job creation result was empty.");
   const job = await getJobById(data.id).catch(() => fullJob(data));
