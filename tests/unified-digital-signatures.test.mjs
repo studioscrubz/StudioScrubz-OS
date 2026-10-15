@@ -81,3 +81,11 @@ test("signed rendering preserves historical typed signatures and prints drawn PN
   assert.match(onlinePage, /font-serif text-2xl italic/);
   assert.match(onlinePage, /Print \/ Save as PDF/);
 });
+
+
+test("PNG validation rejects disguised formats and treats transparent pixels as white", () => {
+  assert.match(validator, /metadata\.format !== "png"/);
+  assert.match(validator, /flatten\(\{ background: "#ffffff" \}\)/);
+  assert.match(validator, /inkPixels < 40/);
+  assert.doesNotMatch(validator, /\.removeAlpha\(\)/);
+});
