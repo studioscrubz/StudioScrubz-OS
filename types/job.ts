@@ -110,6 +110,7 @@ export type DirectJobInput = {
   access_instructions: string | null;
   internal_notes: string | null;
   price_override?: number | null;
+  custom_scope_description?: string | null;
 };
 type JobRelations = {
   proposal: Proposal | null;
