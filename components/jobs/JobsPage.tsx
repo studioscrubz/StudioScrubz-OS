@@ -9,6 +9,7 @@ import {
   assignJobWorker,
   cancelJob,
   completeInProgressJob,
+  completeInProgressJobWithPhotoOverride,
   getCrewConflicts,
   findIndividualTechConflicts,
   getEligibleJobTechs,
@@ -41,6 +42,7 @@ import { vehicleLabel, type AuthorizedVehicle } from "@/types/vehicle";
 import { JobLaborSummary } from "@/components/time/JobLaborSummary";
 import type { CrewWithRelations } from "@/types/crew";
 import { PhotoUploader } from "@/components/photos/PhotoUploader";
+import { getSavedAfterPhotoCount } from "@/lib/services/photoStorage";
 import type { JobPhotoCategory } from "@/types/photo";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
@@ -429,7 +431,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} w-full`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
-      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
+      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(async () => { const count = await getSavedAfterPhotoCount(job.id); if (count < 3) { open(); throw new Error(`Completion Photos: ${count} / 3. Upload ${3 - count} more After ${3 - count === 1 ? "photo" : "photos"} before ending this Job.`); } return completeInProgressJob(job.id); }, "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
@@ -536,6 +538,9 @@ function JobModal({
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [showPresence, setShowPresence] = useState(false);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
+  const [afterPhotoCount, setAfterPhotoCount] = useState(() => new Set(job.photos.filter((photo) => photo.category === "After").map((photo) => `${photo.id}:${photo.storagePath}`)).size);
+  const [showPhotoOverride, setShowPhotoOverride] = useState(false);
+  const [photoOverrideReason, setPhotoOverrideReason] = useState("");
   const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
   const [tab, setTab] = useState<"Overview" | "Scope" | "Discoveries" | "Changes" | "Timeline">("Overview");
   const [changePrefill, setChangePrefill] = useState<VisibleFieldDiscovery | null>(null);
@@ -701,7 +706,10 @@ function JobModal({
           ],
         ]}
       />
-      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
+      <div id={`job-completion-photos-${job.id}`}>
+        <p className={`mt-6 rounded-xl p-3 text-sm font-extrabold ${afterPhotoCount >= 3 ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>Completion Photos: {afterPhotoCount} / 3</p>
+        <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosChange={(photos) => setAfterPhotoCount(new Set(photos.filter((photo) => photo.category === "After").map((photo) => `${photo.id}:${photo.storagePath}`)).size)} />
+      </div>
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
@@ -727,7 +735,9 @@ function JobModal({
           {lifecycleError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{lifecycleError}</p>}
           {job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Crew members currently on Job: {clock.activeWorkerCount}</p>}
           {job.status === "In Progress" && canSupervisorComplete && clock && clock.activeWorkerCount > 0 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">END JOB will stop payroll for all {clock.activeWorkerCount} joined crew {clock.activeWorkerCount === 1 ? "member" : "members"} at the same time.</p>}
-          {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.", undefined, close)} className={`${primary} mt-3`}>END JOB</button>}
+          {job.status === "In Progress" && canSupervisorComplete && afterPhotoCount < 3 && <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800"><p>Upload {3 - afterPhotoCount} more After {3 - afterPhotoCount === 1 ? "photo" : "photos"} before ending this Job.</p><button type="button" className={`${secondary} mt-2`} onClick={() => document.getElementById(`job-completion-photos-${job.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>Go to Photo Uploader</button></div>}
+          {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy || afterPhotoCount < 3} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.", undefined, close)} className={`${primary} mt-3`}>END JOB</button>}
+          {job.status === "In Progress" && role === "Master Admin" && afterPhotoCount < 3 && <button type="button" disabled={busy} onClick={() => setShowPhotoOverride(true)} className={`${secondary} mt-2`}>Master Admin Photo Override</button>}
         </section>
       )}
       <div className="mt-6 flex flex-wrap gap-2">
@@ -788,6 +798,20 @@ function JobModal({
                 undefined,
                 close,
               )}>Confirm Restore and Reopen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {showPhotoOverride && (
+        <div className="fixed inset-0 z-[120] grid place-items-center bg-[#07190a]/75 p-5">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="photo-override-title" className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="photo-override-title" className="text-xl font-extrabold text-red-800">Override completion photo requirement?</h2>
+            <p className="mt-3 text-sm text-neutral-700">This Job currently has {afterPhotoCount} of 3 required After photos. The reason and actual count will be permanently audited.</p>
+            <label className="mt-4 block text-sm font-bold">Override reason<textarea className={`${input} mt-2 min-h-28 py-2`} value={photoOverrideReason} onChange={(event) => setPhotoOverrideReason(event.target.value)} maxLength={2000} placeholder="Explain why the Job must be completed without all required photos." /></label>
+            <p className="mt-1 text-xs text-neutral-500">Minimum 15 characters.</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" disabled={busy} className={secondary} onClick={() => { setShowPhotoOverride(false); setPhotoOverrideReason(""); }}>Cancel</button>
+              <button type="button" disabled={busy || photoOverrideReason.trim().replace(/\s+/g, " ").length < 15} className={danger} onClick={() => { if (!window.confirm("Complete this Job without the required three After photos? This exception will be permanently audited.")) return; mutate(() => completeInProgressJobWithPhotoOverride(job.id, photoOverrideReason), "Job ended with a Master Admin completion-photo override.", setLifecycleError, close); }}>Confirm Override & End Job</button>
             </div>
           </section>
         </div>

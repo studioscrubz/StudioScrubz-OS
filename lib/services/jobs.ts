@@ -513,6 +513,30 @@ export async function completeInProgressJob(id: string): Promise<JobCompletionRe
   await requestImmediateAttentionPush();
   return result;
 }
+export async function completeInProgressJobWithPhotoOverride(id: string, reason: string): Promise<JobCompletionResult> {
+  const normalizedReason = reason.trim().replace(/\s+/g, " ");
+  if (normalizedReason.length < 15) throw new Error("Enter an override reason of at least 15 characters.");
+  type CompletionPhotoOverrideRpcClient = {
+    rpc: (
+      name: "complete_in_progress_job_with_photo_override",
+      args: { p_job_id: string; p_reason: string },
+    ) => Promise<{
+      data: Parameters<typeof operationalJob>[0] | null;
+      error: { message?: string } | null;
+    }>;
+  };
+  const { data, error } = await (
+    getSupabaseClient() as unknown as CompletionPhotoOverrideRpcClient
+  ).rpc("complete_in_progress_job_with_photo_override", {
+    p_job_id: id,
+    p_reason: normalizedReason,
+  });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job completion override failed."));
+  if (!data) throw new Error("The Job completion override result was empty.");
+  const result = await createCompletedJobInvoice(operationalJob(data));
+  await requestImmediateAttentionPush();
+  return result;
+}
 export type CompletedJobMasterTimeInput = {
   startDate: string;
   startTime: string;

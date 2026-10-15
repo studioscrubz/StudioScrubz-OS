@@ -74,6 +74,15 @@ select set_config('request.jwt.claim.sub','fa500000-0000-0000-0000-000000000003'
 select public.start_or_clock_in_to_job('fa500000-0000-0000-0000-000000000030');
 update public.time_entries set clock_in=clock_in+interval '10 minutes' where job_id='fa500000-0000-0000-0000-000000000030' and employee_id='fa500000-0000-0000-0000-000000000013';
 update public.employees set hourly_rate=99,overtime_rate=149 where id='fa500000-0000-0000-0000-000000000012';
+insert into storage.objects(bucket_id,name,owner_id,metadata) values
+('operational-photos','jobs/fa500000-0000-0000-0000-000000000030/after/fa500000-0000-4000-8000-000000000041.jpg','fa500000-0000-0000-0000-000000000001','{"mimetype":"image/jpeg","size":1024}'),
+('operational-photos','jobs/fa500000-0000-0000-0000-000000000030/after/fa500000-0000-4000-8000-000000000042.jpg','fa500000-0000-0000-0000-000000000001','{"mimetype":"image/jpeg","size":1024}'),
+('operational-photos','jobs/fa500000-0000-0000-0000-000000000030/after/fa500000-0000-4000-8000-000000000043.jpg','fa500000-0000-0000-0000-000000000001','{"mimetype":"image/jpeg","size":1024}');
+update public.jobs set photos=jsonb_build_array(
+  jsonb_build_object('id','fa500000-0000-4000-8000-000000000041','storagePath','jobs/fa500000-0000-0000-0000-000000000030/after/fa500000-0000-4000-8000-000000000041.jpg','category','After'),
+  jsonb_build_object('id','fa500000-0000-4000-8000-000000000042','storagePath','jobs/fa500000-0000-0000-0000-000000000030/after/fa500000-0000-4000-8000-000000000042.jpg','category','After'),
+  jsonb_build_object('id','fa500000-0000-4000-8000-000000000043','storagePath','jobs/fa500000-0000-0000-0000-000000000030/after/fa500000-0000-4000-8000-000000000043.jpg','category','After')
+) where id='fa500000-0000-0000-0000-000000000030';
 select set_config('request.jwt.claim.sub','fa500000-0000-0000-0000-000000000001',true);
 select public.complete_in_progress_job('fa500000-0000-0000-0000-000000000030');
 create temporary table ended_snapshot as select id,clock_out,gross_pay from public.time_entries where job_id='fa500000-0000-0000-0000-000000000030';

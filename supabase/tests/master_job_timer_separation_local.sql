@@ -99,6 +99,15 @@ where job_id = 'fb600000-0000-0000-0000-000000000030'
   and employee_id = 'fb600000-0000-0000-0000-000000000012';
 
 select set_config('request.jwt.claim.sub', 'fb600000-0000-0000-0000-000000000001', true);
+insert into storage.objects(bucket_id,name,owner_id,metadata) values
+('operational-photos','jobs/fb600000-0000-0000-0000-000000000030/after/fb600000-0000-4000-8000-000000000041.jpg','fb600000-0000-0000-0000-000000000001','{"mimetype":"image/jpeg","size":1024}'),
+('operational-photos','jobs/fb600000-0000-0000-0000-000000000030/after/fb600000-0000-4000-8000-000000000042.jpg','fb600000-0000-0000-0000-000000000001','{"mimetype":"image/jpeg","size":1024}'),
+('operational-photos','jobs/fb600000-0000-0000-0000-000000000030/after/fb600000-0000-4000-8000-000000000043.jpg','fb600000-0000-0000-0000-000000000001','{"mimetype":"image/jpeg","size":1024}');
+update public.jobs set photos=jsonb_build_array(
+  jsonb_build_object('id','fb600000-0000-4000-8000-000000000041','storagePath','jobs/fb600000-0000-0000-0000-000000000030/after/fb600000-0000-4000-8000-000000000041.jpg','category','After'),
+  jsonb_build_object('id','fb600000-0000-4000-8000-000000000042','storagePath','jobs/fb600000-0000-0000-0000-000000000030/after/fb600000-0000-4000-8000-000000000042.jpg','category','After'),
+  jsonb_build_object('id','fb600000-0000-4000-8000-000000000043','storagePath','jobs/fb600000-0000-0000-0000-000000000030/after/fb600000-0000-4000-8000-000000000043.jpg','category','After')
+) where id='fb600000-0000-0000-0000-000000000030';
 select public.complete_in_progress_job('fb600000-0000-0000-0000-000000000030');
 
 insert into master_timer_results

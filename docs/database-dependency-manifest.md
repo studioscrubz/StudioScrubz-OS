@@ -1,5 +1,7 @@
 ﻿# Database dependency manifest
 
+2026-10-15 Mandatory completion-photo addition: `complete_in_progress_job_with_photo_override` is defined by `20261015201505_mandatory_job_completion_photos.sql`; that migration also replaces `complete_in_progress_job` with the storage-backed three-After-photo guard and adds the immutable override audit relation.
+
 2026-10-14 Physical signing addition: `finalize_physical_service_agreement` is defined by `20261014161859_physical_signed_agreements.sql`. The same migration adds `service_agreement_physical_signing_events`, `service_agreement_physical_files`, and the private `signed-agreements` Storage bucket.
 
 2026-10-07 Job deletion eligibility addition: `get_archived_job_permanent_delete_eligibility` is defined by `20261007193000_job_permanent_delete_eligibility.sql`.

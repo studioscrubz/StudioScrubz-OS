@@ -18,6 +18,11 @@ export async function getOperationalPhotos(recordType: OperationalPhotoRecordTyp
   return normalizePhotos(data);
 }
 
+export async function getSavedAfterPhotoCount(jobId: string): Promise<number> {
+  const photos = await getOperationalPhotos("jobs", jobId);
+  return new Set(photos.filter((photo) => photo.category === "After").map((photo) => `${photo.id}:${photo.storagePath}`)).size;
+}
+
 export async function createPhotoSignedUrls(photos: OperationalPhoto[]): Promise<OperationalPhotoWithUrl[]> {
   if (!photos.length) return [];
   const { data, error } = await getSupabaseClient().storage.from(OPERATIONAL_PHOTO_BUCKET).createSignedUrls(photos.map((photo) => photo.storagePath), SIGNED_URL_SECONDS);

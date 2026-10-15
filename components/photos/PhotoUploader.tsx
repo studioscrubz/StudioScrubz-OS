@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPhotoSignedUrls, deleteOperationalPhoto, getOperationalPhotos, updateOperationalPhotoCaption, updateOperationalPhotoVisibility, uploadOperationalPhoto } from "@/lib/services/photoStorage";
 import { PhotoCaptureQueue } from "@/components/photos/PhotoCaptureQueue";
 import { PhotoGallery } from "@/components/photos/PhotoGallery";
 import type { OperationalPhoto, OperationalPhotoCategory, OperationalPhotoRecordType, OperationalPhotoWithUrl, PendingOperationalPhoto } from "@/types/photo";
 
-export function PhotoUploader({ recordType, recordId, categories, readonly = false, canDelete = true, title, featuredCategory, featuredTitle, cameraLabel, libraryLabel, uploadLabel }: { recordType: OperationalPhotoRecordType; recordId: string; categories: readonly OperationalPhotoCategory[]; readonly?: boolean; canDelete?: boolean; title?: string; featuredCategory?: OperationalPhotoCategory; featuredTitle?: string; cameraLabel?: string; libraryLabel?: string; uploadLabel?: string }) {
+export function PhotoUploader({ recordType, recordId, categories, readonly = false, canDelete = true, title, featuredCategory, featuredTitle, cameraLabel, libraryLabel, uploadLabel, onPhotosChange }: { recordType: OperationalPhotoRecordType; recordId: string; categories: readonly OperationalPhotoCategory[]; readonly?: boolean; canDelete?: boolean; title?: string; featuredCategory?: OperationalPhotoCategory; featuredTitle?: string; cameraLabel?: string; libraryLabel?: string; uploadLabel?: string; onPhotosChange?: (photos: OperationalPhoto[]) => void }) {
   const [photos, setPhotos] = useState<OperationalPhoto[]>([]);
   const [display, setDisplay] = useState<OperationalPhotoWithUrl[]>([]);
   const [pending, setPending] = useState<PendingOperationalPhoto[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { let active = true; void getOperationalPhotos(recordType, recordId).then(async (items) => { const signed = await createPhotoSignedUrls(items); if (active) { setPhotos(items); setDisplay(signed); } }).catch((cause: unknown) => { console.error("Photo load failed", cause); if (active) setError(message(cause, "Photos could not be loaded.")); }); return () => { active = false; }; }, [recordId, recordType]);
-  async function refresh(next: OperationalPhoto[]) { setPhotos(next); setDisplay(await createPhotoSignedUrls(next)); }
+  const onPhotosChangeRef = useRef(onPhotosChange);
+  useEffect(() => { onPhotosChangeRef.current = onPhotosChange; }, [onPhotosChange]);
+  useEffect(() => { let active = true; void getOperationalPhotos(recordType, recordId).then(async (items) => { const signed = await createPhotoSignedUrls(items); if (active) { setPhotos(items); setDisplay(signed); onPhotosChangeRef.current?.(items); } }).catch((cause: unknown) => { console.error("Photo load failed", cause); if (active) setError(message(cause, "Photos could not be loaded.")); }); return () => { active = false; }; }, [recordId, recordType]);
+  async function refresh(next: OperationalPhoto[]) { setPhotos(next); setDisplay(await createPhotoSignedUrls(next)); onPhotosChangeRef.current?.(next); }
   async function upload() { if (!pending.length) return; if (!navigator.onLine) return setError("An internet connection is required to upload photos."); setBusy(true); setError(null); try { for (const queued of pending) { await uploadOperationalPhoto({ recordType, recordId, category: queued.category, caption: queued.caption, source: queued.source, customerVisible: queued.customerVisible, file: queued.file }); setPending((current) => current.filter((item) => item.id !== queued.id)); } const persisted = await getOperationalPhotos(recordType, recordId); await refresh(persisted); } catch (cause) { console.error("Photo upload failed", cause); try { await refresh(await getOperationalPhotos(recordType, recordId)); } catch (refreshCause) { console.error("Photo refresh after upload failure failed", refreshCause); } setError(message(cause, "Photo upload or metadata persistence failed.")); } finally { setBusy(false); } }
   async function remove(photo: OperationalPhoto) { if (!window.confirm("Delete this photo? This cannot be undone.")) return; setBusy(true); setError(null); try { await refresh(await deleteOperationalPhoto(recordType, recordId, photos, photo)); } catch (cause) { console.error("Photo delete failed", cause); setError(message(cause, "Photo could not be deleted.")); } finally { setBusy(false); } }
   async function saveCaption(photo: OperationalPhoto, value: string) { if ((photo.caption ?? "") === value.trim()) return; try { await refresh(await updateOperationalPhotoCaption(recordType, recordId, photos, photo.id, value)); } catch (cause) { console.error("Photo caption failed", cause); setError(message(cause, "Photo caption could not be saved.")); } }
