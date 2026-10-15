@@ -73,6 +73,7 @@ export function DirectJobModal({
 
   const [access, setAccess] = useState("");
   const [notes, setNotes] = useState("");
+  const [otherCleaningScope, setOtherCleaningScope] = useState("");
 
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [overridePrice, setOverridePrice] = useState("");
@@ -181,6 +182,7 @@ export function DirectJobModal({
   );
 
   const service = services.find((row) => row.id === serviceId) ?? null;
+  const isOtherCleaning = service?.service_code === "COM-OTHER" || service?.service_name === "Other Cleaning";
 
   const addons = useMemo(
     () =>
@@ -290,6 +292,10 @@ export function DirectJobModal({
       );
     }
 
+    if (isOtherCleaning && !otherCleaningScope.trim()) {
+      return setError("Enter the Service Description / Scope of Work for Other Cleaning.");
+    }
+
     if (addonPricing.error) {
       return setError(addonPricing.error);
     }
@@ -350,6 +356,7 @@ export function DirectJobModal({
         labor_hours: Math.max(0, laborHours),
         access_instructions: access.trim() || null,
         internal_notes: notes.trim() || null,
+        custom_scope_description: isOtherCleaning ? otherCleaningScope.trim() : null,
         price_override: overrideEnabled ? overrideAmount : null,
       });
 
@@ -481,6 +488,7 @@ export function DirectJobModal({
                         );
 
                         setServiceId(event.target.value);
+                        setOtherCleaningScope("");
                         setAddonNames([]);
                         setAddonSelections([]);
 
@@ -736,6 +744,21 @@ export function DirectJobModal({
                   used.
                 </p>
               </Section>
+
+              {isOtherCleaning && (
+                <Section title="Custom Service Scope">
+                  <Field label="Service Description / Scope of Work" required>
+                    <textarea
+                      required
+                      className={`${input} min-h-36 py-3`}
+                      value={otherCleaningScope}
+                      onChange={(event) => setOtherCleaningScope(event.target.value)}
+                      placeholder="Describe the exact areas and cleaning tasks included in this job, along with any exclusions or special requirements."
+                    />
+                    <span className="mt-1 block text-xs text-neutral-500">Saved to this Job’s operational scope and visible to assigned technicians. Does not change pricing.</span>
+                  </Field>
+                </Section>
+              )}
 
               <Section title="Instructions and Notes">
                 <div className="grid gap-4 sm:grid-cols-2">
