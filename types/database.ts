@@ -1250,6 +1250,27 @@ export interface Database {
           },
         ];
       };
+      customer_credits: {
+        Row: import("@/types/payment").CustomerCredit;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "customer_credits_source_invoice_id_fkey";
+            columns: ["source_invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "customer_credits_source_payment_id_fkey";
+            columns: ["source_payment_id"];
+            isOneToOne: true;
+            referencedRelation: "payments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       expenses: {
         Row: Expense;
         Insert: ExpenseInput & {
@@ -3096,6 +3117,18 @@ export interface Database {
           p_amount: number;
           p_payment_date: string;
           p_payment_method: string;
+          p_reference_number?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Payment;
+      };
+      record_invoice_payment_v2: {
+        Args: {
+          p_invoice_id: string;
+          p_received_amount: number;
+          p_payment_date: string;
+          p_payment_method: string;
+          p_idempotency_key: string;
           p_reference_number?: string | null;
           p_notes?: string | null;
         };
