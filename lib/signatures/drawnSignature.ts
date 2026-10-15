@@ -6,7 +6,11 @@ export async function validateDrawnPngSignature(value: string): Promise<void> {
   if (!match || value.length > 700000) throw new Error("Draw your signature before completing the Agreement.");
   let result: { data: Buffer; info: OutputInfo };
   try {
-    result = await sharp(Buffer.from(match[1], "base64"), { failOn: "error" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const bytes = Buffer.from(match[1], "base64");
+    const image = sharp(bytes, { failOn: "error" });
+    const metadata = await image.metadata();
+    if (metadata.format !== "png") throw new Error("Invalid PNG format");
+    result = await image.flatten({ background: "#ffffff" }).toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
   } catch {
     throw new Error("The drawn signature must be a valid PNG image.");
   }
