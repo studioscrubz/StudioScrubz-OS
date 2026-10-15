@@ -29,6 +29,10 @@ export type PublicAgreement = {
   client_signature: string | null;
   client_consent_text: string | null;
   client_consent_at: string | null;
+  signing_method?: "electronic" | "physical" | "in_person_digital" | null;
+  in_person_witnessed_by_name?: string | null;
+  session_expires_at?: string;
+  session_completed_at?: string | null;
   business_name: string;
   tagline: string | null;
   business_email: string | null;

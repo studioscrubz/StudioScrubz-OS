@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-const migration = read("supabase/migrations/20261014161859_physical_signed_agreements.sql");
+const migration = read("supabase/migrations/20261014170443_physical_signed_agreements.sql");
 const route = read("app/api/agreements/[id]/physical-signing/route.ts");
 const fileRoute = read("app/api/agreements/[id]/physical-signed-files/[fileId]/route.ts");
 const page = read("components/agreements/AgreementsPage.tsx");

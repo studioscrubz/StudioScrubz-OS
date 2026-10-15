@@ -3309,8 +3309,17 @@ export interface Database {
           p_signed_name: string;
           p_signature: string;
           p_consent: boolean;
+          p_reviewed: boolean;
         };
         Returns: import("@/types/publicAgreement").PublicAgreement;
+      };
+      register_validated_agreement_signature: {
+        Args: {
+          p_token: string;
+          p_signature: string;
+          p_signing_context: "electronic" | "in_person_digital";
+        };
+        Returns: string;
       };
       get_estimate_by_token: {
         Args: { p_token: string };
