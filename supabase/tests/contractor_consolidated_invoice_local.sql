@@ -74,9 +74,9 @@ begin
     if sqlerrm='Duplicate Job billing was accepted.' then raise; end if;
   end;
 
-  perform public.record_invoice_payment(v_invoice_id,200,current_date,'ACH','SYNTH-PARTIAL',null);
+  perform public.record_invoice_payment_v2(v_invoice_id,200,current_date,'ACH','f3000000-0000-0000-0000-000000000010','SYNTH-PARTIAL',null);
   if not exists(select 1 from public.invoices where id=v_invoice_id and amount_paid=200 and balance_due=510 and status='Partially Paid') then raise exception 'Partial payment state failed.'; end if;
-  perform public.record_invoice_payment(v_invoice_id,510,current_date,'ACH','SYNTH-FULL',null);
+  perform public.record_invoice_payment_v2(v_invoice_id,510,current_date,'ACH','f3000000-0000-0000-0000-000000000011','SYNTH-FULL',null);
   if not exists(select 1 from public.invoices where id=v_invoice_id and amount_paid=710 and balance_due=0 and status='Paid') then raise exception 'Full payment state failed.'; end if;
 
   insert into public.jobs (id,job_number,client_id,property_id,division,client_name,property_name,service_name,frequency,status,scheduled_date,price,deposit,balance,labor_hours,recommended_crew_size,scope,checklist,photos,assigned_team,completed_at)
