@@ -4,6 +4,7 @@ export type PublicInvoicePayment = {
   amount: number;
   received_amount: number;
   unapplied_amount: number;
+  tip_amount: number;
   payment_date: string;
   payment_method: string;
 };
