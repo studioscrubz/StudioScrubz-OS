@@ -548,6 +548,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
       {
 
+        label: "Customer Credits",
+
+        href: "/customer-credits",
+
+        marker: "",
+
+        permission: "customerCredits.manage",
+
+      },
+
+      {
+
         label: "Commission Payouts",
 
         href: "/lead-commission-payouts",

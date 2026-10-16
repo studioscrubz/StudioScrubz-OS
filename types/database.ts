@@ -1271,6 +1271,12 @@ export interface Database {
           },
         ];
       };
+      customer_credit_tip_reclassification_events: {
+        Row: import("@/types/payment").CustomerCreditTipReclassificationEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       expenses: {
         Row: Expense;
         Insert: ExpenseInput & {
@@ -3154,6 +3160,15 @@ export interface Database {
           p_notes?: string | null;
         };
         Returns: Payment;
+      };
+      reclassify_customer_credit_as_tip: {
+        Args: {
+          p_credit_id: string;
+          p_payment_id: string;
+          p_reason: string;
+          p_idempotency_key: string;
+        };
+        Returns: import("@/types/payment").CustomerCreditTipReclassificationEvent;
       };
       clock_in_operational: {
         Args: {

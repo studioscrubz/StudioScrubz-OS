@@ -18,7 +18,7 @@ export const PERMISSIONS = [
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll",
   "payrollPrep.view", "agreements.view", "agreements.manage", "agreements.financialSummary",
   "invoices.view", "invoices.create", "invoices.edit", "invoices.send", "invoices.recordPayment",
-  "finances.view", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
+  "finances.view", "customerCredits.manage", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage", "appearance.view",
   "communications.view", "communications.create", "communications.archive",
   "attention.view", "reports.view",
@@ -221,6 +221,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/job-performance", "reports.view"],
 
   ["/users", "users.manage"],
+  ["/customer-credits", "customerCredits.manage"],
   ["/revenue", "finances.view"],
   ["/expenses", "expenses.view"],
   ["/vehicles", "vehicles.view"],
