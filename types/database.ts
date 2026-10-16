@@ -89,6 +89,7 @@ import type {
   ServiceAgreement,
   AgreementInput,
   AgreementUpdate,
+  RepresentativeAgreementSignature,
 } from "@/types/agreement";
 import type { ServiceOccurrence } from "@/types/serviceOccurrence";
 import type {
@@ -1547,6 +1548,20 @@ export interface Database {
             columns: ["assigned_crew_id"];
             isOneToOne: false;
             referencedRelation: "crews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_agreement_representative_signing_events: {
+        Row: RepresentativeAgreementSignature;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "service_agreement_representative_signing_events_agreement_id_fkey";
+            columns: ["agreement_id"];
+            isOneToOne: true;
+            referencedRelation: "service_agreements";
             referencedColumns: ["id"];
           },
         ];
@@ -3350,6 +3365,20 @@ export interface Database {
       get_service_agreement_by_token: {
         Args: { p_token: string };
         Returns: import("@/types/publicAgreement").PublicAgreement;
+      };
+      representative_sign_service_agreement: {
+        Args: {
+          p_agreement_id: string;
+          p_signed_name: string;
+          p_signature: string;
+          p_consent: boolean;
+          p_idempotency_key: string;
+        };
+        Returns: RepresentativeAgreementSignature;
+      };
+      get_representative_agreement_signature_by_token: {
+        Args: { p_token: string };
+        Returns: import("@/types/publicAgreement").PublicRepresentativeAgreementSignature | null;
       };
       accept_service_agreement_by_token: {
         Args: {

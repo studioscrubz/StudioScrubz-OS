@@ -34,24 +34,24 @@ function loadPublicAgreementService(fetchImpl) {
 test("successful signing returns the signed agreement JSON", async () => {
   const signed = { agreement_number: "AGR-TEST", status: "Accepted", client_signed_at: "2026-10-12T20:00:00Z", client_signed_name: "Client Name" };
   const service = loadPublicAgreementService(async () => Response.json(signed));
-  assert.deepEqual(await service.acceptPublicAgreement("t".repeat(40), "Client Name", true), signed);
+  assert.deepEqual(await service.acceptPublicAgreement("t".repeat(40), "Client Name", "data:image/png;base64,abc=", true, true), signed);
 });
 
 test("empty, non-JSON, and failed signing responses are client-safe", async () => {
   const empty = loadPublicAgreementService(async () => new Response(null, { status: 200 }));
-  await assert.rejects(empty.acceptPublicAgreement("t".repeat(40), "Client Name", true), /Refresh this page to confirm/);
+  await assert.rejects(empty.acceptPublicAgreement("t".repeat(40), "Client Name", "data:image/png;base64,abc=", true, true), /Refresh this page to confirm/);
   const invalid = loadPublicAgreementService(async () => new Response("gateway response", { status: 200 }));
-  await assert.rejects(invalid.acceptPublicAgreement("t".repeat(40), "Client Name", true), /Refresh this page to confirm/);
+  await assert.rejects(invalid.acceptPublicAgreement("t".repeat(40), "Client Name", "data:image/png;base64,abc=", true, true), /Refresh this page to confirm/);
   const failed = loadPublicAgreementService(async () => Response.json({ error: "This agreement is no longer awaiting acceptance." }, { status: 409 }));
-  await assert.rejects(failed.acceptPublicAgreement("t".repeat(40), "Client Name", true), /no longer awaiting acceptance/);
+  await assert.rejects(failed.acceptPublicAgreement("t".repeat(40), "Client Name", "data:image/png;base64,abc=", true, true), /no longer awaiting acceptance/);
 });
 
 test("public page prevents duplicate submissions and reconciles an uncertain response", () => {
   const page = read("components/agreements/PublicAgreementPage.tsx");
-  assert.match(page, /signingRef\.current\|\|agreement\?\.client_signed_at/);
-  assert.match(page, /catch\(cause\)\{try\{const current=await getPublicAgreement\(token\)/);
-  assert.match(page, /if\(!current\.client_signed_at\)setError/);
-  assert.match(page, /const signed=Boolean\(agreement\.client_signed_at\),canSign=agreement\.status==="Sent"&&!signed/);
+  assert.match(page, /signingRef\.current\s*\|\|\s*agreement\?\.client_signed_at/);
+  assert.match(page, /catch \(cause\)[\s\S]*const current = await getPublicAgreement\(token\)/);
+  assert.match(page, /if \(!current\.client_signed_at\) setError/);
+  assert.match(page, /const signed = Boolean\(agreement\.client_signed_at\);[\s\S]*const canSign = agreement\.status === "Sent" && !signed/);
   assert.match(page, /Agreement Accepted/);
 });
 

@@ -31,6 +31,7 @@ export type PublicAgreement = {
   client_consent_at: string | null;
   signing_method?: "electronic" | "physical" | "in_person_digital" | null;
   in_person_witnessed_by_name?: string | null;
+  representative_signature?: PublicRepresentativeAgreementSignature | null;
   session_expires_at?: string;
   session_completed_at?: string | null;
   business_name: string;
@@ -42,4 +43,15 @@ export type PublicAgreement = {
   city: string | null;
   state: string | null;
   zip: string | null;
+};
+
+export type PublicRepresentativeAgreementSignature = {
+  id: string;
+  agreement_id: string;
+  signed_name: string;
+  signature: string;
+  signed_by_name: string;
+  signed_at: string;
+  consent_text: string;
+  document_hash: string;
 };
