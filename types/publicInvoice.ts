@@ -2,6 +2,8 @@ import type { ContractBillingType, InvoiceJobLine, InvoiceLineItem, InvoiceStatu
 
 export type PublicInvoicePayment = {
   amount: number;
+  received_amount: number;
+  unapplied_amount: number;
   payment_date: string;
   payment_method: string;
 };
