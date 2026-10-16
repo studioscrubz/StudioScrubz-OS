@@ -15,6 +15,7 @@ import type {
   AgreementUpdate,
   AgreementWithRelations,
   ServiceAgreement,
+  RepresentativeAgreementSignature,
 } from "@/types/agreement";
 import { AGREEMENT_BILLING_TYPES } from "@/types/agreement";
 import { withImmediateAttentionPush } from "@/lib/push/client";
@@ -23,7 +24,19 @@ import type { Property } from "@/types/property";
 import type { CatalogService } from "@/types/serviceCatalog";
 import type { ProposalScopeItem, ProposalWithRelations } from "@/types/proposal";
 const select =
-  "*, client:clients!service_agreements_client_id_fkey(*), property:properties!service_agreements_property_id_fkey(*), proposal:proposals!service_agreements_proposal_id_fkey(*), crew:crews!service_agreements_assigned_crew_id_fkey(*)";
+  "*, client:clients!service_agreements_client_id_fkey(*), property:properties!service_agreements_property_id_fkey(*), proposal:proposals!service_agreements_proposal_id_fkey(*), crew:crews!service_agreements_assigned_crew_id_fkey(*), representative_signature:service_agreement_representative_signing_events(*)";
+
+export async function representativeSignAgreement(input: { agreementId: string; signedName: string; signature: string; consent: boolean; idempotencyKey: string }) {
+  const { data, error } = await getSupabaseClient().rpc("representative_sign_service_agreement", {
+    p_agreement_id: input.agreementId,
+    p_signed_name: input.signedName.trim(),
+    p_signature: input.signature,
+    p_consent: input.consent,
+    p_idempotency_key: input.idempotencyKey,
+  });
+  if (error) throw new Error(error.message || "The representative signature could not be recorded.");
+  return data as RepresentativeAgreementSignature;
+}
 export async function getAgreements(): Promise<AgreementWithRelations[]> {
   const { data, error } = await getSupabaseClient()
     .from("service_agreements")

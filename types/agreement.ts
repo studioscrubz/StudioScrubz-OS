@@ -50,7 +50,12 @@ export type ServiceAgreement = {
   in_person_witnessed_by: string | null; in_person_witnessed_by_name: string | null; in_person_signing_session_id: string | null;
   notes: string | null; created_at: string; updated_at: string; archived_at: string | null;
 };
+export type RepresentativeAgreementSignature = {
+  id: string; idempotency_key: string; agreement_id: string; signed_name: string; signature: string;
+  signature_hash: string; signed_by: string; signed_by_name: string; signed_at: string;
+  consent_text: string; document_snapshot: Record<string, unknown>; document_hash: string;
+};
 export type AgreementInput = Omit<ServiceAgreement, "id" | "agreement_number" | "sent_at" | "sent_to" | "sent_by" | "accepted_at" | "client_access_token" | "client_access_token_expires_at" | "client_signed_at" | "client_signed_name" | "client_signature" | "client_signed_snapshot" | "client_consent_text" | "client_consent_at" | "signing_method" | "physically_signed_on" | "physical_signed_uploaded_by" | "physical_signed_uploaded_by_name" | "physical_signed_uploaded_at" | "physical_signing_original_status" | "physical_signing_event_id" | "in_person_witnessed_by" | "in_person_witnessed_by_name" | "in_person_signing_session_id" | "created_at" | "updated_at" | "archived_at" | "pricing_snapshot"> & { pricing_snapshot?: AgreementPricingSnapshot | null };
 export type AgreementUpdate = Partial<AgreementInput> & { sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; accepted_at?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; archived_at?: string | null };
-export type AgreementWithRelations = ServiceAgreement & { client: Client | null; property: Property | null; proposal: Proposal | null; crew: Crew | null };
+export type AgreementWithRelations = ServiceAgreement & { client: Client | null; property: Property | null; proposal: Proposal | null; crew: Crew | null; representative_signature: RepresentativeAgreementSignature | null };
 export type AgreementFinancialSummary = { billingType: AgreementBillingType; contractAmount: number; jobsGenerated: number; completedJobs: number; invoiced: number; paid: number; outstanding: number; remaining: number | null };

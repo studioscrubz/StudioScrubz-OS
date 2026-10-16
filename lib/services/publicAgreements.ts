@@ -1,13 +1,15 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { parsePublicJsonResponse } from "@/lib/services/publicJsonResponse";
-import type { PublicAgreement } from "@/types/publicAgreement";
+import type { PublicAgreement, PublicRepresentativeAgreementSignature } from "@/types/publicAgreement";
 
 export async function getPublicAgreement(token: string): Promise<PublicAgreement> {
   if (!token) throw new Error("This agreement link is invalid.");
   const { data, error } = await getSupabaseClient().rpc("get_service_agreement_by_token", { p_token: token });
   if (error) throw new Error(error.message || "This agreement could not be loaded.");
   if (!data) throw new Error("This agreement link is invalid, expired, or no longer available.");
-  return data as PublicAgreement;
+  const { data: representativeSignature, error: representativeError } = await getSupabaseClient().rpc("get_representative_agreement_signature_by_token", { p_token: token });
+  if (representativeError) throw new Error(representativeError.message || "The StudioScrubz signature could not be loaded.");
+  return { ...(data as PublicAgreement), representative_signature: representativeSignature as PublicRepresentativeAgreementSignature | null };
 }
 
 export async function acceptPublicAgreement(token: string, signedName: string, signature: string, consent: boolean, reviewed: boolean): Promise<PublicAgreement> {
