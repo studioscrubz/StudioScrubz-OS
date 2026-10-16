@@ -62,7 +62,9 @@ test("full receipt, applied amount, and customer credit are shown separately",()
   for(const label of ["Full Payment Received","Applied to This Invoice","Unapplied Customer Credit","Customer Credits"])assert.match(invoices,new RegExp(label));
   assert.match(invoices,/not refunded or applied to another Invoice automatically/);
   assert.match(invoices,/recorded_by_name/);
-  for(const label of ["Payments Received","Remaining Balance","Pay Remaining Balance"])assert.match(publicInvoice,new RegExp(label));
+  for(const label of ["Full Payments Received","Applied to Invoice","Unapplied Customer Credit","Remaining Balance","Pay Remaining Balance"])assert.match(publicInvoice,new RegExp(label));
+  assert.match(publicInvoice,/invoice\.payments\.reduce\(\(sum, payment\) => sum \+ payment\.received_amount, 0\)/);
+  assert.match(publicInvoice,/invoice\.payments\.reduce\(\(sum, payment\) => sum \+ payment\.unapplied_amount, 0\)/);
   assert.match(publicInvoice,/payment\.received_amount/);
   assert.match(publicInvoice,/payment\.unapplied_amount/);
   assert.match(migration,/'received_amount', coalesce\(p\.received_amount, p\.amount\)/);
