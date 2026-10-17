@@ -68,10 +68,13 @@ begin
     end if;
     return new;
   end if;
-  update public.internal_schedule_events
-  set calendar_sequence = calendar_sequence + 1
-  where id = coalesce(new.event_id, old.event_id);
-  if tg_op = 'DELETE' then return old; end if;
+  if tg_op = 'DELETE' then
+    update public.internal_schedule_events set calendar_sequence = calendar_sequence + 1 where id = old.event_id;
+    return old;
+  elsif tg_op = 'INSERT' then
+    update public.internal_schedule_events set calendar_sequence = calendar_sequence + 1 where id = new.event_id;
+    return new;
+  end if;
   return new;
 end;
 $$;
@@ -123,11 +126,15 @@ begin
   where rsvp_token_hash = encode(extensions.digest(convert_to(p_token, 'UTF8'), 'sha256'), 'hex')
     and method = 'REQUEST' order by calendar_sequence desc limit 1;
   if not found or delivery.status <> 'Accepted' then raise exception 'This invitation is invalid or unavailable.'; end if;
+  if not exists (select 1 from public.internal_schedule_events e where e.id = delivery.event_id and e.calendar_sequence = delivery.calendar_sequence and e.status = 'Scheduled') then
+    raise exception 'This invitation has been superseded or canceled.';
+  end if;
   update public.internal_schedule_event_attendees attendee
   set invitation_status = p_response
   from public.internal_schedule_events event
   where attendee.event_id = delivery.event_id and attendee.employee_id = delivery.employee_id
-    and event.id = attendee.event_id and event.status = 'Scheduled';
+    and event.id = attendee.event_id and event.status = 'Scheduled'
+    and event.calendar_sequence = delivery.calendar_sequence;
   if not found then raise exception 'This event is canceled or you are no longer an attendee.'; end if;
   return jsonb_build_object('event_id', delivery.event_id, 'response', p_response);
 end;
@@ -140,7 +147,8 @@ language sql stable security definer set search_path = '' as $$
     delivery.accepted_at, delivery.failure_reason
   from public.internal_schedule_event_invitation_deliveries delivery
   where delivery.event_id = p_event_id
-    and private.internal_schedule_can_view_event(p_event_id)
+    and private.can_view_internal_schedule_event(p_event_id)
+    and private.current_internal_schedule_access_level() = 'Management'
   order by delivery.employee_id, delivery.calendar_sequence desc, delivery.created_at desc;
 $$;
 
