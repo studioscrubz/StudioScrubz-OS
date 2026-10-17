@@ -35,6 +35,8 @@ export type InternalEventAttendee = {
   invitation_status: InternalEventRsvpStatus;
   invited_at: string;
   responded_at: string | null;
+  delivery_status?: "Pending" | "Accepted" | "Failed" | "Unavailable" | null;
+  delivery_failure_reason?: string | null;
   employee: {
     id: string;
     first_name: string;
@@ -102,6 +104,7 @@ export type InternalEventInput = Pick<
   | "call_phone_extension"
 > & {
   attendee_employee_ids: string[];
+  send_calendar_invitations: boolean;
 };
 
 export type InternalEventAttendeeOption = { id: string; display_name: string };
@@ -114,5 +117,6 @@ export type InternalEventClientOption = {
 export type InternalEventMutationResult = {
   eventId: string;
   google: { status: string; meetUrl: string | null };
+  invitations: { accepted: number; failed: number; unavailable: number; pending: number };
   warning: string | null;
 };

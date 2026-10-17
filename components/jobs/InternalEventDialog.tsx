@@ -19,6 +19,7 @@ import {
   cancelInternalScheduleEvent,
   createInternalScheduleEvent,
   getInternalEventFormOptions,
+  retryInternalEventInvitations,
   updateInternalEventRsvp,
   updateInternalScheduleEvent,
 } from "@/lib/services/internalScheduleEvents";
@@ -217,6 +218,15 @@ export function InternalEventDialog({
           </select>
         </Field>
       </FormSection>
+      <label className="mt-4 flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1 h-4 w-4"
+          checked={form.sendCalendarInvitations}
+          onChange={(e) => setForm({ ...form, sendCalendarInvitations: e.target.checked })}
+        />
+        <span><strong>Send Calendar Invitations</strong><br /><span className="text-neutral-500">Email each selected attendee a private calendar invitation. Event saving still succeeds if delivery fails.</span></span>
+      </label>
       <FormSection title="Related Records">
         <Field label="Search Prospects">
           <input className={input} value={prospectSearch} onChange={(e) => setProspectSearch(e.target.value)} placeholder="Search by company name" />
@@ -455,6 +465,7 @@ export function InternalEventDetails({
               {employeeName(attendee.employee)}{" "}
               <span className="text-neutral-500">
                 | {attendee.invitation_status}
+                {attendee.delivery_status ? ` | Email ${attendee.delivery_status}` : " | Email not sent"}
               </span>
             </p>
           ))}
@@ -497,6 +508,23 @@ export function InternalEventDetails({
           >
             Cancel Event
           </button>
+          <button
+            disabled={busy || event.status === "Canceled"}
+            className={secondary}
+            onClick={() => void (async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const result = await retryInternalEventInvitations(event.id);
+                await saved(result.warning ?? "Calendar invitation retry completed.");
+              } catch (cause) {
+                setError(message(cause));
+                setBusy(false);
+              }
+            })()}
+          >
+            Retry Invitations
+          </button>
         </div>
       )}
     </Modal>
@@ -533,6 +561,7 @@ function formState(event: InternalScheduleEvent | null) {
     callPhoneNumber: event?.call_phone_number ?? "",
     callPhoneExtension: event?.call_phone_extension ?? "",
     attendeeIds: event?.attendees.map((attendee) => attendee.employee_id) ?? [],
+    sendCalendarInvitations: true,
   };
 }
 function toInput(form: FormState): InternalEventInput {
@@ -553,6 +582,7 @@ function toInput(form: FormState): InternalEventInput {
     call_phone_number: form.meetingMode === "Phone Call" ? empty(form.callPhoneNumber) : null,
     call_phone_extension: form.meetingMode === "Phone Call" ? empty(form.callPhoneExtension) : null,
     attendee_employee_ids: form.attendeeIds,
+    send_calendar_invitations: form.sendCalendarInvitations,
   };
 }
 function empty(value: string) {

@@ -22,12 +22,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ev
   try {
     const db = await authorized();
     const { eventId } = await params;
+    const body = await request.json();
     const { data, error } = await (db as unknown as InternalEventRpcClient).rpc(
       "save_internal_schedule_event",
-      internalEventRpcArgs(await request.json(), eventId),
+      internalEventRpcArgs(body, eventId),
     );
     if (error) throw error;
-    return Response.json(await synchronizeInternalEvent((data as { id: string }).id));
+    return Response.json(await synchronizeInternalEvent((data as { id: string }).id, body.send_calendar_invitations !== false));
   } catch (cause) {
     return internalEventApiError(cause);
   }
@@ -44,7 +45,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ eventId
       .select("id")
       .single();
     if (error) throw error;
-    return Response.json(await synchronizeInternalEvent(data.id));
+    return Response.json(await synchronizeInternalEvent(data.id, false));
   } catch (cause) {
     return internalEventApiError(cause);
   }

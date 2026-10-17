@@ -67,7 +67,15 @@ export async function getInternalScheduleEvents(): Promise<
     .select(eventSelection)
     .order("starts_at");
   fail(error, "Internal events could not be loaded.");
-  return (data ?? []) as unknown as InternalScheduleEvent[];
+  const events = (data ?? []) as unknown as InternalScheduleEvent[];
+  await Promise.all(events.map(async (event) => {
+    const result = await client().rpc("get_internal_schedule_invitation_statuses", { p_event_id: event.id });
+    if (result.error) return;
+    const rows = (result.data ?? []) as Array<{ employee_id: string; delivery_status: InternalScheduleEvent["attendees"][number]["delivery_status"]; failure_reason: string | null }>;
+    const statuses = new Map(rows.map(row => [row.employee_id, row]));
+    event.attendees = event.attendees.map(attendee => ({ ...attendee, delivery_status: statuses.get(attendee.employee_id)?.delivery_status ?? null, delivery_failure_reason: statuses.get(attendee.employee_id)?.failure_reason ?? null }));
+  }));
+  return events;
 }
 
 export async function getInternalEventFormOptions(): Promise<{
@@ -141,6 +149,10 @@ export async function cancelInternalScheduleEvent(
     `/api/internal-schedule-events/${encodeURIComponent(eventId)}`,
     "DELETE",
   );
+}
+
+export async function retryInternalEventInvitations(eventId: string): Promise<InternalEventMutationResult> {
+  return mutateInternalEvent(`/api/internal-schedule-events/${encodeURIComponent(eventId)}/invitations`, "POST");
 }
 
 async function mutateInternalEvent(
