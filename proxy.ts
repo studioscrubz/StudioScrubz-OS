@@ -17,6 +17,7 @@ export async function proxy(request: NextRequest) {
   if (hostname === "studioscrubz.com") {
     if (pathname === "/robots.txt" || pathname === "/sitemap.xml") return NextResponse.next();
     const publicDocument = pathname.startsWith("/api/public/")
+      || pathname.startsWith("/internal-event/rsvp/")
       || ["/agreement/", "/estimate/", "/invoice/", "/proposal/"].some((prefix) => pathname.startsWith(prefix));
     if (publicDocument) return updateSession(request);
     const marketingPaths = new Set(["/", "/residential", "/commercial", "/property-management", "/property-porter-services", "/luxury-property-care", "/airbnb-cleaning", "/post-construction", "/pressure-washing", "/about", "/contact", "/careers"]);
