@@ -18,6 +18,14 @@ const comparisons = [
   },
 ] as const;
 
+const residentialShowcase = [
+  ["/images/projects/residential-double-vanity.webp", "Bright residential bathroom with a double vanity, two sinks, and wall mirrors"],
+  ["/images/projects/residential-vessel-sinks.webp", "Residential bathroom vanity with two vessel sinks and a tiled countertop"],
+  ["/images/projects/residential-living-room.webp", "Residential living room with light seating, hardwood floors, and plantation shutters"],
+  ["/images/projects/residential-kitchen.webp", "Residential kitchen with white cabinetry, black countertops, and tiled flooring"],
+  ["/images/projects/residential-dining-room.webp", "Residential dining room with a dark table, hardwood floors, and sunlit windows"],
+] as const;
+
 const projectPhotos = [
   ["/images/projects/bathroom-vanity.webp", "Clean residential bathroom vanity completed by StudioScrubz"],
   ["/site/details-ready-living-room.jpg", "Clean living and dining room completed by StudioScrubz"],
@@ -51,6 +59,33 @@ export function ProjectResults() {
               </div>
             </article>
           ))}
+        </div>
+
+        <div className="mt-16 border-t border-white/10 pt-16">
+          <p className="text-xs font-extrabold uppercase tracking-[.22em] text-[#D4AF37]">Residential gallery</p>
+          <h3 className="mt-3 text-3xl font-extrabold tracking-[-.04em] sm:text-4xl">Residential Cleaning Showcase</h3>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70 sm:text-base">
+            Real spaces. Professional care. The StudioScrubz standard.
+          </p>
+
+          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
+            {residentialShowcase.map(([src, alt], index) => (
+              <figure
+                key={src}
+                className={`overflow-hidden rounded-[1.4rem] border border-white/10 bg-white/5 shadow-[0_18px_45px_rgba(0,0,0,.16)] ${index < 2 ? "lg:col-span-3" : "lg:col-span-2"}`}
+              >
+                <Image
+                  src={src}
+                  alt={alt}
+                  width={1050}
+                  height={1400}
+                  loading="lazy"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  className="h-auto w-full object-cover"
+                />
+              </figure>
+            ))}
+          </div>
         </div>
 
         <div className="mt-16 flex items-end justify-between gap-6">
