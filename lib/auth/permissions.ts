@@ -205,6 +205,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/lead-rep/commissions", "leadRep.commissions.viewOwn"],
   ["/lead-rep/leads", "leadRep.leads.viewOwn"],
   ["/lead-rep", "leadRep.portal"],
+  ["/properties/porter", "porterVisits.view"],
   ["/properties/porter-routes", "porterVisits.view"],
   ["/properties/service-reports", "porterVisits.manage"],
   ["/properties/porter-visits", "porterVisits.view"],

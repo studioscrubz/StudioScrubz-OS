@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
-import type { BusinessSettings, BusinessSettingsUpdate } from "@/types/businessSettings";
+import type { BusinessIdentitySettings, BusinessSettings, BusinessSettingsUpdate } from "@/types/businessSettings";
+export async function getBusinessIdentitySettings(){const{data,error}=await getSupabaseClient().rpc("get_business_settings_public");if(error)throw new Error(`Business identity settings could not be loaded: ${error.message}`);const settings=data[0];if(!settings)throw new Error("Business settings have not been configured.");return settings as BusinessIdentitySettings}
 export async function getCompanyMileageRate() {
   const { data, error } = await getSupabaseClient().rpc("get_company_mileage_rate");
   if (error) throw new Error(error.message);

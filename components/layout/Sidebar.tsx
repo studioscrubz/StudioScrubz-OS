@@ -284,6 +284,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
       {
 
+        label: "Overview",
+
+        href: "/properties/porter",
+
+        marker: "",
+
+        permission: "porterVisits.view",
+
+      },
+
+      {
+
         label: "Property Service Plans",
 
         href: "/properties/service-plans",
