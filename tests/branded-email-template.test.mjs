@@ -43,6 +43,15 @@ test("template is mobile-friendly and uses the StudioScrubz palette and tagline"
   assert.match(html, /No mess\. No stress\./);
 });
 
+test("header stays white with a dark-green tagline in light and supported dark modes", () => {
+  const html = loadTemplate().renderStudioScrubzEmail("<p>Hello</p>");
+  assert.match(html, /name="color-scheme" content="light"/);
+  assert.match(html, /name="supported-color-schemes" content="light"/);
+  assert.match(html, /align="center" bgcolor="#FFFFFF" style="[^"]*background-color:#FFFFFF[^"]*border-top:5px solid #D4AF37/);
+  assert.match(html, /width="180"[^>]*margin:0 auto/);
+  assert.match(html, /color:#143D1A[^>]*>No mess\. No stress\.<\/div>/);
+});
+
 test("contact configuration and unsafe text are escaped", () => {
   const template = loadTemplate();
   const html = template.renderStudioScrubzEmail("<p>Preserved content</p>", {
