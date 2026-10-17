@@ -452,6 +452,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
       {
 
+        label: "Messages",
+
+        href: "/messages",
+
+        marker: "",
+
+        permission: "messages.view",
+
+      },
+
+      {
+
         label: "Employee Email",
 
         href: "/communications/employee-email",
