@@ -80,16 +80,16 @@ export function ProjectResults() {
           <p className="hidden max-w-sm text-right text-sm leading-6 text-white/60 md:block">Residential, detail, and move-out cleaning photographed in real customer spaces.</p>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
-          {projectPhotos.map(([src, alt], index) => (
-            <figure key={src} className={`relative overflow-hidden rounded-[1.4rem] bg-white/10 ${index === 2 || index === 5 ? "aspect-[4/5] lg:row-span-2 lg:aspect-auto" : "aspect-[4/5]"}`}>
+        <div className="mx-auto mt-8 grid max-w-6xl grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+          {projectPhotos.map(([src, alt]) => (
+            <figure key={src} className="group relative aspect-[4/5] overflow-hidden rounded-[1.4rem] border border-[#D4AF37]/20 bg-white/10 shadow-[0_14px_36px_rgba(0,0,0,.14)]">
               <Image
                 src={src}
                 alt={alt}
                 fill
                 loading="lazy"
-                sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 50vw"
-                className="object-cover transition duration-500 hover:scale-[1.02]"
+                sizes="(min-width: 1280px) 272px, (min-width: 1024px) 22vw, (min-width: 640px) 46vw, 46vw"
+                className="object-cover transition duration-300 ease-out group-hover:scale-[1.015] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
               />
             </figure>
           ))}
