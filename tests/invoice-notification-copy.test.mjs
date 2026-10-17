@@ -19,13 +19,16 @@ test("Invoice email subject uses the exact safe title", async () => {
 });
 
 test("Invoice email title is passed through without a trailing question mark", async () => {
-  const [source, email] = await Promise.all([
+  const [source, email, template] = await Promise.all([
     invoiceSendSource(),
     read("lib/email/resend.ts"),
+    read("lib/email/studioScrubzTemplate.ts"),
   ]);
   assert.match(source, /deliverDocument\(\{[^}]*subject,messageBody,/);
   assert.match(email, /subject: input\.subject/);
-  assert.match(email, /<strong[^>]*>StudioScrubz<\/strong>/);
+  assert.match(email, /renderStudioScrubzEmail/);
+  assert.match(template, /studioscrubz-logo\.png/);
+  assert.match(template, /No mess\. No stress\./);
   assert.doesNotMatch(email, />StudioScrubz Invoice Ready\s*[?\uFFFD]</);
 });
 
