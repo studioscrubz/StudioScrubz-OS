@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { SectionHeading } from "./SiteSections";
+import { ResidentialShowcaseCarousel } from "./ResidentialShowcaseCarousel";
 
 const comparisons = [
   {
@@ -68,24 +69,7 @@ export function ProjectResults() {
             Real spaces. Professional care. The StudioScrubz standard.
           </p>
 
-          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
-            {residentialShowcase.map(([src, alt], index) => (
-              <figure
-                key={src}
-                className={`overflow-hidden rounded-[1.4rem] border border-white/10 bg-white/5 shadow-[0_18px_45px_rgba(0,0,0,.16)] ${index < 2 ? "lg:col-span-3" : "lg:col-span-2"}`}
-              >
-                <Image
-                  src={src}
-                  alt={alt}
-                  width={1050}
-                  height={1400}
-                  loading="lazy"
-                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                  className="h-auto w-full object-cover"
-                />
-              </figure>
-            ))}
-          </div>
+          <ResidentialShowcaseCarousel photos={residentialShowcase} />
         </div>
 
         <div className="mt-16 flex items-end justify-between gap-6">
