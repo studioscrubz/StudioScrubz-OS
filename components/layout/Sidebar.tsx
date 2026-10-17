@@ -444,6 +444,30 @@ const navItems: Array<NavLink | NavGroup> = [
 
   {
 
+    label: "Communications",
+
+    marker: "C",
+
+    children: [
+
+      {
+
+        label: "Employee Email",
+
+        href: "/communications/employee-email",
+
+        marker: "",
+
+        permission: "employeeEmails.send",
+
+      },
+
+    ],
+
+  },
+
+  {
+
     label: "Employees",
 
     marker: "E",
