@@ -16,6 +16,18 @@ const createEventMigration = readFileSync(
   "supabase/migrations/20261011155011_internal_schedule_google_meet_and_related_clients.sql",
   "utf8",
 );
+const visibilityMigration = readFileSync(
+  "supabase/migrations/20261011190000_internal_schedule_visibility_v2.sql",
+  "utf8",
+);
+const insertRlsRepair = readFileSync(
+  "supabase/migrations/20261017181129_repair_internal_schedule_event_insert_returning_rls.sql",
+  "utf8",
+);
+const insertRlsRegression = readFileSync(
+  "supabase/tests/internal_schedule_event_insert_rls_regression_local.sql",
+  "utf8",
+);
 
 test("internal schedule access comes from the RLS authorization model", () => {
   assert.match(service, /rpc\(\s*"get_current_internal_schedule_access_level"/);
@@ -57,4 +69,44 @@ test("employee linkage remains mandatory outside Master Admin", () => {
   assert.match(masterAdminMigration, /when employee\.id is null[\s\S]*then 'None'/);
   assert.match(masterAdminMigration, /profile\.employee_id = p_employee_id/);
   assert.doesNotMatch(masterAdminMigration, /Scrub Technician' then '(Management|Sales)'/);
+});
+
+test("Master Admin creation avoids INSERT RETURNING visibility snapshot rejection", () => {
+  const createBranch = insertRlsRepair.match(
+    /if p_event_id is null then([\s\S]*?)\n  else/,
+  )?.[1] ?? "";
+  assert.match(visibilityMigration, /create or replace function private\.can_view_internal_schedule_event/);
+  assert.match(visibilityMigration, /from public\.internal_schedule_events e/);
+  assert.match(createBranch, /new_event_id := extensions\.gen_random_uuid\(\)/);
+  assert.match(createBranch, /insert into public\.internal_schedule_events\([\s\S]*?new_event_id,/);
+  assert.doesNotMatch(createBranch, /returning/);
+  assert.match(
+    insertRlsRepair,
+    /select \* into saved[\s\S]*from public\.internal_schedule_events[\s\S]*where id = new_event_id;/,
+  );
+});
+
+test("the repair preserves authenticated organizer identity and restrictive RLS", () => {
+  assert.match(insertRlsRepair, /language plpgsql\s+security invoker/);
+  assert.match(insertRlsRepair, /where id = auth\.uid\(\)/);
+  assert.match(
+    insertRlsRepair,
+    /actor_profile\.id,[\s\S]*actor_profile\.employee_id, p_visibility/,
+  );
+  assert.match(masterAdminMigration, /profile\.role = 'Master Admin' and p_employee_id is null/);
+  assert.match(masterAdminMigration, /organizer_user_id = \(select auth\.uid\(\)\)/);
+  assert.match(
+    visibilityMigration,
+    /private\.internal_schedule_access_level\(auth\.uid\(\)\)='Sales'[\s\S]*organizer_employee_id=current_employee_id\(\)[\s\S]*visibility in \('Authorized attendees only','Company-wide'\)/,
+  );
+  assert.doesNotMatch(insertRlsRepair, /security definer|grant[^;]+service_role|disable row level security/i);
+});
+
+test("transactional coverage includes authorized and unauthorized creation", () => {
+  assert.match(insertRlsRegression, /'Master Admin', true, null/);
+  assert.match(insertRlsRegression, /from public\.save_internal_schedule_event/);
+  assert.match(insertRlsRegression, /created\.organizer_employee_id is not null/);
+  assert.match(insertRlsRegression, /'Scrub Technician', true/);
+  assert.match(insertRlsRegression, /when insufficient_privilege or check_violation then null/);
+  assert.match(insertRlsRegression, /rollback;/);
 });
