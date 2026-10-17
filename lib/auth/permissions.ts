@@ -20,7 +20,7 @@ export const PERMISSIONS = [
   "invoices.view", "invoices.create", "invoices.edit", "invoices.send", "invoices.recordPayment",
   "finances.view", "customerCredits.manage", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
   "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage", "appearance.view",
-  "communications.view", "communications.create", "communications.archive",
+  "communications.view", "communications.create", "communications.archive", "employeeEmails.send",
   "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
   "leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn", "leadRep.payouts.manage",
@@ -45,7 +45,7 @@ const operationalAdmin: Permission[] = [
   "agreements.view", "agreements.manage", "agreements.financialSummary", "invoices.view", "invoices.create",
   "invoices.edit", "invoices.send", "invoices.recordPayment",
   "archives.view", "archives.restore",
-  "communications.view", "communications.create", "communications.archive",
+  "communications.view", "communications.create", "communications.archive", "employeeEmails.send",
   "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
   "leadRep.payouts.manage",
@@ -200,6 +200,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) =>
   ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/communications/employee-email", "employeeEmails.send"],
   ["/lead-commission-payouts", "leadRep.payouts.manage"],
   ["/lead-rep/commissions", "leadRep.commissions.viewOwn"],
   ["/lead-rep/leads", "leadRep.leads.viewOwn"],

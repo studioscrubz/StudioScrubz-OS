@@ -1,0 +1,6 @@
+import type { EmployeeEmailPreview, EmployeeEmailSelection, EmployeeEmailSendResult, EmployeeEmailWorkspace } from "@/types/employeeEmail";
+
+export async function getEmployeeEmailWorkspace(): Promise<EmployeeEmailWorkspace> { return request<EmployeeEmailWorkspace>("/api/communications/employee-email"); }
+export async function previewEmployeeEmail(selection: EmployeeEmailSelection): Promise<EmployeeEmailPreview> { return request<EmployeeEmailPreview>("/api/communications/employee-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "preview", selection }) }); }
+export async function sendEmployeeEmail(input: { requestId: string; selection: EmployeeEmailSelection; subject: string; message: string; confirmed: boolean }): Promise<EmployeeEmailSendResult> { return request<EmployeeEmailSendResult>("/api/communications/employee-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "send", ...input }) }); }
+async function request<T>(url: string, init?: RequestInit): Promise<T> { const response = await fetch(url, init); const result = await response.json().catch(() => null) as (T & { error?: string }) | null; if (!response.ok || !result) throw new Error(result?.error || "Employee email request failed."); return result; }
