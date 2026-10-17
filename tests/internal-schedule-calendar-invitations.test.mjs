@@ -33,7 +33,10 @@ test("RSVP token updates only its associated attendee and status access remains 
   assert.match(migration, /rsvp_token_hash = encode\(extensions\.digest/);
   assert.match(migration, /attendee\.event_id = delivery\.event_id and attendee\.employee_id = delivery\.employee_id/);
   assert.match(migration, /p_response not in \('Accepted', 'Tentative', 'Declined'\)/);
-  assert.match(migration, /private\.internal_schedule_can_view_event\(p_event_id\)/);
+  assert.match(migration, /private\.can_view_internal_schedule_event\(p_event_id\)/);
+  assert.match(migration, /private\.current_internal_schedule_access_level\(\) = 'Management'/);
+  assert.match(migration, /event\.calendar_sequence = delivery\.calendar_sequence/);
+  assert.match(migration, /e\.calendar_sequence = delivery\.calendar_sequence/);
   assert.match(migration, /revoke all on table public\.internal_schedule_event_invitation_deliveries from public, anon, authenticated/);
 });
 
