@@ -38,8 +38,18 @@ test("unread state is based on messages and read states", () => {
   assert.match(sidebar, /getUnreadDirectMessageCount/);
 });
 
-test("sidebar exposes the Messages navigation item with messages.view permission", () => {
-  assert.match(sidebar, /hasPermission\(auth\.profile,\s*"messages\.view"\)[\s\S]*?<Link[\s\S]*?href="\/messages"/);
+test("sidebar exposes Messages above Employee Email in Communications using the same route and permission", () => {
+  const communications = sidebar.slice(sidebar.indexOf('label: "Communications"'), sidebar.indexOf('label: "Employees"'));
+  assert.match(communications, /label: "Messages"[\s\S]*href: "\/messages"[\s\S]*permission: "messages\.view"/);
+  assert.ok(communications.indexOf('label: "Messages"') < communications.indexOf('label: "Employee Email"'));
+  assert.match(communications, /label: "Employee Email"[\s\S]*permission: "employeeEmails\.send"/);
+  assert.equal((sidebar.match(/(?:href:\s*|href=)"\/messages"/g) ?? []).length, 2);
+});
+
+test("existing Messages header bubble keeps unread count behavior and click action", () => {
+  assert.match(sidebar, /hasPermission\(auth\.profile,\s*"messages\.view"\)[\s\S]*?<Link[\s\S]*?href="\/messages"[\s\S]*?onClick=\{onClose\}[\s\S]*?aria-label="Messages"/);
+  assert.match(sidebar, /getUnreadDirectMessageCount\(auth\.user\.id\)/);
+  assert.match(sidebar, /Boolean\(messageCount\)[\s\S]*\{messageCount\}/);
 });
 
 test("only the active Direct conversation is marked read, including automatic selection", () => {
