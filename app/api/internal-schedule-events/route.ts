@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "You do not have permission to manage internal events." }, { status: 403 });
     const { data, error } = await rpcClient.rpc("save_internal_schedule_event", internalEventRpcArgs(body, null));
     if (error) throw error;
-    return Response.json(await synchronizeInternalEvent((data as { id: string }).id));
+    return Response.json(await synchronizeInternalEvent((data as { id: string }).id, body.send_calendar_invitations !== false));
   } catch (cause) {
     return internalEventApiError(cause);
   }

@@ -1,5 +1,6 @@
 import "server-only";
 import { syncInternalScheduleEventGoogle } from "@/lib/google-calendar/internal-events";
+import { dispatchInternalEventInvitations } from "@/lib/internal-schedule/calendarInvitation";
 
 export function internalEventRpcArgs(input: Record<string, unknown>, eventId: string | null) {
   return {
@@ -23,16 +24,21 @@ export function internalEventRpcArgs(input: Record<string, unknown>, eventId: st
   };
 }
 
-export async function synchronizeInternalEvent(eventId: string) {
+export async function synchronizeInternalEvent(eventId: string, sendCalendarInvitations = true) {
+  let google: { status: string; meetUrl: string | null } = { status: "Failed", meetUrl: null };
+  const warnings: string[] = [];
   try {
-    const google = await syncInternalScheduleEventGoogle(eventId);
-    return { eventId, google, warning: null };
+    google = await syncInternalScheduleEventGoogle(eventId);
   } catch (cause) {
-    return {
-      eventId,
-      google: { status: "Failed", meetUrl: null },
-      warning: `Event saved, but Google Calendar sync failed: ${cause instanceof Error ? cause.message : "Unknown error."}`,
-    };
+    warnings.push(`Event saved, but Google Calendar sync failed: ${cause instanceof Error ? cause.message : "Unknown error."}`);
+  }
+  try {
+    const invitations = await dispatchInternalEventInvitations(eventId, sendCalendarInvitations);
+    if (invitations.warning) warnings.push(invitations.warning);
+    return { eventId, google, invitations, warning: warnings.length ? warnings.join(" ") : null };
+  } catch (cause) {
+    warnings.push(`Event saved, but calendar invitation processing failed: ${cause instanceof Error ? cause.message : "Unknown error."}`);
+    return { eventId, google, invitations: { accepted: 0, failed: 0, unavailable: 0, pending: 0 }, warning: warnings.join(" ") };
   }
 }
 
