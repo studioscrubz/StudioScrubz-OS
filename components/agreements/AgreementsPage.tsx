@@ -184,7 +184,7 @@ export function AgreementsPage() {
       <p>{agreement.service_name} · {agreement.frequency}</p><p>{billingLabel(agreement.billing_type)}: {money(agreement.billing_amount)} · {agreementStatusLabel(agreement)}</p>
       {agreement.sent_at && <p className="mt-1 text-xs text-neutral-500">Last sent {new Date(agreement.sent_at).toLocaleString()} to {agreement.sent_to}</p>}
       {agreement.client_signed_at && <p className="mt-1 text-xs font-semibold text-green-700">Signed by {agreement.client_signed_name} on {new Date(agreement.client_signed_at).toLocaleString()}</p>}
-      {hasDocumentedVerbalAcceptance(agreement) && !hasClientSignature(agreement) && <p className="mt-1 text-xs text-green-700">Deloris Forzley verbally approved by phone on September 8, 2026 at 2:15:23 PM PDT; witnessed by Kris Greer. Documented retrospectively; no electronic signature on file.</p>}
+      {hasDocumentedVerbalAcceptance(agreement) && !hasClientSignature(agreement) && <p className="mt-1 text-xs text-green-700">{agreement.agreement_number === "AGR-20260824-2986" ? "Deloris Forzley verbally approved by phone on September 8, 2026 at 2:15:23 PM PDT; witnessed by Kris Greer." : "Client verbally approved in person on October 14, 2026 at 11:50 AM Pacific time; witnessed by Kris Greer."} Documented retrospectively; no electronic signature on file.</p>}
       {agreement.signing_method === "physical" && <p className="mt-1 text-xs font-semibold text-green-700">Physically signed {agreement.physically_signed_on ? new Date(`${agreement.physically_signed_on}T12:00:00`).toLocaleDateString() : "date not recorded"} · Uploaded by {agreement.physical_signed_uploaded_by_name || "authorized administrator"}</p>}
       <p className={`mt-1 text-xs font-semibold ${["Fully Signed", "Verbal Acceptance Documented"].includes(agreementSignatureState(agreement)) ? "text-green-700" : "text-amber-700"}`}>{agreementSignatureState(agreement)}</p>
       {canDeleteDraft&&agreement.proposal_id&&<AgreementDepositPanel proposalId={agreement.proposal_id} onChange={()=>void load()}/>}
@@ -247,7 +247,7 @@ function RepresentativeSigningModal({ agreement, settings, close, signed }: { ag
 
 function hasClientSignature(agreement: AgreementWithRelations) { return Boolean(agreement.client_signed_at || agreement.signing_method === "physical"); }
 function hasDocumentedVerbalAcceptance(agreement: AgreementWithRelations) {
-  return agreement.agreement_number === "AGR-20260824-2986" &&
+  return ["AGR-20260824-2986", "AGR-20261012-9901"].includes(agreement.agreement_number) &&
     Boolean(agreement.notes?.includes("[Historical verbal acceptance documented 2026-10-17]"));
 }
 function agreementSignatureState(agreement: AgreementWithRelations) {
