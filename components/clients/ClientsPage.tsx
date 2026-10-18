@@ -185,8 +185,8 @@ export function ClientsPage() {
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
         <ClientViewTabs view={view} counts={viewCounts} onChange={selectView} />
-        <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_180px]">
-          <label className="relative"><span className="sr-only">Search clients</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, company, phone, or email" className={filterClass} /></label>
+        <div role="group" aria-label="Filter client records" className="grid gap-3 border-b border-neutral-100 bg-[#f8faf7] p-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_180px]">
+          <label className="relative"><span className="mb-1.5 block text-xs font-bold text-[#143d1a]">Search clients</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, company, phone, or email" className={filterClass} /></label>
           <Filter label="Client type" value={typeFilter} onChange={(value) => setTypeFilter(value as TypeFilter)} options={["All", ...CLIENT_TYPES]} />
           <Filter label="Archived records" value={archiveFilter} onChange={(value) => setArchiveFilter(value as ArchiveFilter)} options={["Active Records", "Archived Records", "All Records"]} />
         </div>
@@ -216,7 +216,7 @@ function ClientViewTabs({ view, counts, onChange }: { view: ClientView; counts: 
 }
 
 function Filter({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[] }) {
-  return <label><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={filterClass}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
+  return <label><span className="mb-1.5 block text-xs font-bold text-[#143d1a]">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={filterClass}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
 }
 
 function ClientList({ clients, archivingId, onView, onEdit, onArchive }: { clients: Client[]; archivingId: string | null; onView: (client: Client) => void; onEdit?: (client: Client) => void; onArchive?: (client: Client) => Promise<void> }) {
