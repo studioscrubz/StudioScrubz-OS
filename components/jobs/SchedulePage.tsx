@@ -781,7 +781,7 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
   return (
     <button
       onClick={open}
-      className="w-full rounded-xl bg-white p-3 text-left shadow-sm"
+      className="w-full rounded-xl border border-neutral-200 border-l-4 border-l-[#143d1a] bg-white p-3 text-left shadow-sm transition-colors hover:bg-[#f5f8f3] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#143d1a]"
     >
       <div className="flex justify-between gap-2">
         <b className="text-[#143d1a]">{formatTime(job.start_time)}</b>
@@ -850,11 +850,13 @@ function ListView({
   return (
     <div className="mt-6 grid gap-5 xl:grid-cols-2">
       {groups.map(([title, rows]) => (
-        <section key={title} className="rounded-2xl bg-[#eef1ed] p-4">
-          <h2 className="font-extrabold text-[#143d1a]">
-            {title} <span className="float-right">{rows.length}</span>
+        <section key={title} aria-label={`${title} events`} className={`overflow-hidden rounded-2xl border shadow-sm ${title === "Today" ? "border-[#143d1a]/25 bg-[#eef1ed]" : title === "Upcoming" ? "border-sky-200 bg-sky-50/40" : title === "Unscheduled" ? "border-amber-200 bg-amber-50/40" : "border-neutral-200 bg-neutral-50"}`}>
+          <div className="border-b border-inherit px-4 py-3">
+          <h2 className="flex items-center justify-between gap-3 font-extrabold text-[#143d1a]">
+            {title} <span className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-xs">{rows.length}</span>
           </h2>
-          <div className="mt-3 grid gap-2">
+          </div>
+          <div className="grid gap-2 p-4">
             {[...rows].sort(byEventTime).map((event) => (
               <EventCard
                 key={`${event.kind}-${event.id}`}
