@@ -103,7 +103,8 @@ export function PorterHubPage() {
 }
 
 function QuickLinks({ management }: { management: boolean }) {
-  return <nav aria-label="Porter Hub sections" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+  return <nav aria-label="Porter Hub sections" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <Link className={linkClass} href="/properties/porter/my-visits">My Visits Today</Link>
     <Link className={linkClass} href="/properties/porter-visits">Visits</Link>
     <Link className={linkClass} href="/properties/porter-routes">Routes</Link>
     {management && <Link className={linkClass} href="/properties/service-plans">Plans</Link>}

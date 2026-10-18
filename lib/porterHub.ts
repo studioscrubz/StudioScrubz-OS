@@ -36,6 +36,23 @@ export function porterVisitProgress(visit: Pick<PorterVisitWithAreas, "areas">):
   return { addressed, total, percent: total ? Math.round((addressed / total) * 100) : 0 };
 }
 
+export function porterVisitReadiness(visit: PorterVisitWithAreas) {
+  const photos = (visit.photos ?? []).filter(photo => !photo.archived_at);
+  const pendingRequired = visit.areas.filter(area => area.is_required && area.status === "Pending");
+  const missingPhotoAreas = visit.areas.filter(area => area.is_required && area.requires_photo
+    && !photos.some(photo => photo.visit_area_id === area.id));
+  const unableToComplete = visit.areas.filter(area => area.status === "Unable to Complete");
+  const openIssues = (visit.issues ?? []).filter(issue => issue.status !== "Resolved");
+  return {
+    pendingRequired,
+    missingPhotoAreas,
+    unableToComplete,
+    openIssues,
+    blockers: pendingRequired.length + missingPhotoAreas.length,
+    ready: pendingRequired.length === 0 && missingPhotoAreas.length === 0,
+  };
+}
+
 export function isOverduePorterVisit(
   visit: Pick<PorterVisitWithAreas, "status" | "scheduled_date" | "scheduled_start_time">,
   clock: Pick<PorterBusinessClock, "date" | "time">,

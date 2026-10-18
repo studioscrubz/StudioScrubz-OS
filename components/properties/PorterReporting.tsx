@@ -21,6 +21,7 @@ export function PorterEvidenceGroup({ visit, areaId, issue, busy, run }: Shared 
   const [reporting, setReporting] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
+  const [uploadState, setUploadState] = useState<"idle" | "pending" | "saving" | "saved" | "failed">("idle");
   const terminal = ["Completed", "Cancelled"].includes(visit.status);
   useEffect(() => {
     let active = true;
@@ -33,8 +34,10 @@ export function PorterEvidenceGroup({ visit, areaId, issue, busy, run }: Shared 
     catch (error) { setPreviewError(error instanceof Error ? error.message : "Photo previews unavailable."); }
   }
   async function upload(event: FormEvent) {
-    event.preventDefault(); if (!file) return;
-    if (await run(() => uploadPorterPhoto({ visitId: visit.id, areaId, issueId: issue?.id ?? null, file, caption: caption.trim() || null }))) { setAdding(false); setFile(null); setCaption(""); }
+    event.preventDefault(); if (!file || uploadState === "saving") return;
+    setUploadState("saving");
+    if (await run(() => uploadPorterPhoto({ visitId: visit.id, areaId, issueId: issue?.id ?? null, file, caption: caption.trim() || null }))) { setUploadState("saved"); setAdding(false); setFile(null); setCaption(""); }
+    else setUploadState("failed");
   }
   const area = visit.areas.find(area => area.id === areaId);
   const required = Boolean(area?.is_required && area.requires_photo);
@@ -49,7 +52,9 @@ export function PorterEvidenceGroup({ visit, areaId, issue, busy, run }: Shared 
       <figcaption className="mt-2 break-words text-neutral-600">{photo.caption && <p>{photo.caption}</p>}<p>{visit.areas.find(area => area.id === photo.visit_area_id)?.name ?? "Visit-level evidence"}</p>{photo.issue_id && <p>Issue: {visit.issues?.find(item => item.id === photo.issue_id)?.title ?? "Documented issue"}</p>}<time dateTime={photo.created_at}>{new Date(photo.created_at).toLocaleString()}</time></figcaption>
     </figure>)}</div>
     <div className="mt-3 flex flex-wrap gap-2">{rows.length > 0 && <button type="button" className={button} onClick={() => void renew()}>Refresh Photo Links</button>}{!terminal && <button type="button" className={button} disabled={busy} onClick={() => setAdding(value => !value)}>Add Photo</button>}{!issue && visit.status === "In Progress" && <button type="button" className={button} disabled={busy} onClick={() => setReporting(value => !value)}>Report Issue</button>}</div>
-    {adding && !terminal && <form onSubmit={upload} className="mt-4 space-y-3"><fieldset disabled={busy} className="space-y-3"><label className="block text-sm font-bold">Image (up to 10 MB)<input type="file" required accept={OPERATIONAL_PHOTO_MIME_TYPES.join(",")} className={field} onChange={event => setFile(event.target.files?.[0] ?? null)}/></label><label className="block text-sm font-bold">Caption<input className={field} value={caption} onChange={event => setCaption(event.target.value)}/></label><button type="submit" className={button}>{busy ? "Uploading…" : "Upload Photo"}</button></fieldset></form>}
+    {adding && !terminal && <form onSubmit={upload} className="mt-4 space-y-3"><fieldset disabled={busy || uploadState === "saving"} className="space-y-3"><label className="block text-sm font-bold">Image (up to 10 MB)<input type="file" capture="environment" required accept={OPERATIONAL_PHOTO_MIME_TYPES.join(",")} className={field} onChange={event => { const next = event.target.files?.[0] ?? null; setFile(next); setUploadState(next ? "pending" : "idle"); }}/></label><p className="text-xs text-neutral-600">On supported mobile devices, choose Camera to capture evidence now or select an existing image.</p>{uploadState === "pending" && <p role="status" className="text-sm font-bold text-[#143d1a]">Photo selected and pending upload.</p>}<label className="block text-sm font-bold">Caption<input className={field} value={caption} onChange={event => setCaption(event.target.value)}/></label><button type="submit" className={`${button} min-h-12 w-full sm:w-auto`} disabled={!file || uploadState === "saving"}>{uploadState === "saving" ? "Uploading and confirming…" : uploadState === "failed" ? "Retry Upload" : "Upload Photo"}</button></fieldset></form>}
+    {uploadState === "saved" && <p role="status" className="mt-3 text-sm font-bold text-green-800">Photo saved and confirmed by the server.</p>}
+    {uploadState === "failed" && <p role="alert" className="mt-3 text-sm font-bold text-red-700">Photo was not confirmed. Review the error and retry safely.</p>}
     {reporting && visit.status === "In Progress" && <IssueForm visitId={visit.id} areaId={areaId} busy={busy} run={run} close={() => setReporting(false)}/>}
   </div>;
 }

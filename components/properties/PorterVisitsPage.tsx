@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { PorterEvidenceGroup, PorterIssuesSection } from "@/components/properties/PorterReporting";
-import { missingPorterPhotoRequirements } from "@/types/porterReporting";
+import { porterVisitProgress, porterVisitReadiness } from "@/lib/porterHub";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -151,7 +151,7 @@ function CreateVisit({ plans, crews, options, busy, submit, close }: { plans: Pr
   </fieldset></form>;
 }
 
-function VisitDetail({ visit, crews, options, management, busy: parentBusy, mutate, remove, reload, close }: { visit: PorterVisitWithAreas; crews: CrewWithRelations[]; options: PorterAssignmentOption[]; management: boolean; busy: boolean; mutate: (mutation: PorterVisitMutation) => Promise<void>; remove?: () => Promise<void>; reload: () => Promise<void>; close: () => void }) {
+export function VisitDetail({ visit, crews, options, management, busy: parentBusy, mutate, remove, reload, close, fieldMode = false }: { visit: PorterVisitWithAreas; crews: CrewWithRelations[]; options: PorterAssignmentOption[]; management: boolean; busy: boolean; mutate: (mutation: PorterVisitMutation) => Promise<void>; remove?: () => Promise<void>; reload: () => Promise<void>; close: () => void; fieldMode?: boolean }) {
   const [reportingBusy, setReportingBusy] = useState(false);
   const [reportingError, setReportingError] = useState("");
   const busy = parentBusy || reportingBusy;
@@ -169,13 +169,15 @@ function VisitDetail({ visit, crews, options, management, busy: parentBusy, muta
   const [managerId, setManagerId] = useState(visit.assigned_manager_employee_id);
   const terminal = visit.status === "Completed" || visit.status === "Cancelled";
   const canEditSchedule = management && visit.status === "Scheduled";
-  const missingPhotos = missingPorterPhotoRequirements(visit.areas, visit.photos ?? []);
-  const blocked = visit.areas.some(area => area.is_required && area.status === "Pending") || missingPhotos;
+  const readiness = porterVisitReadiness(visit);
+  const progress = porterVisitProgress(visit);
+  const blocked = !readiness.ready;
   return <section className="mt-6 rounded-2xl border border-[#143d1a]/20 bg-white p-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#9a7a17]">{visit.status} · {visitSchedule(visit)}</p><h2 className="mt-2 text-2xl font-extrabold text-[#143d1a]">{visit.property_label}</h2><p className="mt-2">{visit.plan_name} · Worker: {visit.worker_name ?? visit.crew_name ?? "Unassigned"}{visit.manager_name ? ` · Manager: ${visit.manager_name}` : ""}</p></div><button className={button} disabled={busy} onClick={close}>Close</button></div>
+    {fieldMode && <nav aria-label="Visit workflow" className="mt-5 grid grid-cols-2 gap-2 text-xs font-bold text-[#143d1a] sm:grid-cols-4"><span className="rounded-lg bg-[#f4f7f1] p-3">1. Review &amp; start</span><span className="rounded-lg bg-[#f4f7f1] p-3">2. Checklist</span><span className="rounded-lg bg-[#f4f7f1] p-3">3. Evidence &amp; issues</span><span className="rounded-lg bg-[#f4f7f1] p-3">4. Review &amp; complete</span></nav>}
     <fieldset disabled={busy || terminal} className="mt-5 space-y-4">
       {canEditSchedule && <><div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-bold">Scheduled date<input required type="date" className={field} value={date} onChange={e => setDate(e.target.value)}/></label><label className="text-sm font-bold">Start time<input required type="time" className={field} value={startTime} onChange={e => setStartTime(e.target.value)}/></label></div><AssignmentFields crews={crews} options={options} workerEmployeeId={workerEmployeeId} workerCrewId={workerCrewId} managerId={managerId} change={values => { if ("assigned_worker_employee_id" in values) setWorkerEmployeeId(values.assigned_worker_employee_id ?? null); if ("assigned_worker_crew_id" in values) setWorkerCrewId(values.assigned_worker_crew_id ?? null); if ("assigned_manager_employee_id" in values) setManagerId(values.assigned_manager_employee_id ?? null); }}/></>}
-      <label className="block text-sm font-bold">Visit notes<textarea rows={3} className={field} value={notes} onChange={e => setNotes(e.target.value)}/></label>
+      <label className="block text-sm font-bold">{fieldMode ? "Property and visit instructions" : "Visit notes"}<textarea rows={3} className={field} value={notes} onChange={e => setNotes(e.target.value)}/></label>
       {!terminal && <button className={button} onClick={() => void mutate(canEditSchedule ? { action: "edit", data: { scheduled_date: date, scheduled_start_time: startTime, assigned_worker_employee_id: workerEmployeeId, assigned_worker_crew_id: workerCrewId, assigned_manager_employee_id: managerId, visit_notes: notes || null } } : { action: "notes", data: { visit_notes: notes || null } })}>Save {canEditSchedule ? "Visit Details" : "Notes"}</button>}
     </fieldset>
     {reportingError && <p role="alert" className="mt-4 text-sm text-red-700">{reportingError}</p>}
@@ -186,6 +188,12 @@ function VisitDetail({ visit, crews, options, management, busy: parentBusy, muta
     <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Visit-Level Evidence</h3>
     <PorterEvidenceGroup visit={visit} areaId={null} busy={busy} run={runReporting}/>
     <PorterIssuesSection visit={visit} management={management} busy={busy} run={runReporting}/>
+    {visit.status === "In Progress" && <section aria-labelledby="completion-readiness" className={`mt-7 rounded-2xl border p-5 ${readiness.ready ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
+      <div className="flex items-start justify-between gap-4"><div><h3 id="completion-readiness" className="text-lg font-extrabold text-[#143d1a]">Completion readiness</h3><p className="mt-1 text-sm text-neutral-700">{progress.addressed} of {progress.total} service areas addressed ({progress.percent}%).</p></div><span className={`rounded-full px-3 py-1 text-xs font-black ${readiness.ready ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>{readiness.ready ? "Ready" : `${readiness.blockers} blocker${readiness.blockers === 1 ? "" : "s"}`}</span></div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${progress.percent}%` }}/></div>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2"><ReadinessItem label="Required areas pending" value={readiness.pendingRequired.length} blocker/><ReadinessItem label="Required photos missing" value={readiness.missingPhotoAreas.length} blocker/><ReadinessItem label="Unable to complete" value={readiness.unableToComplete.length}/><ReadinessItem label="Open issues" value={readiness.openIssues.length}/></dl>
+      {!readiness.ready && <p className="mt-4 text-sm font-semibold text-amber-900">Finish required areas and attach required photo evidence. Unable-to-complete areas and open issues are visible warnings but do not replace server validation.</p>}
+    </section>}
     <div className="mt-6 flex flex-wrap gap-3">
       {!terminal && visit.status === "Scheduled" && <button className={primary} disabled={busy} onClick={() => void mutate({ action: "start" })}>Start Visit</button>}
       {!terminal && visit.status === "In Progress" && <button className={primary} disabled={busy || blocked} onClick={() => void mutate({ action: "complete" })}>Complete Visit</button>}
@@ -195,6 +203,9 @@ function VisitDetail({ visit, crews, options, management, busy: parentBusy, muta
     {visit.status === "In Progress" && blocked && <p className="mt-3 text-sm text-neutral-600">Resolve required Pending areas and add evidence to every required area marked Photo Required before completing the visit. Open issues do not block completion.</p>}
     {terminal && <p className="mt-5 text-sm text-neutral-500">Visit operations are historical and read-only. Management may still acknowledge or resolve documented issues.</p>}
   </section>;
+}
+function ReadinessItem({ label, value, blocker = false }: { label: string; value: number; blocker?: boolean }) {
+  return <div className="rounded-xl border border-black/5 bg-white p-3"><dt className="text-xs font-bold text-neutral-600">{label}</dt><dd className={`mt-1 text-xl font-black ${blocker && value ? "text-red-700" : "text-[#143d1a]"}`}>{value}</dd></div>;
 }
 function AreaEditor({ area, disabled, editable, save }: { area: PorterVisitArea; disabled: boolean; editable: boolean; save: (status: PorterVisitArea["status"], notes: string | null) => Promise<void> }) {
   const [status, setStatus] = useState(area.status);
