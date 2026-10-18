@@ -23,7 +23,8 @@ export type RouteMutation = { action: "edit"; data: RouteEdit } | { action: "sta
 export function routeProgress(route: PorterRouteWithStops) {
   const completed = route.stops.filter(stop => stop.visit?.status === "Completed").length;
   const cancelled = route.stops.filter(stop => stop.visit?.status === "Cancelled").length;
-  return { total: route.stops.length, completed, cancelled, remaining: route.stops.length - completed - cancelled };
+  const total = route.stops.length;
+  return { total, completed, cancelled, remaining: total - completed - cancelled, percentage: total ? Math.round((completed / total) * 100) : 0 };
 }
 export function eligibleRouteVisits(visits: PorterVisitWithAreas[], routes: PorterRouteWithStops[], date: string, crew: string, routeId?: string) {
   const reserved = new Set(routes.filter(route => route.id !== routeId && route.status !== "Cancelled").flatMap(route => route.stops.map(stop => stop.visit_id)));

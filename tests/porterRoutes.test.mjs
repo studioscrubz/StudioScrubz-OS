@@ -84,7 +84,7 @@ test("route lifecycle is independent and terminal routes/started structure are i
   for (const status of ["Scheduled","In Progress"]) assert.throws(()=>validate({...started,stops:[{visit:{status}}]},{action:"complete"}),/every Porter Visit/);
   assert.doesNotThrow(()=>validate({...started,stops:[{visit:{status:"Completed",issues:[{status:"Open"}]}},{visit:{status:"Cancelled"}}]},{action:"complete"}));
   for (const status of ["Completed","Cancelled"]) for(const action of ["start","complete","cancel","edit"]) assert.throws(()=>validate({...route,status},{action,data:input}),/read-only/);
-  assert.deepEqual(JSON.parse(JSON.stringify(model.routeProgress({stops:[{visit:{status:"Completed"}},{visit:{status:"Cancelled"}},{visit:null}]}))),{total:3,completed:1,cancelled:1,remaining:1});
+  assert.deepEqual(JSON.parse(JSON.stringify(model.routeProgress({stops:[{visit:{status:"Completed"}},{visit:{status:"Cancelled"}},{visit:null}]}))),{total:3,completed:1,cancelled:1,remaining:1,percentage:33});
 });
 test("service propagates SQL stale/relationship/reservation errors", async () => {
   for (const message of ["Route changed", "Visit date must match", "Visit crew must match", "Select an active crew", "Visit already belongs to another active route", "Invalid or cross-route stop fields"]) {
