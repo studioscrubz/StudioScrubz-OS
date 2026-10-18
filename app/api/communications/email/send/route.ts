@@ -51,7 +51,8 @@ export async function POST(request: Request) {
 
     admin = createSupabaseAdminClient();
     await validateLinks(admin, links);
-    const sender = resolveEmailSenderProfile(await senderProfileForCommunication(admin, communicationType, metadata));
+    const defaultSender = resolveEmailSenderProfile(await senderProfileForCommunication(admin, communicationType, metadata));
+    const sender = profile.role === "Sales" ? salesSenderIdentity(profile) : defaultSender;
     const eventKey = `communications-email:${profile.id}:${requestId}`;
     const expected = { recipientEmail, subject, messageBody, communicationType, ...links };
     const { data: found, error: findError } = await admin.from("client_communications").select("*").eq("event_key", eventKey).maybeSingle();
@@ -132,6 +133,18 @@ async function validateLinks(admin: Admin, links: Links) {
     const { data, error } = await admin.from(table).select("id,client_id,property_id,archived_at").eq("id", recordId).single();
     if (error || !data || data.archived_at || (links.clientId && data.client_id !== links.clientId) || (links.propertyId && data.property_id !== links.propertyId)) throw new InputError(`The selected ${label} is unavailable or does not match this communication.`);
   }
+}
+
+function salesSenderIdentity(profile: UserProfile): { from: string; replyTo: string } {
+  const email = profile.email?.trim().toLowerCase() ?? "";
+  if (!EMAIL_PATTERN.test(email) || !email.endsWith("@studioscrubz.com")) {
+    throw new InputError("Your Sales account must have a valid @studioscrubz.com email address to send Communications email.", 403);
+  }
+  const name = (profile.display_name?.trim() || email.split("@")[0])
+    .replace(/[\r\n<>"]/g, "")
+    .slice(0, 100)
+    .trim() || "StudioScrubz Sales";
+  return { from: `${name} <${email}>`, replyTo: email };
 }
 
 async function senderProfileForCommunication(admin: Admin, type: CommunicationType, metadata: CommunicationMetadata, retryDepth = 0): Promise<EmailSenderProfileKey> {
