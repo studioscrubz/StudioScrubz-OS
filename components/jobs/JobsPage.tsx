@@ -71,6 +71,8 @@ import { checkScopeAdvisory } from "@/lib/services/scopeAdvisory";
 import type { ScopeAdvisoryResult } from "@/types/scopeAdvisory";
 import { MyTeamworkEvents } from "@/components/jobs/MyTeamworkEvents";
 import { MyPerformanceReviews } from "@/components/jobs/EmployeePerformanceReviews";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
 
 type ScheduleFilter = "All" | "Scheduled" | "Unscheduled" | "Upcoming" | "Past";
 const activeStatuses: JobStatus[] = [
@@ -302,9 +304,9 @@ export function JobsPage() {
       {profile && ["Crew Lead", "Scrub Technician"].includes(profile.role) && <MyPerformanceReviews />}
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
-      <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section aria-label="Job overview" className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(([label, value]) => (
-          <Metric key={label} label={label} value={loading ? "—" : value} />
+          <MetricCard key={label} label={label} value={loading ? "—" : value} tone={label === "In Progress" ? "info" : label === "Ready to Schedule" ? "warning" : label === "Scheduled" ? "success" : "brand"} />
         ))}
       </section>
       <section className="mt-6 rounded-2xl border bg-white p-4">
@@ -1093,28 +1095,7 @@ function pricingNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 function Header({ canCreate, create }: { canCreate: boolean; create: () => void }) {
-  return (
-    <header className="flex flex-col gap-5 border-b border-[#143d1a]/10 pb-7 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">
-        Operations workspace
-      </p>
-      <h1 className="text-3xl font-extrabold text-[#143d1a]">Jobs</h1>
-      <p className="mt-3 text-neutral-600">
-        Manage active StudioScrubz service jobs.
-      </p>
-      </div>
-      {canCreate && <button type="button" onClick={create} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)]">Create Job</button>}
-    </header>
-  );
-}
-function Metric({ label, value }: { label: string; value: number | string }) {
-  return (
-    <article className="rounded-2xl border bg-white p-5">
-      <p className="text-xs font-bold uppercase text-neutral-500">{label}</p>
-      <p className="mt-4 text-3xl font-extrabold text-[#143d1a]">{value}</p>
-    </article>
-  );
+  return <PageHeader title="Jobs" description="Manage active StudioScrubz service jobs." actions={canCreate ? <button type="button" onClick={create} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(20,61,26,.18)]">Create Job</button> : undefined} />;
 }
 function Select({
   value,
