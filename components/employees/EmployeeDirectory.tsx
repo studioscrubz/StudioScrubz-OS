@@ -33,6 +33,8 @@ import {
 import { CrewManager } from "./CrewManager";
 
 import { EmployeeTimeSummary } from "@/components/time/EmployeeTimeSummary";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
 
 import {
 
@@ -388,19 +390,11 @@ export function EmployeeDirectory({
 
       {directory && (
 
-        <section className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-5">
+        <section aria-label="Employee summary" className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
 
           {metrics.map(([l, v]) => (
 
-            <Metric
-
-              key={String(l)}
-
-              l={String(l)}
-
-              v={loading ? "—" : v}
-
-            />
+            <MetricCard key={String(l)} label={String(l)} value={loading ? "—" : v} tone={String(l) === "Total Employees" ? "brand" : String(l) === "Scrub Technicians" ? "success" : String(l) === "Sales" ? "info" : "neutral"} />
 
           ))}
 
@@ -1364,90 +1358,8 @@ function pick(e: Employee): EmployeeInput {
 
 }
 
-function Header({
-
-  title,
-
-  description,
-
-  actions,
-
-}: {
-
-  title: string;
-
-  description: string;
-
-  actions: React.ReactNode;
-
-}) {
-
-  return (
-
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-7">
-
-      <div>
-
-        <h1 className="text-3xl font-extrabold text-[#143d1a]">
-
-          {title}
-
-        </h1>
-
-        <p className="mt-3 text-neutral-600">
-
-          {description}
-
-        </p>
-
-      </div>
-
-      <div className="flex gap-2">
-
-        {actions}
-
-      </div>
-
-    </header>
-
-  );
-
-}
-
-function Metric({
-
-  l,
-
-  v,
-
-}: {
-
-  l: string;
-
-  v: string | number;
-
-}) {
-
-  return (
-
-    <article className="rounded-2xl border bg-white p-5">
-
-      <p className="text-xs font-bold uppercase text-neutral-500">
-
-        {l}
-
-      </p>
-
-      <p className="mt-3 text-3xl font-extrabold text-[#143d1a]">
-
-        {v}
-
-      </p>
-
-    </article>
-
-  );
-
+function Header({ title, description, actions }: { title: string; description: string; actions: React.ReactNode }) {
+  return <PageHeader title={title} description={description} actions={actions} />;
 }
 
 function Modal({
