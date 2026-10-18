@@ -176,5 +176,7 @@ test("dispatcher UI requires confirmation and re-fetches before one atomic exist
   assert.match(source, /mutatePorterRoute\(fresh, \{ action: "edit"/);
   assert.match(source, /Review Suggestion/);
   assert.match(source, /Apply Suggested Order/);
-  assert.match(source, /Travel time[\s\S]*Unavailable/);
+  assert.match(source, /Geoapify compares road distance/);
+  assert.match(source, /Estimated time savings/);
+  assert.match(source, /Powered by Geoapify/);
 });

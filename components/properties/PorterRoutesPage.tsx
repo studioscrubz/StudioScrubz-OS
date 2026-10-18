@@ -5,16 +5,15 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getPorterBusinessClock } from "@/lib/porterHub";
-import { buildPorterCrewWorkloads, buildPorterRouteSuggestion, validatePorterRouteSuggestion, type PorterCrewWorkload, type PorterRouteLocation, type PorterRouteSuggestion } from "@/lib/porterRoutePlanning";
+import { buildPorterCrewWorkloads, validatePorterRouteSuggestion, type PorterCrewWorkload, type PorterRouteLocation, type PorterRouteSuggestion } from "@/lib/porterRoutePlanning";
 import { getBusinessIdentitySettings } from "@/lib/services/businessSettings";
 import { getActiveCrews } from "@/lib/services/crews";
-import { getProperties } from "@/lib/services/properties";
+import { optimizePorterRoute, type GeocodeReview } from "@/lib/services/porterRouteOptimization";
 import { listPorterVisits } from "@/lib/services/porterVisits";
 import { createPorterRoute, getPorterRoute, listPorterRoutes, mutatePorterRoute } from "@/lib/services/porterRoutes";
 import { eligibleRouteVisits, PORTER_ROUTE_STATUSES, routeProgress, type CreatePorterRouteInput, type PorterRouteWithStops, type RouteMutation } from "@/types/porterRoute";
 import type { PorterVisitWithAreas } from "@/types/porterVisit";
 import type { CrewWithRelations } from "@/types/crew";
-import type { PropertyWithClient } from "@/types/property";
 
 const button = "rounded-lg border border-[#143d1a]/20 px-3 py-2 text-sm font-bold text-[#143d1a] hover:bg-[#f4f7f1] disabled:opacity-50";
 const field = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm";
@@ -27,7 +26,6 @@ export function PorterRoutesPage() {
   const [routes, setRoutes] = useState<PorterRouteWithStops[]>([]);
   const [visits, setVisits] = useState<PorterVisitWithAreas[]>([]);
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
-  const [properties, setProperties] = useState<PropertyWithClient[]>([]);
   const [selected, setSelected] = useState<PorterRouteWithStops | null>(null);
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -52,8 +50,8 @@ export function PorterRoutesPage() {
   useEffect(() => {
     if (!allowed) return;
     let active = true;
-    Promise.all([listPorterRoutes(), management ? listPorterVisits() : Promise.resolve([]), management ? getActiveCrews() : Promise.resolve([]), management ? getBusinessIdentitySettings() : Promise.resolve(null), management ? getProperties().catch(() => []) : Promise.resolve([])])
-      .then(([r,v,c,settings,p]) => { if (active) { setRoutes(r); setVisits(v); setCrews(c); setProperties(p); if (settings?.timezone) setDate(current => current || getPorterBusinessClock(new Date(), settings.timezone!).date); } })
+    Promise.all([listPorterRoutes(), management ? listPorterVisits() : Promise.resolve([]), management ? getActiveCrews() : Promise.resolve([]), management ? getBusinessIdentitySettings() : Promise.resolve(null)])
+      .then(([r,v,c,settings]) => { if (active) { setRoutes(r); setVisits(v); setCrews(c); if (settings?.timezone) setDate(current => current || getPorterBusinessClock(new Date(), settings.timezone!).date); } })
       .catch(error => { if (active) setError(errorText(error)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [allowed, management]);
@@ -122,7 +120,7 @@ export function PorterRoutesPage() {
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-extrabold text-[#143d1a]">Porter Routes</h1><p className="mt-2 text-sm text-neutral-600">Organize existing Porter Visits by date, crew, and stop order.</p></div><div className="flex gap-2"><button className={button} disabled={busy} onClick={() => void refresh()}>Refresh</button>{management && <button className={button} disabled={busy} onClick={() => { setDraftDefaults({ date, crewId: crew }); setCreating(true); setSelected(null); setEditing(false); }}>Create Route</button>}</div></header>
     {error && <p role="alert" className="text-red-700">{error}</p>}{notice && <p role="status" className="text-sm text-neutral-600">{notice}</p>}
     {(creating || editing) && management ? <RouteEditor key={selected?.id ?? `new-${draftDefaults?.date}-${draftDefaults?.crewId}`} route={editing ? selected : null} defaults={editing ? null : draftDefaults} {...{ routes, visits, crews, busy }} save={save} close={() => { setCreating(false); setEditing(false); setDraftDefaults(null); if (selected) void open(selected.id); }}/>
-      : selected ? <RouteDetail route={selected} locations={routeLocations(selected, visits, properties)} {...{ management, busy, mutate }} applySuggestion={applySuggestion} edit={() => setEditing(true)} close={() => setSelected(null)}/>
+      : selected ? <RouteDetail route={selected} {...{ management, busy, mutate }} applySuggestion={applySuggestion} edit={() => setEditing(true)} close={() => setSelected(null)}/>
       : <>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-sm font-bold">Search<input className={field} value={search} onChange={event => setSearch(event.target.value)} placeholder="Route or property"/></label><label className="text-sm font-bold">Service date<input type="date" className={field} value={date} onChange={event => setDate(event.target.value)}/></label><label className="text-sm font-bold">Status<select className={field} value={status} onChange={event => setStatus(event.target.value)}><option value="">All statuses</option>{PORTER_ROUTE_STATUSES.map(value => <option key={value}>{value}</option>)}</select></label><label className="text-sm font-bold">Crew<select className={field} value={crew} onChange={event => setCrew(event.target.value)}><option value="">All visible crews</option>{Array.from(new Map([...crews.map(item => [item.id, item.crew_name] as const), ...routes.map(route => [route.assigned_crew_id, route.crew_name] as const)]).entries()).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select></label></div>
         {management && <RoutePlanningSummary workloads={crew ? workloads.filter(item => item.crewId === crew) : workloads} serviceDate={date} busy={busy} plan={(date, crewId) => { setDraftDefaults({ date, crewId }); setCreating(true); setSelected(null); setEditing(false); }} />}
@@ -159,40 +157,37 @@ function RouteProgress({ progress }: { progress: ReturnType<typeof routeProgress
   </div>;
 }
 
-function RouteDetail({ route, locations, management, busy, mutate, applySuggestion, edit, close }: { route: PorterRouteWithStops; locations: PorterRouteLocation[]; management: boolean; busy: boolean; mutate: (mutation: RouteMutation) => Promise<void>; applySuggestion: (suggestion: PorterRouteSuggestion) => Promise<void>; edit: () => void; close: () => void }) {
+function RouteDetail({ route, management, busy, mutate, applySuggestion, edit, close }: { route: PorterRouteWithStops; management: boolean; busy: boolean; mutate: (mutation: RouteMutation) => Promise<void>; applySuggestion: (suggestion: PorterRouteSuggestion) => Promise<void>; edit: () => void; close: () => void }) {
   const progress = routeProgress(route);
   return <section className="space-y-4 rounded-xl border bg-white p-5"><header><h2 className="text-xl font-bold text-[#143d1a]">{route.route_name || "Porter Route"}</h2><p>{route.route_date} | {route.crew_name} | {route.status}</p><p className="mt-2 whitespace-pre-wrap text-sm">{route.notes}</p><RouteProgress progress={progress} /></header>
     <div className="flex flex-wrap gap-2"><button className={button} onClick={close}>Back to Routes</button>{management && route.status === "Planned" && <><button className={button} disabled={busy} onClick={edit}>Edit Route / Stops</button><button className={button} disabled={busy || !progress.total} onClick={() => void mutate({ action: "start" })}>Start Route</button></>}{management && route.status === "In Progress" && <button className={button} disabled={busy || progress.remaining > 0} onClick={() => void mutate({ action: "complete" })}>Complete Route</button>}{management && ["Planned","In Progress"].includes(route.status) && <button className={button} disabled={busy} onClick={() => void mutate({ action: "cancel" })}>Cancel Route</button>}</div>
-    {management && <RouteOptimization route={route} locations={locations} busy={busy} apply={applySuggestion} />}
+    {management && <RouteOptimization route={route} busy={busy} apply={applySuggestion} />}
     {route.status === "In Progress" && <p className="text-sm">Route structure is locked. Complete or cancel each visit in Porter Visits before completing this route.</p>}
     {[...route.stops].sort((a,b) => a.stop_order-b.stop_order).map(stop => <article key={stop.id} className="rounded-lg border p-4"><p className="text-sm font-bold text-[#9a7a17]">Stop {stop.stop_order}</p>{stop.visit ? <><h3 className="font-bold text-[#143d1a]">{stop.visit.property_label}</h3><p className="text-sm">{stop.visit.plan_name} | {stop.visit.status}</p><p className="mt-2 whitespace-pre-wrap text-sm">{stop.visit.visit_notes}</p>{stop.stop_notes && <p className="mt-2 whitespace-pre-wrap text-sm">Stop notes: {stop.stop_notes}</p>}<Link className={`${button} mt-3 inline-block`} href={`/properties/porter-visits?visit=${encodeURIComponent(stop.visit_id)}`}>Open Visit</Link></> : <p>Visit is no longer available to your crew.</p>}</article>)}
     {!progress.total && <p>No stops. Add existing Scheduled visits before starting.</p>}
   </section>;
 }
 
-function routeLocations(route: PorterRouteWithStops, visits: PorterVisitWithAreas[], properties: PropertyWithClient[]): PorterRouteLocation[] {
-  return route.stops.map(stop => {
-    const visit = visits.find(item => item.id === stop.visit_id);
-    const property = properties.find(item => item.id === visit?.property_id);
-    const address = property ? [property.address, property.address_line_2, property.city, property.state, property.zip].filter(Boolean).join(", ") : null;
-    return { stopId: stop.id, visitId: stop.visit_id, label: stop.visit?.property_label ?? visit?.property_label ?? "Porter Visit", address, scheduledStartTime: stop.visit?.scheduled_start_time ?? visit?.scheduled_start_time ?? null, visitStatus: stop.visit?.status ?? visit?.status ?? null, latitude: null, longitude: null };
-  });
-}
-
-function RouteOptimization({ route, locations, busy, apply }: { route: PorterRouteWithStops; locations: PorterRouteLocation[]; busy: boolean; apply: (suggestion: PorterRouteSuggestion) => Promise<void> }) {
+function RouteOptimization({ route, busy, apply }: { route: PorterRouteWithStops; busy: boolean; apply: (suggestion: PorterRouteSuggestion) => Promise<void> }) {
   const [suggestion, setSuggestion] = useState<PorterRouteSuggestion | null>(null);
+  const [reviews,setReviews]=useState<GeocodeReview[]>([]);
+  const [working,setWorking]=useState(false);
+  const [optimizationError,setOptimizationError]=useState("");
   const available = route.status === "Planned" && route.stops.length > 1;
-  if (!suggestion) return <section className="rounded-xl border border-[#d4af37]/40 bg-[#fffdf7] p-4"><h3 className="font-extrabold text-[#143d1a]">Optimize Route</h3><p className="mt-1 text-sm text-neutral-600">Review an advisory stop-order recommendation. Nothing changes until an authorized dispatcher confirms an applicable suggestion.</p><button type="button" className={`${button} mt-3`} disabled={busy || !available} onClick={() => setSuggestion(buildPorterRouteSuggestion(route, locations))}>Review Suggestion</button>{!available && <p className="mt-2 text-xs text-neutral-600">Optimization is available only for Planned routes with at least two stops. Historical and active routes remain read-only.</p>}</section>;
-  const distanceDifference = suggestion.currentStraightLineMiles !== null && suggestion.suggestedStraightLineMiles !== null ? suggestion.currentStraightLineMiles - suggestion.suggestedStraightLineMiles : null;
+  async function analyze(review?:{propertyId:string;placeId:string}){setWorking(true);setOptimizationError("");try{const result=await optimizePorterRoute(route.id,review);if(result.status==="ready"){setSuggestion(result.suggestion);setReviews([])}else setReviews(result.reviewNeeded)}catch(error){setOptimizationError(errorText(error))}finally{setWorking(false)}}
+  if (!suggestion) return <section className="rounded-xl border border-[#d4af37]/40 bg-[#fffdf7] p-4"><h3 className="font-extrabold text-[#143d1a]">Optimize Route</h3><p className="mt-1 text-sm text-neutral-600">Review a server-authorized Geoapify driving-route recommendation. Nothing changes until an authorized dispatcher confirms it.</p><button type="button" className={`${button} mt-3`} disabled={busy || working || !available} onClick={() => void analyze()}>{working?"Calculating...":"Review Suggestion"}</button>{optimizationError&&<p role="alert" className="mt-2 text-sm text-red-700">{optimizationError}</p>}{reviews.map(review=><div key={review.propertyId} className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3"><p className="font-bold text-amber-900">Review location: {review.label}</p><p className="text-sm">{review.address}</p>{review.candidates.length?<div className="mt-2 space-y-2">{review.candidates.map(candidate=><button type="button" className={`${button} block w-full text-left`} disabled={!candidate.placeId||working} key={candidate.placeId??candidate.formattedAddress} onClick={()=>candidate.placeId&&void analyze({propertyId:review.propertyId,placeId:candidate.placeId})}>{candidate.formattedAddress} ({Math.round(candidate.confidence*100)}% confidence)</button>)}</div>:<p className="mt-2 text-sm">No reliable candidate was returned. Correct the property address before retrying.</p>}</div>)}{!available && <p className="mt-2 text-xs text-neutral-600">Optimization is available only for Planned routes with at least two stops. Historical and active routes remain read-only.</p>}</section>;
+  const distanceDifference = suggestion.currentDrivingMiles != null && suggestion.suggestedDrivingMiles != null ? suggestion.currentDrivingMiles - suggestion.suggestedDrivingMiles : null;
+  const timeDifference = suggestion.currentDrivingSeconds != null && suggestion.suggestedDrivingSeconds != null ? suggestion.currentDrivingSeconds-suggestion.suggestedDrivingSeconds : null;
   const canApply = suggestion.method !== "unavailable" && suggestion.changed && !suggestion.unavailable.length && !suggestion.lockedStops.length;
   return <section aria-labelledby="route-suggestion-heading" className="space-y-4 rounded-xl border-2 border-[#d4af37]/50 bg-[#fffdf7] p-4">
-    <div><p className="text-xs font-black uppercase tracking-[.14em] text-[#8a6b12]">Advisory only</p><h3 id="route-suggestion-heading" className="mt-1 text-lg font-extrabold text-[#143d1a]">Review Suggestion</h3><p className="mt-1 text-sm text-neutral-600">Method: keep the current first stop, then choose the nearest remaining verified coordinate. This is straight-line proximity—not road routing—and does not estimate travel time or arrival time.</p></div>
-    <div className="grid gap-4 md:grid-cols-2"><SuggestionColumn title="Current route" stops={suggestion.currentOrder} miles={suggestion.currentStraightLineMiles}/><SuggestionColumn title="Suggested route" stops={suggestion.suggestedOrder} miles={suggestion.suggestedStraightLineMiles}/></div>
-    <dl className="grid gap-2 rounded-lg bg-white p-3 text-sm sm:grid-cols-3"><div><dt className="font-bold">Travel time</dt><dd>Unavailable</dd></div><div><dt className="font-bold">Distance difference</dt><dd>{distanceDifference === null ? "Unavailable" : `${distanceDifference.toFixed(1)} mi straight-line`}</dd></div><div><dt className="font-bold">Stop order</dt><dd>{suggestion.changed ? "Recommendation differs" : "No supported change"}</dd></div></dl>
+    <div><p className="text-xs font-black uppercase tracking-[.14em] text-[#8a6b12]">Advisory only</p><h3 id="route-suggestion-heading" className="mt-1 text-lg font-extrabold text-[#143d1a]">Review Suggestion</h3><p className="mt-1 text-sm text-neutral-600">Geoapify compares road distance and estimated driving time using verified property coordinates. Estimates exclude visit duration and guaranteed arrival times.</p></div>
+    <div className="grid gap-4 md:grid-cols-2"><SuggestionColumn title="Current route" stops={suggestion.currentOrder} miles={suggestion.currentDrivingMiles??null} seconds={suggestion.currentDrivingSeconds??null}/><SuggestionColumn title="Suggested route" stops={suggestion.suggestedOrder} miles={suggestion.suggestedDrivingMiles??null} seconds={suggestion.suggestedDrivingSeconds??null}/></div>
+    <dl className="grid gap-2 rounded-lg bg-white p-3 text-sm sm:grid-cols-3"><div><dt className="font-bold">Estimated time savings</dt><dd>{timeDifference===null?"Unavailable":`${Math.round(timeDifference/60)} min`}</dd></div><div><dt className="font-bold">Driving-distance savings</dt><dd>{distanceDifference === null ? "Unavailable" : `${distanceDifference.toFixed(1)} mi`}</dd></div><div><dt className="font-bold">Stop order</dt><dd>{suggestion.changed ? "Recommendation differs" : "Current order retained"}</dd></div></dl>
     {!!suggestion.unavailable.length && <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-bold">Location evaluation unavailable</p><p className="mt-1">{suggestion.unavailable.map(stop => `${stop.label} (${stop.address || "address unavailable"})`).join("; ")}</p><p className="mt-1">Property records do not contain verified coordinates. No distance or reordered recommendation was fabricated.</p></div>}
     {!!suggestion.lockedStops.length && <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-bold">Locked stop constraint</p><p className="mt-1">Completed or Cancelled visits are never reordered: {suggestion.lockedStops.map(stop => stop.label).join(", ")}.</p></div>}
     <div className="grid gap-3 md:grid-cols-2"><SchedulingWarnings title="Current scheduling warnings" warnings={suggestion.schedulingWarnings}/><SchedulingWarnings title="Suggested scheduling warnings" warnings={suggestion.schedulingWarnings}/></div>
     <p className="text-xs text-neutral-600">Applying uses the existing atomic route edit RPC after rechecking authorization, Planned status, route version, crew, service date, and the complete stop set.</p>
+    <p className="text-xs text-neutral-500"><a className="underline" href="https://www.geoapify.com/" target="_blank" rel="noreferrer">Powered by Geoapify</a></p>
     <div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={busy || !canApply} onClick={() => void apply(suggestion)}>Apply Suggested Order</button><button type="button" className={button} disabled={busy} onClick={() => setSuggestion(null)}>Cancel</button></div>
   </section>;
 }
@@ -201,8 +196,8 @@ function SchedulingWarnings({ title, warnings }: { title: string; warnings: stri
   return <div className={`rounded-lg border p-3 text-sm ${warnings.length ? "border-amber-300 bg-amber-50 text-amber-900" : "border-neutral-200 bg-white text-neutral-600"}`}><p className="font-bold">{title}</p>{warnings.length ? <ul className="mt-1 list-disc pl-5">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul> : <p className="mt-1">No duplicate scheduled-start warnings.</p>}</div>;
 }
 
-function SuggestionColumn({ title, stops, miles }: { title: string; stops: PorterRouteLocation[]; miles: number | null }) {
-  return <div className="rounded-lg border border-neutral-200 bg-white p-3"><h4 className="font-extrabold text-[#143d1a]">{title}</h4><p className="mt-1 text-xs text-neutral-500">{miles === null ? "Straight-line distance unavailable" : `Estimated straight-line distance: ${miles.toFixed(1)} mi`}</p><ol className="mt-3 space-y-2">{stops.map((stop, index) => <li key={stop.stopId} className="flex gap-3 text-sm"><span className="font-black text-[#8a6b12]">{index + 1}</span><span><span className="font-bold">{stop.label}</span><span className="block text-xs text-neutral-500">{stop.address || "Address unavailable"}</span></span></li>)}</ol></div>;
+function SuggestionColumn({ title, stops, miles, seconds }: { title: string; stops: PorterRouteLocation[]; miles: number | null; seconds:number|null }) {
+  return <div className="rounded-lg border border-neutral-200 bg-white p-3"><h4 className="font-extrabold text-[#143d1a]">{title}</h4><p className="mt-1 text-xs text-neutral-500">{miles === null ? "Driving estimate unavailable" : `${miles.toFixed(1)} mi | ${Math.round((seconds??0)/60)} min estimated driving`}</p><ol className="mt-3 space-y-2">{stops.map((stop, index) => <li key={stop.stopId} className="flex gap-3 text-sm"><span className="font-black text-[#8a6b12]">{index + 1}</span><span><span className="font-bold">{stop.label}</span><span className="block text-xs text-neutral-500">{stop.address || "Address unavailable"}</span></span></li>)}</ol></div>;
 }
 
 function RouteEditor({ route, defaults, routes, visits, crews, busy, save, close }: { route: PorterRouteWithStops | null; defaults: { date: string; crewId: string } | null; routes: PorterRouteWithStops[]; visits: PorterVisitWithAreas[]; crews: CrewWithRelations[]; busy: boolean; save: (input: CreatePorterRouteInput) => Promise<void>; close: () => void }) {

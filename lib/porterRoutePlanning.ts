@@ -39,9 +39,13 @@ export type PorterRouteSuggestion = {
   lockedStops: PorterRouteLocation[];
   currentStraightLineMiles: number | null;
   suggestedStraightLineMiles: number | null;
+  currentDrivingMiles?: number | null;
+  suggestedDrivingMiles?: number | null;
+  currentDrivingSeconds?: number | null;
+  suggestedDrivingSeconds?: number | null;
   changed: boolean;
   schedulingWarnings: string[];
-  method: "nearest_neighbor_straight_line_v1" | "unavailable";
+  method: "nearest_neighbor_straight_line_v1" | "geoapify_driving_v1" | "unavailable";
 };
 
 type CrewReference = { id: string; crew_name: string };
