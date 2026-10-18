@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { UserProfile } from "@/types/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import {
@@ -607,7 +608,8 @@ function Filters(p: {
   setSource: (v: EventSource) => void;
 }) {
   return (
-    <section className="mt-5 rounded-2xl border bg-white p-4">
+    <section aria-label="Schedule filters" className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:p-5">
+      <div className="mb-3"><h2 className="text-sm font-extrabold text-[var(--brand-green)]">Filter calendar</h2><p className="mt-1 text-xs text-[var(--muted)]">Narrow events by type, job status, division, or assigned crew.</p></div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <input
           className={input}
@@ -796,9 +798,7 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
         {job.service_name} | {job.estimated_duration ?? 0}h
       </p>
       <p className="text-[11px] text-neutral-500">{jobAssignmentLabel(job)}</p>
-      <span className="mt-2 inline-block rounded-full bg-[#edf4ec] px-2 py-1 text-[10px] font-bold text-[#143d1a]">
-        {displayJobStatus(job.status)}
-      </span>
+      <div className="mt-2"><StatusBadge status={job.status} label={displayJobStatus(job.status)} /></div>
     </button>
   );
 }
