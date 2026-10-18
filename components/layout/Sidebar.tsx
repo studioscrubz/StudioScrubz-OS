@@ -476,6 +476,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
       {
 
+        label: "General Email",
+
+        href: "/communications/general-email",
+
+        marker: "",
+
+        permission: "communications.create",
+
+      },
+
+      {
+
         label: "Employee Email",
 
         href: "/communications/employee-email",
