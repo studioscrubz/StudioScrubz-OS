@@ -1,9 +1,8 @@
-export function PageHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <header className="mb-7 border-b border-[#143d1a]/10 pb-7 sm:mb-9 sm:pb-8">
-      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a7a17]">Operations workspace</p>
-      <h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#143d1a] sm:text-4xl">{title}</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">{description}</p>
-    </header>
-  );
+import type { ReactNode } from "react";
+
+type PageHeaderProps = { title: string; description: string; eyebrow?: string; actions?: ReactNode; variant?: "default" | "hero"; className?: string };
+
+export function PageHeader({ title, description, eyebrow = "Operations workspace", actions, variant = "default", className = "" }: PageHeaderProps) {
+  if (variant === "hero") return <header className={`mb-7 overflow-hidden rounded-3xl bg-[var(--brand-green-deep)] px-5 py-7 text-white shadow-[0_22px_55px_rgba(20,61,26,.2)] sm:mb-9 sm:px-8 sm:py-9 ${className}`}><div className="flex flex-wrap items-end justify-between gap-5"><div className="min-w-0"><p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[var(--brand-gold)]">{eyebrow}</p><h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">{title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">{description}</p></div>{actions && <div className="shrink-0">{actions}</div>}</div></header>;
+  return <header className={`mb-7 border-b border-[var(--border)] pb-7 sm:mb-9 sm:pb-8 ${className}`}><div className="flex flex-wrap items-end justify-between gap-5"><div className="min-w-0"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[var(--status-warning-fg)]">{eyebrow}</p><h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[var(--brand-green)] sm:text-4xl">{title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:text-base">{description}</p></div>{actions && <div className="shrink-0">{actions}</div>}</div></header>;
 }

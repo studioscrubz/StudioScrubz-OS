@@ -11,6 +11,11 @@
   --muted: #626b64;
   --border: #dfe4df;
   --input-background: #ffffff;
+  --status-success-bg: #ecfdf3; --status-success-border: #a7d8b5; --status-success-fg: #17632b;
+  --status-info-bg: #eff6ff; --status-info-border: #b8d4f4; --status-info-fg: #1e5799;
+  --status-warning-bg: #fff8e6; --status-warning-border: #e4ca72; --status-warning-fg: #72570d;
+  --status-danger-bg: #fff1f2; --status-danger-border: #fecdd3; --status-danger-fg: #a61b2b;
+  --status-neutral-bg: #f3f4f6; --status-neutral-border: #d1d5db; --status-neutral-fg: #4b5563;
   color-scheme: light;
 }
 
@@ -25,6 +30,11 @@
   --muted: #aab6ad;
   --border: #344139;
   --input-background: #131b16;
+  --status-success-bg: #15351f; --status-success-border: #347548; --status-success-fg: #a8e6b8;
+  --status-info-bg: #172d45; --status-info-border: #3f6f9f; --status-info-fg: #b9d9fa;
+  --status-warning-bg: #382f16; --status-warning-border: #806c2c; --status-warning-fg: #f0d474;
+  --status-danger-bg: #3b1c21; --status-danger-border: #8d3d49; --status-danger-fg: #ffb8c0;
+  --status-neutral-bg: #252d28; --status-neutral-border: #465149; --status-neutral-fg: #c5cec7;
   color-scheme: dark;
 }
 
