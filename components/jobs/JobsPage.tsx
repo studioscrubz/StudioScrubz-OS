@@ -1237,7 +1237,7 @@ function formatJobTime(value: string | null) {
 }
 function JobSection({ title, count, jobs, renderJob, muted = false }: { title: string; count: number; jobs: JobWithRelations[]; renderJob: (job: JobWithRelations) => React.ReactNode; muted?: boolean }) {
   if (!count) return null;
-  return <section className={`rounded-2xl border p-3 sm:p-4 ${muted ? "bg-[#f6f7f5]" : "bg-[#eef1ed]"}`}><header className="mb-3 flex items-center justify-between gap-4"><h2 className="text-sm font-extrabold text-[#143d1a] sm:text-base">{title}</h2><span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#143d1a]">{count}</span></header><div>{jobs.map(renderJob)}</div></section>;
+  return <section aria-label={title} className={`overflow-hidden rounded-2xl border shadow-sm ${title === "Cancelled" ? "border-red-200 bg-red-50/40" : title === "Completed" ? "border-green-200 bg-green-50/40" : title === "Unscheduled" ? "border-amber-200 bg-amber-50/40" : muted ? "border-neutral-200 bg-neutral-50" : "border-[#143d1a]/15 bg-[#eef1ed]"}`}><header className="flex items-center justify-between gap-4 border-b border-inherit px-4 py-3 sm:px-5"><h2 className="text-sm font-extrabold text-[#143d1a] sm:text-base">{title}</h2><span className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-xs font-extrabold text-[#143d1a]">{count}</span></header><div className="p-3 sm:p-4">{jobs.map(renderJob)}</div></section>;
 }
 function money(v: number) {
   return new Intl.NumberFormat("en-US", {
