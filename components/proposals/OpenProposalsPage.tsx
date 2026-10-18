@@ -56,6 +56,8 @@ import {
 } from "./ProposalDocument";
 import { ProposalPricingPhotos } from "./ProposalPricingPhotos";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
 type Sort =
   | "Newest"
   | "Oldest"
@@ -277,12 +279,12 @@ export function OpenProposalsPage() {
       {<Header />}
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
-      <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-5">
-        <Summary l="Total Proposals" v={loading ? "—" : summary.total} />
-        <Summary l="Pending Approval" v={loading ? "—" : summary.pending} />
-        <Summary l="Sent" v={loading ? "—" : summary.sent} />
-        <Summary l="Accepted" v={loading ? "—" : summary.accepted} />
-        <Summary l="Expired" v={loading ? "—" : summary.expired} />
+      <section aria-label="Proposal summary" className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Total Proposals" value={loading ? "—" : summary.total} tone="brand" />
+        <MetricCard label="Pending Approval" value={loading ? "—" : summary.pending} tone="warning" />
+        <MetricCard label="Sent" value={loading ? "—" : summary.sent} tone="info" />
+        <MetricCard label="Accepted" value={loading ? "—" : summary.accepted} tone="success" />
+        <MetricCard label="Expired" value={loading ? "—" : summary.expired} tone="neutral" />
       </section>
       <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
         <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_170px_150px_180px_190px]">
@@ -1086,19 +1088,7 @@ function printProposal(p: ProposalWithRelations) {
   w.print();
 }
 function Header() {
-  return (
-    <header className="border-b border-[#143d1a]/10 pb-7 sm:pb-8">
-      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">
-        Operations workspace
-      </p>
-      <h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">
-        Open Proposals
-      </h1>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">
-        Review, approve, send, and track StudioScrubz proposals.
-      </p>
-    </header>
-  );
+  return <PageHeader title="Open Proposals" description="Review, approve, send, and track StudioScrubz proposals." />;
 }
 function Summary({ l, v }: { l: string; v: number | string }) {
   return (
