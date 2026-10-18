@@ -73,6 +73,8 @@ import { MyTeamworkEvents } from "@/components/jobs/MyTeamworkEvents";
 import { MyPerformanceReviews } from "@/components/jobs/EmployeePerformanceReviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SectionCard } from "@/components/ui/SectionCard";
 
 type ScheduleFilter = "All" | "Scheduled" | "Unscheduled" | "Upcoming" | "Past";
 const activeStatuses: JobStatus[] = [
@@ -309,7 +311,7 @@ export function JobsPage() {
           <MetricCard key={label} label={label} value={loading ? "—" : value} tone={label === "In Progress" ? "info" : label === "Ready to Schedule" ? "warning" : label === "Scheduled" ? "success" : "brand"} />
         ))}
       </section>
-      <section className="mt-6 rounded-2xl border bg-white p-4">
+      <SectionCard title="Find jobs" description="Filter by status, division, assigned worker, or schedule." className="mt-6">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <input
             className={input}
@@ -339,7 +341,7 @@ export function JobsPage() {
             options={["All", "Scheduled", "Unscheduled", "Upcoming", "Past"]}
           />
         </div>
-      </section>
+      </SectionCard>
       {loading ? (
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
@@ -419,7 +421,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       </div>
       <div className="flex flex-wrap gap-2 md:max-w-40 md:justify-end">
         <span className="rounded-full bg-[#edf4ec] px-2.5 py-1 text-[10px] font-bold text-[#143d1a]">{job.division}</span>
-        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-bold text-neutral-700">{displayJobStatus(job.status)}</span>
+        <StatusBadge status={job.status} label={displayJobStatus(job.status)} />
       </div>
     </div>
     <div className="text-left">
