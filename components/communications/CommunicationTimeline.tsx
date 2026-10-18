@@ -28,7 +28,7 @@ export function CommunicationTimeline(props: CommunicationTimelineProps) {
   const [typeFilter, setTypeFilter] = useState<(typeof FILTER_TYPES)[number]>("All");
   const [statusFilter, setStatusFilter] = useState<"All" | CommunicationStatus>("All");
   const [search, setSearch] = useState(""); const [showArchived, setShowArchived] = useState(false);
-  const [detail, setDetail] = useState<ClientCommunication | null>(null); const [logging, setLogging] = useState(false);
+  const [detail, setDetail] = useState<ClientCommunication | null>(null); const [logging, setLogging] = useState(false); const [composeGeneral, setComposeGeneral] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [smsActionId, setSmsActionId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export function CommunicationTimeline(props: CommunicationTimelineProps) {
   return <section className="rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_10px_30px_rgba(20,61,26,.05)]">
     <header className="flex flex-col gap-4 border-b border-neutral-100 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div><h3 className="text-lg font-extrabold text-[#143d1a]">Communication History</h3><p className="mt-1 text-sm text-neutral-500">Client-facing delivery and interaction history.</p></div>
-      {canCreate && <button type="button" onClick={() => setLogging(true)} className="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white">+ Log Communication</button>}
+      {canCreate && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setComposeGeneral(true); setLogging(true); }} className="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white">Compose General Email</button><button type="button" onClick={() => { setComposeGeneral(false); setLogging(true); }} className="rounded-lg border border-[#143d1a]/20 px-4 py-2.5 text-sm font-bold text-[#143d1a]">+ Log Communication</button></div>}
     </header>
     <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[1fr_170px_150px_auto]">
       <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search communication history" className={filterClass} />
@@ -114,7 +114,7 @@ export function CommunicationTimeline(props: CommunicationTimelineProps) {
           <div className="flex shrink-0 flex-col justify-center gap-1">{canCreate && item.channel === "SMS" && item.status === "Prepared" && <><button type="button" disabled={!item.recipient_phone || smsActionId === item.id} onClick={() => text(item)} className="rounded-lg border border-[#143d1a]/20 px-3 py-2 text-xs font-bold text-[#143d1a] disabled:opacity-50">Text Client</button><button type="button" disabled={smsActionId === item.id} onClick={() => void updateSms(item, "Sent")} className="rounded-lg bg-[#143d1a] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Mark as Sent</button><button type="button" disabled={smsActionId === item.id} onClick={() => void updateSms(item, "Failed")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">Mark as Failed</button></>}{canArchive && !item.archived_at && <button type="button" disabled={archivingId === item.id} onClick={() => void archive(item)} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-neutral-500 hover:border-red-200 hover:text-red-700 disabled:opacity-50">{archivingId === item.id ? "Archiving…" : "Archive"}</button>}</div>
         </article>)}</div>}
     {detail && <CommunicationDetailModal communication={detail} onClose={() => setDetail(null)} />}
-    {logging && <LogCommunicationModal links={props} client={props.client} initialType={props.initialLogType} initialServiceId={props.initialServiceId} onClose={() => setLogging(false)} onCreated={upsert} />}
+    {logging && <LogCommunicationModal key={composeGeneral ? "general-email" : "communication-log"} links={props} client={props.client} initialType={composeGeneral ? "General" : props.initialLogType} initialServiceId={props.initialServiceId} onClose={() => { setLogging(false); setComposeGeneral(false); }} onCreated={upsert} />}
   </section>;
 }
 
