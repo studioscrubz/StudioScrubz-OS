@@ -9,6 +9,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
 import { CLIENT_TYPES, type Client, type ClientInput, type ClientStatus, type ClientType } from "@/types/client";
 import { clientViewCounts, isClientView, matchesClientView, type ClientView } from "@/lib/clients/clientView";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
 
 type TypeFilter = "All" | ClientType;
 type ArchiveFilter = "Active Records" | "Archived Records" | "All Records";
@@ -173,12 +175,12 @@ export function ClientsPage() {
       {notice && <div role="status" className="mt-6 flex items-center justify-between rounded-xl border border-[#143d1a]/15 bg-[#edf4ec] px-4 py-3 text-sm font-semibold text-[#143d1a]"><span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss message" className="text-lg text-[#143d1a]/50">×</button></div>}
       {error && <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
 
-      <section aria-label="Client summary" className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-5">
-        <SummaryCard label="Total Records" value={loading ? "—" : summary.total} />
-        <SummaryCard label="Residential" value={loading ? "—" : summary.residential} />
-        <SummaryCard label="Commercial" value={loading ? "—" : summary.commercial} />
-        <SummaryCard label="Contractors" value={loading ? "—" : summary.contractor} />
-        <SummaryCard label="Leads" value={loading ? "—" : summary.leads} />
+      <section aria-label="Client summary" className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Total Records" value={loading ? "—" : summary.total} tone="brand" />
+        <MetricCard label="Residential" value={loading ? "—" : summary.residential} tone="success" />
+        <MetricCard label="Commercial" value={loading ? "—" : summary.commercial} tone="info" />
+        <MetricCard label="Contractors" value={loading ? "—" : summary.contractor} tone="neutral" />
+        <MetricCard label="Leads" value={loading ? "—" : summary.leads} tone="warning" />
       </section>
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
@@ -200,11 +202,7 @@ export function ClientsPage() {
 }
 
 function PageHeaderContent() {
-  return <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#143d1a] sm:text-4xl">Clients</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">Manage StudioScrubz leads and established residential, commercial, and contractor clients.</p></div>;
-}
-
-function SummaryCard({ label, value }: { label: string; value: number | string }) {
-  return <article className="rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-[0_8px_25px_rgba(20,61,26,.045)]"><p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 sm:text-xs">{label}</p><p className="mt-5 text-3xl font-extrabold text-[#143d1a]">{value}</p></article>;
+  return <PageHeader title="Clients" description="Manage StudioScrubz leads and established residential, commercial, and contractor clients." />;
 }
 
 function ClientViewTabs({ view, counts, onChange }: { view: ClientView; counts: Record<ClientView, number>; onChange: (view: ClientView) => void }) {
