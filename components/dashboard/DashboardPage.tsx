@@ -12,6 +12,8 @@ import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh"
 import { DashboardTimeClockControl } from "@/components/time/DashboardTimeClockControl";
 import { DashboardActiveEmployeesMonitor } from "@/components/time/DashboardActiveEmployeesMonitor";
 import { dismissAttentionItem } from "@/lib/services/attention";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
 export function DashboardPage() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -98,9 +100,9 @@ export function DashboardPage() {
               <Empty text="No jobs scheduled today." />
             )}
           </Panel>}
-          <section className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-6">
+          <section aria-label="Operations summary" className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
-              <Metric key={kpi.label} label={kpi.label} value={kpi.value} />
+              <MetricCard key={kpi.label} label={kpi.label} value={kpi.value} tone="brand" />
             ))}
           </section>
         </>
@@ -154,19 +156,7 @@ export function DashboardPage() {
 }
 
 function Header() {
-  return (
-    <header className="border-b border-[#143d1a]/10 pb-7">
-      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">
-        Operations Command Center
-      </p>
-      <h1 className="text-3xl font-extrabold text-[#143d1a]">
-        StudioScrubz OS
-      </h1>
-      <p className="mt-3 text-neutral-600">
-        Live operational priorities, schedules, sales activity, and crew status.
-      </p>
-    </header>
-  );
+  return <PageHeader eyebrow="Operations Command Center" title="StudioScrubz OS" description="Live operational priorities, schedules, sales activity, and crew status." />;
 }
 function OperationCard({
   job,
