@@ -52,7 +52,9 @@ test("authorized users see a clear failure while the header action stays respons
   assert.match(schedule, /internalAccessDiagnostic\(profile, level\)/);
   assert.match(schedule, /!internalEventCandidateRoles\.has\(profile\.role\)/);
   assert.match(schedule, /Create Internal Event/);
-  assert.match(schedule, /flex flex-wrap items-start justify-between/);
+  assert.match(schedule, /import \{ PageHeader \} from "@\/components\/layout\/PageHeader"/);
+  assert.match(schedule, /<PageHeader title="Schedule"/);
+  assert.match(schedule, /actions=\{createInternal \? <button[^>]*onClick=\{createInternal\}>Create Internal Event<\/button>/);
   assert.doesNotMatch(schedule, /authorization failed[\s\S]{0,180}setInternalAccess\("None"\);\s*\}\);/);
 });
 
