@@ -3,6 +3,7 @@ import { useJobCommunication } from "@/components/communications/LogCommunicatio
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { PageHeader } from "@/components/layout/PageHeader";
 import type { UserProfile } from "@/types/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import {
@@ -403,7 +404,7 @@ export function SchedulePage() {
         }
       />
       {internalAccessError && <Alert text={internalAccessError} />}
-      <section className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <section aria-label="Calendar navigation" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:p-5">
         <div className="flex rounded-xl bg-[#edf1eb] p-1">
           {(["Day", "Week", "Month", "List"] as View[]).map((v) => (
             <button
@@ -590,24 +591,7 @@ export function SchedulePage() {
   );
 }
 function Header({ createInternal }: { createInternal: (() => void) | null }) {
-  return (
-    <>
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b pb-7">
-        <div>
-          <h1 className="text-3xl font-extrabold text-[#143d1a]">Schedule</h1>
-          <p className="mt-3 text-neutral-600">
-            Manage StudioScrubz upcoming jobs, walkthroughs, internal events,
-            and crew assignments.
-          </p>
-        </div>
-        {createInternal && (
-          <button type="button" className={primary} onClick={createInternal}>
-            Create Internal Event
-          </button>
-        )}
-      </header>
-    </>
-  );
+  return <PageHeader title="Schedule" description="Manage StudioScrubz upcoming jobs, walkthroughs, internal events, and crew assignments." actions={createInternal ? <button type="button" className={primary} onClick={createInternal}>Create Internal Event</button> : undefined} />;
 }
 function Filters(p: {
   search: string;
