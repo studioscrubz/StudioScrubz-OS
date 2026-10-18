@@ -5,6 +5,8 @@ import { getEmployees } from "@/lib/services/employees";
 import { createUserProfile, getUserProfiles, setUserActive, updateUserProfile } from "@/lib/services/users";
 import { USER_ROLES, type UserProfile, type UserProfileInput, type UserRole } from "@/types/auth";
 import { employeeName, type Employee } from "@/types/employee";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 const empty: UserProfileInput = { auth_user_id: "", email: "", display_name: "", role: "Administrator", employee_id: null, is_active: true };
 
@@ -44,7 +46,7 @@ export function UserManagementPage() {
 
   return <>
     <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-7">
-      <div><p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">System administration</p><h1 className="mt-2 text-3xl font-extrabold text-[#143d1a]">User Management</h1><p className="mt-3 text-neutral-600">Manage StudioScrubz OS access, roles, and account status.</p></div>
+      <PageHeader title="User Management" description="Manage StudioScrubz OS access, roles, and account status." />
       <button className={primary} onClick={() => setEditing("new")}>+ Add User Access</button>
     </header>
     <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Create the user in Supabase Authentication first, then enter the Auth User ID here. StudioScrubz never stores or displays passwords.</p>
@@ -54,7 +56,7 @@ export function UserManagementPage() {
       <select className={input} value={role} onChange={(event) => setRole(event.target.value as UserRole | "All")}><option>All</option>{USER_ROLES.map((value) => <option key={value}>{value}</option>)}</select>
       <select className={input} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option>All</option><option>Active</option><option>Inactive</option></select>
     </section>
-    {loading ? <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" /> : <section className="mt-6 overflow-hidden rounded-2xl border bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-[#edf4ec] text-[#143d1a]"><tr>{["Display Name", "Email", "Role", "Status", "Created", "Actions"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody>{visible.map((user) => <tr key={user.id} className="border-t"><td className="px-4 py-3 font-bold">{user.display_name || "—"}</td><td className="px-4 py-3">{user.email || "—"}</td><td className="px-4 py-3">{user.role}</td><td className="px-4 py-3"><Badge active={user.is_active} /></td><td className="px-4 py-3">{new Date(user.created_at).toLocaleDateString()}</td><td className="px-4 py-3"><div className="flex gap-2"><button className={small} onClick={() => setViewing(user)}>View</button><button className={small} onClick={() => setEditing(user)}>Edit Access</button><button disabled={busy === user.id} className={small} onClick={() => void toggle(user)}>{user.is_active ? "Deactivate" : "Reactivate"}</button></div></td></tr>)}</tbody></table></div>{!visible.length && <p className="p-10 text-center text-neutral-500">No user profiles match these filters.</p>}</section>}
+    {loading ? <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" /> : <section className="mt-6 overflow-hidden rounded-2xl border bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-[#edf4ec] text-[#143d1a]"><tr>{["Display Name", "Email", "Role", "Status", "Created", "Actions"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody>{visible.map((user) => <tr key={user.id} className="border-t"><td className="px-4 py-3 font-bold">{user.display_name || "—"}</td><td className="px-4 py-3">{user.email || "—"}</td><td className="px-4 py-3">{user.role}</td><td className="px-4 py-3"><StatusBadge status={user.is_active ? "Active" : "Inactive"} tone={user.is_active ? "success" : "neutral"} /></td><td className="px-4 py-3">{new Date(user.created_at).toLocaleDateString()}</td><td className="px-4 py-3"><div className="flex gap-2"><button className={small} onClick={() => setViewing(user)}>View</button><button className={small} onClick={() => setEditing(user)}>Edit Access</button><button disabled={busy === user.id} className={small} onClick={() => void toggle(user)}>{user.is_active ? "Deactivate" : "Reactivate"}</button></div></td></tr>)}</tbody></table></div>{!visible.length && <p className="p-10 text-center text-neutral-500">No user profiles match these filters.</p>}</section>}
     {editing && <UserForm user={editing === "new" ? null : editing} employees={employees} activeMasterAdmins={users.filter((candidate) => candidate.is_active && candidate.role === "Master Admin").length} close={() => setEditing(null)} saved={async () => { setEditing(null); await load(); setNotice("User access saved."); }} />}
     {viewing && <UserDetail user={viewing} employee={employees.find((employee) => employee.id === viewing.employee_id)} close={() => setViewing(null)} />}
   </>;
