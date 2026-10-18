@@ -58,6 +58,7 @@ import { ProposalPricingPhotos } from "./ProposalPricingPhotos";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { StatusBadge as SharedStatusBadge } from "@/components/ui/StatusBadge";
 type Sort =
   | "Newest"
   | "Oldest"
@@ -287,7 +288,7 @@ export function OpenProposalsPage() {
         <MetricCard label="Expired" value={loading ? "—" : summary.expired} tone="neutral" />
       </section>
       <section className="mt-6 overflow-hidden rounded-2xl border border-[#143d1a]/10 bg-white shadow-[0_12px_34px_rgba(20,61,26,.05)]">
-        <div className="grid gap-3 border-b border-neutral-100 p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_170px_150px_180px_190px]">
+        <div className="border-b border-neutral-100 bg-[#f8faf7] p-4 sm:p-5"><h2 className="text-sm font-extrabold text-[#143d1a]">Find proposals</h2><p className="mt-1 text-xs text-neutral-500">Search and narrow records by status, division, approval, or sort order.</p><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_170px_150px_180px_190px]">
           <label>
             <span className="sr-only">Search proposals</span>
             <input
@@ -326,7 +327,7 @@ export function OpenProposalsPage() {
               "Price Low to High",
             ]}
           />
-        </div>
+        </div></div>
         {loading ? (
           <Loading />
         ) : (
@@ -1145,21 +1146,8 @@ function Badge({ t }: { t: string }) {
   );
 }
 function StatusBadge({ status }: { status: ProposalStatus }) {
-  const tone =
-    status === "Accepted"
-      ? "bg-emerald-50 text-emerald-700"
-      : status === "Declined" || status === "Expired"
-        ? "bg-red-50 text-red-700"
-        : status === "Ready for Approval" || status === "Approved"
-          ? "bg-amber-50 text-amber-800"
-          : "bg-[#edf4ec] text-[#143d1a]";
-  return (
-    <span
-      className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${tone}`}
-    >
-      {status}
-    </span>
-  );
+  const tone = status === "Accepted" ? "success" : status === "Declined" ? "danger" : status === "Expired" ? "neutral" : status === "Ready for Approval" ? "warning" : status === "Approved" || status === "Sent" || status === "Viewed" ? "info" : "brand";
+  return <SharedStatusBadge status={status} tone={tone} />;
 }
 function proposalProperty(p: ProposalWithRelations): string {
   return p.property
