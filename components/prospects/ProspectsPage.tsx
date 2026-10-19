@@ -7,6 +7,7 @@ import { createProspect, getProspectAssignees, getProspectEvents, getProspects, 
 import type { Prospect, ProspectAssignee, ProspectEvent, ProspectInput, ProspectStatus, ProspectVerificationStatus } from "@/types/prospect";
 import { ProspectDiscovery } from "./ProspectDiscovery";
 import { ProspectCsvImport } from "./ProspectCsvImport";
+import { ProspectUpdateImport } from "./ProspectUpdateImport";
 import { mergeProspects } from "@/lib/services/prospects";
 import { flyerCategoriesForIndustry, hasUsableProspectEmail } from "@/types/marketingMaterial";
 
@@ -23,6 +24,7 @@ export function ProspectsPage() {
   const [rows,setRows]=useState<Prospect[]>([]), [assignees,setAssignees]=useState<ProspectAssignee[]>([]), [events,setEvents]=useState<ProspectEvent[]>([]);
   const [selectedId,setSelectedId]=useState<string|null>(null), [editing,setEditing]=useState(false), [loading,setLoading]=useState(true), [saving,setSaving]=useState(false);
   const [search,setSearch]=useState(""), [status,setStatus]=useState("All"), [territory,setTerritory]=useState("All"), [assignee,setAssignee]=useState("All"), [error,setError]=useState<string|null>(null);
+  const [updatingCsv,setUpdatingCsv]=useState(false);
   const [form,setForm]=useState<ProspectInput>(emptyForm),  [importing,setImporting]=useState(false), [discovering,setDiscovering]=useState(false), [merging,setMerging]=useState(false);
   const selected=rows.find(row=>row.id===selectedId)??null;
 
@@ -36,6 +38,8 @@ export function ProspectsPage() {
   const territories=Array.from(new Set(rows.map(row=>row.territory).filter((value):value is string=>Boolean(value)))).sort();
   const due=rows.filter(row=>row.next_follow_up_at&&new Date(row.next_follow_up_at)<=new Date()&&row.status!=="Disqualified").length;
   const preview=calculateProspectScore({territory:form.territory,industry:form.industry,recurringPotential:form.recurring_potential,verificationStatus:form.verification_status,email:form.business_email,phone:form.business_phone,estimatedValue:form.estimated_value,discoveredAt:form.discovered_at});
+
+  async function exportSignedUpdate(){try{setError(null);const response=await fetch("/api/prospects/signed-export");if(!response.ok){const detail=await response.json();throw Error(detail.error||"Export failed");}const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="StudioScrubz_Prospects_Update_"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(cause){setError(message(cause));}}
 
   function exportAllProspects(){
     const columns: Array<[string,(row:Prospect)=>unknown]> = [
@@ -72,7 +76,7 @@ export function ProspectsPage() {
       <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" aria-hidden="true" />
       <div className="relative flex flex-wrap items-end justify-between gap-6">
         <div><p className="text-[11px] font-extrabold uppercase tracking-[.22em] text-[#e4c86d]">Sales workspace / Prospect management</p><h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Prospect Engine</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/75">Organize business opportunities by industry, track qualifications, and manage follow-ups without automated outreach.</p></div>
-        <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setDiscovering(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Discover Prospects</button><button type="button" onClick={exportAllProspects} disabled={loading||activeRows.length===0} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20 disabled:opacity-50">Export All CSV ({activeRows.length})</button><button type="button" onClick={()=>setImporting(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Import CSV</button>{canManageAll&&<button type="button" onClick={openCreate} className="rounded-lg bg-[#d4af37] px-4 py-2.5 text-sm font-extrabold text-[#143d1a] transition hover:bg-[#ebca61]">+ New prospect</button>}</div>
+        <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setDiscovering(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Discover Prospects</button>{canManageAll&&<><button type="button" onClick={()=>void exportSignedUpdate()} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white">Export for Updates</button><button type="button" onClick={()=>setUpdatingCsv(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white">Reimport Updates</button></>}<button type="button" onClick={exportAllProspects} disabled={loading||activeRows.length===0} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20 disabled:opacity-50">Export All CSV ({activeRows.length})</button><button type="button" onClick={()=>setImporting(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Import CSV</button>{canManageAll&&<button type="button" onClick={openCreate} className="rounded-lg bg-[#d4af37] px-4 py-2.5 text-sm font-extrabold text-[#143d1a] transition hover:bg-[#ebca61]">+ New prospect</button>}</div>
       </div>
     </header>
     {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -103,6 +107,7 @@ export function ProspectsPage() {
     {(editing||selected)&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-6" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!saving&&!merging){setEditing(false);setSelectedId(null);}}}><section role="dialog" aria-modal="true" aria-label={editing?"Edit prospect":"Prospect details"} className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><header className="flex shrink-0 items-center justify-between border-b border-[#143d1a]/10 px-5 py-4"><div><p className="text-xs font-bold uppercase tracking-wider text-[#9a7a17]">Prospect Engine</p><h2 className="text-lg font-extrabold text-[#143d1a]">{editing?(selected?"Edit prospect":"New prospect"):"Prospect profile"}</h2></div><button type="button" aria-label="Close prospect popup" disabled={saving||merging} onClick={()=>{setEditing(false);setSelectedId(null);}} className="rounded-lg border px-3 py-2 text-sm font-bold text-[#143d1a]">Close ✕</button></header><div className="overflow-y-auto p-5 sm:p-6">{editing?<ProspectForm form={form} setForm={setForm} assignees={assignees} canAssign={canManageAll} preview={preview} saving={saving} save={save} cancel={()=>{setEditing(false);setSelectedId(null);}}/>:selected?<ProspectDetail row={selected} rows={activeRows} assignees={assignees} events={events} edit={()=>openEdit(selected)} merge={mergeInto} merging={merging}/>:null}</div></section></div>}
     
     
+    {updatingCsv&&<ProspectUpdateImport close={()=>setUpdatingCsv(false)} completed={()=>{setUpdatingCsv(false);void load();}}/>}
     {importing&&profile&&<ProspectCsvImport prospects={activeRows} assignees={assignees} currentUserId={profile.id} canAssign={canManageAll} close={()=>setImporting(false)} completed={()=>{setImporting(false);void load();}}/>}
     {discovering&&profile&&<ProspectDiscovery prospects={activeRows} assignees={assignees} currentUserId={profile.id} canAssign={canManageAll} close={()=>setDiscovering(false)} completed={()=>{void load();}}/>}
   </div>;
