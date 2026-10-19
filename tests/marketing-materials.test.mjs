@@ -28,6 +28,14 @@ test("navigation permits management and Sales but denies field roles", () => {
   assert.match(sidebar, /Marketing Materials/);
 });
 
+test("Marketing Materials offers only Client or new Prospect recipients", () => {
+  assert.match(page, /recipientKind:"Existing Client"\|"New Prospect"/);
+  assert.match(page, /> Existing Client<\/label>/);
+  assert.match(page, /> New Prospect<\/label>/);
+  assert.doesNotMatch(page, /Existing Prospect/);
+  assert.equal((page.match(/type="radio"/g) ?? []).length, 2);
+});
+
 test("catalog is reusable and the initial flyer remains a manual management upload", () => {
   assert.match(migration, /create table public\.marketing_materials/);
   assert.match(migration, /create table public\.marketing_material_versions/);
