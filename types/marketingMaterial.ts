@@ -6,7 +6,7 @@ export type MarketingMaterialCatalogItem=MarketingMaterial&{current:MarketingMat
 export type MarketingMaterialDelivery={id:string;material_identifier:string;material_version:number;material_version_id:string;material_title:string;media_type:string;storage_path:string;original_filename:string;client_id:string|null;recipient_kind:"Existing Client"|"New Prospect";recipient_name:string;recipient_company:string|null;recipient_email:string;recipient_phone:string|null;subject:string;message_body:string;status:"Prepared"|"Sent"|"Failed";provider:string;provider_message_id:string|null;failure_reason:string|null;sent_by_user_id:string;sent_by_name:string;client_communication_id:string|null;attempt_count:number;prepared_at:string;sent_at:string|null;updated_at:string};
 
 /** Match prospect industry labels to approved flyer categories. Unmapped industries remain unfiltered. */
-export function hasUsableProspectEmail(email:string|null|undefined):boolean{return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test((email??"").trim());}
+export function hasUsableProspectEmail(email:string|null|undefined):boolean{return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email??"").trim());}
 export function flyerCategoriesForIndustry(industry:string|null|undefined):string[]{
  const key=(industry??"").trim().toLowerCase();
  if(!key)return [];
