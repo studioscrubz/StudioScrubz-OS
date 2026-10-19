@@ -794,6 +794,7 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
       <p className="truncate text-[11px] text-neutral-500">
         {job.property_name}
       </p>
+      {job.property?.address && <p className="mt-1 flex items-start gap-1 text-[11px] text-neutral-600"><span aria-hidden="true">📍</span><span className="min-w-0 break-words">{[job.property.address, job.property.address_line_2, [job.property.city, job.property.state].filter(Boolean).join(", "), job.property.zip].filter(Boolean).join(" · ")}</span></p>}
       <p className="mt-2 text-xs">
         {job.service_name} | {job.estimated_duration ?? 0}h
       </p>
