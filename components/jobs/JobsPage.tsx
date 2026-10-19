@@ -412,7 +412,6 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       <div className="min-w-0">
         <p className="font-extrabold text-neutral-800">{job.client_name || "Unnamed client"}</p>
         <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
-        {job.property?.address && <p className="mt-1 flex items-start gap-1.5 text-sm text-neutral-600"><span aria-hidden="true">📍</span><span>{[job.property.address, job.property.address_line_2, [job.property.city, job.property.state].filter(Boolean).join(", "), job.property.zip].filter(Boolean).join(" · ")}</span></p>}
         <p className="mt-2 text-sm font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
       </div>
       <div className="text-sm text-neutral-600">
