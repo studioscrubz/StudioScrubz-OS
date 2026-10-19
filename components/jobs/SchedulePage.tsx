@@ -795,7 +795,7 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
       <p className="truncate text-[11px] text-neutral-500">
         {job.property_name}
       </p>
-      {profile?.role === "Sales" && job.property?.address && <p className="mt-1 flex items-start gap-1 text-[11px] text-neutral-600"><span aria-hidden="true">📍</span><span className="min-w-0 break-words">{[job.property.address, job.property.address_line_2, [job.property.city, job.property.state].filter(Boolean).join(", "), job.property.zip].filter(Boolean).join(" · ")}</span></p>}
+      {profile?.role === "Sales" && job.property?.address && ![job.property.address, [job.property.address, job.property.city, job.property.state, job.property.zip].filter(Boolean).join(" ")].some((address) => address.trim() && (job.property_name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(address.toLowerCase().replace(/[^a-z0-9]/g, ""))) && <p className="mt-1 text-[11px] text-neutral-600 break-words">{[job.property.address, job.property.address_line_2, [job.property.city, job.property.state].filter(Boolean).join(", "), job.property.zip].filter(Boolean).join(" · ")}</p>}
       <p className="mt-2 text-xs">
         {job.service_name} | {job.estimated_duration ?? 0}h
       </p>
