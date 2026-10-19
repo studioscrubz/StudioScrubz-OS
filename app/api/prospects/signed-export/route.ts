@@ -5,7 +5,11 @@ import { hasPermission } from "@/lib/auth/permissions";
 import type { UserProfile } from "@/types/auth";
 
 const FIELDS = ["company_name","industry","company_type","contact_name","contact_title","contact_phone","contact_location","contact_linkedin","business_email","business_phone","website","address","city","state","zip","territory","source_url","notes","next_action","next_follow_up_at"] as const;
-const UUID=/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type QueryError={message:string};
+type LooseResult={data:unknown;error:QueryError|null};
+type ProspectQuery=PromiseLike<LooseResult>&{select:(columns?:string)=>ProspectQuery;is:(column:string,value:unknown)=>ProspectQuery;order:(column:string)=>ProspectQuery;range:(from:number,to:number)=>ProspectQuery;eq:(column:string,value:unknown)=>ProspectQuery;maybeSingle:()=>ProspectQuery;update:(values:Record<string,string>)=>ProspectQuery};
+type ProspectDatabase={from:(relation:"prospects")=>ProspectQuery};
 function secret(){const value=process.env.PROSPECT_EXPORT_SIGNING_KEY;if(!value||value.length<32)throw new Error("Configure PROSPECT_EXPORT_SIGNING_KEY (at least 32 characters) on the server.");return value;}
 function signature(id:string,updated:string,user:string){return createHmac("sha256",secret()).update("studioscrubz-prospect-export-v1|"+user+"|"+id+"|"+updated).digest("hex");}
 async function context(){const db=await createSupabaseServerClient();const {data:{user}}=await db.auth.getUser();if(!user)return null;const {data:profile}=await db.from("user_profiles").select("*").eq("id",user.id).single();if(!profile||!hasPermission(profile as UserProfile,"prospects.manage"))return null;return {db,user};}
@@ -13,7 +17,8 @@ function csvCell(value:unknown){let s=value==null?"":String(value);if(/^[\s]*[=+
 export async function GET(){
  try{
   const ctx=await context();if(!ctx)return Response.json({error:"Unauthorized"},{status:403});
-  const all:Record<string,unknown>[]=[];for(let from=0;from<20000;from+=500){const {data,error}=await ctx.db.from("prospects").select("*").is("merged_into_prospect_id",null).order("id").range(from,from+499);if(error)throw error;all.push(...(data??[]));if((data??[]).length<500)break;}
+  const prospects=ctx.db as unknown as ProspectDatabase;
+  const all:Record<string,unknown>[]=[];for(let from=0;from<20000;from+=500){const {data,error}=await prospects.from("prospects").select("*").is("merged_into_prospect_id",null).order("id").range(from,from+499);if(error)throw error;const page=(data??[]) as Record<string,unknown>[];all.push(...page);if(page.length<500)break;}
   if(all.length>2000)return Response.json({error:"Update exports currently support up to 2,000 prospects. No file was generated; use smaller batches once available."},{status:400});
   const columns=["Prospect ID","Export Version","Export Updated At","Export Signature",...FIELDS];
   const lines=[columns.map(csvCell).join(",")];
@@ -26,6 +31,7 @@ export async function POST(request:Request){
   const ctx=await context();if(!ctx)return Response.json({error:"Unauthorized"},{status:403});
   const body=await request.json() as {mode?:string;rows?:Array<Record<string,unknown>>};
   if(!["preview","apply"].includes(body.mode??"")||!Array.isArray(body.rows)||body.rows.length===0||body.rows.length>2000)return Response.json({error:"Invalid update request (maximum 2,000 rows)."}, {status:400});
+  const prospects=ctx.db as unknown as ProspectDatabase;
   const ids=new Set<string>();const results: Array<{id:string;status:string;changes?:Record<string,string>;error?:string}>=[];
   for(const row of body.rows){
    const id=String(row["Prospect ID"]??""),updated=String(row["Export Updated At"]??""),sig=String(row["Export Signature"]??"");
@@ -33,7 +39,7 @@ export async function POST(request:Request){
    if(row["Export Version"]!=="1"||!/^[a-f0-9]{64}$/.test(sig)){results.push({id,status:"Rejected",error:"Not a valid StudioScrubz export"});continue;}
    const expected=signature(id,updated,ctx.user.id);
    if(!timingSafeEqual(Buffer.from(sig),Buffer.from(expected))){results.push({id,status:"Rejected",error:"Export signature mismatch"});continue;}
-   const {data:existing,error}=await ctx.db.from("prospects").select("*").eq("id",id).is("merged_into_prospect_id",null).maybeSingle();
+   const {data,error}=await prospects.from("prospects").select("*").eq("id",id).is("merged_into_prospect_id",null).maybeSingle();const existing=data as Record<string,unknown>|null;
    if(error||!existing){results.push({id,status:"Rejected",error:"Record not accessible or no longer exists"});continue;}
    if(existing.updated_at!==updated){results.push({id,status:"Conflict",error:"Prospect changed since export; download a fresh copy"});continue;}
    const changes:Record<string,string>={};let invalid=false;
@@ -45,7 +51,7 @@ export async function POST(request:Request){
    if(invalid){results.push({id,status:"Rejected",error:"Invalid or missing editable field"});continue;}
    if(!Object.keys(changes).length){results.push({id,status:"Unchanged"});continue;}
    if(body.mode==="apply"){
-    const {data:written,error:writeError}=await ctx.db.from("prospects").update(changes).eq("id",id).eq("updated_at",updated).select("id").maybeSingle();
+    const {data:written,error:writeError}=await prospects.from("prospects").update(changes).eq("id",id).eq("updated_at",updated).select("id").maybeSingle();
     if(writeError||!written){results.push({id,status:"Rejected",error:writeError?.message??"Concurrent update or insufficient permissions"});continue;}
    }
    results.push({id,status:body.mode==="apply"?"Updated":"Will update",changes});
