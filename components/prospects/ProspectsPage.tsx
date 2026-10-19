@@ -37,6 +37,31 @@ export function ProspectsPage() {
   const due=rows.filter(row=>row.next_follow_up_at&&new Date(row.next_follow_up_at)<=new Date()&&row.status!=="Disqualified").length;
   const preview=calculateProspectScore({territory:form.territory,industry:form.industry,recurringPotential:form.recurring_potential,verificationStatus:form.verification_status,email:form.business_email,phone:form.business_phone,estimatedValue:form.estimated_value,discoveredAt:form.discovered_at});
 
+  function exportAllProspects(){
+    const columns: Array<[string,(row:Prospect)=>unknown]> = [
+      ["Company",r=>r.company_name],["Industry",r=>r.industry],["Company Type",r=>r.company_type],
+      ["Contact Name",r=>r.contact_name],["Contact Title",r=>r.contact_title],["Contact Phone",r=>r.contact_phone],
+      ["Contact Location",r=>r.contact_location],["Contact LinkedIn",r=>r.contact_linkedin],
+      ["Email",r=>r.business_email],["Business Phone",r=>r.business_phone],["Website",r=>r.website],
+      ["Address",r=>r.address],["City",r=>r.city],["State",r=>r.state],["ZIP",r=>r.zip],
+      ["Territory",r=>r.territory],["Services",r=>r.services.join("; ")],
+      ["Recurring Potential",r=>r.recurring_potential?"Yes":"No"],["Estimated Value",r=>r.estimated_value],
+      ["Source",r=>r.source_type],["Source URL",r=>r.source_url],["Discovered At",r=>r.discovered_at],
+      ["Verified At",r=>r.verified_at],["Verification Status",r=>r.verification_status],
+      ["Score",r=>r.score],["Score Explanation",r=>r.score_explanation],
+      ["Assigned To",r=>assignees.find(a=>a.id===r.assigned_user_id)?.display_name??r.assigned_user_id],
+      ["Status",r=>r.status],["Next Action",r=>r.next_action],["Next Follow-up",r=>r.next_follow_up_at],
+      ["Notes",r=>r.notes],["Additional Contact Info",r=>JSON.stringify(r.additional_contact_info??{})],
+      ["Created At",r=>r.created_at],["Updated At",r=>r.updated_at],["Prospect ID",r=>r.id]
+    ];
+    // Quote CSV cells and neutralize spreadsheet formula injection from imported prospect fields.
+    const cell=(value:unknown)=>{let v=value==null?"":String(value);if(/^[\\s]*[=+@-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
+    const csv="\\uFEFF"+[columns.map(([name])=>cell(name)).join(","),...activeRows.map(row=>columns.map(([,get])=>cell(get(row))).join(","))].join("\\r\\n");
+    const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"}));
+    const link=document.createElement("a");link.href=url;link.download="StudioScrubz_Prospects_All_"+new Date().toISOString().slice(0,10)+".csv";
+    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
   function openCreate(){const next=emptyForm();next.assigned_user_id=canManageAll?null:profile?.id??null;setForm(next);setSelectedId(null);setEditing(true);}
   function openEdit(row:Prospect){setForm(toInput(row));setSelectedId(row.id);setEditing(true);}
   async function save(event:FormEvent){event.preventDefault();setSaving(true);setError(null);try{const saved=selectedId?await updateProspect(selectedId,form):await createProspect(form);setEditing(false);await load();setSelectedId(null);}catch(cause){setError(message(cause));}finally{setSaving(false);}}
@@ -47,7 +72,7 @@ export function ProspectsPage() {
       <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" aria-hidden="true" />
       <div className="relative flex flex-wrap items-end justify-between gap-6">
         <div><p className="text-[11px] font-extrabold uppercase tracking-[.22em] text-[#e4c86d]">Sales workspace / Prospect management</p><h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Prospect Engine</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/75">Organize business opportunities by industry, track qualifications, and manage follow-ups without automated outreach.</p></div>
-        <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setDiscovering(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Discover Prospects</button><button type="button" onClick={()=>setImporting(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Import CSV</button>{canManageAll&&<button type="button" onClick={openCreate} className="rounded-lg bg-[#d4af37] px-4 py-2.5 text-sm font-extrabold text-[#143d1a] transition hover:bg-[#ebca61]">+ New prospect</button>}</div>
+        <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setDiscovering(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Discover Prospects</button><button type="button" onClick={exportAllProspects} disabled={loading||activeRows.length===0} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20 disabled:opacity-50">Export All CSV ({activeRows.length})</button><button type="button" onClick={()=>setImporting(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Import CSV</button>{canManageAll&&<button type="button" onClick={openCreate} className="rounded-lg bg-[#d4af37] px-4 py-2.5 text-sm font-extrabold text-[#143d1a] transition hover:bg-[#ebca61]">+ New prospect</button>}</div>
       </div>
     </header>
     {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
