@@ -14,6 +14,7 @@ export async function GET(){
  try{
   const ctx=await context();if(!ctx)return Response.json({error:"Unauthorized"},{status:403});
   const all:Record<string,unknown>[]=[];for(let from=0;from<20000;from+=500){const {data,error}=await ctx.db.from("prospects").select("*").is("merged_into_prospect_id",null).order("id").range(from,from+499);if(error)throw error;all.push(...(data??[]));if((data??[]).length<500)break;}
+  if(all.length>2000)return Response.json({error:"Update exports currently support up to 2,000 prospects. No file was generated; use smaller batches once available."},{status:400});
   const columns=["Prospect ID","Export Version","Export Updated At","Export Signature",...FIELDS];
   const lines=[columns.map(csvCell).join(",")];
   for(const row of all){const id=String(row.id),updated=String(row.updated_at);lines.push([id,"1",updated,signature(id,updated,ctx.user.id),...FIELDS.map(k=>row[k])].map(csvCell).join(","));}
@@ -24,7 +25,7 @@ export async function POST(request:Request){
  try{
   const ctx=await context();if(!ctx)return Response.json({error:"Unauthorized"},{status:403});
   const body=await request.json() as {mode?:string;rows?:Array<Record<string,unknown>>};
-  if(!["preview","apply"].includes(body.mode??"")||!Array.isArray(body.rows)||body.rows.length>2000)return Response.json({error:"Invalid update request (maximum 2,000 rows)."}, {status:400});
+  if(!["preview","apply"].includes(body.mode??"")||!Array.isArray(body.rows)||body.rows.length===0||body.rows.length>2000)return Response.json({error:"Invalid update request (maximum 2,000 rows)."}, {status:400});
   const ids=new Set<string>();const results: Array<{id:string;status:string;changes?:Record<string,string>;error?:string}>=[];
   for(const row of body.rows){
    const id=String(row["Prospect ID"]??""),updated=String(row["Export Updated At"]??""),sig=String(row["Export Signature"]??"");
