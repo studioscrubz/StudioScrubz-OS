@@ -15,9 +15,7 @@ begin
    public.has_role('Crew Lead') and j.assigned_crew_id is not null and
    exists(select 1 from public.crews c where c.id=j.assigned_crew_id and c.crew_lead_id=public.current_employee_id() and c.archived_at is null and c.status='Active')
  ) then raise exception 'Only the assigned Crew Lead or Master Admin may assign equipment responsibility.'; end if;
- if p_employee_ids is null or cardinality(p_employee_ids)=0 then
-   raise exception 'Assign at least one equipment custodian.';
- end if;
+ if p_employee_ids is null then raise exception 'Explicit custodian selection is required (empty array means none).'; end if;
  if exists(select 1 from unnest(p_employee_ids) e where e is null) or
     (select count(distinct e) from unnest(p_employee_ids) e) <> cardinality(p_employee_ids) then
    raise exception 'Equipment custodians must be unique valid employees.';
@@ -38,7 +36,7 @@ begin
    select 1 from public.job_equipment_assignments a
    where a.job_id=p_job_id and a.released_at is null
      and not (a.employee_id=any(p_employee_ids))
-     and exists(select 1 from public.job_equipment_clearances cl where cl.assignment_id=a.id and cl.status<>'Cleared')
+     and (exists(select 1 from public.job_equipment_clearances cl where cl.assignment_id=a.id and cl.status<>'Cleared') or (j.status='In Progress' and not exists(select 1 from public.job_equipment_clearances cl where cl.assignment_id=a.id and cl.checkpoint='End Job' and cl.status='Cleared')))
  ) then raise exception 'Resolve pending equipment clearance before releasing a custodian.'; end if;
  for v_existing in select * from public.job_equipment_assignments
    where job_id=p_job_id and released_at is null and not(employee_id=any(p_employee_ids)) for update loop
