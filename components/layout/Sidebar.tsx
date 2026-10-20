@@ -150,63 +150,15 @@ const navItems: Array<NavLink | NavGroup> = [
 
       },
 
-    ],
-
-  },
-
-  {
-
-    label: "Sales Assessments",
-
-    marker: "S",
-
-    children: [
-
       {
 
-        label: "Assessments",
-
-        href: "/walkthroughs",
-
-        marker: "S",
-
-        permission: "walkthroughs.view",
-
-      },
-
-      {
-
-        label: "Assigned Walkthroughs",
+        label: "Walkthroughs",
 
         href: "/field-walkthroughs",
 
         marker: "W",
 
         permission: "walkthroughs.field",
-
-      },
-
-      {
-
-        label: "My Prospects",
-
-        href: "/my-prospects",
-
-        marker: "M",
-
-        permission: "prospects.view",
-
-      },
-
-      {
-
-        label: "Prospects",
-
-        href: "/prospects",
-
-        marker: "P",
-
-        permission: "prospects.view",
 
       },
 
@@ -351,6 +303,54 @@ const navItems: Array<NavLink | NavGroup> = [
         marker: "",
 
         permission: "porterVisits.manage",
+
+      },
+
+    ],
+
+  },
+
+  {
+
+    label: "Sales",
+
+    marker: "S",
+
+    children: [
+
+      {
+
+        label: "Assessments",
+
+        href: "/walkthroughs",
+
+        marker: "S",
+
+        permission: "walkthroughs.view",
+
+      },
+
+      {
+
+        label: "My Prospects",
+
+        href: "/my-prospects",
+
+        marker: "M",
+
+        permission: "prospects.view",
+
+      },
+
+      {
+
+        label: "Prospects",
+
+        href: "/prospects",
+
+        marker: "P",
+
+        permission: "prospects.view",
 
       },
 
