@@ -81,7 +81,10 @@ export async function getScheduleJobs(): Promise<JobWithRelations[]> {
   if (!hasPermission(profile, "schedule.view")) throw new Error("Schedule access is denied.");
   const { data, error } = await (getSupabaseClient() as unknown as SalesScheduleRpcClient).rpc("get_sales_schedule_jobs", {});
   if (error) throw new Error(safeDatabaseMessage(error, "Schedule jobs could not be loaded."));
-  return (data as Parameters<typeof operationalJob>[0][]).map(operationalJob);
+  return (data as (Parameters<typeof operationalJob>[0] & { property?: JobWithRelations["property"] })[]).map((row) => ({
+    ...operationalJob(row),
+    property: row.property ?? null,
+  }));
 }
 export async function getJobsForMileageAssociation(): Promise<JobWithRelations[]> {
   if (!(await master())) throw new Error("Mileage Job association access is denied.");
