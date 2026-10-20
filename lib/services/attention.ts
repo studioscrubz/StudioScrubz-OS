@@ -329,7 +329,7 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const actionableKeys = new Set(retainedItems.map((entry) => entry.id));
   const activeStates = states.filter((state) => actionableKeys.has(state.attention_key));
   const stateMap = new Map(activeStates.map((state) => [state.attention_key, state]));
-  const visible = retainedItems.map((entry) => ({ ...entry, attention_state: effectiveState(stateMap.get(entry.id), clock.now) }))
+  const visible = retainedItems.filter((entry) => stateMap.get(entry.id)?.state !== "Deleted").map((entry) => ({ ...entry, attention_state: effectiveState(stateMap.get(entry.id), clock.now) }))
     .filter((entry) => view === "All" || (view === "Active" ? !entry.attention_state : entry.attention_state?.state === view))
     .sort((a, b) => rank(a.severity) - rank(b.severity) || (a.due_date ?? a.scheduled_date ?? "9999").localeCompare(b.due_date ?? b.scheduled_date ?? "9999") || b.created_at.localeCompare(a.created_at));
   return { items: visible, allKeys: [...actionableKeys] };
@@ -354,6 +354,19 @@ export function summarizeAttention(items: AttentionItem[]): AttentionSummary { r
 export async function getAttentionItemStates(): Promise<AttentionStateRecord[]> { const { data, error } = await getSupabaseClient().from("attention_item_states").select("*").order("updated_at", { ascending: false }); if (error) throw new Error(`Attention state could not be loaded: ${error.message}`); return data as AttentionStateRecord[]; }
 export async function snoozeAttentionItem(attentionKey: string, until: string): Promise<void> { if (Date.parse(until) <= Date.now()) throw new Error("Choose a future snooze time."); await saveState(attentionKey, "Snoozed", until); }
 export async function dismissAttentionItem(attentionKey: string): Promise<void> { await saveState(attentionKey, "Dismissed", null); }
+export async function deleteAttentionItems(keys: string[]): Promise<void> {
+  const profile = await getCurrentProfile();
+  if (!profile?.is_active) throw new Error("An active profile is required.");
+  const unique = [...new Set(keys.filter(Boolean))];
+  if (!unique.length) return;
+  const now = new Date().toISOString();
+  const { error } = await getSupabaseClient().from("attention_item_states").upsert(
+    unique.map((attention_key) => ({ user_id: profile.id, attention_key, state: "Deleted", snoozed_until: null, dismissed_at: now })),
+    { onConflict: "user_id,attention_key" },
+  );
+  if (error) throw new Error(`Notifications could not be deleted: ${error.message}`);
+}
+
 export async function restoreAttentionItem(attentionKey: string): Promise<void> { return withImmediateAttentionPush(async()=>{const profile = await getCurrentProfile(); if (!profile) throw new Error("Authentication is required."); const { error } = await getSupabaseClient().from("attention_item_states").delete().eq("user_id", profile.id).eq("attention_key", attentionKey); if (error) throw new Error(`Attention item could not be restored: ${error.message}`);}); }
 async function saveState(attentionKey: string, state: "Snoozed" | "Dismissed", until: string | null) { const profile = await getCurrentProfile(); if (!profile) throw new Error("Authentication is required."); const { error } = await getSupabaseClient().from("attention_item_states").upsert({ user_id: profile.id, attention_key: attentionKey, state, snoozed_until: state === "Snoozed" ? until : null, dismissed_at: state === "Dismissed" ? new Date().toISOString() : null }, { onConflict: "user_id,attention_key" }); if (error) throw new Error(`Attention state could not be saved: ${error.message}`); }
 async function removeResolvedAttentionStates(userId: string, states: AttentionStateRecord[]) { if (!states.length) return; const { error } = await getSupabaseClient().from("attention_item_states").delete().eq("user_id", userId).in("attention_key", states.map((state) => state.attention_key)); if (error) throw new Error(`Resolved attention state could not be cleared: ${error.message}`); }
