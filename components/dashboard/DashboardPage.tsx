@@ -100,9 +100,9 @@ export function DashboardPage() {
               <Empty text="No jobs scheduled today." />
             )}
           </Panel>}
-          <section aria-label="Operations summary" className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <section aria-label="Operations summary" className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
             {kpis.filter((kpi) => hasPermission(profile, kpi.permission)).map((kpi) => (
-              <MetricCard key={kpi.label} label={kpi.label} value={kpi.value} tone="brand" />
+              <MetricCard key={kpi.label} label={kpi.label} value={kpi.value} tone="brand" className="min-w-0 !rounded-xl !p-3 sm:!p-4 [&>div]:!mb-2 [&>div]:!items-start [&>div>p]:!text-[10px] [&>div>p]:!leading-snug [&>div>p]:!tracking-[0.04em] [&>div>span]:!shrink-0 [&>p]:!text-2xl sm:[&>p]:!text-3xl" />
             ))}
           </section>
         </>
