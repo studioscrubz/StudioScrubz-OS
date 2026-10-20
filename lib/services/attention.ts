@@ -338,7 +338,8 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
 const EXPIRING_ATTENTION_TYPES = new Set<AttentionItem["type"]>([
   "Porter Visit Assigned", "Porter Visit Assignment Removed", "Porter Visit Schedule Changed",
   "Porter Route Changed", "Job Started", "Job Completed", "Labor Budget Update",
-  "Change Request Approved", "Change Request Declined", "Walkthrough Assigned",\n  "Upcoming Walkthrough", "Job Assigned", "Upcoming Job",
+  "Change Request Approved", "Change Request Declined", "Walkthrough Assigned",
+  "Upcoming Walkthrough", "Job Assigned", "Upcoming Job",
 ]);
 
 export function shouldRetainAttentionItem(entry: AttentionItem, now: Date): boolean {
