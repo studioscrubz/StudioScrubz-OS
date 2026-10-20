@@ -105,6 +105,28 @@ body {
   opacity: .8;
 }
 
+
+/* Shared workspace surface hierarchy: clearer panels without altering workflow layout. */
+.workspace-shell :is(section, article)[class*="rounded-"][class*="border"][class*="bg-white"],
+.workspace-shell :is(section, article)[class*="rounded-"][class*="border"][class*="bg-[#f"] {
+  border-color: color-mix(in srgb, var(--brand-green) 24%, var(--border));
+  box-shadow: 0 1px 3px rgb(13 43 18 / 7%);
+}
+.workspace-shell :is(section, article)[class*="rounded-"][class*="border"][class*="bg-white"] > :is(header, h2, h3):first-child {
+  border-color: var(--border);
+}
+.workspace-shell :is(input, select, textarea)[class*="border"] {
+  border-color: color-mix(in srgb, var(--brand-green) 24%, var(--border));
+}
+.workspace-shell :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 1px;
+}
+:root[data-theme="dark"] .workspace-shell :is(section, article)[class*="rounded-"][class*="border"] {
+  border-color: var(--border);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 16%);
+}
+
 @media (display-mode: standalone) and (max-width: 1023px) {
   .pwa-mobile-header {
     height: calc(4rem + env(safe-area-inset-top));
