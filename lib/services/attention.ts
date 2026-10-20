@@ -309,14 +309,14 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     if (invoice.due_date && invoice.due_date < today) items.push(item(`invoice:${invoice.id}:overdue`, "Overdue Invoice", "Urgent", "Invoices", "Invoice overdue", `${invoice.invoice_number} · ${money(invoice.balance_due)} outstanding · ${invoice.client_name || "Deleted Client"}${lastFollowup(communications, "invoice_id", invoice.id)}`, "Invoice", invoice.id, invoice.client_id, invoice.invoice_number, invoice.due_date, null, invoice.created_at, `/invoices?invoiceId=${invoice.id}`, "Open Invoice", reminderContext));
     else if (invoice.due_date && invoice.due_date <= inSeven) items.push(item(`invoice:${invoice.id}:due`, "Invoice Due Soon", "Info", "Invoices", "Invoice due soon", `${invoice.invoice_number} · ${money(invoice.balance_due)} outstanding · ${invoice.client_name || "Deleted Client"}${lastFollowup(communications, "invoice_id", invoice.id)}`, "Invoice", invoice.id, invoice.client_id, invoice.invoice_number, invoice.due_date, null, invoice.created_at, `/invoices?invoiceId=${invoice.id}`, "Open Invoice", reminderContext));
   }
-  for (const invoice of invoices.filter((row) => !row.archived_at && row.status === "Paid")) {
+  for (const invoice of invoices.filter((row) => !row.archived_at && row.status === "Paid" && Boolean(row.paid_at) && Date.parse(row.paid_at!) >= clock.now.getTime() - 5 * 24 * 60 * 60 * 1000)) {
     const clientName = displayName(invoice.client, invoice.client_name);
     const firstName = invoice.client?.first_name?.trim() || "there";
     const phone = invoice.client?.phone?.trim() || invoice.customer_phone?.trim() || null;
     const message = `Hi ${firstName}, thank you again for choosing StudioScrubz! We’d really appreciate it if you could take a moment to leave us a Google review: ${GOOGLE_REVIEW_URL}`;
     const review = item(`invoice:${invoice.id}:review-request`, "Review Request Ready", "Info", "Invoices", "Review Request Ready", `${clientName} — Invoice #${invoice.invoice_number} paid`, "Invoice", invoice.id, invoice.client_id, invoice.invoice_number, null, null, invoice.paid_at ?? invoice.updated_at, `/invoices?invoiceId=${invoice.id}`, "Open Invoice");
     review.snoozable = false;
-    review.dismissible = false;
+    review.dismissible = true;
     review.resolution_label = "MARK SENT";
     review.sms_action = { href: phone ? `sms:${encodeURIComponent(phone)}?body=${encodeURIComponent(message)}` : null, unavailable_reason: phone ? null : "No client phone number on file." };
     items.push(review);
@@ -339,6 +339,7 @@ const EXPIRING_ATTENTION_TYPES = new Set<AttentionItem["type"]>([
   "Porter Visit Assigned", "Porter Visit Assignment Removed", "Porter Visit Schedule Changed",
   "Porter Route Changed", "Job Started", "Job Completed", "Labor Budget Update",
   "Change Request Approved", "Change Request Declined", "Walkthrough Assigned",
+  "Review Request Ready",
   "Upcoming Walkthrough", "Job Assigned", "Upcoming Job",
 ]);
 
