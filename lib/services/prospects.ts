@@ -55,3 +55,14 @@ function prospectClient() { return getSupabaseClient() as unknown as { from: (ta
 
 export async function saveEnrichmentDecisions(runId:string,decisions:Array<{fieldId:string;decision:Exclude<EnrichmentDecision,"Pending">}>):Promise<void>{const{error}=await prospectClient().rpc("save_prospect_enrichment_decisions",{p_run_id:runId,p_decisions:decisions});if(error)throw new Error(error.message)}
 export async function getEnrichmentReview(runId:string):Promise<EnrichmentReviewItem[]>{const{data,error}=await prospectClient().rpc("get_prospect_enrichment_review",{p_run_id:runId});if(error)throw new Error(error.message);return groupEnrichmentReview(data as EnrichmentReviewItem[])}
+
+export type ProspectContactActivity = { id:string; prospect_id:string; activity_type:"Call"|"Email"|"Text"|"Meeting"|"Other"; outcome:string; actor_user_id:string; created_at:string };
+export async function getProspectContactActivities(prospectId:string):Promise<ProspectContactActivity[]>{
+  const {data,error}=await prospectClient().from("prospect_contact_activities").select("*").eq("prospect_id",prospectId).order("created_at",{ascending:false});
+  if(error)throw new Error(error.message);
+  return data as ProspectContactActivity[];
+}
+export async function createProspectContactActivity(prospectId:string,activityType:ProspectContactActivity["activity_type"],outcome:string):Promise<void>{
+  const {error}=await prospectClient().from("prospect_contact_activities").insert({prospect_id:prospectId,activity_type:activityType,outcome:outcome.trim()});
+  if(error)throw new Error(error.message);
+}
