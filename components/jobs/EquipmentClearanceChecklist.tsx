@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect,useState } from "react";
+import { getEquipmentCatalog } from "@/lib/services/equipmentAccountability";
 import { submitEquipmentClearance, type EquipmentCheckpoint, type EquipmentItem } from "@/lib/services/equipmentClearance";
 
 const BASE_ITEMS: { name: string; kind: EquipmentItem["kind"] }[] = [
@@ -16,6 +17,8 @@ export function EquipmentClearanceChecklist({ jobId, checkpoint, onSubmitted }: 
 }) {
   type DraftItem = Omit<EquipmentItem, "status"> & { status: EquipmentItem["status"] | "Pending" };
   const [items,setItems] = useState<DraftItem[]>(BASE_ITEMS.map(item => ({...item,status:"Pending"})));
+  const [catalogLoading,setCatalogLoading]=useState(true);
+  useEffect(()=>{let active=true;getEquipmentCatalog(jobId).then(rows=>{if(active)setItems(rows.map(row=>({name:row.item_name,kind:row.item_kind,status:"Pending"})))}).catch(()=>{if(active)setError("Unable to load the service-specific equipment checklist. Submission is disabled.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[jobId]);
   const [busy,setBusy] = useState(false);
   const [result,setResult] = useState<string | null>(null);
   const [error,setError] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export function EquipmentClearanceChecklist({ jobId, checkpoint, onSubmitted }: 
       </label>)}</div>
       {item.status==="Missing" && <textarea aria-label={item.name+" missing details"} className="mt-2 w-full rounded-lg border p-2 text-sm" value={item.description??""} disabled={busy || !!result} onChange={e => change(i,{description:e.target.value})} placeholder="What is missing? Last known location, who was notified…" />}
     </div>)}</div>
-    {!result && <button type="button" disabled={busy || items.some(i => !["Checked","Not Needed","Missing"].includes(i.status) || (i.status==="Missing" && !i.description?.trim()))} className="mt-3 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+    {!result && <button type="button" disabled={busy || catalogLoading || !!error || items.some(i => !["Checked","Not Needed","Missing"].includes(i.status) || (i.status==="Missing" && !i.description?.trim()))} className="mt-3 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
       onClick={async () => {setBusy(true);setError(null);try {const verified = items.filter((item): item is EquipmentItem => item.status !== "Pending");
         if (verified.length !== items.length) throw new Error("Verify every equipment item.");
         const id=await submitEquipmentClearance(jobId,checkpoint,verified);setResult(id);onSubmitted?.();} catch(e){setError(e instanceof Error?e.message:"Equipment clearance failed.");}finally{setBusy(false);}}}>{busy?"Submitting…":"Submit Equipment Clearance"}</button>}
