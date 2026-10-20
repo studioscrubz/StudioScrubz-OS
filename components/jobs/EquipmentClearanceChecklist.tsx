@@ -14,7 +14,7 @@ const BASE_ITEMS: { name: string; kind: EquipmentItem["kind"] }[] = [
 export function EquipmentClearanceChecklist({ jobId, checkpoint, onSubmitted }: {
   jobId: string; checkpoint: EquipmentCheckpoint; onSubmitted?: () => void;
 }) {
-  const [items,setItems] = useState<EquipmentItem[]>(BASE_ITEMS.map(item => ({...item,status:"Checked"})));
+  const [items,setItems] = useState<EquipmentItem[]>(BASE_ITEMS.map(item => ({...item,status:"Pending" as EquipmentItem["status"]})));
   const [busy,setBusy] = useState(false);
   const [result,setResult] = useState<string | null>(null);
   const [error,setError] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function EquipmentClearanceChecklist({ jobId, checkpoint, onSubmitted }: 
       </label>)}</div>
       {item.status==="Missing" && <textarea aria-label={item.name+" missing details"} className="mt-2 w-full rounded-lg border p-2 text-sm" value={item.description??""} disabled={busy || !!result} onChange={e => change(i,{description:e.target.value})} placeholder="What is missing? Last known location, who was notified…" />}
     </div>)}</div>
-    {!result && <button type="button" disabled={busy || items.some(i => i.status==="Missing" && !i.description?.trim())} className="mt-3 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+    {!result && <button type="button" disabled={busy || items.some(i => !["Checked","Not Needed","Missing"].includes(i.status) || (i.status==="Missing" && !i.description?.trim()))} className="mt-3 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
       onClick={async () => {setBusy(true);setError(null);try {const id=await submitEquipmentClearance(jobId,checkpoint,items);setResult(id);onSubmitted?.();} catch(e){setError(e instanceof Error?e.message:"Equipment clearance failed.");}finally{setBusy(false);}}}>{busy?"Submitting…":"Submit Equipment Clearance"}</button>}
     {result && <p role="status" className="mt-2 text-sm font-bold text-[#143d1a]">Checklist submitted. {items.some(i=>i.status==="Missing")?"Supervisor resolution is required before clearance.":"Equipment clearance complete."}</p>}
     {error && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{error}</p>}
