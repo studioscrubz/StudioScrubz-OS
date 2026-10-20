@@ -216,6 +216,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/lead-generator-applications", "jobApplications.manage"],
 
   ["/field-walkthroughs", "walkthroughs.field"],
+  ["/my-prospects", "prospects.view"],
   ["/prospects", "prospects.view"],
 
   ["/vendor-packets", "estimates.create"],
