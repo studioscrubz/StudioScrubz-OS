@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getJobEquipmentAssignments, setJobEquipmentResponsibility } from "@/lib/services/equipmentAccountability";
+import { getJobEquipmentAssignments, setJobEquipmentResponsibility, getEquipmentConfirmation, confirmEquipmentResponsibility } from "@/lib/services/equipmentAccountability";
 import type { EligibleJobTech } from "@/types/job";
 
 export function EquipmentAssignmentControl({
@@ -21,10 +21,12 @@ export function EquipmentAssignmentControl({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [confirmed,setConfirmed] = useState(false);
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getJobEquipmentAssignments(jobId).then(rows => {
+    Promise.all([getJobEquipmentAssignments(jobId),getEquipmentConfirmation(jobId)]).then(([rows,isConfirmed]) => {
+      if (active) setConfirmed(isConfirmed);
       if (!active) return;
       const ids = rows.map(row => row.employee_id);
       setSelected(ids);
@@ -56,10 +58,11 @@ export function EquipmentAssignmentControl({
       <button type="button" disabled={!dirty || saving || selected.length === 0} className="mt-2 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
         onClick={async () => { setSaving(true); setError(null); setNotice(null); try {
           await setJobEquipmentResponsibility(jobId,selected,reason);
-          setSaved([...selected]); setNotice("Equipment custodians saved."); setReason("");
+          setSaved([...selected]); setConfirmed(false); setNotice("Equipment custodians saved. Confirm assignments before starting the job."); setReason("");
         } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save equipment assignments."); }
         finally { setSaving(false); } }}>{saving ? "Saving…" : "Save Equipment Custodians"}</button>
     </>}
+    {canEdit && !loading && <button type="button" disabled={saving || disabled || dirty || confirmed} className="mt-2 ml-2 rounded-lg border border-[#143d1a] bg-white px-3 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50" onClick={async()=>{setSaving(true);setError(null);try{await confirmEquipmentResponsibility(jobId);setConfirmed(true);setNotice("Equipment responsibility confirmed for job start.");}catch(e){setError(e instanceof Error?e.message:"Confirmation failed.");}finally{setSaving(false);}}}>{confirmed?"Responsibility Confirmed":"Confirm Custodians / None"}</button>}
     {!canEdit && !loading && <p className="mt-2 text-xs text-neutral-600">Only the assigned Crew Lead or Master Admin can change custodians.</p>}
     {notice && <p role="status" className="mt-2 text-xs font-bold text-[#143d1a]">{notice}</p>}
     {error && <p role="alert" className="mt-2 text-xs font-bold text-red-700">{error}</p>}
