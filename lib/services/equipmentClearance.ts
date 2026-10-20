@@ -22,3 +22,15 @@ export async function submitEquipmentClearance(jobId: string, checkpoint: Equipm
   if (!data) throw new Error("Clearance confirmation was not returned.");
   return data;
 }
+
+export type PendingEquipmentSignout = { job_id: string; job_number: string };
+export async function getPendingEquipmentSignouts(): Promise<PendingEquipmentSignout[]> {
+  const rpcClient = getSupabaseClient() as unknown as {
+    rpc: (name: "get_my_pending_equipment_signouts") => Promise<{
+      data: PendingEquipmentSignout[] | null; error: { message: string } | null;
+    }>;
+  };
+  const { data, error } = await rpcClient.rpc("get_my_pending_equipment_signouts");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
