@@ -39,6 +39,8 @@ export const ATTENTION_REALTIME_TABLES = [
   "time_entries",
   "porter_notification_events",
   "job_labor_threshold_events",
+  "internal_schedule_events",
+  "internal_schedule_event_attendees",
 ] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
@@ -92,7 +94,15 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   ]);
   if (discoveries.error) throw discoveries.error;
   if (decisions.error) throw decisions.error;
-  const input: AttentionRuleInput = { porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const { data: eventRows, error: eventError } = profile.employee_id
+    ? await getSupabaseClient().from("internal_schedule_event_attendees").select("event_id,invited_at,event:internal_schedule_events(id,title,starts_at,location,status)").eq("employee_id", profile.employee_id)
+    : { data: [], error: null };
+  if (eventError) throw eventError;
+  const assignedEvents = (eventRows ?? []).flatMap((row) => {
+    const event = Array.isArray(row.event) ? row.event[0] : row.event;
+    return event && event.status === "Scheduled" ? [{ id: event.id, title: event.title, startsAt: event.starts_at, location: event.location, invitedAt: row.invited_at }] : [];
+  });
+  const input: AttentionRuleInput = { assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -103,6 +113,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 export type AssignedWalkthroughAttention = { id: string; employeeId: string; date: string; time: string | null };
 
 export type AttentionRuleInput = {
+  assignedEvents?: Array<{ id: string; title: string; startsAt: string; location: string | null; invitedAt: string }>;
   porterNotifications?: PorterNotificationEvent[];
   laborThresholdEvents?: JobLaborThresholdEvent[];
   fieldDiscoveries?: Pick<FieldDiscovery, "id" | "job_id" | "status" | "created_at">[];
@@ -133,6 +144,11 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  for (const event of input.assignedEvents ?? []) {
+    if (Date.parse(event.startsAt) < clock.now.getTime()) continue;
+    items.push(item(`internal-event:${event.id}:assigned`, "Event Invitation", "Attention", "Events", "Event Assigned", `${event.title} — ${new Date(event.startsAt).toLocaleString("en-US")}${event.location ? ` — ${event.location}` : ""}`, "Internal Event", event.id, null, event.title, event.startsAt, event.startsAt.slice(0, 10), event.invitedAt, "/schedule", "View Schedule"));
+  }
 
   for (const event of input.porterNotifications ?? []) {
     if (event.recipient_user_id !== profile.id || event.cancelled_at) continue;
