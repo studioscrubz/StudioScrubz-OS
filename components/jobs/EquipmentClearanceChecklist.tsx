@@ -16,7 +16,7 @@ export function EquipmentClearanceChecklist({ jobId, checkpoint, onSubmitted }: 
   jobId: string; checkpoint: EquipmentCheckpoint; onSubmitted?: () => void;
 }) {
   type DraftItem = Omit<EquipmentItem, "status"> & { status: EquipmentItem["status"] | "Pending" };
-  const [items,setItems] = useState<DraftItem[]>(BASE_ITEMS.map(item => ({...item,status:"Pending"})));
+  const [items,setItems] = useState<DraftItem[]>(BASE_ITEMS.map(item => ({...item,status:"Pending" as const})));
   const [catalogLoading,setCatalogLoading]=useState(true);
   useEffect(()=>{let active=true;getEquipmentCatalog(jobId).then(rows=>{if(active)setItems(rows.map(row=>({name:row.item_name,kind:row.item_kind,status:"Pending"})))}).catch(()=>{if(active)setError("Unable to load the service-specific equipment checklist. Submission is disabled.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[jobId]);
   const [busy,setBusy] = useState(false);
