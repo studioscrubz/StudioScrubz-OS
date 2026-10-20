@@ -238,7 +238,11 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     }
   }
 
-  for (const estimate of estimates.filter((row) => !row.archived_at && row.result.submission?.source === "Customer Self-Service")) {
+  const progressedEstimateIds = new Set([
+    ...walkthroughs.filter((row) => !row.archived_at).map((row) => row.estimate_id),
+    ...proposals.filter((row) => !row.archived_at).map((row) => row.estimate_id),
+  ].filter((id): id is string => Boolean(id)));
+  for (const estimate of estimates.filter((row) => !row.archived_at && !progressedEstimateIds.has(row.id) && row.result.submission?.source === "Customer Self-Service")) {
     const submission = estimate.result.submission!;
     const customer = estimate.division === "Commercial" && estimate.client?.company_name
       ? estimate.client.company_name
@@ -334,7 +338,7 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
 const EXPIRING_ATTENTION_TYPES = new Set<AttentionItem["type"]>([
   "Porter Visit Assigned", "Porter Visit Assignment Removed", "Porter Visit Schedule Changed",
   "Porter Route Changed", "Job Started", "Job Completed", "Labor Budget Update",
-  "Change Request Approved", "Change Request Declined",
+  "Change Request Approved", "Change Request Declined", "Walkthrough Assigned",\n  "Upcoming Walkthrough", "Job Assigned", "Upcoming Job",
 ]);
 
 export function shouldRetainAttentionItem(entry: AttentionItem, now: Date): boolean {
