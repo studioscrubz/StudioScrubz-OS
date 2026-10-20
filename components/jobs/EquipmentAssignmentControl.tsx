@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getJobEquipmentAssignments, setJobEquipmentResponsibility, getEquipmentConfirmation, confirmEquipmentResponsibility } from "@/lib/services/equipmentAccountability";
+import { getJobEquipmentAssignments, setJobEquipmentResponsibility, getEquipmentConfirmation, confirmEquipmentResponsibility, handoffJobEquipment } from "@/lib/services/equipmentAccountability";
 import type { EligibleJobTech } from "@/types/job";
 
 export function EquipmentAssignmentControl({
@@ -21,6 +21,9 @@ export function EquipmentAssignmentControl({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [handoffFrom,setHandoffFrom]=useState("");
+  const [handoffTo,setHandoffTo]=useState("");
+  const [handoffReason,setHandoffReason]=useState("");
   const [confirmed,setConfirmed] = useState(false);
   useEffect(() => {
     let active = true;
@@ -63,6 +66,13 @@ export function EquipmentAssignmentControl({
         finally { setSaving(false); } }}>{saving ? "Saving…" : "Save Equipment Custodians"}</button>
     </>}
     {canEdit && !loading && <button type="button" disabled={saving || disabled || dirty || confirmed} className="mt-2 ml-2 rounded-lg border border-[#143d1a] bg-white px-3 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50" onClick={async()=>{setSaving(true);setError(null);try{await confirmEquipmentResponsibility(jobId);setConfirmed(true);setNotice("Equipment responsibility confirmed for job start.");}catch(e){setError(e instanceof Error?e.message:"Confirmation failed.");}finally{setSaving(false);}}}>{confirmed?"Responsibility Confirmed":"Confirm Custodians / None"}</button>}
+    {canEdit && !loading && saved.length>0 && <div className="mt-3 rounded-lg border bg-white p-3">
+      <p className="text-sm font-bold">Document Equipment Handoff</p>
+      <select aria-label="Outgoing custodian" className="mt-2 w-full border p-2 text-sm" value={handoffFrom} onChange={e=>setHandoffFrom(e.target.value)}><option value="">Outgoing custodian</option>{options.filter(t=>saved.includes(t.employee_id)).map(t=><option key={t.employee_id} value={t.employee_id}>{t.display_name}</option>)}</select>
+      <select aria-label="Incoming custodian" className="mt-2 w-full border p-2 text-sm" value={handoffTo} onChange={e=>setHandoffTo(e.target.value)}><option value="">Incoming custodian</option>{options.filter(t=>t.employee_id!==handoffFrom).map(t=><option key={t.employee_id} value={t.employee_id}>{t.display_name}</option>)}</select>
+      <textarea aria-label="Equipment handoff reason" className="mt-2 w-full border p-2 text-sm" value={handoffReason} onChange={e=>setHandoffReason(e.target.value)} placeholder="Reason and equipment being transferred" />
+      <button type="button" disabled={saving || !handoffFrom || !handoffTo || !handoffReason.trim()} className="mt-2 rounded-lg bg-[#143d1a] px-3 py-2 text-xs font-bold text-white disabled:opacity-50" onClick={async()=>{setSaving(true);setError(null);try{await handoffJobEquipment(jobId,handoffFrom,handoffTo,handoffReason);const rows=await getJobEquipmentAssignments(jobId);const ids=rows.map(row=>row.employee_id);setSaved(ids);setSelected(ids);setConfirmed(false);setHandoffFrom("");setHandoffTo("");setHandoffReason("");setNotice("Handoff recorded. Incoming custodian must acknowledge; reconfirm before job start.");}catch(e){setError(e instanceof Error?e.message:"Handoff failed.");}finally{setSaving(false)}}}>Record Handoff</button>
+    </div>}
     {!canEdit && !loading && <p className="mt-2 text-xs text-neutral-600">Only the assigned Crew Lead or Master Admin can change custodians.</p>}
     {notice && <p role="status" className="mt-2 text-xs font-bold text-[#143d1a]">{notice}</p>}
     {error && <p role="alert" className="mt-2 text-xs font-bold text-red-700">{error}</p>}
