@@ -319,13 +319,29 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   }
   for (const communication of communications.filter((row) => row.status === "Failed" && !row.archived_at && !communications.some((retry) => retry.status === "Sent" && retry.metadata.retry_of_communication_id === row.id))) items.push(item(`communication:${communication.id}:failed`, "Failed Client Communication", "Urgent", "Communications", "Client communication failed", `${communication.communication_number} · ${communication.subject || communication.communication_type}`, "Communication", communication.id, communication.client_id, communication.communication_number, null, null, communication.created_at, communication.client_id ? `/clients?clientId=${communication.client_id}` : "/clients", "View Client", { clientId: communication.client_id, propertyId: communication.property_id, estimateId: communication.estimate_id, proposalId: communication.proposal_id, agreementId: communication.agreement_id, invoiceId: communication.invoice_id, communicationType: communication.communication_type, channel: communication.channel, clientName: "Client", recipientEmail: communication.recipient_email, recipientPhone: communication.recipient_phone, subject: communication.subject ?? "", messageBody: communication.message_body ?? "", sourceType: "Communication Retry", sourceId: communication.id, metadata: { retry_of_communication_id: communication.id } }));
   for (const entry of timeEntries.filter((row) => Boolean(row.job_id) && row.status === "Open" && !row.clock_out && !row.archived_at)) items.push(item(`time:${entry.id}:open`, "Open Time Entry", "Attention", "Time", "Job time entry is still open", `${entry.time_entry_number} · ${entry.employee ? [entry.employee.first_name, entry.employee.last_name].filter(Boolean).join(" ") : "Deleted Employee"}`, "Time Entry", entry.id, null, entry.time_entry_number, null, entry.work_date, entry.created_at, "/time-clock", "Open Job"));
-  const actionableKeys = new Set(items.map((entry) => entry.id));
+  // Informational notifications expire after five days. Outstanding tasks and
+  // follow-ups remain visible until the underlying work is resolved.
+  const retainedItems = items.filter((entry) => shouldRetainAttentionItem(entry, clock.now));
+  const actionableKeys = new Set(retainedItems.map((entry) => entry.id));
   const activeStates = states.filter((state) => actionableKeys.has(state.attention_key));
   const stateMap = new Map(activeStates.map((state) => [state.attention_key, state]));
-  const visible = items.map((entry) => ({ ...entry, attention_state: effectiveState(stateMap.get(entry.id), clock.now) }))
+  const visible = retainedItems.map((entry) => ({ ...entry, attention_state: effectiveState(stateMap.get(entry.id), clock.now) }))
     .filter((entry) => view === "All" || (view === "Active" ? !entry.attention_state : entry.attention_state?.state === view))
     .sort((a, b) => rank(a.severity) - rank(b.severity) || (a.due_date ?? a.scheduled_date ?? "9999").localeCompare(b.due_date ?? b.scheduled_date ?? "9999") || b.created_at.localeCompare(a.created_at));
   return { items: visible, allKeys: [...actionableKeys] };
+}
+
+const EXPIRING_ATTENTION_TYPES = new Set<AttentionItem["type"]>([
+  "Porter Visit Assigned", "Porter Visit Assignment Removed", "Porter Visit Schedule Changed",
+  "Porter Route Changed", "Job Started", "Job Completed", "Labor Budget Update",
+  "Change Request Approved", "Change Request Declined",
+]);
+
+export function shouldRetainAttentionItem(entry: AttentionItem, now: Date): boolean {
+  // Follow-ups and unresolved operational alerts never age out.
+  if (!EXPIRING_ATTENTION_TYPES.has(entry.type)) return true;
+  const created = Date.parse(entry.created_at);
+  return !Number.isFinite(created) || created >= now.getTime() - 5 * 24 * 60 * 60 * 1000;
 }
 
 export async function getAttentionSummary(): Promise<AttentionSummary> { const all = await getAttentionItems("All"), active = all.filter((item) => !item.attention_state); return { ...summarizeAttention(active), snoozed: all.filter((item) => item.attention_state?.state === "Snoozed").length }; }
