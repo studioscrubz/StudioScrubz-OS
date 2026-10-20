@@ -1,5 +1,5 @@
 begin;
-create table public.prospect_contact_activities (
+create table if not exists public.prospect_contact_activities (
  id uuid primary key default gen_random_uuid(),
  prospect_id uuid not null references public.prospects(id) on delete restrict,
  activity_type text not null check (activity_type in ('Call','Email','Text','Meeting','Other')),
@@ -7,11 +7,13 @@ create table public.prospect_contact_activities (
  actor_user_id uuid not null default auth.uid() references public.user_profiles(id),
  created_at timestamptz not null default now()
 );
-create index prospect_contact_activities_recent on public.prospect_contact_activities(prospect_id,created_at desc);
+create index if not exists prospect_contact_activities_recent on public.prospect_contact_activities(prospect_id,created_at desc);
 alter table public.prospect_contact_activities enable row level security;
+drop policy if exists "Authorized prospect contact activity read" on public.prospect_contact_activities;
 create policy "Authorized prospect contact activity read" on public.prospect_contact_activities for select to authenticated using (
  exists(select 1 from public.prospects p where p.id=prospect_id)
 );
+drop policy if exists "Authorized prospect contact activity create" on public.prospect_contact_activities;
 create policy "Authorized prospect contact activity create" on public.prospect_contact_activities for insert to authenticated with check (
  actor_user_id=(select auth.uid()) and exists(select 1 from public.prospects p where p.id=prospect_id)
 );
