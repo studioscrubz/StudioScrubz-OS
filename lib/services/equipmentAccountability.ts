@@ -23,7 +23,6 @@ export async function getJobEquipmentAssignments(jobId: string): Promise<Equipme
 }
 
 export async function setJobEquipmentResponsibility(jobId: string, employeeIds: string[], reason?: string): Promise<void> {
-  if (!employeeIds.length) throw new Error("Select at least one equipment custodian.");
   const { error } = await client().rpc("set_job_equipment_responsibility", {
     p_job_id: jobId,
     p_employee_ids: employeeIds,
