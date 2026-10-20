@@ -55,7 +55,7 @@ export function EquipmentAssignmentControl({
       </div>}
     {canEdit && !loading && !disabled && <>
       <input aria-label="Reason for equipment reassignment" className="mt-2 w-full rounded-lg border p-2 text-sm" placeholder="Reason for reassignment (optional)" value={reason} onChange={event => setReason(event.target.value)} />
-      <button type="button" disabled={!dirty || saving || selected.length === 0} className="mt-2 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+      <button type="button" disabled={!dirty || saving} className="mt-2 rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
         onClick={async () => { setSaving(true); setError(null); setNotice(null); try {
           await setJobEquipmentResponsibility(jobId,selected,reason);
           setSaved([...selected]); setConfirmed(false); setNotice("Equipment custodians saved. Confirm assignments before starting the job."); setReason("");
