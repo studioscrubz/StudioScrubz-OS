@@ -14,13 +14,13 @@ begin
   if v_session is null then raise exception 'An active work session is required for final equipment sign-out.'; end if;
  end if;
  if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'Complete the equipment checklist.'; end if;
- if exists(select 1 from jsonb_array_elements(p_items) x group by x->>'name' having count(*)>1) then raise exception 'Duplicate checklist items are not allowed.'; end if;
+ if exists(select 1 from jsonb_array_elements(p_items) as x(value) group by x.value->>'name' having count(*)>1) then raise exception 'Duplicate checklist items are not allowed.'; end if;
  select * into c from public.job_equipment_clearances where assignment_id=a.id and checkpoint=p_checkpoint and work_session_id is not distinct from v_session for update;
- if found and c.status='Cleared' then raise exception 'Equipment clearance is already complete.'; end if;
+ if found and c.submitted_at is not null then raise exception 'Equipment checkpoint already submitted; supervisor must resolve any missing items.'; end if;
  if found then
-   delete from public.job_equipment_exceptions where clearance_item_id in (select id from public.job_equipment_clearance_items where clearance_id=c.id) and resolved_at is not null;
+   -- Preserve resolved exception history; submitted checkpoints are immutable after an exception.
    if exists(select 1 from public.job_equipment_exceptions e join public.job_equipment_clearance_items i on i.id=e.clearance_item_id where i.clearance_id=c.id and e.resolved_at is null) then raise exception 'Missing equipment requires supervisor resolution before resubmission.'; end if;
-   delete from public.job_equipment_clearance_items where clearance_id=c.id;
+   if exists(select 1 from public.job_equipment_clearance_items where clearance_id=c.id) then raise exception 'A submitted equipment checkpoint cannot be overwritten.'; end if;
  else
    insert into public.job_equipment_clearances(assignment_id,job_id,employee_id,work_session_id,checkpoint) values(a.id,p_job_id,a.employee_id,v_session,p_checkpoint) returning * into c;
  end if;
