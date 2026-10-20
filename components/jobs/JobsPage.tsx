@@ -404,15 +404,15 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
   const lifecycleAct = (fn: () => Promise<unknown>, text: string, onSuccess?: () => void) => { setLifecycleError(null); act(fn, text, setLifecycleError, onSuccess); };
   const content = (
     <>
-    <div className="grid gap-4 text-left md:grid-cols-[7rem_minmax(0,1.4fr)_minmax(12rem,1fr)_auto] md:items-start">
+    <div className="grid gap-2 text-left sm:grid-cols-[6rem_minmax(0,1.4fr)_minmax(10rem,1fr)] lg:grid-cols-[6rem_minmax(0,1.4fr)_minmax(10rem,1fr)_auto] md:items-start">
       <div>
-        <p className="text-xl font-extrabold text-[#143d1a]">{formatJobTime(job.start_time)}</p>
+        <p className="text-base font-extrabold text-[#143d1a]">{formatJobTime(job.start_time)}</p>
         <p className="mt-1 text-xs font-bold text-neutral-500">{job.job_number}</p>
       </div>
       <div className="min-w-0">
         <p className="font-extrabold text-neutral-800">{job.client_name || "Unnamed client"}</p>
         <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
-        <p className="mt-2 text-sm font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
+        <p className="mt-1 text-xs font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
       </div>
       <div className="text-sm text-neutral-600">
         <p><span className="font-bold text-neutral-800">Assigned Worker:</span> {jobAssignmentLabel(job)}</p>
@@ -428,12 +428,12 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {job.status === "In Progress" && <JobCardActiveTime job={job} entries={timeEntries} />}
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
-    <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#143d1a]/15 pt-2">
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
-      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} w-full`}>START JOB</button>}
-      {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} w-full`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
+      {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} min-w-32`}>START JOB</button>}
+      {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} min-w-32`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
-      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} w-full`}>END JOB</button>}
+      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} min-w-32`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
@@ -442,7 +442,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
   );
   const card = job.status === "Completed"
     ? <JobInvoiceAction jobId={job.id}>{content}</JobInvoiceAction>
-    : <article className="mb-3 rounded-xl border border-neutral-100 bg-white p-4 shadow-sm">{content}</article>;
+    : <article className="mb-2 rounded-xl border-2 border-[#143d1a]/20 bg-white p-3 shadow-sm">{content}</article>;
   return <>
     {card}
     {showPresence && activeCrew && <CrewPresenceModal
@@ -1314,9 +1314,9 @@ function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: {
   }
   return <div className="space-y-2">
     <p className="text-sm font-bold text-[#143d1a]">{active ? "Mileage Tracking Active" : completed ? "GPS mileage saved" : "Automatic GPS mileage"}</p>
-    <p className="text-xs text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>
+    <p className="text-[11px] leading-snug text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>
     {!active && !completed && <>
-      {vehicles.length > 0 ? <label className="block text-sm">Vehicle<select className={input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">{management ? "Select active vehicle" : "Select assigned vehicle"}</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">{management ? "No active vehicle is available. Add or reactivate a vehicle before starting GPS mileage." : "No eligible active assigned vehicle. Contact management; manual mileage remains available separately."}</p>}
+      {vehicles.length > 0 ? <label className="block text-xs">Vehicle<select className={input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">{management ? "Select active vehicle" : "Select assigned vehicle"}</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">{management ? "No active vehicle is available. Add or reactivate a vehicle before starting GPS mileage." : "No eligible active assigned vehicle. Contact management; manual mileage remains available separately."}</p>}
       {!eligible && <p className="text-sm">On My Way requires an eligible scheduled Job and a valid client phone number.</p>}
     </>}
     {!completed && <button type="button" disabled={busy || !loaded || (!active && (!eligible || !vehicleId))} className={primary} onClick={() => void act()}>{busy ? "Saving / locating…" : active ? "ARRIVED" : "ON MY WAY"}</button>}
