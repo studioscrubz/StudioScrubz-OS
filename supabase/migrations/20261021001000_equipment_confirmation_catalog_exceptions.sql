@@ -94,7 +94,7 @@ insert into public.equipment_checklist_catalog(service_type,item_name,item_kind,
 on conflict(service_type,item_name) do nothing;
 create or replace function public.get_job_equipment_catalog(p_job_id uuid)
 returns table(item_name text,item_kind text) language sql security definer set search_path='' as $$
-select c.item_name,c.item_kind from public.equipment_checklist_catalog c join public.jobs j on j.id=p_job_id
+select c.item_name,c.item_kind from public.equipment_checklist_catalog c join public.jobs_operational_safe j on j.id=p_job_id
 where c.active and auth.uid() is not null
 and (c.service_type='General' or (coalesce(j.service_name,'') ilike '%pressure%' and c.service_type='Pressure Washing')
 or (coalesce(j.service_name,'') ilike '%construction%' and c.service_type='Post-Construction')
