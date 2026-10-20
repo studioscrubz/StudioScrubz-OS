@@ -19,7 +19,7 @@ const managementRoles = new Set(["Master Admin", "Administrator", "Manager"]);
 const inputClass = "w-full rounded-lg border border-[#143d1a]/15 bg-white px-3 py-2 text-sm text-neutral-800 outline-none focus:border-[#143d1a]";
 const emptyForm = (): ProspectInput => ({ company_name:"",contact_name:null,contact_title:null,contact_phone:null,contact_location:null,contact_linkedin:null,additional_contact_info:{},industry:null,company_type:null,website:null,business_email:null,business_phone:null,address:null,city:null,state:null,zip:null,territory:null,services:[],recurring_potential:false,estimated_value:null,source_type:"Manual",source_url:null,discovered_at:new Date().toISOString(),verified_at:null,verification_status:"Unverified",assigned_user_id:null,status:"New",next_action:null,next_follow_up_at:null,notes:null });
 
-export function ProspectsPage() {
+export function ProspectsPage({assignedOnly=false}:{assignedOnly?:boolean}) {
   const { profile } = useAuth();
   const canManageAll = managementRoles.has(profile?.role ?? "");
   const [rows,setRows]=useState<Prospect[]>([]), [assignees,setAssignees]=useState<ProspectAssignee[]>([]), [events,setEvents]=useState<ProspectEvent[]>([]);
@@ -27,13 +27,13 @@ export function ProspectsPage() {
   const [search,setSearch]=useState(""), [status,setStatus]=useState("All"), [territory,setTerritory]=useState("All"), [assignee,setAssignee]=useState("All"), [error,setError]=useState<string|null>(null);
   const [updatingCsv,setUpdatingCsv]=useState(false);
   const [form,setForm]=useState<ProspectInput>(emptyForm),  [importing,setImporting]=useState(false), [discovering,setDiscovering]=useState(false), [merging,setMerging]=useState(false);
-  const selected=rows.find(row=>row.id===selectedId)??null;
+  const selected=rows.find(row=>row.id===selectedId&&(!assignedOnly||row.assigned_user_id===profile?.id))??null;
 
-  async function load() { setLoading(true); setError(null); try { const [prospects,nextAssignees]=await Promise.all([getProspects(),canManageAll?getProspectAssignees():Promise.resolve(profile?[{id:profile.id,display_name:profile.display_name||profile.email||"Sales User"}]:[])]); setRows(prospects);setAssignees(nextAssignees);setSelectedId(current=>current&&prospects.some(row=>row.id===current)?current:null); } catch(cause){setError(message(cause));} finally{setLoading(false);} }
+  async function load() { setLoading(true); setError(null); try { const [prospects,nextAssignees]=await Promise.all([getProspects(),canManageAll?getProspectAssignees():Promise.resolve(profile?[{id:profile.id,display_name:profile.display_name||profile.email||"Sales User"}]:[])]); setRows(prospects);setAssignees(nextAssignees);setSelectedId(current=>current&&prospects.some(row=>row.id===current&&(!assignedOnly||row.assigned_user_id===profile?.id))?current:null); } catch(cause){setError(message(cause));} finally{setLoading(false);} }
   useEffect(()=>{queueMicrotask(()=>void load());},[]); // RLS remains the source of truth; route access already requires an active profile.
   useEffect(()=>{if(!selectedId){queueMicrotask(()=>setEvents([]));return;}void getProspectEvents(selectedId).then(setEvents).catch(cause=>setError(message(cause)));},[selectedId,rows]);
 
-  const activeRows=useMemo(()=>rows.filter(row=>!row.merged_into_prospect_id),[rows]);
+  const activeRows=useMemo(()=>rows.filter(row=>!row.merged_into_prospect_id&&(!assignedOnly||row.assigned_user_id===profile?.id)),[rows,assignedOnly,profile?.id]);
   const visible=useMemo(()=>activeRows.filter(row=>{const term=search.trim().toLocaleLowerCase();const haystack=[row.company_name,row.contact_name,row.contact_title,row.contact_phone,row.industry,row.company_type,row.website,row.business_email,row.business_phone,row.city,row.state,row.territory].filter(Boolean).join(" ").toLocaleLowerCase();return(!term||haystack.includes(term))&&(status==="All"||row.status===status)&&(territory==="All"||row.territory===territory)&&(assignee==="All"||row.assigned_user_id===assignee);}),[activeRows,search,status,territory,assignee]);
   const industryGroups=useMemo(()=>{const groups=new Map<string,{label:string;rows:Prospect[]}>();for(const row of visible){const label=row.industry?.trim()||"Uncategorized";const key=label.toLocaleLowerCase();const group=groups.get(key);if(group)group.rows.push(row);else groups.set(key,{label,rows:[row]});}return Array.from(groups.values()).sort((a,b)=>a.label.localeCompare(b.label));},[visible]);
   const territories=Array.from(new Set(rows.map(row=>row.territory).filter((value):value is string=>Boolean(value)))).sort();
@@ -85,7 +85,7 @@ export function ProspectsPage() {
     <header className="relative overflow-hidden rounded-2xl bg-[#143d1a] px-5 py-7 text-white shadow-lg shadow-[#143d1a]/10 sm:px-8 sm:py-9">
       <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" aria-hidden="true" />
       <div className="relative flex flex-wrap items-end justify-between gap-6">
-        <div><p className="text-[11px] font-extrabold uppercase tracking-[.22em] text-[#e4c86d]">Sales workspace / Prospect management</p><h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Prospect Engine</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/75">Organize business opportunities by industry, track qualifications, and manage follow-ups without automated outreach.</p></div>
+        <div><p className="text-[11px] font-extrabold uppercase tracking-[.22em] text-[#e4c86d]">Sales workspace / Prospect management</p><h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">{assignedOnly?"My Prospects":"Prospect Engine"}</h1><p className="mt-2 max-w-xl text-sm leading-6 text-white/75">{assignedOnly?"Your assigned prospects, contact history, and follow-ups in one place.":"Organize business opportunities by industry, track qualifications, and manage follow-ups without automated outreach."}</p></div>
         <div className="flex flex-wrap gap-2">
           {canManageAll&&<button type="button" onClick={openCreate} className="rounded-lg bg-[#d4af37] px-4 py-2.5 text-sm font-extrabold text-[#143d1a] transition hover:bg-[#ebca61]">+ New prospect</button>}
           <button type="button" onClick={()=>setImporting(true)} className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20">Import CSV</button>
