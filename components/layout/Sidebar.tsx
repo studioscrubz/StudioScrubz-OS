@@ -188,6 +188,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
       {
 
+        label: "My Prospects",
+
+        href: "/my-prospects",
+
+        marker: "M",
+
+        permission: "prospects.view",
+
+      },
+
+      {
+
         label: "Prospects",
 
         href: "/prospects",
