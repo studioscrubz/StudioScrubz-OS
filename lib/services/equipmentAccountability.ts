@@ -46,3 +46,8 @@ export const confirmEquipmentResponsibility = (jobId:string) => equipmentRpc<voi
 export const getEquipmentExceptions = (jobId:string) => equipmentRpc<EquipmentException[]>("get_open_job_equipment_exceptions",{p_job_id:jobId});
 export const resolveEquipmentException = (id:string,resolution:string) => equipmentRpc<void>("resolve_job_equipment_exception",{p_exception_id:id,p_resolution:resolution});
 export const getEquipmentCatalog = (jobId:string) => equipmentRpc<EquipmentCatalogItem[]>("get_job_equipment_catalog",{p_job_id:jobId});
+
+export type EquipmentNotification = {id:string;job_id:string;event_type:string;created_at:string;details:{handoff?:string}};
+export const handoffJobEquipment = (jobId:string,fromId:string,toId:string,reason:string) => equipmentRpc<string>("handoff_job_equipment",{p_job_id:jobId,p_from_employee_id:fromId,p_to_employee_id:toId,p_reason:reason});
+export const getMyEquipmentNotifications = () => equipmentRpc<EquipmentNotification[]>("get_my_equipment_notifications");
+export const acknowledgeEquipmentHandoff = (id:string) => equipmentRpc<void>("acknowledge_equipment_handoff",{p_handoff_id:id});
