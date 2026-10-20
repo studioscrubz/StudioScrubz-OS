@@ -36,7 +36,16 @@ export function ProspectsPage() {
   const visible=useMemo(()=>activeRows.filter(row=>{const term=search.trim().toLocaleLowerCase();const haystack=[row.company_name,row.contact_name,row.contact_title,row.contact_phone,row.industry,row.company_type,row.website,row.business_email,row.business_phone,row.city,row.state,row.territory].filter(Boolean).join(" ").toLocaleLowerCase();return(!term||haystack.includes(term))&&(status==="All"||row.status===status)&&(territory==="All"||row.territory===territory)&&(assignee==="All"||row.assigned_user_id===assignee);}),[activeRows,search,status,territory,assignee]);
   const industryGroups=useMemo(()=>{const groups=new Map<string,{label:string;rows:Prospect[]}>();for(const row of visible){const label=row.industry?.trim()||"Uncategorized";const key=label.toLocaleLowerCase();const group=groups.get(key);if(group)group.rows.push(row);else groups.set(key,{label,rows:[row]});}return Array.from(groups.values()).sort((a,b)=>a.label.localeCompare(b.label));},[visible]);
   const territories=Array.from(new Set(rows.map(row=>row.territory).filter((value):value is string=>Boolean(value)))).sort();
-  const due=rows.filter(row=>row.next_follow_up_at&&new Date(row.next_follow_up_at)<=new Date()&&row.status!=="Disqualified").length;
+  const due=activeRows.filter(row=>row.next_follow_up_at&&new Date(row.next_follow_up_at)<=new Date()&&row.status!=="Disqualified").length;
+  const followUpGroups=useMemo(()=>{
+    const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate()),end=new Date(start);end.setDate(end.getDate()+1);
+    const pending=activeRows.filter(row=>row.next_follow_up_at&&row.status!=="Disqualified").sort((a,b)=>new Date(a.next_follow_up_at!).getTime()-new Date(b.next_follow_up_at!).getTime());
+    return [
+      {label:"Overdue",items:pending.filter(row=>new Date(row.next_follow_up_at!)<start)},
+      {label:"Today",items:pending.filter(row=>new Date(row.next_follow_up_at!)>=start&&new Date(row.next_follow_up_at!)<end)},
+      {label:"Upcoming",items:pending.filter(row=>new Date(row.next_follow_up_at!)>=end)}
+    ];
+  },[activeRows]);
   const preview=calculateProspectScore({territory:form.territory,industry:form.industry,recurringPotential:form.recurring_potential,verificationStatus:form.verification_status,email:form.business_email,phone:form.business_phone,estimatedValue:form.estimated_value,discoveredAt:form.discovered_at});
 
   async function exportSignedUpdate(){try{setError(null);const response=await fetch("/api/prospects/signed-export");if(!response.ok){const detail=await response.json();throw Error(detail.error||"Export failed");}const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="StudioScrubz_Prospects_Update_"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(cause){setError(message(cause));}}
@@ -89,6 +98,15 @@ export function ProspectsPage() {
     <section aria-label="Prospect overview" className="space-y-3">
       <div className="flex items-center gap-3"><span className="h-5 w-1 rounded-full bg-[#d4af37]" /><h2 className="text-base font-extrabold text-[#143d1a]">Pipeline overview</h2></div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[["Visible prospects",activeRows.length,"All active records"],["New",activeRows.filter(r=>r.status==="New").length,"Awaiting review"],["Qualified",activeRows.filter(r=>r.status==="Qualified").length,"Ready for next steps"],["Follow-up due",due,"Needs attention"]].map(([label,value,description],index)=><div key={label} className={`relative overflow-hidden rounded-2xl border bg-white px-5 py-5 shadow-sm ${index===3?"border-[#d4af37]/50":"border-[#143d1a]/10"}`}><span className={`absolute left-0 top-0 h-full w-1 ${index===3?"bg-[#d4af37]":"bg-[#143d1a]"}`}/><p className="text-xs font-extrabold uppercase tracking-wider text-neutral-500">{label}</p><p className="mt-2 text-3xl font-extrabold tabular-nums text-[#143d1a]">{value}</p><p className="mt-1 text-xs text-neutral-500">{description}</p></div>)}</div>
+    </section>
+    <section aria-label="Sales follow-up queue" className="space-y-3">
+      <div className="flex items-center gap-3"><span className="h-5 w-1 rounded-full bg-[#d4af37]"/><h2 className="text-base font-extrabold text-[#143d1a]">Follow-up queue</h2></div>
+      <div className="grid gap-3 lg:grid-cols-3">{followUpGroups.map(group=><div key={group.label} className="rounded-xl border border-[#143d1a]/10 bg-white p-4 shadow-sm">
+        <h3 className="flex items-center justify-between font-extrabold text-[#143d1a]">{group.label}<span className="rounded-full bg-[#edf4ec] px-2 py-1 text-xs">{group.items.length}</span></h3>
+        <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">{group.items.slice(0,30).map(row=><button type="button" key={row.id} onClick={()=>{setEditing(false);setSelectedId(row.id);}} className="w-full rounded-lg border border-neutral-200 p-3 text-left hover:bg-[#edf4ec] focus-visible:outline-2 focus-visible:outline-[#143d1a]">
+          <p className="text-sm font-bold text-[#143d1a]">{row.company_name}</p><p className="mt-1 text-xs text-neutral-600">{row.next_action||"Follow up"}</p><p className="mt-1 text-xs text-neutral-500">{new Date(row.next_follow_up_at!).toLocaleString()}</p>
+        </button>)}{group.items.length>30&&<p className="text-xs text-neutral-500">Showing first 30 of {group.items.length}.</p>}{group.items.length===0&&<p className="text-xs text-neutral-500">No follow-ups.</p>}</div>
+      </div>)}</div>
     </section>
     <section aria-label="Prospect filters" className="space-y-4 rounded-2xl border border-[#143d1a]/10 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-extrabold text-[#143d1a]">Find prospects</h2><p className="mt-1 text-xs text-neutral-500">Search or narrow your pipeline before browsing industries.</p></div><span className="rounded-full bg-[#edf4ec] px-3 py-1 text-xs font-extrabold text-[#143d1a]">{visible.length} matching</span></div>
