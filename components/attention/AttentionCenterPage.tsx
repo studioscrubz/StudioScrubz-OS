@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { dismissAttentionItem, getAttentionItems, restoreAttentionItem, snoozeAttentionItem, summarizeAttention } from "@/lib/services/attention";
+import { deleteAttentionItems, dismissAttentionItem, getAttentionItems, restoreAttentionItem, snoozeAttentionItem, summarizeAttention } from "@/lib/services/attention";
 import { ATTENTION_CATEGORIES, ATTENTION_SEVERITIES, type AttentionCategory, type AttentionItem, type AttentionSeverity, type AttentionView } from "@/types/attention";
 import { LogCommunicationModal } from "@/components/communications/LogCommunicationModal";
 import { useAttentionRefresh } from "@/components/attention/useAttentionRefresh";
@@ -28,23 +28,22 @@ export function AttentionCenterPage() {
   const selectedVisible = selectable.filter((entry) => selected.includes(entry.id));
   async function dismissSelected() {
     if (!selectedVisible.length || bulkBusy) return;
-    if (!window.confirm(`Clear ${selectedVisible.length} selected notification(s) from the active list? This does not delete their underlying jobs, invoices, or follow-ups. Already-dismissed notifications remain dismissed.`)) return;
+    if (!window.confirm(`Permanently remove ${selectedVisible.length} notification(s) from your Attention Center? Business records and outstanding follow-up tasks will not be deleted.`)) return;
     setBulkBusy(true); setError(null);
-    const failures: string[] = [];
-    for (const entry of selectedVisible) {
-      try { if (entry.attention_state?.state !== "Dismissed") await dismissAttentionItem(entry.id); }
-      catch { failures.push(entry.title); }
-    }
-    try { await load(); } catch { setError("Notifications could not be refreshed."); }
-    if (failures.length) setError(`${failures.length} notification(s) could not be dismissed. Please retry.`);
-    setBulkBusy(false);
+    try {
+      await deleteAttentionItems(selectedVisible.map((entry) => entry.id));
+      setSelected([]);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Notifications could not be deleted.");
+    } finally { setBulkBusy(false); }
   }
   function snooze(entry: AttentionItem) { const choice = window.prompt("Snooze for: 1 hour, Tomorrow, 3 days, 1 week, or enter a date/time", "Tomorrow"); if (!choice) return; const until = snoozeDate(choice); if (!until) { setError("Enter 1 hour, Tomorrow, 3 days, 1 week, or a valid date/time."); return; } void change(entry.id, () => snoozeAttentionItem(entry.id, until)); }
   return <>
     <header className="border-b border-[#143d1a]/10 pb-7"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#9a7a17]">Operations workspace</p><h1 className="text-3xl font-extrabold tracking-[-.04em] text-[#143d1a] sm:text-4xl">Attention Center</h1><p className="mt-3 max-w-2xl text-neutral-600">Review operational items that need follow-up across StudioScrubz OS.</p></header>
     <section className="mt-7 grid grid-cols-2 gap-4 xl:grid-cols-4"><Metric label="Urgent" value={summary.urgent} tone="red"/><Metric label="Needs Attention" value={summary.attention} tone="amber"/><Metric label="Upcoming" value={summary.info} tone="green"/><Metric label="Total Open" value={summary.total} tone="neutral"/></section>
     <section className="mt-6 grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-3"><select className={selectClass} value={view} onChange={(e) => setView(e.target.value as AttentionView)}>{(["Active", "Snoozed", "Dismissed", "All"] as AttentionView[]).map((value) => <option key={value}>{value}</option>)}</select><select className={selectClass} value={severity} onChange={(e) => setSeverity(e.target.value as typeof severity)}><option>All</option>{ATTENTION_SEVERITIES.map((value) => <option key={value}>{value}</option>)}</select><select className={selectClass} value={category} onChange={(e) => setCategory(e.target.value as typeof category)}><option>All</option>{ATTENTION_CATEGORIES.map((value) => <option key={value}>{value}</option>)}</select></section>
-    {!loading && <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border-2 border-[#143d1a]/20 bg-[#f3f7f1] px-3 py-2 text-sm"><button type="button" disabled={bulkBusy || selectable.length === 0} aria-pressed={selectable.length > 0 && selectedVisible.length === selectable.length} onClick={() => setSelected(selectedVisible.length === selectable.length ? [] : selectable.map((entry) => entry.id))} className="rounded-lg border-2 border-[#143d1a] bg-white px-3 py-2 font-bold text-[#143d1a] disabled:opacity-50">{selectable.length > 0 && selectedVisible.length === selectable.length ? "Deselect All" : `Select All (${selectable.length})`}</button><span className="text-neutral-600">{selectedVisible.length} selected</span><button type="button" disabled={!selectedVisible.length || bulkBusy} onClick={() => void dismissSelected()} className="rounded-lg bg-[#143d1a] px-3 py-2 font-bold text-white disabled:opacity-50">{bulkBusy ? "Clearing…" : `Clear Selected (${selectedVisible.length})`}</button></div>}
+    {!loading && <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border-2 border-[#143d1a]/20 bg-[#f3f7f1] px-3 py-2 text-sm"><button type="button" disabled={bulkBusy || selectable.length === 0} aria-pressed={selectable.length > 0 && selectedVisible.length === selectable.length} onClick={() => setSelected(selectedVisible.length === selectable.length ? [] : selectable.map((entry) => entry.id))} className="rounded-lg border-2 border-[#143d1a] bg-white px-3 py-2 font-bold text-[#143d1a] disabled:opacity-50">{selectable.length > 0 && selectedVisible.length === selectable.length ? "Deselect All" : `Select All (${selectable.length})`}</button><span className="text-neutral-600">{selectedVisible.length} selected</span><button type="button" disabled={!selectedVisible.length || bulkBusy} onClick={() => void dismissSelected()} className="rounded-lg bg-[#143d1a] px-3 py-2 font-bold text-white disabled:opacity-50">{bulkBusy ? "Deleting…" : `Delete Selected (${selectedVisible.length})`}</button></div>}
     {error && <div role="alert" className="mt-6 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700"><span>{error}</span><button className="rounded-lg border border-red-200 px-3 py-2" onClick={() => void load()}>Retry</button></div>}
     {loading ? <div className="mt-6 space-y-3" aria-label="Loading attention items"><p className="text-sm font-semibold text-neutral-500">Loading attention items…</p><div className="h-28 animate-pulse rounded-2xl bg-neutral-100"/><div className="h-28 animate-pulse rounded-2xl bg-neutral-100"/></div>
       : shown.length === 0 ? <div className="mt-6 grid min-h-64 place-items-center rounded-2xl border bg-white p-8 text-center"><div><h2 className="font-extrabold text-[#143d1a]">No items need attention.</h2><p className="mt-2 text-sm text-neutral-500">Resolved items disappear automatically as operational records are updated.</p></div></div>
