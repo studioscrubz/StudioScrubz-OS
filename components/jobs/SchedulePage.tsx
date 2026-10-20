@@ -419,22 +419,22 @@ export function SchedulePage() {
           ))}
         </div>
         {view !== "List" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              className={secondary}
+              className="rounded-md border border-[#143d1a]/25 bg-white px-2.5 py-1.5 text-xs font-bold leading-tight text-[#143d1a] shadow-sm hover:bg-[#f3f7f1] sm:px-3"
               onClick={() => move(-1)}
             >
               Previous{view === "Week" ? " Week" : view === "Month" ? " Month" : ""}
             </button>
             <button
               type="button"
-              className={secondary}
+              className="rounded-md border border-[#143d1a]/25 bg-white px-2.5 py-1.5 text-xs font-bold leading-tight text-[#143d1a] shadow-sm hover:bg-[#f3f7f1] sm:px-3"
               onClick={() => setSelectedDate(today())}
             >
               {view === "Week" ? "This Week" : view === "Month" ? "This Month" : "Today"}
             </button>
-            <button type="button" className={secondary} onClick={() => move(1)}>
+            <button type="button" className="rounded-md border border-[#143d1a]/25 bg-white px-2.5 py-1.5 text-xs font-bold leading-tight text-[#143d1a] shadow-sm hover:bg-[#f3f7f1] sm:px-3" onClick={() => move(1)}>
               Next{view === "Week" ? " Week" : view === "Month" ? " Month" : ""}
             </button>
           </div>
