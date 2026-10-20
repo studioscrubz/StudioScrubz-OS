@@ -34,6 +34,7 @@ import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
+import { EquipmentExceptionResolution } from "@/components/jobs/EquipmentExceptionResolution";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
 import { getAuthorizedVehicles } from "@/lib/services/vehicles";
 import { getCurrentPosition } from "@/lib/geo/currentPosition";
@@ -440,6 +441,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
       {job.assigned_crew_id && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
       {job.status === "In Progress" && currentEntry && <div className="w-full"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job" /></div>}
+      {["Master Admin","Administrator","Manager"].includes(role ?? "") && job.status === "In Progress" && <div className="w-full"><EquipmentExceptionResolution jobId={job.id} /></div>}
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
     </div>
     </>
