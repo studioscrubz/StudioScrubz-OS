@@ -150,19 +150,19 @@ const navItems: Array<NavLink | NavGroup> = [
 
       },
 
-      {
-
-        label: "Walkthroughs",
-
-        href: "/field-walkthroughs",
-
-        marker: "W",
-
-        permission: "walkthroughs.field",
-
-      },
-
     ],
+
+  },
+
+  {
+
+    label: "Walkthroughs",
+
+    href: "/field-walkthroughs",
+
+    marker: "W",
+
+    permission: "walkthroughs.field",
 
   },
 
