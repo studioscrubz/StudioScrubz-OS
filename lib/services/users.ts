@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type { UserProfile, UserProfileInput } from "@/types/auth";
+import { invalidateAuthIdentityCache } from "@/lib/services/auth";
 
 export async function getUserProfiles(): Promise<UserProfile[]> {
   const { data, error } = await getSupabaseClient().from("user_profiles").select("*").order("created_at", { ascending: false });
@@ -17,6 +18,7 @@ export async function createUserProfile(input: UserProfileInput): Promise<UserPr
     p_is_active: input.is_active,
   });
   if (error) throw new Error(profileError(error.message));
+  invalidateAuthIdentityCache();
   return data;
 }
 
@@ -29,12 +31,14 @@ export async function updateUserProfile(id: string, input: Omit<UserProfileInput
     p_is_active: input.is_active,
   });
   if (error) throw new Error(profileError(error.message));
+  invalidateAuthIdentityCache();
   return data;
 }
 
 export async function setUserActive(id: string, isActive: boolean): Promise<UserProfile> {
   const { data, error } = await getSupabaseClient().rpc("admin_set_user_active", { p_profile_id: id, p_is_active: isActive });
   if (error) throw new Error(profileError(error.message));
+  invalidateAuthIdentityCache();
   return data;
 }
 

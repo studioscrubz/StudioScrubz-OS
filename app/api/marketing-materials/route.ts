@@ -6,6 +6,18 @@ class InputError extends Error{}
 export async function GET(request:Request){
  try{
   const{session,canManage}=await authorized();
+  const url=new URL(request.url),assetIdentifier=url.searchParams.get("asset"),assetMode=url.searchParams.get("mode");
+  if(assetIdentifier){
+   if(!SLUG.test(assetIdentifier)||!new Set(["preview","download"]).has(assetMode??""))throw new InputError("Select a valid material asset action.");
+   const material=await session.from("marketing_materials").select("identifier,current_version,is_active").eq("identifier",assetIdentifier).maybeSingle();
+   if(material.error||!material.data)throw new InputError("Marketing material not found.");
+   if(!material.data.is_active&&!canManage)throw forbidden();
+   const version=await session.from("marketing_material_versions").select("storage_path,original_filename").eq("material_identifier",assetIdentifier).eq("version",material.data.current_version).maybeSingle();
+   if(version.error||!version.data)throw new InputError("Marketing material version not found.");
+   const signed=await session.storage.from(BUCKET).createSignedUrl(version.data.storage_path,3600,assetMode==="download"?{download:version.data.original_filename}:undefined);
+   if(signed.error)throw signed.error;
+   return new Response(null,{status:307,headers:{Location:signed.data.signedUrl,"Cache-Control":"private, no-store"}});
+  }
   const[{data:materials,error:me},{data:versions,error:ve},{data:deliveries,error:de}]=await Promise.all([
    session.from("marketing_materials").select("*").order("title"),
    session.from("marketing_material_versions").select("*"),
@@ -16,12 +28,10 @@ export async function GET(request:Request){
   for(const material of (materials??[])as MarketingMaterial[]){
    const current=versionRows.find(row=>row.material_identifier===material.identifier&&row.version===material.current_version);
    if(!current)continue;
-   const preview=await session.storage.from(BUCKET).createSignedUrl(current.storage_path,900);
-   const download=await session.storage.from(BUCKET).createSignedUrl(current.storage_path,900,{download:current.original_filename});
-   if(preview.error||download.error)throw preview.error||download.error;
-   catalog.push({...material,current,preview_url:preview.data.signedUrl,download_url:download.data.signedUrl});
+   const assetBase=`/api/marketing-materials?asset=${encodeURIComponent(material.identifier)}`;
+   catalog.push({...material,current,preview_url:`${assetBase}&mode=preview`,download_url:`${assetBase}&mode=download`});
   }
-  const email=new URL(request.url).searchParams.get("recipientEmail")?.trim().toLowerCase();
+  const email=url.searchParams.get("recipientEmail")?.trim().toLowerCase();
   if(email){
    if(!EMAIL.test(email))return Response.json({materials:catalog,deliveries:[],canManage},{headers:{"Cache-Control":"private, no-store"}});
    const history=await session.from("marketing_material_deliveries").select("*").eq("recipient_email",email).eq("recipient_kind","New Prospect").eq("status","Sent").order("sent_at",{ascending:false});

@@ -17,9 +17,16 @@ export function useAttentionRefresh(refresh: () => void | Promise<void>, extraTa
     return () => window.removeEventListener(ATTENTION_REFRESH_EVENT, handleRefresh);
   }, []);
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
       void Promise.resolve(refreshRef.current()).catch((error: unknown) => console.error("Timed Attention refresh failed", error));
-    }, 60_000);
-    return () => window.clearInterval(timer);
+    };
+    const timer = window.setInterval(() => {
+      refreshIfVisible();
+    // Realtime and explicit mutation events remain immediate. This is only a
+    // resilience fallback for missed websocket events.
+    }, 5 * 60_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refreshIfVisible); };
   }, []);
 }

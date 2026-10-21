@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { getCurrentProfile, signOut as signOutService } from "@/lib/services/auth";
+import { getCurrentProfile, invalidateAuthIdentityCache, seedCurrentProfile, signOut as signOutService } from "@/lib/services/auth";
 import type { AuthState, UserProfile } from "@/types/auth";
 import type { Session } from "@supabase/supabase-js";
 import { hasPermission, permissionForPath } from "@/lib/auth/permissions";
@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const commitProfile = useCallback((nextProfile: UserProfile | null) => {
     if (!nextProfile || nextProfile.id !== profileRef.current?.id) void clearAppNotificationBadge();
     profileRef.current = nextProfile;
+    seedCurrentProfile(nextProfile);
     setProfile(nextProfile);
   }, []);
   const resolveProfile = useCallback(async (nextSession: Session, showLoading: boolean) => {
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.setTimeout(() => {
         if (event === "INITIAL_SESSION") return;
         if (event === "SIGNED_OUT" || !nextSession?.user) {
+          invalidateAuthIdentityCache();
           resolutionRef.current += 1; userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); return;
         }
         const sameUser = userIdRef.current === nextSession.user.id;
@@ -67,11 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userIdRef.current = nextSession.user.id; setSession(nextSession); return;
         }
         if (event === "USER_UPDATED") {
+          invalidateAuthIdentityCache();
           if (sameUser && profileRef.current) { setSession(nextSession); void resolveProfile(nextSession, false); }
           else void resolveProfile(nextSession, true);
           return;
         }
         if (event === "SIGNED_IN" || event === "MFA_CHALLENGE_VERIFIED") {
+          if (!sameUser) invalidateAuthIdentityCache();
           if (sameUser && profileRef.current) { setSession(nextSession); return; }
           void resolveProfile(nextSession, true);
         }
@@ -79,6 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => data.subscription.unsubscribe();
   }, [commitProfile, resolveProfile]);
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+    const client = getSupabaseClient();
+    const channel = client.channel(`identity-profile-${userId}`).on("postgres_changes", { event: "UPDATE", schema: "public", table: "user_profiles", filter: `id=eq.${userId}` }, () => {
+      invalidateAuthIdentityCache();
+      void resolveProfile(session, false);
+    }).subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") console.error(`Identity profile realtime status: ${status}`);
+    });
+    return () => { void client.removeChannel(channel); };
+  }, [resolveProfile, session]);
   async function refreshProfile() { if (session?.user) await resolveProfile(session, false); }
   async function logout() { await signOutService(); resolutionRef.current += 1; userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); }
   const value: AuthContextValue = { session, user: session?.user ?? null, profile, loading, error, refreshProfile, signOut: logout };
