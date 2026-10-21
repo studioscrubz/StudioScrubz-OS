@@ -18,9 +18,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const sessionRef = useRef<Session | null>(null);
   const userIdRef = useRef<string | null>(null);
   const profileRef = useRef<UserProfile | null>(null);
   const resolutionRef = useRef(0);
+  const authEventSequenceRef = useRef(0);
+  const commitSession = useCallback((nextSession: Session | null) => {
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+  }, []);
   const commitProfile = useCallback((nextProfile: UserProfile | null) => {
     if (!nextProfile || nextProfile.id !== profileRef.current?.id) void clearAppNotificationBadge();
     profileRef.current = nextProfile;
@@ -30,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resolveProfile = useCallback(async (nextSession: Session, showLoading: boolean) => {
     const resolution = ++resolutionRef.current;
     userIdRef.current = nextSession.user.id;
-    setSession(nextSession);
+    commitSession(nextSession);
     setError(null);
     if (showLoading) { setLoading(true); commitProfile(null); }
     try {
@@ -47,56 +53,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(cause instanceof Error ? cause.message : "Your account could not be verified.");
       }
     } finally { if (resolution === resolutionRef.current && showLoading) setLoading(false); }
-  }, [commitProfile]);
+  }, [commitProfile, commitSession]);
   useEffect(() => {
     const client = getSupabaseClient();
+    const initialAuthSequence = authEventSequenceRef.current;
+    let disposed = false;
     void client.auth.getSession().then(({ data, error: sessionError }) => {
+      if (disposed || initialAuthSequence !== authEventSequenceRef.current) return;
       if (sessionError) { setError("Your session could not be verified."); setLoading(false); return; }
       if (!data.session?.user) {
-        userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); return;
+        userIdRef.current = null; commitSession(null); commitProfile(null); setError(null); setLoading(false); return;
       }
       void resolveProfile(data.session, true);
     });
     const { data } = client.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "INITIAL_SESSION") return;
+      const authEventSequence = ++authEventSequenceRef.current;
       window.setTimeout(() => {
-        if (event === "INITIAL_SESSION") return;
+        if (disposed || authEventSequence !== authEventSequenceRef.current) return;
         if (event === "SIGNED_OUT" || !nextSession?.user) {
           invalidateAuthIdentityCache();
-          resolutionRef.current += 1; userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); return;
+          resolutionRef.current += 1; userIdRef.current = null; commitSession(null); commitProfile(null); setError(null); setLoading(false); return;
         }
         const sameUser = userIdRef.current === nextSession.user.id;
         if (event === "TOKEN_REFRESHED" || event === "PASSWORD_RECOVERY") {
-          userIdRef.current = nextSession.user.id; setSession(nextSession); return;
+          if (sameUser && profileRef.current) { commitSession(nextSession); return; }
+          void resolveProfile(nextSession, true);
+          return;
         }
         if (event === "USER_UPDATED") {
           invalidateAuthIdentityCache();
-          if (sameUser && profileRef.current) { setSession(nextSession); void resolveProfile(nextSession, false); }
+          if (sameUser && profileRef.current) { commitSession(nextSession); void resolveProfile(nextSession, false); }
           else void resolveProfile(nextSession, true);
           return;
         }
         if (event === "SIGNED_IN" || event === "MFA_CHALLENGE_VERIFIED") {
           if (!sameUser) invalidateAuthIdentityCache();
-          if (sameUser && profileRef.current) { setSession(nextSession); return; }
+          if (sameUser && profileRef.current) { commitSession(nextSession); return; }
           void resolveProfile(nextSession, true);
         }
       }, 0);
     });
-    return () => data.subscription.unsubscribe();
-  }, [commitProfile, resolveProfile]);
+    return () => { disposed = true; authEventSequenceRef.current += 1; data.subscription.unsubscribe(); };
+  }, [commitProfile, commitSession, resolveProfile]);
+  const authenticatedUserId = session?.user.id ?? null;
   useEffect(() => {
-    const userId = session?.user.id;
-    if (!userId) return;
+    if (!authenticatedUserId) return;
     const client = getSupabaseClient();
-    const channel = client.channel(`identity-profile-${userId}`).on("postgres_changes", { event: "UPDATE", schema: "public", table: "user_profiles", filter: `id=eq.${userId}` }, () => {
+    const channel = client.channel(`identity-profile-${authenticatedUserId}`).on("postgres_changes", { event: "UPDATE", schema: "public", table: "user_profiles", filter: `id=eq.${authenticatedUserId}` }, () => {
+      const latestSession = sessionRef.current;
+      if (!latestSession || latestSession.user.id !== authenticatedUserId || userIdRef.current !== authenticatedUserId) return;
       invalidateAuthIdentityCache();
-      void resolveProfile(session, false);
+      void resolveProfile(latestSession, false);
     }).subscribe((status) => {
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") console.error(`Identity profile realtime status: ${status}`);
     });
     return () => { void client.removeChannel(channel); };
-  }, [resolveProfile, session]);
+  }, [authenticatedUserId, resolveProfile]);
   async function refreshProfile() { if (session?.user) await resolveProfile(session, false); }
-  async function logout() { await signOutService(); resolutionRef.current += 1; userIdRef.current = null; setSession(null); commitProfile(null); setError(null); setLoading(false); }
+  async function logout() { await signOutService(); resolutionRef.current += 1; userIdRef.current = null; commitSession(null); commitProfile(null); setError(null); setLoading(false); }
   const value: AuthContextValue = { session, user: session?.user ?? null, profile, loading, error, refreshProfile, signOut: logout };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -36,9 +36,31 @@ test("identity requests share in-flight work and invalidate on auth and role cha
   assert.match(auth, /const PROFILE_CACHE_MS = 30_000/);
   assert.match(auth, /if \(userRequest\) return userRequest/);
   assert.match(auth, /if \(profileRequest\?\.userId === id\) return profileRequest\.promise/);
-  assert.match(authProvider, /table: "user_profiles", filter: `id=eq\.\$\{userId\}`/);
+  assert.match(authProvider, /table: "user_profiles", filter: `id=eq\.\$\{authenticatedUserId\}`/);
   assert.match(authProvider, /invalidateAuthIdentityCache\(\)/);
   assert.ok((users.match(/invalidateAuthIdentityCache\(\)/g) ?? []).length >= 3);
+});
+
+test("identity realtime follows the user id without cycling on token refresh", () => {
+  assert.match(authProvider, /const sessionRef = useRef<Session \| null>\(null\)/);
+  assert.match(authProvider, /sessionRef\.current = nextSession;\s+setSession\(nextSession\)/);
+  assert.match(authProvider, /const authenticatedUserId = session\?\.user\.id \?\? null/);
+  assert.match(authProvider, /\}, \[authenticatedUserId, resolveProfile\]\)/);
+  assert.doesNotMatch(authProvider, /\[resolveProfile, session\]/);
+  assert.match(authProvider, /event === "TOKEN_REFRESHED"[\s\S]*sameUser && profileRef\.current[\s\S]*commitSession\(nextSession\); return/);
+  assert.match(authProvider, /event === "TOKEN_REFRESHED"[\s\S]*void resolveProfile\(nextSession, true\)/);
+});
+
+test("identity realtime uses the latest matching session and cleans up on sign-out or user switch", () => {
+  assert.match(authProvider, /const latestSession = sessionRef\.current/);
+  assert.match(authProvider, /latestSession\.user\.id !== authenticatedUserId \|\| userIdRef\.current !== authenticatedUserId/);
+  assert.match(authProvider, /void resolveProfile\(latestSession, false\)/);
+  assert.match(authProvider, /return \(\) => \{ void client\.removeChannel\(channel\); \}/);
+  assert.match(authProvider, /SIGNED_OUT[\s\S]*commitSession\(null\)/);
+  assert.match(authProvider, /async function logout\(\)[\s\S]*commitSession\(null\)/);
+  assert.match(authProvider, /const authEventSequence = \+\+authEventSequenceRef\.current/);
+  assert.match(authProvider, /disposed \|\| authEventSequence !== authEventSequenceRef\.current/);
+  assert.match(authProvider, /disposed = true; authEventSequenceRef\.current \+= 1; data\.subscription\.unsubscribe\(\)/);
 });
 
 test("realtime subscribes only to tables requested by mounted consumers", () => {
