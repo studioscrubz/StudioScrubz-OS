@@ -6,6 +6,7 @@ import type { RecurringPricingRule } from "@/types/serviceCatalog";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 
 export function repriceEstimateFrequency(estimate: EstimateResult, frequency: Frequency, rules: RecurringPricingRule[], serviceId: string, recurringPricingRuleId?:string|null, customIntervalDays?: number | null, serviceDaysOfWeek?: ServiceWeekday[]): EstimateResult {
+  if (estimate.weeklyMixedVisits?.length) return estimate; // Preserve negotiated individual weekday prices. Save validation prevents incompatible edits.
   const interval = frequency === "Custom" ? customIntervalDays ?? estimate.calculatorInput.customIntervalDays ?? null : null;
   const days = frequency === "Multiple Days Per Week" ? serviceDaysOfWeek ?? estimate.calculatorInput.serviceDaysOfWeek ?? [] : [];
   const addonTotal = catalogAddonTotal(estimate);
