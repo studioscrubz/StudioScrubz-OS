@@ -6,7 +6,7 @@ import { estimatedMonthlyTotal } from "@/lib/scheduling/frequency";
 export function withAuthoritativeEstimatePrice(result: EstimateResult, manualPrice: number | null): EstimateResult {
   const calculatedFinalPrice = result.calculatedFinalPrice ?? result.finalPrice;
   const finalPrice = manualPrice === null ? calculatedFinalPrice : money(manualPrice);
-  const monthlyPrice = estimatedMonthlyTotal(finalPrice, result.calculatorInput.frequency, result.calculatorInput.customIntervalDays, result.calculatorInput.serviceDaysOfWeek);
+  const monthlyPrice = result.weeklyMixedVisits?.length ? Math.round((result.weeklyContractTotal??0)*52/12*100)/100 : estimatedMonthlyTotal(finalPrice, result.calculatorInput.frequency, result.calculatorInput.customIntervalDays, result.calculatorInput.serviceDaysOfWeek);
   return {
     ...result,
     calculatedFinalPrice,
@@ -25,7 +25,7 @@ export function withAuthoritativeProposalPrice(result: ProposalResult, manualPri
     calculatedPerVisitTotal,
     manualPerVisitTotal: manualPrice,
     perVisitTotal,
-    monthlyTotal: estimatedMonthlyTotal(perVisitTotal, frequency, customIntervalDays ?? result.customIntervalDays, result.serviceDaysOfWeek),
+    monthlyTotal: result.weeklyMixedVisits?.length ? Math.round((result.weeklyContractTotal??0)*52/12*100)/100 : estimatedMonthlyTotal(perVisitTotal, frequency, customIntervalDays ?? result.customIntervalDays, result.serviceDaysOfWeek),
 
     estimatedProfit: money(result.estimatedProfit + perVisitTotal - result.perVisitTotal),
   };
@@ -38,7 +38,7 @@ export function withPreservedProposalPrice(result: ProposalResult, storedPrice: 
     calculatedPerVisitTotal: result.calculatedPerVisitTotal ?? result.perVisitTotal,
     manualPerVisitTotal: null,
     perVisitTotal,
-    monthlyTotal: estimatedMonthlyTotal(perVisitTotal, frequency, customIntervalDays ?? result.customIntervalDays, result.serviceDaysOfWeek),
+    monthlyTotal: result.weeklyMixedVisits?.length ? Math.round((result.weeklyContractTotal??0)*52/12*100)/100 : estimatedMonthlyTotal(perVisitTotal, frequency, customIntervalDays ?? result.customIntervalDays, result.serviceDaysOfWeek),
 
     estimatedProfit: money(result.estimatedProfit + perVisitTotal - result.perVisitTotal),
   };

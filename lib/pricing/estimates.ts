@@ -14,6 +14,7 @@ import {
   residentialCatalogPrice,
 } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
+import { withMixedVisitEstimate } from "@/lib/pricing/weeklyMixedVisits";
 import {
   estimatedMonthlyTotal,
   estimatedVisitsPerMonth,
@@ -714,7 +715,7 @@ export function calculateCommercialEstimate(
     protectedTotalDiscount - recurringDiscount,
   );
 
-  return result({
+  const commercialEstimate = result({
     input,
     serviceName: service.service_name,
     catalogAddons: snapshots(
@@ -739,6 +740,7 @@ export function calculateCommercialEstimate(
     supplyCost,
     scope: [],
   });
+  return withMixedVisitEstimate(commercialEstimate, input);
 }
 
 function commercialServiceFloor(

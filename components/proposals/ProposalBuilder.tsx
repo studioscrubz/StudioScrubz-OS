@@ -307,7 +307,8 @@ export function ProposalBuilder({
       ? getAvailableServiceAddons(catalog, catalogService.id, proposalDivision)
       : [];
   const selectedAddonSnapshots = proposalAddonSnapshots(adjustments, availableAddons);
-  const matchingRules = catalogService
+  const weeklyMixedSource = Boolean(estimate?.result.weeklyMixedVisits?.length || walkthrough?.pricing_review?.estimateResult.weeklyMixedVisits?.length || proposal?.result.weeklyMixedVisits?.length);
+  const matchingRules = weeklyMixedSource ? [] : catalogService
     ? matchingRecurringRules(frequency, rules, catalogService.id)
     : [];
   const effectiveRuleId =
@@ -493,6 +494,8 @@ export function ProposalBuilder({
       return setError("Select the recurring pricing rule for this Proposal.");
     if (frequency === "Multiple Days Per Week" && !validServiceWeekdays(serviceDaysOfWeek))
       return setError("Choose at least two distinct weekly service days before saving the proposal.");
+    if (weeklyMixedSource && (frequency !== "Multiple Days Per Week" || JSON.stringify([...(serviceDaysOfWeek??[])].sort()) !== JSON.stringify([...(sourceEstimate?.calculatorInput.serviceDaysOfWeek??proposal?.result.serviceDaysOfWeek??[])].sort()) || manualPrice !== null || discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.some(item=>!item.inherited)))
+      return setError("Mixed-scope weekly proposals must preserve the approved individual day prices. Edit weekday prices in the source Estimate; do not apply a uniform per-visit change or discount.");
     if (!proposal && walkthrough && !walkthrough.pricing_review)
       return setError(
         "Review and approve Walkthrough pricing before creating the Proposal.",
@@ -1071,6 +1074,7 @@ function Summary({
   const customServiceAdjustments = r.adjustments
     .filter((item) => !item.catalogAddonId)
     .reduce((sum, item) => sum + item.amount, 0) + r.additionalLabor + r.additionalMaterials;
+  const mixed = r.weeklyMixedVisits?.length ? r.weeklyMixedVisits : null;
   const discountedService = Math.max(
     0,
     r.baseEstimateAmount + customServiceAdjustments -
@@ -1092,6 +1096,7 @@ function Summary({
       </div>
       <dl className="mt-5 divide-y divide-white/10">
         {[
+          ...(mixed ? [...mixed.map(v => [["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][v.day]+" — "+v.serviceLevel, money(v.price)]), ["Weekly Contract Total",money(r.weeklyContractTotal??0)],["Average Monthly Contract",money(r.monthlyTotal??0)]] : [
           ["Base Service Price", money(r.baseEstimateAmount)],
           [
             "Custom Service Adjustments",
@@ -1121,6 +1126,7 @@ function Summary({
             "Estimated Monthly",
             r.monthlyTotal !== null ? money(r.monthlyTotal) : "—",
           ],
+          ]),
           ["Labor Hours", String(r.laborHours)],
           ["Crew", String(r.crewRecommendation)],
           ["Duration", `${r.estimatedDuration} hrs`],
