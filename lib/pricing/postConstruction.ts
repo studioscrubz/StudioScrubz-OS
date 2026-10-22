@@ -176,17 +176,3 @@ function whole(value: number): number { return Math.floor(nonnegative(value)); }
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, finite(value))); }
 function money(value: number): number { return Math.round(finite(value) * 100) / 100; }
 function tenth(value: number): number { return Math.round(finite(value) * 10) / 10; }
-function estimatedVisitsPerMonth(frequency: string, customIntervalDays?: number | null): number {
-  if (frequency === "Daily") return 365 / 12;
-  if (frequency === "Weekly") return 52 / 12;
-  if (frequency === "Biweekly") return 26 / 12;
-  if (frequency === "Twice Monthly") return 2;
-  if (frequency === "Monthly") return 1;
-  if (frequency === "Custom") return Number.isInteger(customIntervalDays) && Number(customIntervalDays) >= 1 ? 365 / Number(customIntervalDays) / 12 : 0;
-  return frequency === "One-Time" ? 1 : 0;
-}
-function estimatedMonthlyTotal(perVisit: number, frequency: string, customIntervalDays?: number | null): number | null {
-  if (frequency === "One-Time") return null;
-  const visits = estimatedVisitsPerMonth(frequency, customIntervalDays);
-  return visits > 0 ? money(perVisit * visits) : null;
-}
