@@ -167,6 +167,13 @@ a:focus-visible {
   .document-print-root { position: static; width: 100%; overflow: visible; }
   .document-print-root section, .document-print-root dl, .document-print-root header { break-inside: avoid-page; }
   .document-print-root p { orphans: 3; widows: 3; }
+  /* Estimate printing must be a single document flow, not a fixed/scrollable dialog. */
+  .estimate-standalone-print { display: block; min-height: 0; overflow: visible; margin: 0; padding: 0; }
+  .estimate-standalone-print #estimate-document { display: block; position: static; overflow: visible; width: 100%; }
+  #estimate-document section { break-inside: auto; }
+  #estimate-document section > h3 { break-after: avoid-page; }
+  #estimate-document .weekly-visit-print-card { break-inside: avoid-page; page-break-inside: avoid; }
+
   #public-agreement.document-print-root { page: public-agreement; font-size: 9pt; line-height: 1.25; }
   #public-agreement .agreement-print-page { display: block; }
   #public-agreement .agreement-print-page-two { break-before: page; }
