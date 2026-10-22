@@ -210,10 +210,10 @@ export function serviceFrequencyDiscountLabel(
   if (matches.length !== 1) return matches.length > 1 ? `${label} — choose pricing rule` : label;
   const rule = matches[0];
   if (rule.adjustment_type === "Percentage" && Number(rule.adjustment_value) > 0) {
-    return `${label} — ${Number(rule.adjustment_value)}% off`;
+    return `${label} — up to ${Number(rule.adjustment_value)}% off`;
   }
   if (rule.adjustment_type === "Flat Amount" && Number(rule.adjustment_value) > 0) {
-    return `${label} — ${Number(rule.adjustment_value).toFixed(2)} off`;
+    return `${label} — up to ${Number(rule.adjustment_value).toFixed(2)} off`;
   }
   if (rule.adjustment_type === "Override Price") return `${label} — custom rate`;
   return label;
