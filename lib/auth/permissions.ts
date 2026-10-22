@@ -237,6 +237,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
 
   ["/estimates", "estimates.create"],
   ["/open-estimates", "estimates.view"],
+  ["/estimate-preview", "estimates.view"],
 
   ["/walkthroughs", "walkthroughs.view"],
 
