@@ -34,7 +34,7 @@ export function mixedVisitTotals(
 
 export function withMixedVisitEstimate(base: EstimateResult, input: CommercialCalculatorInput): EstimateResult {
   const visits = input.weeklyMixedVisits;
-  if (input.frequency !== "Multiple Days Per Week" || !visits?.length) return base;
+  if (input.frequency !== "Multiple Days Per Week" || visits === undefined) return base;
   const totals = mixedVisitTotals(visits, input.serviceDaysOfWeek, input.workerHourlyPay);
   const laborCost = round(totals.weeklyHours * input.workerHourlyPay / visits.length);
   const averageSupplyCost = base.supplyCost;
