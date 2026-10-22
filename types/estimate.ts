@@ -7,6 +7,7 @@ export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
 export type EstimateStatus = "Open" | "Converted" | "Superseded" | "Declined" | "Archived";
 export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Multiple Days Per Week" | "Custom";
 export type ServiceWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type WeeklyMixedVisit = { day: ServiceWeekday; serviceLevel: string; scope: string; hours: number; price: number };
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionSeverity = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionDetailLevel = "Standard" | "Detailed" | "High Detail";
@@ -55,6 +56,7 @@ export type CommercialCalculatorInput = {
   frequency: Frequency;
   customIntervalDays?: number | null;
   serviceDaysOfWeek?: ServiceWeekday[];
+  weeklyMixedVisits?: WeeklyMixedVisit[];
   recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;
@@ -162,6 +164,8 @@ export type EstimateResult = {
   manualPrice?: number | null;
   finalPrice: number;
   monthlyPrice: number | null;
+  weeklyMixedVisits?: WeeklyMixedVisit[];
+  weeklyContractTotal?: number;
   visitsPerMonth: number;
   upkeepPlan?: { standardCleaningValue: number; adjustmentPercent: number; upkeepVisitValue: number; visitsIncluded: 3; monthlyPackage: number } | null;
   laborHours: number;
