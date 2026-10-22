@@ -31,7 +31,9 @@ import type {
   ServiceCatalogBundle,
 } from "@/types/serviceCatalog";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
-import type { EstimateResult, EstimateWithRelations, Frequency } from "@/types/estimate";
+import type { EstimateResult, EstimateWithRelations, Frequency, ServiceWeekday } from "@/types/estimate";
+import { WeeklyServiceDaysField } from "@/components/forms/WeeklyServiceDaysField";
+import { validServiceWeekdays } from "@/lib/scheduling/frequency";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import type {
   ProposalAdjustment,
@@ -57,6 +59,7 @@ const termsDefault: ProposalTerms = {
 };
 function proposalPricingFingerprint(value: {
   frequency: Frequency;
+  serviceDaysOfWeek: ServiceWeekday[];
   ruleId: string;
   additionalLabor: number;
   additionalMaterials: number;
@@ -111,6 +114,7 @@ export function ProposalBuilder({
   const [frequency, setFrequency] = useState<Frequency>(
     proposal?.frequency ?? "One-Time",
   );
+  const [serviceDaysOfWeek, setServiceDaysOfWeek] = useState<ServiceWeekday[]>(proposal?.result.serviceDaysOfWeek ?? []);
   const [selectedRuleId, setSelectedRuleId] = useState(
     proposal?.result.recurringPricingRuleId ?? "",
   );
@@ -177,6 +181,7 @@ export function ProposalBuilder({
   const [initialPricingFingerprint] = useState(() =>
     proposalPricingFingerprint({
       frequency: proposal?.frequency ?? "One-Time",
+      serviceDaysOfWeek: proposal?.result.serviceDaysOfWeek ?? [],
       ruleId: proposal?.result.recurringPricingRuleId ?? "",
       additionalLabor: proposal?.result.additionalLabor ?? 0,
       additionalMaterials: proposal?.result.additionalMaterials ?? 0,
@@ -194,6 +199,7 @@ export function ProposalBuilder({
   );
   const pricingFingerprint = proposalPricingFingerprint({
     frequency,
+    serviceDaysOfWeek,
     ruleId: selectedRuleId,
     additionalLabor,
     additionalMaterials,
@@ -319,13 +325,16 @@ export function ProposalBuilder({
     catalogService &&
     (frequency !== authoritativeEstimate.calculatorInput.frequency ||
       resolvedServiceName !== authoritativeEstimate.serviceName ||
-      effectiveRuleId !== (authoritativeEstimate.recurringPricingRuleId ?? ""))
+      effectiveRuleId !== (authoritativeEstimate.recurringPricingRuleId ?? "") ||
+      (frequency === "Multiple Days Per Week" && JSON.stringify(serviceDaysOfWeek) !== JSON.stringify(authoritativeEstimate.calculatorInput.serviceDaysOfWeek ?? [])))
       ? repriceEstimateFrequency(
           authoritativeEstimate,
           frequency,
           pricingRules,
           catalogService.id,
           effectiveRuleId || null,
+          null,
+          serviceDaysOfWeek,
         )
       : authoritativeEstimate;
   const calculatedResult = calculateProposal({
@@ -342,6 +351,7 @@ export function ProposalBuilder({
         authoritativeEstimate?.serviceDescription ||
         null,
     frequency,
+    serviceDaysOfWeek,
     estimatedCleaningDays: postConstruction ? estimatedCleaningDays : null,
     estimatedHoursPerDay: postConstruction ? estimatedHoursPerDay : null,
     adjustments,
@@ -463,6 +473,7 @@ export function ProposalBuilder({
       setFrequency(
         approved?.frequency ?? selectedEstimate?.frequency ?? "One-Time",
       );
+      setServiceDaysOfWeek(approved?.estimateResult.calculatorInput.serviceDaysOfWeek ?? selectedEstimate?.result.calculatorInput.serviceDaysOfWeek ?? []);
       setRequestedDate(
         selectedEstimate?.result.submission?.preferredServiceDate ?? "",
       );
@@ -480,6 +491,8 @@ export function ProposalBuilder({
       return setError("Select a saved Estimate or Walkthrough.");
     if (matchingRules.length > 1 && !effectiveRuleId)
       return setError("Select the recurring pricing rule for this Proposal.");
+    if (frequency === "Multiple Days Per Week" && !validServiceWeekdays(serviceDaysOfWeek))
+      return setError("Choose at least two distinct weekly service days before saving the proposal.");
     if (!proposal && walkthrough && !walkthrough.pricing_review)
       return setError(
         "Review and approve Walkthrough pricing before creating the Proposal.",
@@ -803,8 +816,11 @@ export function ProposalBuilder({
                   "Biweekly",
                   "Twice Monthly",
                   "Monthly",
+                  "Multiple Days Per Week",
+                  ...(frequency === "Custom" ? ["Custom"] : []),
                 ]}
               />
+              {frequency === "Multiple Days Per Week" && <WeeklyServiceDaysField value={serviceDaysOfWeek} onChange={setServiceDaysOfWeek} />}
               {matchingRules.length > 0 && (
                 <Select
                   l="Pricing Rule"
