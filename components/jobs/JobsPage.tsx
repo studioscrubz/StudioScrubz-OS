@@ -293,7 +293,7 @@ export function JobsPage() {
       employeeId={profile?.employee_id ?? null}
       role={profile?.role ?? null}
       activeCrew={activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null}
-      activeTechs={activeTechs}
+      activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null)}
       canComplete={hasPermission(profile, "jobs.complete")}
       canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
@@ -373,7 +373,7 @@ export function JobsPage() {
           employeeId={profile?.employee_id ?? null}
           role={profile?.role ?? null}
           activeCrew={activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null}
-activeTechs={activeTechs}
+          activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null)}
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
@@ -469,6 +469,14 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
 }}
     />}
   </>;
+}
+
+function equipmentCrewOptions(crew:CrewWithRelations|null):EligibleJobTech[]{
+  if(!crew)return [];
+  const rows=new Map<string,EligibleJobTech>();
+  if(crew.crew_lead)rows.set(crew.crew_lead.id,{employee_id:crew.crew_lead.id,display_name:crew.crew_lead.preferred_name||`${crew.crew_lead.first_name} ${crew.crew_lead.last_name}`.trim(),operational_role:"Crew Lead"});
+  for(const member of crew.members){if(member.employee.employment_status==='Active')rows.set(member.employee.id,{employee_id:member.employee.id,display_name:member.employee.preferred_name||`${member.employee.first_name} ${member.employee.last_name}`.trim(),operational_role:member.employee.id===crew.crew_lead_id?"Crew Lead":"Scrub Technician"})}
+  return [...rows.values()];
 }
 function JobCardActiveTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const [now, setNow] = useState<number | null>(null);
@@ -715,6 +723,8 @@ function JobModal({
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
+      {job.assigned_crew_id&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-6"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
       {showLifecycle && (

@@ -12,6 +12,7 @@ export const OPERATIONAL_TABLES = [
   "estimates", "walkthroughs", "proposals", "service_agreements", "jobs",
   "invoices", "attention_item_states", "client_communications", "service_occurrences",
   "job_labor_threshold_events",
+  "job_equipment_responsibility_tasks",
   "invoice_job_photos", "invoice_job_lines",
   "service_agreement_documents",
   "payments", "expenses", "time_entries", "employee_work_sessions", "clients", "properties", "crews", "employees",

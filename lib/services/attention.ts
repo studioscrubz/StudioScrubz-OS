@@ -22,6 +22,7 @@ import type { FieldDiscovery } from "@/types/fieldDiscovery";
 import type { ChangeRequest } from "@/types/changeRequest";
 import type { PorterNotificationEvent, PorterNotificationType } from "@/types/porterNotification";
 import type { JobLaborThresholdEvent } from "@/types/job";
+import { getMyEquipmentResponsibilityTasks, type EquipmentResponsibilityAttention } from "@/lib/services/equipmentAccountability";
 
 const GOOGLE_REVIEW_URL = "https://g.page/r/CT2X4ZAN1E8oEAI/review";
 
@@ -41,13 +42,14 @@ export const ATTENTION_REALTIME_TABLES = [
   "job_labor_threshold_events",
   "internal_schedule_events",
   "internal_schedule_event_attendees",
+  "job_equipment_responsibility_tasks",
 ] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
   const badgeRequest = beginAppBadgeSync();
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
-  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings] = await Promise.all([
+  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings, equipmentResponsibilityTasks] = await Promise.all([
     hasPermission(profile, "estimates.view") ? getEstimates() : Promise.resolve([]),
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
     hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
@@ -59,6 +61,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     hasPermission(profile, "timeClock.view") ? getOpenTimeEntries() : Promise.resolve([]),
     getAttentionItemStates(),
     getBusinessSettings().catch(() => null),
+    getMyEquipmentResponsibilityTasks().catch(() => []),
   ]);
   const [jobRouteIds, agreementRoutes] = await Promise.all([
     hasPermission(profile, "jobs.view")
@@ -102,7 +105,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     const event = Array.isArray(row.event) ? row.event[0] : row.event;
     return event && event.status === "Scheduled" ? [{ id: event.id, title: event.title, startsAt: event.starts_at, location: event.location, invitedAt: row.invited_at }] : [];
   });
-  const input: AttentionRuleInput = { assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const input: AttentionRuleInput = { equipmentResponsibilityTasks, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -113,6 +116,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 export type AssignedWalkthroughAttention = { id: string; employeeId: string; date: string; time: string | null };
 
 export type AttentionRuleInput = {
+  equipmentResponsibilityTasks?: EquipmentResponsibilityAttention[];
   assignedEvents?: Array<{ id: string; title: string; startsAt: string; location: string | null; invitedAt: string }>;
   porterNotifications?: PorterNotificationEvent[];
   laborThresholdEvents?: JobLaborThresholdEvent[];
@@ -144,6 +148,15 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  for (const task of input.equipmentResponsibilityTasks ?? []) {
+    const label=task.job_number||"Job";
+    if(task.status==="Pending Assignment"&&profile.employee_id===task.crew_lead_employee_id){
+      items.push(item(`equipment-responsibility:${task.task_id}:pending:${task.revision}`,"Equipment Responsibility Assignment Required","Attention","Jobs","Equipment & Supplies Assignment Required",`You have been assigned as Crew Lead for ${label}. Please designate a crew member responsible for equipment and supplies check-off before the job begins.`,"Job",task.job_id,null,label,null,null,task.updated_at,`/jobs?jobId=${task.job_id}&equipment=assignment`,"Assign Responsibility"));
+    } else if(task.responsible_employee_id&&profile.employee_id===task.responsible_employee_id&&task.status!=="Reconciled") {
+      items.push(item(`equipment-responsibility:${task.task_id}:assigned:${task.revision}:${profile.employee_id}`,"Equipment Check-Off Assigned","Attention","Jobs","Equipment & Supplies Check-Off Assigned",`You are responsible for equipment and supplies verification for ${label}. Open your assigned job to review and complete the checklist.`,"Job",task.job_id,null,label,null,null,task.assigned_at??task.updated_at,`/jobs?jobId=${task.job_id}&equipment=checkoff`,"Open Checklist"));
+    }
+  }
 
   for (const event of input.assignedEvents ?? []) {
     if (Date.parse(event.startsAt) < clock.now.getTime()) continue;

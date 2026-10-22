@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { withImmediateAttentionPush } from "@/lib/push/client";
 
 type EquipmentAssignmentRow = {
   employee_id: string;
@@ -23,12 +24,14 @@ export async function getJobEquipmentAssignments(jobId: string): Promise<Equipme
 }
 
 export async function setJobEquipmentResponsibility(jobId: string, employeeIds: string[], reason?: string): Promise<void> {
-  const { error } = await client().rpc("set_job_equipment_responsibility", {
-    p_job_id: jobId,
-    p_employee_ids: employeeIds,
-    p_reason: reason?.trim() || null,
+  await withImmediateAttentionPush(async () => {
+    const { error } = await client().rpc("set_job_equipment_responsibility", {
+      p_job_id: jobId,
+      p_employee_ids: employeeIds,
+      p_reason: reason?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
   });
-  if (error) throw new Error(error.message);
 }
 
 type EquipmentAdminRpc = {
@@ -46,6 +49,23 @@ export const confirmEquipmentResponsibility = (jobId:string) => equipmentRpc<voi
 export const getEquipmentExceptions = (jobId:string) => equipmentRpc<EquipmentException[]>("get_open_job_equipment_exceptions",{p_job_id:jobId});
 export const resolveEquipmentException = (id:string,resolution:string) => equipmentRpc<void>("resolve_job_equipment_exception",{p_exception_id:id,p_resolution:resolution});
 export const getEquipmentCatalog = (jobId:string) => equipmentRpc<EquipmentCatalogItem[]>("get_job_equipment_catalog",{p_job_id:jobId});
+
+export type EquipmentResponsibilityStatus = "Pending Assignment" | "Assigned" | "Check-Off In Progress" | "Check-Off Complete" | "Return Pending" | "Reconciled";
+export type EquipmentResponsibility = {
+  task_id:string; crew_id:string|null; crew_lead_employee_id:string|null;
+  responsible_employee_id:string|null; responsible_name:string|null;
+  status:EquipmentResponsibilityStatus; revision:number; assigned_at:string|null; updated_at:string;
+};
+export async function getJobEquipmentResponsibility(jobId:string): Promise<EquipmentResponsibility|null> {
+  const rows=await equipmentRpc<EquipmentResponsibility[]>("get_job_equipment_responsibility",{p_job_id:jobId});
+  return rows[0]??null;
+}
+
+export type EquipmentResponsibilityAttention = {
+  task_id:string;job_id:string;job_number:string;crew_id:string|null;crew_lead_employee_id:string|null;
+  responsible_employee_id:string|null;status:EquipmentResponsibilityStatus;revision:number;assigned_at:string|null;created_at:string;updated_at:string;
+};
+export const getMyEquipmentResponsibilityTasks = () => equipmentRpc<EquipmentResponsibilityAttention[]>("get_my_equipment_responsibility_tasks");
 
 export type EquipmentNotification = {id:string;job_id:string;event_type:string;created_at:string;details:{handoff?:string}};
 export const handoffJobEquipment = (jobId:string,fromId:string,toId:string,reason:string) => equipmentRpc<string>("handoff_job_equipment",{p_job_id:jobId,p_from_employee_id:fromId,p_to_employee_id:toId,p_reason:reason});
