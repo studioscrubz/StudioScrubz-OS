@@ -35,7 +35,9 @@ assert.equal(estimatePriceDisplay({ finalPrice: 5584.62 }).amount, 5584.62);
 const page = code("components/estimates/OpenEstimatesPage.tsx");
 assert.match(page, /estimatePriceDisplay\(item\.result\)/);
 assert.match(page, /currency\(price\.amount\)/);
-assert.match(page, /weekdayName\(visit\.day\)/);
+assert.match(page, /price\.isWeeklyContract && " \/ week"/);
+assert.doesNotMatch(page, /weekdayName\(visit\.day\)/, "The list should not show weekday labels");
+assert.doesNotMatch(page, /Mixed-scope weekly contract/, "The list should not show the weekly explanation label");
 assert.match(page, /visibleEstimates=\{filtered\}/);
 assert.match(page, /estimatePriceDisplay\(b\.result\)\.amount/);
 
