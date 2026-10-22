@@ -65,80 +65,111 @@ create trigger job_equipment_responsibility_events_append_only
 before update or delete on public.job_equipment_responsibility_events
 for each row execute function private.protect_job_equipment_responsibility_event();
 
-create function private.sync_job_equipment_responsibility_task()
-returns trigger language plpgsql security definer set search_path='' as $$
+create function private.reconcile_job_equipment_responsibility_task(
+  p_job_id uuid, p_assigned_crew_id uuid, p_actor_user_id uuid
+) returns void language plpgsql security definer set search_path='' as $$
 declare
   lead_id uuid;
   current_task public.job_equipment_responsibility_tasks;
   retained_employee uuid;
   next_revision integer;
 begin
-  if new.assigned_crew_id is not null then
+  if p_assigned_crew_id is not null then
     select c.crew_lead_id into lead_id from public.crews c
-    where c.id=new.assigned_crew_id and c.archived_at is null and c.status='Active';
+    where c.id=p_assigned_crew_id and c.archived_at is null and c.status='Active';
   end if;
   select * into current_task from public.job_equipment_responsibility_tasks
-  where job_id=new.id for update;
+  where job_id=p_job_id for update;
 
-  if new.assigned_crew_id is null or lead_id is null then
+  if p_assigned_crew_id is null or lead_id is null then
     if found then
       if exists (
         select 1 from public.job_equipment_assignments a
         join public.job_equipment_clearances cl on cl.assignment_id=a.id
-        where a.job_id=new.id and a.released_at is null and cl.status<>'Cleared'
+        where a.job_id=p_job_id and a.released_at is null and cl.status<>'Cleared'
       ) then raise exception 'Resolve pending equipment clearance before removing the assigned crew or Crew Lead.'; end if;
-      update public.job_equipment_assignments set released_at=now(),released_by_user_id=auth.uid(),
-        release_reason='Crew or Crew Lead removed' where job_id=new.id and released_at is null;
+      update public.job_equipment_assignments set released_at=now(),released_by_user_id=p_actor_user_id,
+        release_reason='Crew or Crew Lead removed' where job_id=p_job_id and released_at is null;
       next_revision:=current_task.revision+1;
-      update public.job_equipment_responsibility_tasks set crew_id=new.assigned_crew_id,
+      update public.job_equipment_responsibility_tasks set crew_id=p_assigned_crew_id,
         crew_lead_employee_id=lead_id,responsible_employee_id=null,status='Pending Assignment',
         assigned_at=null,revision=next_revision,updated_at=now() where id=current_task.id;
       insert into public.job_equipment_responsibility_events(task_id,job_id,revision,event_type,crew_id,crew_lead_employee_id,reason)
-      values(current_task.id,new.id,next_revision,'Crew Removed',new.assigned_crew_id,lead_id,'Assigned crew or Crew Lead removed');
+      values(current_task.id,p_job_id,next_revision,'Crew Removed',p_assigned_crew_id,lead_id,'Assigned crew or Crew Lead removed');
     end if;
-    return new;
+    return;
   end if;
 
   if not found then
     insert into public.job_equipment_responsibility_tasks(job_id,crew_id,crew_lead_employee_id)
-    values(new.id,new.assigned_crew_id,lead_id) returning * into current_task;
+    values(p_job_id,p_assigned_crew_id,lead_id) returning * into current_task;
     insert into public.job_equipment_responsibility_events(task_id,job_id,revision,event_type,crew_id,crew_lead_employee_id,reason)
-    values(current_task.id,new.id,current_task.revision,'Pending',new.assigned_crew_id,lead_id,'Crew with Crew Lead assigned');
-    return new;
+    values(current_task.id,p_job_id,current_task.revision,'Pending',p_assigned_crew_id,lead_id,'Crew with Crew Lead assigned');
+    return;
   end if;
 
-  if current_task.crew_id is not distinct from new.assigned_crew_id
-     and current_task.crew_lead_employee_id is not distinct from lead_id then return new; end if;
+  if current_task.crew_id is not distinct from p_assigned_crew_id
+     and current_task.crew_lead_employee_id is not distinct from lead_id then return; end if;
 
   retained_employee:=current_task.responsible_employee_id;
   if retained_employee is not null and not (
     retained_employee=lead_id or exists(select 1 from public.crew_members cm
-      where cm.crew_id=new.assigned_crew_id and cm.employee_id=retained_employee)
+      where cm.crew_id=p_assigned_crew_id and cm.employee_id=retained_employee)
   ) then
     if exists(select 1 from public.job_equipment_assignments a join public.job_equipment_clearances cl on cl.assignment_id=a.id
-      where a.job_id=new.id and a.employee_id=retained_employee and a.released_at is null and cl.status<>'Cleared') then
+      where a.job_id=p_job_id and a.employee_id=retained_employee and a.released_at is null and cl.status<>'Cleared') then
       raise exception 'Resolve pending equipment clearance before assigning a different crew.';
     end if;
-    update public.job_equipment_assignments set released_at=now(),released_by_user_id=auth.uid(),
+    update public.job_equipment_assignments set released_at=now(),released_by_user_id=p_actor_user_id,
       release_reason='Responsible employee is not assigned to the new crew'
-      where job_id=new.id and employee_id=retained_employee and released_at is null;
+      where job_id=p_job_id and employee_id=retained_employee and released_at is null;
     retained_employee:=null;
   end if;
   next_revision:=current_task.revision+1;
-  update public.job_equipment_responsibility_tasks set crew_id=new.assigned_crew_id,
+  update public.job_equipment_responsibility_tasks set crew_id=p_assigned_crew_id,
     crew_lead_employee_id=lead_id,responsible_employee_id=retained_employee,
     status=case when retained_employee is null then 'Pending Assignment' else current_task.status end,
     assigned_at=case when retained_employee is null then null else current_task.assigned_at end,
     revision=next_revision,updated_at=now() where id=current_task.id;
   insert into public.job_equipment_responsibility_events(task_id,job_id,revision,event_type,crew_id,crew_lead_employee_id,responsible_employee_id,reason)
-  values(current_task.id,new.id,next_revision,case when retained_employee is null then 'Pending' else 'Status Changed' end,
-    new.assigned_crew_id,lead_id,retained_employee,'Crew or Crew Lead changed; responsibility revalidated');
+  values(current_task.id,p_job_id,next_revision,case when retained_employee is null then 'Pending' else 'Status Changed' end,
+    p_assigned_crew_id,lead_id,retained_employee,'Crew or Crew Lead changed; responsibility revalidated');
+end; $$;
+
+create function private.sync_job_equipment_responsibility_task()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  perform private.reconcile_job_equipment_responsibility_task(new.id,new.assigned_crew_id,auth.uid());
+  return new;
+end; $$;
+
+create function private.sync_crew_equipment_responsibility_tasks()
+returns trigger language plpgsql security definer set search_path='' as $$
+declare affected_job record;
+begin
+  if new.crew_lead_id is not distinct from old.crew_lead_id
+    and new.status is not distinct from old.status
+    and new.archived_at is not distinct from old.archived_at then
+    return new;
+  end if;
+  for affected_job in
+    select j.id,j.assigned_crew_id from public.jobs j
+    where j.assigned_crew_id=new.id
+  loop
+    perform private.reconcile_job_equipment_responsibility_task(
+      affected_job.id,affected_job.assigned_crew_id,auth.uid()
+    );
+  end loop;
   return new;
 end; $$;
 
 create trigger sync_job_equipment_responsibility_task
 after insert or update of assigned_crew_id on public.jobs
 for each row execute function private.sync_job_equipment_responsibility_task();
+
+create trigger sync_crew_equipment_responsibility_tasks
+after update of crew_lead_id,status,archived_at on public.crews
+for each row execute function private.sync_crew_equipment_responsibility_tasks();
 
 -- Backfill existing eligible planned and active jobs without changing their lifecycle.
 insert into public.job_equipment_responsibility_tasks(job_id,crew_id,crew_lead_employee_id,responsible_employee_id,status,assigned_at)
@@ -334,7 +365,14 @@ grant execute on function public.set_job_equipment_responsibility(uuid,uuid[],te
  public.confirm_job_equipment_responsibility(uuid),public.get_job_equipment_responsibility(uuid),
  public.get_my_equipment_responsibility_tasks(),public.save_job_equipment_checklist_progress(uuid,text,jsonb),
  public.get_my_job_equipment_checklist(uuid,text) to authenticated;
-revoke all on function private.protect_job_equipment_responsibility_event(),private.sync_job_equipment_responsibility_task(),private.update_equipment_task_for_job_status() from public,anon,authenticated;
+revoke all on function private.protect_job_equipment_responsibility_event(),
+ private.reconcile_job_equipment_responsibility_task(uuid,uuid,uuid),
+ private.sync_job_equipment_responsibility_task(),private.sync_crew_equipment_responsibility_tasks(),
+ private.update_equipment_task_for_job_status() from public,anon,authenticated;
+
+-- Trigger helpers from the earlier equipment migration are not API surfaces.
+revoke all on function public.equipment_assignment_changed(),public.equipment_assignment_released()
+from public,anon,authenticated;
 
 notify pgrst,'reload schema';
 commit;

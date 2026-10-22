@@ -36,15 +36,17 @@ begin
 end; $$;
 create trigger equipment_assignment_changed after insert on public.job_equipment_assignments
 for each row execute function public.equipment_assignment_changed();
-create or replace function public.equipment_assignment_released() returns trigger language plpgsql security definer set search_path='' as $
+create or replace function public.equipment_assignment_released() returns trigger language plpgsql security definer set search_path='' as $$
 begin
  if old.released_at is null and new.released_at is not null then
   update public.jobs set equipment_responsibility_confirmed_at=null,equipment_responsibility_confirmed_by=null where id=new.job_id;
   insert into public.job_equipment_notifications(job_id,employee_id,event_type,details) values(new.job_id,new.employee_id,'Equipment Released',jsonb_build_object('assignment_id',new.id));
  end if;
  return new;
-end; $;
+end; $$;
 create trigger equipment_assignment_released after update of released_at on public.job_equipment_assignments for each row execute function public.equipment_assignment_released();
+revoke all on function public.equipment_assignment_changed(),public.equipment_assignment_released()
+from public,anon,authenticated;
 create or replace function public.confirm_job_equipment_responsibility(p_job_id uuid)
 returns void language plpgsql security definer set search_path='' as $$
 declare j public.jobs;
