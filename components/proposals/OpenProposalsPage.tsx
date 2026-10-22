@@ -29,6 +29,7 @@ import {
   expireDueProposals,
   getProposalFamilyHistory,
   getProposalRevisionHistory,
+  getProposalById,
   getProposals,
   canRecordManualProposalAcceptance,
   markProposalDeclined,
@@ -159,6 +160,17 @@ export function OpenProposalsPage() {
         if (active) {
           setRows(proposals);
           setJobProposalIds(new Set(proposalIds));
+          const requestedProposalId = new URLSearchParams(window.location.search).get("proposalId");
+          if (requestedProposalId) {
+            const requestedProposal = proposals.find(row => row.id === requestedProposalId);
+            if (requestedProposal) setView(requestedProposal);
+            else void getProposalById(requestedProposalId)
+              .then(row => { if (active) setView(row); })
+              .catch(cause => {
+                console.error("Linked proposal could not be loaded", cause);
+                if (active) setError("The requested proposal could not be opened. It may be unavailable to your account.");
+              });
+          }
           setCanRecordManualAcceptance(manualAccess);
         }
       })
@@ -659,12 +671,15 @@ function SharedProposalPreview({
   const { profile } = useAuth();
   return (
     <Modal title={p.proposal_number} close={close}>
+      {(p.archived_at || p.status === "Archived" || p.superseded_at || !p.is_current_revision) && <p role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+        Historical / archived proposal — read-only. Open the current revision for any new actions.
+      </p>}
       <ProposalDocument document={proposalDocumentFromRecord(p)} />
       <div className="mt-6 print:hidden">
         <ProposalPricingPhotos
           proposalId={p.id}
           status={p.status}
-          canManage={canManageProposalPricingPhotos(profile)}
+          canManage={canManageProposalPricingPhotos(profile) && !p.archived_at && p.status !== "Archived" && !p.superseded_at && p.is_current_revision}
         />
       </div>
       <button
