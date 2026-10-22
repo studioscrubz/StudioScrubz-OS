@@ -11,7 +11,7 @@ import type {
   ServicePriceTier,
 } from "@/types/serviceCatalog";
 
-import { estimatedMonthlyTotal } from "@/lib/scheduling/frequency";
+import { estimatedMonthlyTotal, serviceFrequencyLabel } from "@/lib/scheduling/frequency";
 
 export function findMatchingTier(
   tiers: ServicePriceTier[],
@@ -195,6 +195,28 @@ export function matchingRecurringRules(
       rule.frequency === frequency &&
       rule.service_id === null,
   );
+}
+
+
+/** Service-scoped catalog frequency labels; never advertise an inactive rule or a different service's price. */
+export function serviceFrequencyDiscountLabel(
+  frequency: string,
+  rules: RecurringPricingRule[],
+  serviceId?: string | null,
+): string {
+  const label = serviceFrequencyLabel(frequency);
+  if (frequency === "One-Time" || !serviceId) return label;
+  const matches = matchingRecurringRules(frequency, rules, serviceId);
+  if (matches.length !== 1) return matches.length > 1 ? `${label} — choose pricing rule` : label;
+  const rule = matches[0];
+  if (rule.adjustment_type === "Percentage" && Number(rule.adjustment_value) > 0) {
+    return `${label} — up to ${Number(rule.adjustment_value)}% off`;
+  }
+  if (rule.adjustment_type === "Flat Amount" && Number(rule.adjustment_value) > 0) {
+    return `${label} — up to ${Number(rule.adjustment_value).toFixed(2)} off`;
+  }
+  if (rule.adjustment_type === "Override Price") return `${label} — custom rate`;
+  return label;
 }
 
 export function applyRecurringRule(
