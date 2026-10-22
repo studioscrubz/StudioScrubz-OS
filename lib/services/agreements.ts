@@ -91,7 +91,7 @@ export async function createAgreement(input: AgreementInput) {
     const catalog = await getServiceCatalog();
     const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
     if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
-    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
+    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceDaysOfWeek:input.days_of_week, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
     prepared = { ...input, billing_amount:input.billing_type !== "Per Visit" ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
   }
   for (let i = 0; i < 5; i++) {
