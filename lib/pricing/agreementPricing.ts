@@ -58,8 +58,8 @@ export function agreementPricingWithAdditionalDiscount(pricing: AgreementPricing
   };
 }
 
-export function catalogAgreementPricing(input: { standardPrice:number; frequency:AgreementFrequency; serviceId:string; rules:RecurringPricingRule[]; recurringPricingRuleId?:string|null;customDiscount?:number; serviceDescription?:string|null }): AgreementPricingSnapshot {
-  const pricing=calculateRecurringTotals({subtotal:input.standardPrice,frequency:input.frequency,rules:input.rules,serviceId:input.serviceId,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountAmount:Math.max(0,input.customDiscount??0)});
+export function catalogAgreementPricing(input: { standardPrice:number; frequency:AgreementFrequency; serviceId:string; rules:RecurringPricingRule[]; recurringPricingRuleId?:string|null;customDiscount?:number; serviceDaysOfWeek?:readonly number[]|null; serviceDescription?:string|null }): AgreementPricingSnapshot {
+  const pricing=calculateRecurringTotals({subtotal:input.standardPrice,frequency:input.frequency,serviceDaysOfWeek:input.serviceDaysOfWeek,rules:input.rules,serviceId:input.serviceId,recurringPricingRuleId:input.recurringPricingRuleId,manualDiscountAmount:Math.max(0,input.customDiscount??0)});
   return make({ source:"Service Catalog", serviceDescription:input.serviceDescription?.trim()||null, standard:input.standardPrice, frequency:input.frequency, recurringRuleId:pricing.recurringPricingRuleId,recurringRuleName:pricing.recurringPricingRuleName,frequencyDiscount:pricing.recurringDiscountAmount, frequencyPercent:pricing.recurringDiscountPercent, customDiscount:pricing.manualDiscount, taxes:pricing.taxes, final:pricing.finalPrice, monthly:pricing.monthlyPrice });
 }
 
