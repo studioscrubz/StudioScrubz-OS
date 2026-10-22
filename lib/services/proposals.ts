@@ -4,6 +4,16 @@ import { withImmediateAttentionPush } from "@/lib/push/client";
 import { getBusinessSettings } from "@/lib/services/businessSettings";
 
 const select = "*, client:clients!proposals_client_id_fkey(*), property:properties!proposals_property_id_fkey(*), estimate:estimates!proposals_estimate_id_fkey(*), walkthrough:walkthroughs!proposals_walkthrough_id_fkey(*)";
+/** Read-only linkage data for the Estimates page, including archived and superseded revisions. */
+export type ProposalLinkRecord = Pick<Proposal, "id" | "proposal_number" | "estimate_id" | "walkthrough_id" | "client_name" | "status" | "revision_number" | "is_current_revision" | "superseded_at" | "archived_at" | "created_at">;
+export async function getProposalLinks(): Promise<ProposalLinkRecord[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("proposals")
+    .select("id,proposal_number,estimate_id,walkthrough_id,client_name,status,revision_number,is_current_revision,superseded_at,archived_at,created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ProposalLinkRecord[];
+}
 export async function getProposals(): Promise<ProposalWithRelations[]> { const { data,error }=await getSupabaseClient().from("proposals").select(select).is("archived_at",null).or("is_current_revision.eq.true,superseded_at.is.null").neq("status","Archived").order("created_at",{ascending:false}); if(error) throw error; return data as ProposalWithRelations[]; }
 export async function getProposalById(id:string):Promise<ProposalWithRelations>{const{data,error}=await getSupabaseClient().from("proposals").select(select).eq("id",id).single();if(error)throw error;return data as ProposalWithRelations;}
 async function getActionableProposalById(id:string):Promise<ProposalWithRelations>{const{data,error}=await getSupabaseClient().from("proposals").select(select).eq("id",id).is("archived_at",null).or("is_current_revision.eq.true,superseded_at.is.null").neq("status","Archived").maybeSingle();if(error)throw error;if(!data)throw new Error("This proposal revision is historical and read-only. Open its current revision to continue.");return data as ProposalWithRelations;}
