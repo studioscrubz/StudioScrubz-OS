@@ -299,6 +299,7 @@ export function calculateRecurringTotals(input: {
   addonTotal?: number;
   frequency: string;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: readonly number[] | null;
   rules: RecurringPricingRule[];
   serviceId: string;
   recurringPricingRuleId?: string | null;
@@ -391,6 +392,7 @@ export function calculateRecurringTotals(input: {
       finalPrice,
       input.frequency,
       input.customIntervalDays,
+      input.serviceDaysOfWeek,
     ),
   };
 }

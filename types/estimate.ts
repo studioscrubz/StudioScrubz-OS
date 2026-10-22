@@ -5,7 +5,8 @@ import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
 export type EstimateStatus = "Open" | "Converted" | "Superseded" | "Declined" | "Archived";
-export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Custom";
+export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Multiple Days Per Week" | "Custom";
+export type ServiceWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionSeverity = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionDetailLevel = "Standard" | "Detailed" | "High Detail";
@@ -32,6 +33,7 @@ export type ResidentialCalculatorInput = {
   serviceType: string;
   frequency: Frequency;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: ServiceWeekday[];
   recurringPricingRuleId?: string | null;
   condition: Condition;
   squareFeet: number;
@@ -52,6 +54,7 @@ export type CommercialCalculatorInput = {
   commercialType: string;
   frequency: Frequency;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: ServiceWeekday[];
   recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;
@@ -78,6 +81,7 @@ export type PostConstructionCalculatorInput = {
   serviceCode?: string | null;
   frequency: Frequency;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: ServiceWeekday[];
   recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;
