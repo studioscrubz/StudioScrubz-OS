@@ -35,6 +35,8 @@ export function mixedVisitTotals(
 export function withMixedVisitEstimate(base: EstimateResult, input: CommercialCalculatorInput): EstimateResult {
   const visits = input.weeklyMixedVisits;
   if (input.frequency !== "Multiple Days Per Week" || visits === undefined) return base;
+  if (input.additionalServices.length || input.addonSelections?.length) throw new Error("For mixed weekly contracts, include any add-ons in the appropriate weekday scope and price.");
+  if (input.additionalDiscountPercent !== 0 || input.taxRatePercent !== 0) throw new Error("Mixed weekly day prices must be entered as final amounts; additional discounts and tax adjustments are not supported in this quote mode.");
   const totals = mixedVisitTotals(visits, input.serviceDaysOfWeek, input.workerHourlyPay);
   const laborCost = round(totals.weeklyHours * input.workerHourlyPay / visits.length);
   const averageSupplyCost = base.supplyCost;
