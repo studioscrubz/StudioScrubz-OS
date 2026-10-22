@@ -307,7 +307,8 @@ export function ProposalBuilder({
       ? getAvailableServiceAddons(catalog, catalogService.id, proposalDivision)
       : [];
   const selectedAddonSnapshots = proposalAddonSnapshots(adjustments, availableAddons);
-  const matchingRules = catalogService
+  const weeklyMixedSource = Boolean(estimate?.result.weeklyMixedVisits?.length || walkthrough?.pricing_review?.estimateResult.weeklyMixedVisits?.length || proposal?.result.weeklyMixedVisits?.length);
+  const matchingRules = weeklyMixedSource ? [] : catalogService
     ? matchingRecurringRules(frequency, rules, catalogService.id)
     : [];
   const effectiveRuleId =
@@ -493,6 +494,8 @@ export function ProposalBuilder({
       return setError("Select the recurring pricing rule for this Proposal.");
     if (frequency === "Multiple Days Per Week" && !validServiceWeekdays(serviceDaysOfWeek))
       return setError("Choose at least two distinct weekly service days before saving the proposal.");
+    if (weeklyMixedSource && (frequency !== "Multiple Days Per Week" || JSON.stringify([...(serviceDaysOfWeek??[])].sort()) !== JSON.stringify([...(sourceEstimate?.calculatorInput.serviceDaysOfWeek??proposal?.result.serviceDaysOfWeek??[])].sort()) || manualPrice !== null || discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.some(item=>!item.inherited)))
+      return setError("Mixed-scope weekly proposals must preserve the approved individual day prices. Edit weekday prices in the source Estimate; do not apply a uniform per-visit change or discount.");
     if (!proposal && walkthrough && !walkthrough.pricing_review)
       return setError(
         "Review and approve Walkthrough pricing before creating the Proposal.",
