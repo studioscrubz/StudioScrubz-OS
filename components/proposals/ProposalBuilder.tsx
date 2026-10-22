@@ -1074,6 +1074,7 @@ function Summary({
   const customServiceAdjustments = r.adjustments
     .filter((item) => !item.catalogAddonId)
     .reduce((sum, item) => sum + item.amount, 0) + r.additionalLabor + r.additionalMaterials;
+  const mixed = r.weeklyMixedVisits?.length ? r.weeklyMixedVisits : null;
   const discountedService = Math.max(
     0,
     r.baseEstimateAmount + customServiceAdjustments -
@@ -1095,6 +1096,7 @@ function Summary({
       </div>
       <dl className="mt-5 divide-y divide-white/10">
         {[
+          ...(mixed ? [...mixed.map(v => [["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][v.day]+" — "+v.serviceLevel, money(v.price)]), ["Weekly Contract Total",money(r.weeklyContractTotal??0)],["Average Monthly Contract",money(r.monthlyTotal??0)]] : [
           ["Base Service Price", money(r.baseEstimateAmount)],
           [
             "Custom Service Adjustments",
@@ -1124,6 +1126,7 @@ function Summary({
             "Estimated Monthly",
             r.monthlyTotal !== null ? money(r.monthlyTotal) : "—",
           ],
+          ]),
           ["Labor Hours", String(r.laborHours)],
           ["Crew", String(r.crewRecommendation)],
           ["Duration", `${r.estimatedDuration} hrs`],
