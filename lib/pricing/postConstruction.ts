@@ -1,6 +1,7 @@
 import type { Condition, EstimateResult, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
 import type { PostConstructionV2Input, PostConstructionV2Result } from "@/types/estimate";
 import { requireMinimumWorkerHourlyPay } from "@/lib/pricing/workerHourlyPay";
+import { estimatedMonthlyTotal as scheduleMonthlyTotal, estimatedVisitsPerMonth as scheduleVisitsPerMonth } from "@/lib/scheduling/frequency";
 
 export const POST_CONSTRUCTION_BASE_HOURS_PER_1K_SQUARE_FEET = 19;
 export const POST_CONSTRUCTION_MAX_MARGIN_PERCENT = 70;
@@ -121,8 +122,8 @@ export function calculatePostConstructionEstimate(input: PostConstructionCalcula
     taxes: money(taxes),
     calculatedFinalPrice: money(finalPrice),
     finalPrice: money(finalPrice),
-    monthlyPrice: estimatedMonthlyTotal(finalPrice, input.frequency, input.customIntervalDays),
-    visitsPerMonth: estimatedVisitsPerMonth(input.frequency, input.customIntervalDays),
+    monthlyPrice: scheduleMonthlyTotal(finalPrice, input.frequency, input.customIntervalDays, input.serviceDaysOfWeek),
+    visitsPerMonth: scheduleVisitsPerMonth(input.frequency, input.customIntervalDays, input.serviceDaysOfWeek),
     laborHours: roundedLaborHours,
     crewSize: recommendedCrewSize,
     estimatedDuration: tenth(totalLaborHours / recommendedCrewSize),
