@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { usesSalesPipelineProjection, readSalesPipeline } from "@/lib/services/salesPipeline";
 import { createClient } from "@/lib/services/clients";
 import { createProperty } from "@/lib/services/properties";
 import type { Client, ClientInput } from "@/types/client";
@@ -8,12 +9,18 @@ import type { Property, PropertyInput } from "@/types/property";
 const estimateSelect = "*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)";
 
 export async function getEstimates(): Promise<EstimateWithRelations[]> {
+  if (await usesSalesPipelineProjection()) return readSalesPipeline<EstimateWithRelations>("read_sales_estimates");
   const { data, error } = await getSupabaseClient().from("estimates").select(estimateSelect).order("created_at", { ascending: false });
   if (error) throw error;
   return data as EstimateWithRelations[];
 }
 
 export async function getEstimateById(id: string): Promise<EstimateWithRelations> {
+  if (await usesSalesPipelineProjection()) {
+    const item = (await readSalesPipeline<EstimateWithRelations>("read_sales_estimates")).find(row=>row.id===id);
+    if (!item) throw new Error("Estimate not found.");
+    return item;
+  }
   const { data, error } = await getSupabaseClient().from("estimates").select(estimateSelect).eq("id", id).single();
   if (error) throw error;
   return data as EstimateWithRelations;
