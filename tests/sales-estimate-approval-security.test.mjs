@@ -59,3 +59,16 @@ test("migration function terminators and PL/pgSQL declaration structure",()=>{
   assert.ok(migration.includes(["DECLARE","  valid_review boolean;","  source_id uuid;","  e public.estimates;"].join(String.fromCharCode(10))));
   assert.ok(migration.includes(["end;","$function$;","","","CREATE OR REPLACE FUNCTION public.review_proposal_approval"].join(String.fromCharCode(10))));
 });
+
+test("pricing revisions are audited and cannot silently reuse prior approvals",()=>{
+  assert.match(migration,/CREATE OR REPLACE FUNCTION private\.audit_estimate_approval_invalidation/);
+  assert.match(migration,/CREATE TRIGGER estimates_approval_revision_audit AFTER UPDATE/);
+  assert.match(migration,/new\.approval_version > old\.approval_version/);
+  assert.match(migration,/old\.approval_version,'Revision Required',actor,old\.approval_status,new\.approval_status/);
+  assert.match(migration,/Authenticated user required to revise reviewed pricing/);
+});
+test("new estimates and proposals cannot forge reviewer metadata on INSERT",()=>{
+  assert.match(migration,/Estimate approval audit fields are server-generated/);
+  assert.match(migration,/New proposals must begin unapproved and unsent/);
+  assert.match(migration,/new\.status <> 'Draft' OR new\.approval_status <> 'Not Submitted'/);
+});
