@@ -161,6 +161,11 @@ export function hasPermission(
   );
 }
 
+/** Manager inherits Crew Lead employee-facing tools while retaining all management grants. */
+export function canViewOwnJobFeedback(profile: UserProfile | null): boolean {
+  return Boolean(profile?.is_active && profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role));
+}
+
 export function isMasterAdmin(profile: UserProfile | null): boolean {
   return profile?.is_active === true && profile.role === "Master Admin";
 }
