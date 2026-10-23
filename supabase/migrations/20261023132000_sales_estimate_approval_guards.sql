@@ -636,3 +636,26 @@ BEGIN
    );
  END LOOP;
 END $security$;
+
+-- Published customer prices remain available to Sales, never internal margin rules.
+CREATE OR REPLACE FUNCTION public.read_sales_catalog()
+RETURNS SETOF jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF auth.uid() IS NULL OR NOT EXISTS (
+  SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role='Sales'
+ ) THEN RAISE EXCEPTION 'Sales access required' USING ERRCODE='42501'; END IF;
+ RETURN QUERY SELECT jsonb_build_object(
+   'services',(SELECT coalesce(jsonb_agg(to_jsonb(s)-'pricing_config' ORDER BY s.display_order,s.service_name),'[]'::jsonb)
+                FROM public.services s WHERE s.is_active AND s.archived_at IS NULL),
+   'tiers',(SELECT coalesce(jsonb_agg(to_jsonb(t)-'pricing_config' ORDER BY t.display_order),'[]'::jsonb)
+              FROM public.service_price_tiers t WHERE t.is_active),
+   'addons',(SELECT coalesce(jsonb_agg(to_jsonb(a)-'pricing_config' ORDER BY a.display_order),'[]'::jsonb)
+               FROM public.service_addons a WHERE a.is_active AND a.archived_at IS NULL),
+   'addonLinks',(SELECT coalesce(jsonb_agg(jsonb_build_object('service_id',l.service_id,'addon_id',l.addon_id)),'[]'::jsonb)
+                   FROM public.service_addon_links l),
+   'recurringRules',(SELECT coalesce(jsonb_agg(to_jsonb(r)),'[]'::jsonb)
+                       FROM public.recurring_pricing_rules r WHERE r.is_active)
+ );
+END $$;
+REVOKE ALL ON FUNCTION public.read_sales_catalog() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.read_sales_catalog() TO authenticated;
