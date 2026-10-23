@@ -200,3 +200,6 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 - New table: `estimate_approval_history`.
 - Existing RPC safeguards and triggers: `mark_estimate_sent_for_delivery`, `prepare_proposal_delivery`, and `mark_proposal_sent_for_delivery` are further restricted with approval-integrity triggers.
 - Not deployed: Sales-only data redaction and production migration verification are required before merge.
+
+
+2026-10-23 Sales financial read restriction (unapplied): `read_sales_estimates`, `read_sales_proposals`, `read_sales_walkthroughs`, and `read_sales_catalog` return authorized customer-facing JSON only, and restrictive Sales SELECT policies deny direct reads of raw financial table records. Source is `20261023132000_sales_estimate_approval_guards.sql`. Do not deploy until Sales write RPCs and pricing screens are adapted: PostgreSQL UPDATE with RLS also requires SELECT.
