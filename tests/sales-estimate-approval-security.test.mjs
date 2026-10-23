@@ -24,7 +24,7 @@ test("approval states and server-side deliverability guard exist",()=>{
 });
 test("signed-in role checks protect approval RPCs and snapshots are not client-supplied",()=>{
   assert.match(migration,/actor uuid:=auth\.uid\(\)/);
-  assert.match(migration,/role_name NOT IN \('Manager','Master Admin'\)/);
+  assert.match(migration,/coalesce\\(role_name, ''\\) NOT IN \('Manager','Master Admin'\)/);
   assert.match(migration,/Use the estimate approval workflow/);
   assert.match(migration,/Cannot forge a proposal approval snapshot/);
   assert.match(migration,/Proposal approval must be recorded by an authorized reviewer/);
@@ -53,4 +53,9 @@ test("proposal decisions are made by audited server-side RPC",()=>{
 test("Lead Representative payout and attribution unchanged",()=>{
   assert.doesNotMatch(migration,/ALTER TABLE public\.lead_representatives|UPDATE public\.lead_representative_commissions/i);
   assert.match(permissions,/"Lead Representative": new Set\(\[/);
+});
+
+test("migration function terminators and PL/pgSQL declaration structure",()=>{
+  assert.match(migration,/DECLARE\s+valid_review boolean;\s+source_id uuid;\s+e public\\.estimates;/);
+  assert.match(migration,/end;\s*\\$function\\$;\s*CREATE OR REPLACE FUNCTION public\\.review_proposal_approval/);
 });
