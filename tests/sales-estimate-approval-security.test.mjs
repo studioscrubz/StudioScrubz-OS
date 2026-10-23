@@ -56,6 +56,6 @@ test("Lead Representative payout and attribution unchanged",()=>{
 });
 
 test("migration function terminators and PL/pgSQL declaration structure",()=>{
-  assert.ok(migration.includes("DECLARE\\n  valid_review boolean;\\n  source_id uuid;\\n  e public.estimates;"));
-  assert.ok(migration.includes("end;\\n$function$;\\n\\n\\nCREATE OR REPLACE FUNCTION public.review_proposal_approval"));
+  assert.ok(migration.includes(["DECLARE","  valid_review boolean;","  source_id uuid;","  e public.estimates;"].join(String.fromCharCode(10))));
+  assert.ok(migration.includes(["end;","$function$;","","","CREATE OR REPLACE FUNCTION public.review_proposal_approval"].join(String.fromCharCode(10))));
 });
