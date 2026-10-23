@@ -72,3 +72,28 @@ test("new estimates and proposals cannot forge reviewer metadata on INSERT",()=>
   assert.match(migration,/New proposals must begin unapproved and unsent/);
   assert.match(migration,/new\.status <> 'Draft' OR new\.approval_status <> 'Not Submitted'/);
 });
+
+test("Sales cannot directly SELECT private estimate, proposal, walkthrough or catalog JSON",()=>{
+  assert.match(migration,/AS RESTRICTIVE FOR SELECT TO authenticated/);
+  assert.match(migration,/\['estimates','proposals','walkthroughs','services','service_addons','service_price_tiers','recurring_pricing_rules'\]/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.read_sales_estimates\(\)/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.read_sales_proposals\(\)/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.read_sales_walkthroughs\(\)/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.read_sales_catalog\(\)/);
+  assert.match(migration,/p\.is_active AND p\.role='Sales'/);
+  assert.match(migration,/private\.sales_public_estimate_result\(e\.result\)/);
+  assert.match(migration,/private\.sales_public_proposal_result\(p\.result\)/);
+  assert.match(migration,/REVOKE ALL ON FUNCTION public\.read_sales_estimates\(\) FROM PUBLIC,anon/);
+  assert.match(migration,/REVOKE ALL ON FUNCTION public\.read_sales_catalog\(\) FROM PUBLIC,anon/);
+});
+test("Client Sales reads must route through authenticated safe RPCs",()=>{
+  const projection=read("lib/services/salesPipeline.ts");
+  const catalog=read("lib/services/serviceCatalog.ts");
+  const walkthroughs=read("lib/services/walkthroughs.ts");
+  assert.match(projection,/usesSalesPipelineProjection/);
+  assert.match(projection,/getCurrentProfile\(\)/);
+  assert.match(estimates,/readSalesPipeline<EstimateWithRelations>\("read_sales_estimates"\)/);
+  assert.match(proposals,/readSalesPipeline<ProposalWithRelations>\("read_sales_proposals"\)/);
+  assert.match(walkthroughs,/readSalesPipeline<WalkthroughWithRelations>\("read_sales_walkthroughs"\)/);
+  assert.match(catalog,/readSalesPipeline<ServiceCatalogBundle>\("read_sales_catalog"\)/);
+});
