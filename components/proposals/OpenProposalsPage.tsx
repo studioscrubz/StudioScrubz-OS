@@ -603,11 +603,11 @@ function Card({
                 disabled={busy}
                 f={() => promptAction("changes")}
               />
-              <Action
+              {profile?.role === "Master Admin" && <Action
                 t="Reject"
                 disabled={busy}
                 f={() => promptAction("reject")}
-              />
+              />}
             </>
           )}
         {actionable && canSend &&
