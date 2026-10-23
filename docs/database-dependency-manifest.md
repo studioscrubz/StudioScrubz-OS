@@ -191,3 +191,12 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 2026-10-11 Internal Schedule Events: `internal_schedule_event_google_syncs` is introduced by migration `20261011155011_internal_schedule_google_meet_and_related_clients.sql`.
 
 2026-10-11 Calendar Completed History: `get_calendar_completed_history` is defined by migration `20261011210000_calendar_completed_history.sql`.
+
+
+## 2026-10-23 Sales estimate approvals (unapplied forward migration)
+
+- Migration source: `supabase/migrations/20261023132000_sales_estimate_approval_guards.sql`.
+- New RPC: `submit_estimate_for_approval`, `review_estimate_approval`, `get_estimate_approval_history`, and `review_proposal_approval`.
+- New table: `estimate_approval_history`.
+- Existing RPC safeguards and triggers: `mark_estimate_sent_for_delivery`, `prepare_proposal_delivery`, and `mark_proposal_sent_for_delivery` are further restricted with approval-integrity triggers.
+- Not deployed: Sales-only data redaction and production migration verification are required before merge.
