@@ -533,7 +533,7 @@ REVOKE ALL ON FUNCTION private.sales_public_proposal_result(jsonb) FROM PUBLIC,a
 
 CREATE OR REPLACE FUNCTION private.sales_public_walkthrough(p_walkthrough public.walkthroughs)
 RETURNS jsonb LANGUAGE sql STABLE SET search_path='' AS $$
- SELECT (to_jsonb(p_walkthrough) - 'pricing_review' - 'measurements')
+ SELECT (to_jsonb(p_walkthrough) - 'pricing_review' - 'measurements' - 'recommendations')
  || jsonb_build_object(
    'measurements',coalesce(to_jsonb(p_walkthrough.measurements),'{}'::jsonb)
        - 'workerHourlyPay' - 'targetProfitMarginPercent' - 'projectCosting'
@@ -645,7 +645,7 @@ BEGIN
   SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role='Sales'
  ) THEN RAISE EXCEPTION 'Sales access required' USING ERRCODE='42501'; END IF;
  RETURN QUERY SELECT jsonb_build_object(
-   'services',(SELECT coalesce(jsonb_agg(to_jsonb(s)-'pricing_config' ORDER BY s.display_order,s.service_name),'[]'::jsonb)
+   'services',(SELECT coalesce(jsonb_agg(to_jsonb(s)-'pricing_config'-'notes' ORDER BY s.display_order,s.service_name),'[]'::jsonb)
                 FROM public.services s WHERE s.is_active AND s.archived_at IS NULL),
    'tiers',(SELECT coalesce(jsonb_agg(to_jsonb(t)-'pricing_config' ORDER BY t.display_order),'[]'::jsonb)
               FROM public.service_price_tiers t WHERE t.is_active),
