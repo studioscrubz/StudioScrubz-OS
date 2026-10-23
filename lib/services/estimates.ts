@@ -59,14 +59,17 @@ export type EstimateApprovalHistoryRow = {
   actor_id: string; from_status: string; to_status: string; notes: string | null; created_at: string;
 };
 
+type ApprovalRpcClient = {rpc:(functionName:string,args:Record<string,unknown>)=>Promise<{data:unknown,error:{message:string}|null}>};
+const approvalRpc = () => getSupabaseClient() as unknown as ApprovalRpcClient;
+
 export async function submitEstimateForApproval(id: string): Promise<Estimate> {
-  const { data, error } = await getSupabaseClient().rpc("submit_estimate_for_approval", { p_estimate_id: id });
+  const { data, error } = await approvalRpc().rpc("submit_estimate_for_approval", { p_estimate_id: id });
   if (error) throw error;
   return data as Estimate;
 }
 
 export async function reviewEstimateApproval(id: string, decision: "Approved" | "Changes Requested", notes: string | null): Promise<Estimate> {
-  const { data, error } = await getSupabaseClient().rpc("review_estimate_approval", {
+  const { data, error } = await approvalRpc().rpc("review_estimate_approval", {
     p_estimate_id: id, p_decision: decision, p_notes: notes,
   });
   if (error) throw error;
@@ -74,9 +77,7 @@ export async function reviewEstimateApproval(id: string, decision: "Approved" | 
 }
 
 export async function getEstimateApprovalHistory(id: string): Promise<EstimateApprovalHistoryRow[]> {
-  const { data, error } = await getSupabaseClient().from("estimate_approval_history")
-    .select("id,estimate_id,version,action,actor_id,from_status,to_status,notes,created_at")
-    .eq("estimate_id", id).order("created_at", { ascending: false });
+  const { data, error } = await approvalRpc().rpc("get_estimate_approval_history",{p_estimate_id:id});
   if (error) throw error;
   return (data ?? []) as EstimateApprovalHistoryRow[];
 }
