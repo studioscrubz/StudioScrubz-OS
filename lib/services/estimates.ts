@@ -53,6 +53,34 @@ export async function markEstimateSent(id: string, input: { recipient: string; s
   return data;
 }
 
+export type EstimateApprovalHistoryRow = {
+  id: string; estimate_id: string; version: number;
+  action: "Submitted" | "Approved" | "Changes Requested" | "Revision Required";
+  actor_id: string; from_status: string; to_status: string; notes: string | null; created_at: string;
+};
+
+export async function submitEstimateForApproval(id: string): Promise<Estimate> {
+  const { data, error } = await getSupabaseClient().rpc("submit_estimate_for_approval", { p_estimate_id: id });
+  if (error) throw error;
+  return data as Estimate;
+}
+
+export async function reviewEstimateApproval(id: string, decision: "Approved" | "Changes Requested", notes: string | null): Promise<Estimate> {
+  const { data, error } = await getSupabaseClient().rpc("review_estimate_approval", {
+    p_estimate_id: id, p_decision: decision, p_notes: notes,
+  });
+  if (error) throw error;
+  return data as Estimate;
+}
+
+export async function getEstimateApprovalHistory(id: string): Promise<EstimateApprovalHistoryRow[]> {
+  const { data, error } = await getSupabaseClient().from("estimate_approval_history")
+    .select("id,estimate_id,version,action,actor_id,from_status,to_status,notes,created_at")
+    .eq("estimate_id", id).order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as EstimateApprovalHistoryRow[];
+}
+
 export async function findOrCreateEstimateClient(customer: CustomerInformation, division: EstimateDivision): Promise<Client> {
   const { data, error } = await getSupabaseClient().from("clients").select("*");
   if (error) throw new Error(`Client lookup failed: ${error.message}`);
