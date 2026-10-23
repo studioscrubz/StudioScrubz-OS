@@ -456,3 +456,183 @@ LANGUAGE sql SECURITY INVOKER SET search_path='' AS $$
 $$;
 REVOKE ALL ON FUNCTION public.get_estimate_approval_history(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.get_estimate_approval_history(uuid) TO authenticated;
+
+
+-- Direct table read access would expose internal profit, labor and pricing JSON.
+-- Route Sales reads through whitelisted projections, not SELECT * or generic JSON key subtraction.
+CREATE OR REPLACE FUNCTION private.sales_public_estimate_result(p_result jsonb)
+RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $$
+ SELECT jsonb_strip_nulls(jsonb_build_object(
+   'serviceName',p_result->'serviceName',
+   'serviceDescription',p_result->'serviceDescription',
+   'scope',p_result->'scope',
+   'basePrice',p_result->'basePrice',
+   'oneTimePrice',p_result->'oneTimePrice',
+   'calculatedFinalPrice',p_result->'calculatedFinalPrice',
+   'finalPrice',p_result->'finalPrice',
+   'weeklyContractTotal',p_result->'weeklyContractTotal',
+   'monthlyPrice',p_result->'monthlyPrice',
+   'recurringDiscount',p_result->'recurringDiscount',
+   'recurringDiscountPercent',p_result->'recurringDiscountPercent',
+   'manualDiscount',p_result->'manualDiscount',
+   'totalDiscount',p_result->'totalDiscount',
+   'taxes',p_result->'taxes',
+   'visitsPerMonth',p_result->'visitsPerMonth',
+   'manualPrice',p_result->'manualPrice',
+   'catalogAddons',p_result->'catalogAddons',
+   'adjustments',p_result->'adjustments',
+   'weeklyMixedVisits',(
+     SELECT coalesce(jsonb_agg(jsonb_build_object(
+       'day',v.value->'day',
+       'serviceLevel',v.value->'serviceLevel',
+       'scope',v.value->'scope',
+       'price',v.value->'price'
+     ) ORDER BY v.ordinality),'[]'::jsonb)
+     FROM jsonb_array_elements(
+       CASE WHEN jsonb_typeof(p_result->'weeklyMixedVisits')='array'
+         THEN p_result->'weeklyMixedVisits' ELSE '[]'::jsonb END
+     ) WITH ORDINALITY AS v(value,ordinality)
+   )
+ ))
+$$;
+REVOKE ALL ON FUNCTION private.sales_public_estimate_result(jsonb) FROM PUBLIC,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION private.sales_public_proposal_result(p_result jsonb)
+RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $$
+ SELECT jsonb_strip_nulls(jsonb_build_object(
+   'serviceName',p_result->'serviceName',
+   'serviceDescription',p_result->'serviceDescription',
+   'baseEstimateAmount',p_result->'baseEstimateAmount',
+   'adjustments',p_result->'adjustments',
+   'manualDiscount',p_result->'manualDiscount',
+   'perVisitTotal',p_result->'perVisitTotal',
+   'monthlyTotal',p_result->'monthlyTotal',
+   'weeklyContractTotal',p_result->'weeklyContractTotal',
+   'serviceDaysOfWeek',p_result->'serviceDaysOfWeek',
+   'scope',p_result->'scope',
+   'terms',p_result->'terms',
+   'taxes',p_result->'taxes',
+   'taxRate',p_result->'taxRate',
+   'taxFreePricing',p_result->'taxFreePricing',
+   'calculatedPerVisitTotal',p_result->'calculatedPerVisitTotal',
+   'weeklyMixedVisits',(
+     SELECT coalesce(jsonb_agg(jsonb_build_object(
+       'day',v.value->'day',
+       'serviceLevel',v.value->'serviceLevel',
+       'scope',v.value->'scope',
+       'price',v.value->'price'
+     ) ORDER BY v.ordinality),'[]'::jsonb)
+     FROM jsonb_array_elements(
+       CASE WHEN jsonb_typeof(p_result->'weeklyMixedVisits')='array'
+         THEN p_result->'weeklyMixedVisits' ELSE '[]'::jsonb END
+     ) WITH ORDINALITY AS v(value,ordinality)
+   )
+ ))
+$$;
+REVOKE ALL ON FUNCTION private.sales_public_proposal_result(jsonb) FROM PUBLIC,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION private.sales_public_walkthrough(p_walkthrough public.walkthroughs)
+RETURNS jsonb LANGUAGE sql STABLE SET search_path='' AS $$
+ SELECT (to_jsonb(p_walkthrough) - 'pricing_review' - 'measurements')
+ || jsonb_build_object(
+   'measurements',coalesce(to_jsonb(p_walkthrough.measurements),'{}'::jsonb)
+       - 'workerHourlyPay' - 'targetProfitMarginPercent' - 'projectCosting'
+       - 'totalLaborCost' - 'projectedProfit' - 'profitMargin',
+   'pricing_review',CASE WHEN p_walkthrough.pricing_review IS NULL THEN NULL ELSE
+     jsonb_strip_nulls(jsonb_build_object(
+       'serviceName',p_walkthrough.pricing_review->'serviceName',
+       'serviceDescription',p_walkthrough.pricing_review->'serviceDescription',
+       'scope',p_walkthrough.pricing_review->'scope',
+       'finalReviewedPrice',p_walkthrough.pricing_review->'finalReviewedPrice',
+       'frequency',p_walkthrough.pricing_review->'frequency',
+       'reviewedAt',p_walkthrough.pricing_review->'reviewedAt',
+       'reviewedBy',p_walkthrough.pricing_review->'reviewedBy',
+       'estimateResult',private.sales_public_estimate_result(p_walkthrough.pricing_review->'estimateResult')
+     )) END
+ )
+$$;
+REVOKE ALL ON FUNCTION private.sales_public_walkthrough(public.walkthroughs) FROM PUBLIC,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION public.read_sales_estimates()
+RETURNS SETOF jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF auth.uid() IS NULL OR NOT EXISTS(
+   SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role='Sales'
+ ) THEN RAISE EXCEPTION 'Sales access required' USING ERRCODE='42501'; END IF;
+ RETURN QUERY
+   SELECT (to_jsonb(e) - 'result' - 'approved_pricing_snapshot' - 'client_delivery_snapshot')
+    || jsonb_build_object('result',private.sales_public_estimate_result(e.result),
+                         'client',to_jsonb(c),'property',to_jsonb(pr))
+   FROM public.estimates e
+   LEFT JOIN public.clients c ON c.id=e.client_id
+   LEFT JOIN public.properties pr ON pr.id=e.property_id
+   ORDER BY e.created_at DESC;
+END $$;
+REVOKE ALL ON FUNCTION public.read_sales_estimates() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.read_sales_estimates() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.read_sales_walkthroughs()
+RETURNS SETOF jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF auth.uid() IS NULL OR NOT EXISTS(
+   SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role='Sales'
+ ) THEN RAISE EXCEPTION 'Sales access required' USING ERRCODE='42501'; END IF;
+ RETURN QUERY
+   SELECT private.sales_public_walkthrough(w)
+     || jsonb_build_object('client',to_jsonb(c),'property',to_jsonb(pr),
+         'estimate',CASE WHEN e.id IS NULL THEN NULL ELSE
+           (to_jsonb(e)-'result'-'approved_pricing_snapshot'-'client_delivery_snapshot')
+           || jsonb_build_object('result',private.sales_public_estimate_result(e.result)) END)
+   FROM public.walkthroughs w
+   LEFT JOIN public.clients c ON c.id=w.client_id
+   LEFT JOIN public.properties pr ON pr.id=w.property_id
+   LEFT JOIN public.estimates e ON e.id=w.estimate_id
+   ORDER BY w.created_at DESC;
+END $$;
+REVOKE ALL ON FUNCTION public.read_sales_walkthroughs() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.read_sales_walkthroughs() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.read_sales_proposals()
+RETURNS SETOF jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF auth.uid() IS NULL OR NOT EXISTS(
+   SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role='Sales'
+ ) THEN RAISE EXCEPTION 'Sales access required' USING ERRCODE='42501'; END IF;
+ RETURN QUERY
+   SELECT (to_jsonb(p)-'result'-'approved_pricing_snapshot'-'client_delivery_snapshot')
+     || jsonb_build_object(
+       'result',private.sales_public_proposal_result(p.result),
+       'client',to_jsonb(c),'property',to_jsonb(pr),
+       'estimate',CASE WHEN e.id IS NULL THEN NULL ELSE
+           (to_jsonb(e)-'result'-'approved_pricing_snapshot'-'client_delivery_snapshot')
+           || jsonb_build_object('result',private.sales_public_estimate_result(e.result)) END,
+       'walkthrough',CASE WHEN w.id IS NULL THEN NULL ELSE private.sales_public_walkthrough(w) END)
+   FROM public.proposals p
+   LEFT JOIN public.clients c ON c.id=p.client_id
+   LEFT JOIN public.properties pr ON pr.id=p.property_id
+   LEFT JOIN public.estimates e ON e.id=p.estimate_id
+   LEFT JOIN public.walkthroughs w ON w.id=p.walkthrough_id
+   ORDER BY p.created_at DESC;
+END $$;
+REVOKE ALL ON FUNCTION public.read_sales_proposals() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.read_sales_proposals() TO authenticated;
+
+-- Always close direct raw JSON reads, regardless of permissive legacy Sales RLS grants.
+-- These restrictive policies also deny SELECT required for direct Sales UPDATE/INSERT RETURNING.
+-- Consequently, Sales writes must use separately validated RPCs before this migration can release.
+DO $security$
+DECLARE t text;
+BEGIN
+ FOREACH t IN ARRAY ARRAY['estimates','proposals','walkthroughs','services','service_addons','service_price_tiers','recurring_pricing_rules']
+ LOOP
+   EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I','Deny Sales raw financial records',t);
+   EXECUTE format(
+     'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR SELECT TO authenticated USING (' ||
+     'NOT EXISTS (SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role=%L))',
+     'Deny Sales raw financial records',t,'Sales'
+   );
+ END LOOP;
+END $security$;
