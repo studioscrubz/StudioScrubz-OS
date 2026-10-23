@@ -42,7 +42,7 @@ CREATE POLICY "Estimate approval history view" ON public.estimate_approval_histo
  FOR SELECT TO authenticated USING (
   public.has_any_role(ARRAY['Master Admin','Manager','Administrator'])
   OR EXISTS (SELECT 1 FROM public.estimates e
-    WHERE e.id=estimate_id AND e.approval_submitted_by=auth.uid())
+    WHERE e.id=estimate_id AND (e.approval_submitted_by=auth.uid() OR e.approval_created_by=auth.uid()))
  );
 REVOKE ALL ON public.estimate_approval_history FROM anon,authenticated;
 GRANT SELECT ON public.estimate_approval_history TO authenticated;
@@ -412,3 +412,12 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.review_proposal_approval(uuid,text,text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.review_proposal_approval(uuid,text,text) TO authenticated;
+
+-- History is filtered by RLS; expose a read-only RPC without broadening table access.
+CREATE OR REPLACE FUNCTION public.get_estimate_approval_history(p_estimate_id uuid)
+RETURNS SETOF public.estimate_approval_history
+LANGUAGE sql SECURITY INVOKER SET search_path='' AS $$
+ SELECT * FROM public.estimate_approval_history WHERE estimate_id=p_estimate_id ORDER BY created_at DESC
+$$;
+REVOKE ALL ON FUNCTION public.get_estimate_approval_history(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.get_estimate_approval_history(uuid) TO authenticated;
