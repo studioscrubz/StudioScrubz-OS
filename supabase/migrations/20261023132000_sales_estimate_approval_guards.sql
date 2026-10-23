@@ -67,6 +67,12 @@ DECLARE
   previous_status text;
 BEGIN
   IF TG_OP='INSERT' THEN
+    IF new.approval_created_by IS NOT NULL
+      OR new.approval_submitted_at IS NOT NULL
+      OR new.approval_reviewed_at IS NOT NULL
+      OR new.approval_notes IS NOT NULL THEN
+      RAISE EXCEPTION 'Estimate approval audit fields are server-generated' USING ERRCODE='42501';
+    END IF;
     IF new.approval_status <> 'Draft'
       OR new.approval_version <> 1
       OR new.approval_reviewed_by IS NOT NULL OR new.approval_submitted_by IS NOT NULL
@@ -117,6 +123,29 @@ BEGIN
   END IF;
   RETURN new;
 END $$;
+-- Record the exact previous approval version when an authenticated edit invalidates it.
+CREATE OR REPLACE FUNCTION private.audit_estimate_approval_invalidation()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE actor uuid := auth.uid();
+BEGIN
+  IF new.approval_version > old.approval_version THEN
+    IF actor IS NULL THEN
+      RAISE EXCEPTION 'Authenticated user required to revise reviewed pricing' USING ERRCODE='42501';
+    END IF;
+    INSERT INTO public.estimate_approval_history
+      (estimate_id,version,action,actor_id,from_status,to_status,notes)
+    VALUES
+      (old.id,old.approval_version,'Revision Required',actor,old.approval_status,new.approval_status,
+       'Estimate pricing or scope changed; prior approval invalidated.');
+  END IF;
+  RETURN NULL;
+END $;
+REVOKE ALL ON FUNCTION private.audit_estimate_approval_invalidation() FROM PUBLIC,anon,authenticated;
+DROP TRIGGER IF EXISTS estimates_approval_revision_audit ON public.estimates;
+CREATE TRIGGER estimates_approval_revision_audit AFTER UPDATE ON public.estimates
+  FOR EACH ROW WHEN (new.approval_version > old.approval_version)
+  EXECUTE FUNCTION private.audit_estimate_approval_invalidation();
+
 DROP TRIGGER IF EXISTS estimates_approval_guard ON public.estimates;
 CREATE TRIGGER estimates_approval_guard BEFORE INSERT OR UPDATE ON public.estimates
   FOR EACH ROW EXECUTE FUNCTION private.guard_estimate_approval();
@@ -217,6 +246,11 @@ BEGIN
    AND current_user=(SELECT pg_catalog.pg_get_userbyid(proowner) FROM pg_catalog.pg_proc
      WHERE oid='public.review_proposal_approval(uuid,text,text)'::pg_catalog.regprocedure);
  IF tg_op='INSERT' THEN
+   IF new.status <> 'Draft' OR new.approval_status <> 'Not Submitted'
+      OR new.approved_at IS NOT NULL OR new.approved_by IS NOT NULL
+      OR new.sent_at IS NOT NULL OR new.client_access_token IS NOT NULL THEN
+     RAISE EXCEPTION 'New proposals must begin unapproved and unsent' USING ERRCODE='42501';
+   END IF;
    IF new.approved_pricing_snapshot IS NOT NULL THEN
      RAISE EXCEPTION 'Cannot forge a proposal approval snapshot' USING ERRCODE='42501';
    END IF;
