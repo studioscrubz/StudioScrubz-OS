@@ -208,9 +208,10 @@ REVOKE ALL ON FUNCTION private.proposal_approved_snapshot(public.proposals) FROM
 
 CREATE OR REPLACE FUNCTION private.proposal_approval_integrity()
 RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$
-DECLARE valid_review boolean;
-DECLARE source_id uuid;
-DECLARE e public.estimates;
+DECLARE
+  valid_review boolean;
+  source_id uuid;
+  e public.estimates;
 BEGIN
  valid_review := current_setting('studioscrubz.proposal_review_rpc',true)='on'
    AND current_user=(SELECT pg_catalog.pg_get_userbyid(proowner) FROM pg_catalog.pg_proc
@@ -375,7 +376,7 @@ begin
   then raise exception 'Only Master Admin may change proposal approval or acceptance fields'; end if;
   return new;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.review_proposal_approval(p_proposal_id uuid,p_decision text,p_notes text DEFAULT NULL)
@@ -383,7 +384,7 @@ RETURNS public.proposals LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS
 DECLARE p public.proposals; actor uuid:=auth.uid(); role_name text;
 BEGIN
  SELECT role INTO role_name FROM public.user_profiles WHERE id=actor AND is_active=true;
- IF role_name NOT IN ('Manager','Master Admin') THEN
+ IF coalesce(role_name, '') NOT IN ('Manager','Master Admin') THEN
    RAISE EXCEPTION 'Only Manager or Master Admin can approve proposals' USING ERRCODE='42501';
  END IF;
  IF p_decision NOT IN ('Approved','Changes Requested') THEN RAISE EXCEPTION 'Invalid decision'; END IF;
