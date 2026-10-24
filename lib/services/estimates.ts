@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { usesSalesPipelineProjection, readSalesPipeline } from "@/lib/services/salesPipeline";
 import { createClient } from "@/lib/services/clients";
 import { createProperty } from "@/lib/services/properties";
 import type { Client, ClientInput } from "@/types/client";
@@ -8,18 +9,25 @@ import type { Property, PropertyInput } from "@/types/property";
 const estimateSelect = "*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)";
 
 export async function getEstimates(): Promise<EstimateWithRelations[]> {
+  if (await usesSalesPipelineProjection()) return readSalesPipeline<EstimateWithRelations>("read_sales_estimates");
   const { data, error } = await getSupabaseClient().from("estimates").select(estimateSelect).order("created_at", { ascending: false });
   if (error) throw error;
   return data as EstimateWithRelations[];
 }
 
 export async function getEstimateById(id: string): Promise<EstimateWithRelations> {
+  if (await usesSalesPipelineProjection()) {
+    const item = (await readSalesPipeline<EstimateWithRelations>("read_sales_estimates")).find(row=>row.id===id);
+    if (!item) throw new Error("Estimate not found.");
+    return item;
+  }
   const { data, error } = await getSupabaseClient().from("estimates").select(estimateSelect).eq("id", id).single();
   if (error) throw error;
   return data as EstimateWithRelations;
 }
 
 export async function createEstimate(input: Omit<EstimateInsert, "estimate_number">): Promise<Estimate> {
+  if (await usesSalesPipelineProjection()) return saveSalesEstimate(null, input);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const payload: EstimateInsert = { ...input, estimate_number: generateEstimateNumber() };
     const { data, error } = await getSupabaseClient().from("estimates").insert(payload).select().single();
@@ -30,9 +38,35 @@ export async function createEstimate(input: Omit<EstimateInsert, "estimate_numbe
 }
 
 export async function updateEstimate(id: string, input: EstimateUpdate): Promise<Estimate> {
+  if (await usesSalesPipelineProjection()) return saveSalesEstimate(id, input);
   const { data, error } = await getSupabaseClient().from("estimates").update(input).eq("id", id).select().single();
   if (error) throw error;
   return data;
+}
+
+export async function calculateSalesEstimatePreview(input: { calculatorInput: unknown; manualPrice: number | null; serviceDescription: string }): Promise<Record<string, unknown>> {
+  const response = await fetch("/api/sales-pipeline/estimates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "calculate", ...input, calculatorInput: publicCalculatorInput(input.calculatorInput) }) });
+  const body = await response.json() as { result?: Record<string, unknown>; error?: string };
+  if (!response.ok || !body.result) throw new Error(body.error || "Sales pricing could not be calculated.");
+  return body.result;
+}
+
+async function saveSalesEstimate(id: string | null, input: Omit<EstimateInsert, "estimate_number"> | EstimateUpdate): Promise<Estimate> {
+  if (!input.result) throw new Error("Pricing is required before saving the Estimate.");
+  const { result, ...estimate } = input;
+  const response = await fetch("/api/sales-pipeline/estimates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "save", estimateId: id, estimate, calculatorInput: publicCalculatorInput(result.calculatorInput), manualPrice: result.manualPrice ?? null, serviceDescription: result.serviceDescription }) });
+  const body = await response.json() as { estimate?: Estimate; error?: string };
+  if (!response.ok || !body.estimate) throw new Error(body.error || "The Estimate could not be saved.");
+  return body.estimate;
+}
+
+function publicCalculatorInput(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const input = { ...(value as Record<string, unknown>) };
+  delete input.workerHourlyPay;
+  delete input.targetProfitMarginPercent;
+  delete input.projectCosting;
+  return input;
 }
 
 export async function archiveEstimate(id: string): Promise<Estimate> {
@@ -51,6 +85,35 @@ export async function markEstimateSent(id: string, input: { recipient: string; s
   const { data, error } = await getSupabaseClient().rpc("mark_estimate_sent_for_delivery", { p_estimate_id:id, p_recipient:input.recipient.trim(), p_sender:input.sender, p_token:input.token, p_token_expires_at:input.expiresAt, p_snapshot:input.snapshot });
   if (error) throw error;
   return data;
+}
+
+export type EstimateApprovalHistoryRow = {
+  id: string; estimate_id: string; version: number;
+  action: "Submitted" | "Approved" | "Changes Requested" | "Revision Required";
+  actor_id: string; from_status: string; to_status: string; notes: string | null; created_at: string;
+};
+
+type ApprovalRpcClient = {rpc:(functionName:string,args:Record<string,unknown>)=>Promise<{data:unknown,error:{message:string}|null}>};
+const approvalRpc = () => getSupabaseClient() as unknown as ApprovalRpcClient;
+
+export async function submitEstimateForApproval(id: string): Promise<Estimate> {
+  const { data, error } = await approvalRpc().rpc("submit_estimate_for_approval", { p_estimate_id: id });
+  if (error) throw error;
+  return data as Estimate;
+}
+
+export async function reviewEstimateApproval(id: string, decision: "Approved" | "Changes Requested", notes: string | null): Promise<Estimate> {
+  const { data, error } = await approvalRpc().rpc("review_estimate_approval", {
+    p_estimate_id: id, p_decision: decision, p_notes: notes,
+  });
+  if (error) throw error;
+  return data as Estimate;
+}
+
+export async function getEstimateApprovalHistory(id: string): Promise<EstimateApprovalHistoryRow[]> {
+  const { data, error } = await approvalRpc().rpc("get_estimate_approval_history",{p_estimate_id:id});
+  if (error) throw error;
+  return (data ?? []) as EstimateApprovalHistoryRow[];
 }
 
 export async function findOrCreateEstimateClient(customer: CustomerInformation, division: EstimateDivision): Promise<Client> {

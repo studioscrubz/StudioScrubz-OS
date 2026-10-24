@@ -161,6 +161,38 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  // Estimate approval requests and decisions are version-specific Attention items.
+  // Never include cost, profit or other internal pricing details in these notifications.
+  for (const estimate of estimates) {
+    if (estimate.archived_at || estimate.status !== "Open") continue;
+    const approval = estimate.approval_status ?? "Draft";
+    const v = estimate.approval_version ?? 1;
+    if (approval === "Pending Approval" && hasPermission(profile,"estimates.approve")) {
+      items.push(item(
+        `estimate-approval:${estimate.id}:v${v}:pending`,
+        "Estimate Approval Request", "Attention", "Estimates",
+        "Estimate Awaiting Approval", `${estimate.estimate_number} requires a pricing review.`,
+        "Estimate", estimate.id, estimate.client_id, estimate.estimate_number,
+        null, null, estimate.approval_submitted_at || estimate.updated_at,
+        `/open-estimates?estimateId=${estimate.id}`, "Review Estimate",
+      ));
+    }
+    if (profile.role === "Sales" && (estimate.approval_created_by === profile.id || estimate.approval_submitted_by === profile.id)) {
+      if (approval === "Approved" || approval === "Changes Requested") {
+        items.push(item(
+          `estimate-approval:${estimate.id}:v${v}:${approval}`,
+          "Estimate Approval Decision", approval==="Approved"?"Info":"Attention", "Estimates",
+          approval==="Approved"?"Estimate Approved":"Estimate Changes Requested",
+          `${estimate.estimate_number}: ${approval}.`,
+          "Estimate", estimate.id, estimate.client_id, estimate.estimate_number,
+          null, null, estimate.approval_reviewed_at || estimate.updated_at,
+          `/open-estimates?estimateId=${estimate.id}`, "View Estimate",
+        ));
+      }
+    }
+  }
+
   const ownAssignedJobs = new Set(input.assignedOperationalJobIds ?? []);
   const mayReceiveEmployeeJobAlert = (jobId:string) =>
     profile.role !== "Manager" || ownAssignedJobs.has(jobId);
