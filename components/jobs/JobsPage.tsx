@@ -32,6 +32,9 @@ import {
 } from "@/lib/services/jobs";
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
+import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
+import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
+import { EquipmentExceptionResolution } from "@/components/jobs/EquipmentExceptionResolution";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
 import { getAuthorizedVehicles } from "@/lib/services/vehicles";
 import { getCurrentPosition } from "@/lib/geo/currentPosition";
@@ -290,7 +293,7 @@ export function JobsPage() {
       employeeId={profile?.employee_id ?? null}
       role={profile?.role ?? null}
       activeCrew={activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null}
-      activeTechs={activeTechs}
+      activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null)}
       canComplete={hasPermission(profile, "jobs.complete")}
       canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
@@ -370,7 +373,7 @@ export function JobsPage() {
           employeeId={profile?.employee_id ?? null}
           role={profile?.role ?? null}
           activeCrew={activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null}
-activeTechs={activeTechs}
+          activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null)}
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
@@ -436,6 +439,9 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} min-w-32`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
+      {job.assigned_crew_id && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
+      {job.status === "In Progress" && currentEntry && <div className="w-full"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job" /></div>}
+      {["Master Admin","Administrator","Manager"].includes(role ?? "") && job.status === "In Progress" && <div className="w-full"><EquipmentExceptionResolution jobId={job.id} /></div>}
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
     </div>
     </>
@@ -463,6 +469,14 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
 }}
     />}
   </>;
+}
+
+function equipmentCrewOptions(crew:CrewWithRelations|null):EligibleJobTech[]{
+  if(!crew)return [];
+  const rows=new Map<string,EligibleJobTech>();
+  if(crew.crew_lead)rows.set(crew.crew_lead.id,{employee_id:crew.crew_lead.id,display_name:crew.crew_lead.preferred_name||`${crew.crew_lead.first_name} ${crew.crew_lead.last_name}`.trim(),operational_role:"Crew Lead"});
+  for(const member of crew.members){if(member.employee.employment_status==='Active')rows.set(member.employee.id,{employee_id:member.employee.id,display_name:member.employee.preferred_name||`${member.employee.first_name} ${member.employee.last_name}`.trim(),operational_role:member.employee.id===crew.crew_lead_id?"Crew Lead":"Scrub Technician"})}
+  return [...rows.values()];
 }
 function JobCardActiveTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
   const [now, setNow] = useState<number | null>(null);
@@ -709,6 +723,8 @@ function JobModal({
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
+      {job.assigned_crew_id&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-6"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
       {showLifecycle && (

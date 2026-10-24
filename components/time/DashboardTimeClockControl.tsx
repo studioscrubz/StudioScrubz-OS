@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
+import { EquipmentNotifications } from "@/components/jobs/EquipmentNotifications";
+import { getPendingEquipmentSignouts, type PendingEquipmentSignout } from "@/lib/services/equipmentClearance";
 import { useCallback, useEffect, useState } from "react";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { getMyWorkSession, notifyPlatformPresenceChanged, toggleMyWorkAuthoritatively } from "@/lib/services/workSessions";
@@ -14,12 +17,15 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
   const [loading, setLoading] = useState(Boolean(employeeId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingEquipment, setPendingEquipment] = useState<PendingEquipmentSignout[]>([]);
   const now = useCurrentTime(Boolean(jobEntry));
   const load = useCallback(async () => {
     if (!employeeId) { setSession(null); setJobEntry(null); setLoading(false); return; }
     setLoading(true);
     try {
       const [presence, entries] = await Promise.all([getMyWorkSession(), getOperationalActiveTimeEntries()]);
+      if (presence) setPendingEquipment(await getPendingEquipmentSignouts());
+      else setPendingEquipment([]);
       setSession(presence);
       setJobEntry(entries.find((entry) => entry.employee_id === employeeId && Boolean(entry.job_id)) ?? null);
       setError(null);
@@ -35,6 +41,11 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
   async function toggle() {
     setBusy(true); setError(null);
     try {
+      if (session) {
+        const pending = await getPendingEquipmentSignouts();
+        setPendingEquipment(pending);
+        if (pending.length) throw new Error("Complete final equipment clearance for every listed job before clocking out.");
+      }
       const result = await toggleMyWorkAuthoritatively(session);
       setSession(result.session);
       await load();
@@ -49,6 +60,8 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
       <h2 className="text-xs font-extrabold uppercase tracking-[.14em] text-[#143d1a]">My Availability</h2>
       {loading ? <span className="text-xs text-neutral-500">Loading status...</span> : jobEntry ? <span className="inline-flex items-center gap-2 text-xs font-extrabold text-amber-700"><span aria-hidden="true" className="size-2 rounded-full bg-amber-500"/>On Job · Unavailable</span> : session ? <button type="button" disabled={busy} aria-pressed="true" onClick={() => void toggle()} className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 disabled:opacity-60"><span aria-hidden="true" className="size-2 rounded-full bg-emerald-500"/>{busy ? "Deactivating…" : "Active · Available"}</button> : <button type="button" disabled={busy} aria-pressed="false" onClick={() => void toggle()} className="inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-extrabold text-neutral-600 disabled:opacity-60"><span aria-hidden="true" className="size-2 rounded-full bg-neutral-400"/>{busy ? "Activating…" : "Inactive"}</button>}
     </div>
+    <EquipmentNotifications />
+    {session && pendingEquipment.length > 0 && <div className="mt-3 space-y-3"><p className="text-sm font-bold text-amber-800">Final equipment sign-out required before going offline.</p>{pendingEquipment.map(job => <EquipmentClearanceChecklist key={job.job_id} jobId={job.job_id} checkpoint="Final Sign Out" onSubmitted={() => void load()} />)}</div>}
     {error && <p role="alert" className="mt-2 rounded-lg bg-red-50 p-2 text-sm font-bold text-red-700">{error}</p>}
     {!loading && jobEntry ? <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <p className="font-extrabold text-[#143d1a]">{jobEntry.job_number ?? "Assigned Job"}</p>
