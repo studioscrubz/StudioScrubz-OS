@@ -27,6 +27,7 @@ export async function getEstimateById(id: string): Promise<EstimateWithRelations
 }
 
 export async function createEstimate(input: Omit<EstimateInsert, "estimate_number">): Promise<Estimate> {
+  if (await usesSalesPipelineProjection()) return saveSalesEstimate(null, input);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const payload: EstimateInsert = { ...input, estimate_number: generateEstimateNumber() };
     const { data, error } = await getSupabaseClient().from("estimates").insert(payload).select().single();
@@ -37,9 +38,35 @@ export async function createEstimate(input: Omit<EstimateInsert, "estimate_numbe
 }
 
 export async function updateEstimate(id: string, input: EstimateUpdate): Promise<Estimate> {
+  if (await usesSalesPipelineProjection()) return saveSalesEstimate(id, input);
   const { data, error } = await getSupabaseClient().from("estimates").update(input).eq("id", id).select().single();
   if (error) throw error;
   return data;
+}
+
+export async function calculateSalesEstimatePreview(input: { calculatorInput: unknown; manualPrice: number | null; serviceDescription: string }): Promise<Record<string, unknown>> {
+  const response = await fetch("/api/sales-pipeline/estimates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "calculate", ...input, calculatorInput: publicCalculatorInput(input.calculatorInput) }) });
+  const body = await response.json() as { result?: Record<string, unknown>; error?: string };
+  if (!response.ok || !body.result) throw new Error(body.error || "Sales pricing could not be calculated.");
+  return body.result;
+}
+
+async function saveSalesEstimate(id: string | null, input: Omit<EstimateInsert, "estimate_number"> | EstimateUpdate): Promise<Estimate> {
+  if (!input.result) throw new Error("Pricing is required before saving the Estimate.");
+  const { result, ...estimate } = input;
+  const response = await fetch("/api/sales-pipeline/estimates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "save", estimateId: id, estimate, calculatorInput: publicCalculatorInput(result.calculatorInput), manualPrice: result.manualPrice ?? null, serviceDescription: result.serviceDescription }) });
+  const body = await response.json() as { estimate?: Estimate; error?: string };
+  if (!response.ok || !body.estimate) throw new Error(body.error || "The Estimate could not be saved.");
+  return body.estimate;
+}
+
+function publicCalculatorInput(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const input = { ...(value as Record<string, unknown>) };
+  delete input.workerHourlyPay;
+  delete input.targetProfitMarginPercent;
+  delete input.projectCosting;
+  return input;
 }
 
 export async function archiveEstimate(id: string): Promise<Estimate> {

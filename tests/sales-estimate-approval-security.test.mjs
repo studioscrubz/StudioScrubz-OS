@@ -10,6 +10,10 @@ const open=read("components/estimates/OpenEstimatesPage.tsx");
 const attention=read("lib/services/attention.ts");
 const component=read("components/estimates/EstimateApprovalControls.tsx");
 const permissions=read("lib/auth/permissions.ts");
+const estimateWriteRoute=read("app/api/sales-pipeline/estimates/route.ts");
+const proposalWriteRoute=read("app/api/sales-pipeline/proposals/route.ts");
+const walkthroughWriteRoute=read("app/api/sales-pipeline/walkthroughs/route.ts");
+const pricingReviewRoute=read("app/api/walkthroughs/pricing-review/route.ts");
 test("approval states and server-side deliverability guard exist",()=>{
   assert.match(migration,/ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'Draft'/);
   assert.match(migration,/approval_version integer NOT NULL DEFAULT 1/);
@@ -56,8 +60,24 @@ test("Lead Representative payout and attribution unchanged",()=>{
 });
 
 test("migration function terminators and PL/pgSQL declaration structure",()=>{
-  assert.ok(migration.includes(["DECLARE","  valid_review boolean;","  source_id uuid;","  e public.estimates;"].join(String.fromCharCode(10))));
-  assert.ok(migration.includes(["end;","$function$;","","","CREATE OR REPLACE FUNCTION public.review_proposal_approval"].join(String.fromCharCode(10))));
+  const normalized=migration.replaceAll("\r\n","\n");
+  assert.ok(normalized.includes(["DECLARE","  valid_review boolean;","  source_id uuid;","  e public.estimates;"].join("\n")));
+  assert.ok(normalized.includes(["end;","$function$;","","","CREATE OR REPLACE FUNCTION public.review_proposal_approval"].join("\n")));
+});
+
+test("Sales writes use server-authorized paths and cannot submit raw protected JSON",()=>{
+  assert.match(migration,/service_save_sales_estimate/);
+  assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.service_save_sales_estimate\(uuid,uuid,jsonb,jsonb\) TO service_role/);
+  assert.match(migration,/CREATE POLICY %I ON public\.%I AS RESTRICTIVE FOR ALL/);
+  assert.match(migration,/submit_proposal_for_approval/);
+  for(const route of [estimateWriteRoute,proposalWriteRoute,walkthroughWriteRoute]){
+    assert.match(route,/profile\.role\s*!==\s*"Sales"/);
+    assert.match(route,/createSupabaseAdminClient/);
+  }
+  assert.match(estimateWriteRoute,/calculateSalesEstimate/);
+  assert.match(proposalWriteRoute,/source\.laborCost/);
+  assert.match(walkthroughWriteRoute,/protectedMeasurementKeys/);
+  assert.match(pricingReviewRoute,/\["Manager", "Master Admin"\]\.includes\(profile\.role\)/);
 });
 
 test("pricing revisions are audited and cannot silently reuse prior approvals",()=>{

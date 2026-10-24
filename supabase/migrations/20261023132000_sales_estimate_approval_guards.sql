@@ -68,6 +68,8 @@ DECLARE
 BEGIN
   IF TG_OP='INSERT' THEN
     IF new.approval_created_by IS NOT NULL
+      AND NOT (current_setting('studioscrubz.sales_estimate_write_rpc',true)='on'
+        AND new.approval_created_by::text=current_setting('studioscrubz.sales_estimate_actor',true))
       OR new.approval_submitted_at IS NOT NULL
       OR new.approval_reviewed_at IS NOT NULL
       OR new.approval_notes IS NOT NULL THEN
@@ -79,7 +81,7 @@ BEGIN
       OR new.approved_pricing_snapshot IS NOT NULL THEN
       RAISE EXCEPTION 'Estimate approval fields cannot be supplied by the client' USING ERRCODE='42501';
     END IF;
-    new.approval_created_by := auth.uid();
+    new.approval_created_by := coalesce(auth.uid(),new.approval_created_by);
     RETURN new;
   END IF;
   controlled := current_setting('studioscrubz.estimate_review_rpc',true)='on'
@@ -125,8 +127,8 @@ BEGIN
 END $$;
 -- Record the exact previous approval version when an authenticated edit invalidates it.
 CREATE OR REPLACE FUNCTION private.audit_estimate_approval_invalidation()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
-DECLARE actor uuid := auth.uid();
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE actor uuid := coalesce(auth.uid(),nullif(current_setting('studioscrubz.sales_estimate_actor',true),'')::uuid);
 BEGIN
   IF new.approval_version > old.approval_version THEN
     IF actor IS NULL THEN
@@ -139,7 +141,7 @@ BEGIN
        'Estimate pricing or scope changed; prior approval invalidated.');
   END IF;
   RETURN NULL;
-END $;
+END $$;
 REVOKE ALL ON FUNCTION private.audit_estimate_approval_invalidation() FROM PUBLIC,anon,authenticated;
 DROP TRIGGER IF EXISTS estimates_approval_revision_audit ON public.estimates;
 CREATE TRIGGER estimates_approval_revision_audit AFTER UPDATE ON public.estimates
@@ -151,7 +153,7 @@ CREATE TRIGGER estimates_approval_guard BEFORE INSERT OR UPDATE ON public.estima
   FOR EACH ROW EXECUTE FUNCTION private.guard_estimate_approval();
 
 CREATE OR REPLACE FUNCTION public.submit_estimate_for_approval(p_estimate_id uuid)
-RETURNS public.estimates LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE e public.estimates; actor uuid:=auth.uid();
 BEGIN
  IF actor IS NULL OR NOT public.has_any_role(ARRAY['Sales','Manager','Master Admin','Administrator']) THEN
@@ -169,7 +171,8 @@ BEGIN
  PERFORM pg_catalog.set_config('studioscrubz.estimate_submit_rpc','',true);
  INSERT INTO public.estimate_approval_history(estimate_id,version,action,actor_id,from_status,to_status)
  VALUES(e.id,e.approval_version,'Submitted',actor,'Draft','Pending Approval');
- RETURN e;
+ RETURN (to_jsonb(e)-'result'-'approved_pricing_snapshot'-'client_delivery_snapshot')
+   || jsonb_build_object('result',private.sales_public_estimate_result(e.result));
 END $$;
 REVOKE ALL ON FUNCTION public.submit_estimate_for_approval(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.submit_estimate_for_approval(uuid) TO authenticated;
@@ -448,6 +451,28 @@ END $$;
 REVOKE ALL ON FUNCTION public.review_proposal_approval(uuid,text,text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.review_proposal_approval(uuid,text,text) TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.submit_proposal_for_approval(p_proposal_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE p public.proposals; actor uuid:=auth.uid(); actor_name text;
+BEGIN
+ IF actor IS NULL OR NOT public.has_any_role(ARRAY['Sales','Manager','Master Admin','Administrator']) THEN
+   RAISE EXCEPTION 'Not permitted to submit Proposals for review' USING ERRCODE='42501';
+ END IF;
+ SELECT * INTO p FROM public.proposals WHERE id=p_proposal_id FOR UPDATE;
+ IF NOT FOUND OR p.archived_at IS NOT NULL OR p.status<>'Draft' OR p.approval_status NOT IN ('Not Submitted','Changes Requested') THEN
+   RAISE EXCEPTION 'Only an actionable Proposal draft may be submitted';
+ END IF;
+ UPDATE public.proposals SET status='Ready for Approval',approval_status='Pending Approval',approval_notes=NULL
+   WHERE id=p.id RETURNING * INTO p;
+ SELECT coalesce(nullif(btrim(display_name),''),email,actor::text) INTO actor_name FROM public.user_profiles WHERE id=actor;
+ INSERT INTO public.proposal_history(proposal_id,event_type,previous_status,new_status,description,performed_by,metadata)
+ VALUES(p.id,'Submitted for Approval','Draft','Ready for Approval','Proposal submitted for approval.',actor_name,'{}'::jsonb);
+ RETURN (to_jsonb(p)-'result'-'approved_pricing_snapshot'-'client_delivery_snapshot')
+   || jsonb_build_object('result',private.sales_public_proposal_result(p.result));
+END $$;
+REVOKE ALL ON FUNCTION public.submit_proposal_for_approval(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.submit_proposal_for_approval(uuid) TO authenticated;
+
 -- History is filtered by RLS; expose a read-only RPC without broadening table access.
 CREATE OR REPLACE FUNCTION public.get_estimate_approval_history(p_estimate_id uuid)
 RETURNS SETOF public.estimate_approval_history
@@ -465,6 +490,8 @@ RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $$
  SELECT jsonb_strip_nulls(jsonb_build_object(
    'serviceName',p_result->'serviceName',
    'serviceDescription',p_result->'serviceDescription',
+   'calculatorInput',coalesce(p_result->'calculatorInput','{}'::jsonb)
+      - 'workerHourlyPay' - 'targetProfitMarginPercent' - 'projectCosting',
    'scope',p_result->'scope',
    'basePrice',p_result->'basePrice',
    'oneTimePrice',p_result->'oneTimePrice',
@@ -572,6 +599,73 @@ END $$;
 REVOKE ALL ON FUNCTION public.read_sales_estimates() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.read_sales_estimates() TO authenticated;
 
+-- The application server recalculates the full private result from the protected
+-- catalog, then calls this service-role-only writer. Browsers cannot invoke it.
+CREATE OR REPLACE FUNCTION public.service_save_sales_estimate(
+  p_actor_id uuid, p_estimate_id uuid, p_payload jsonb, p_result jsonb
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE e public.estimates; client_row public.clients; property_row public.properties; number_value text;
+BEGIN
+ IF auth.role() IS DISTINCT FROM 'service_role' THEN
+   RAISE EXCEPTION 'Service role required' USING ERRCODE='42501';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.user_profiles p WHERE p.id=p_actor_id AND p.is_active AND p.role='Sales') THEN
+   RAISE EXCEPTION 'Active Sales actor required' USING ERRCODE='42501';
+ END IF;
+ IF p_result IS NULL OR jsonb_typeof(p_result)<>'object' OR coalesce((p_result->>'finalPrice')::numeric,-1)<0 THEN
+   RAISE EXCEPTION 'A server-calculated estimate result is required';
+ END IF;
+ IF coalesce(p_payload->>'division','') NOT IN ('Residential','Commercial')
+   OR coalesce(p_payload->>'status','')<>'Open' THEN
+   RAISE EXCEPTION 'Only active Sales estimate drafts may be saved';
+ END IF;
+ SELECT * INTO client_row FROM public.clients WHERE id=(p_payload->>'client_id')::uuid AND archived_at IS NULL;
+ SELECT * INTO property_row FROM public.properties WHERE id=(p_payload->>'property_id')::uuid AND archived_at IS NULL;
+ IF client_row.id IS NULL OR property_row.id IS NULL OR property_row.client_id<>client_row.id THEN
+   RAISE EXCEPTION 'The selected active Client and Property are invalid';
+ END IF;
+ IF property_row.property_type<>p_payload->>'division' THEN
+   RAISE EXCEPTION 'The Property division does not match the Estimate';
+ END IF;
+ IF p_payload->>'lead_representative_id' IS NOT NULL AND NOT EXISTS(
+   SELECT 1 FROM public.employees employee WHERE employee.id=(p_payload->>'lead_representative_id')::uuid
+     AND employee.department='Lead Representative' AND employee.employment_status='Active' AND employee.archived_at IS NULL
+ ) THEN RAISE EXCEPTION 'The Lead Representative is unavailable'; END IF;
+ PERFORM pg_catalog.set_config('studioscrubz.sales_estimate_write_rpc','on',true);
+ PERFORM pg_catalog.set_config('studioscrubz.sales_estimate_actor',p_actor_id::text,true);
+ IF p_estimate_id IS NULL THEN
+   number_value:='EST-'||to_char(current_date,'YYYYMMDD')||'-'||lpad((floor(random()*10000))::integer::text,4,'0');
+   INSERT INTO public.estimates(
+     estimate_number,client_id,property_id,division,customer_first_name,customer_last_name,
+     customer_phone,customer_email,customer_address,frequency,service_name,status,result,notes,terms,
+     lead_representative_id,approval_created_by
+   ) VALUES(
+     number_value,(p_payload->>'client_id')::uuid,(p_payload->>'property_id')::uuid,p_payload->>'division',
+     nullif(p_payload->>'customer_first_name',''),nullif(p_payload->>'customer_last_name',''),
+     nullif(p_payload->>'customer_phone',''),nullif(p_payload->>'customer_email',''),nullif(p_payload->>'customer_address',''),
+     p_payload->>'frequency',nullif(p_payload->>'service_name',''),'Open',p_result,
+     nullif(p_payload->>'notes',''),nullif(p_payload->>'terms',''),
+     nullif(p_payload->>'lead_representative_id','')::uuid,p_actor_id
+   ) RETURNING * INTO e;
+ ELSE
+   SELECT * INTO e FROM public.estimates WHERE id=p_estimate_id FOR UPDATE;
+   IF NOT FOUND OR e.archived_at IS NOT NULL OR e.status<>'Open' THEN RAISE EXCEPTION 'Only an active Estimate may be edited'; END IF;
+   UPDATE public.estimates SET
+     client_id=(p_payload->>'client_id')::uuid,property_id=(p_payload->>'property_id')::uuid,
+     division=p_payload->>'division',customer_first_name=nullif(p_payload->>'customer_first_name',''),
+     customer_last_name=nullif(p_payload->>'customer_last_name',''),customer_phone=nullif(p_payload->>'customer_phone',''),
+     customer_email=nullif(p_payload->>'customer_email',''),customer_address=nullif(p_payload->>'customer_address',''),
+     frequency=p_payload->>'frequency',service_name=nullif(p_payload->>'service_name',''),result=p_result,
+     notes=nullif(p_payload->>'notes',''),terms=nullif(p_payload->>'terms',''),
+     lead_representative_id=nullif(p_payload->>'lead_representative_id','')::uuid
+   WHERE id=p_estimate_id RETURNING * INTO e;
+ END IF;
+ RETURN (to_jsonb(e)-'result'-'approved_pricing_snapshot'-'client_delivery_snapshot')
+   || jsonb_build_object('result',private.sales_public_estimate_result(e.result));
+END $$;
+REVOKE ALL ON FUNCTION public.service_save_sales_estimate(uuid,uuid,jsonb,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.service_save_sales_estimate(uuid,uuid,jsonb,jsonb) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.read_sales_walkthroughs()
 RETURNS SETOF jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -620,19 +714,25 @@ END $$;
 REVOKE ALL ON FUNCTION public.read_sales_proposals() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.read_sales_proposals() TO authenticated;
 
--- Always close direct raw JSON reads, regardless of permissive legacy Sales RLS grants.
--- These restrictive policies also deny SELECT required for direct Sales UPDATE/INSERT RETURNING.
--- Consequently, Sales writes must use separately validated RPCs before this migration can release.
+-- Always close direct raw JSON reads and writes, regardless of permissive legacy
+-- Sales RLS grants. Sales writes use the validated application-server path above.
 DO $security$
 DECLARE t text;
 BEGIN
  FOREACH t IN ARRAY ARRAY['estimates','proposals','walkthroughs','services','service_addons','service_price_tiers','recurring_pricing_rules']
  LOOP
    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I','Deny Sales raw financial records',t);
+   EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I','Deny Sales raw financial writes',t);
    EXECUTE format(
      'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR SELECT TO authenticated USING (' ||
      'NOT EXISTS (SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role=%L))',
      'Deny Sales raw financial records',t,'Sales'
+   );
+   EXECUTE format(
+     'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR ALL TO authenticated USING (' ||
+     'NOT EXISTS (SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role=%L)) WITH CHECK (' ||
+     'NOT EXISTS (SELECT 1 FROM public.user_profiles p WHERE p.id=auth.uid() AND p.is_active AND p.role=%L))',
+     'Deny Sales raw financial writes',t,'Sales','Sales'
    );
  END LOOP;
 END $security$;

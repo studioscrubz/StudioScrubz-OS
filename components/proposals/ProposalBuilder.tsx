@@ -735,7 +735,7 @@ export function ProposalBuilder({
               </p>
             </Panel>
           )}
-          <Panel title="Labor Planning">
+          {profile?.role!=="Sales"&&<Panel title="Labor Planning">
             <div className="grid gap-4 sm:grid-cols-2">
               <LaborPlanInput
                 label="Crew Size"
@@ -756,19 +756,19 @@ export function ProposalBuilder({
             <p className="mt-3 text-sm text-neutral-600">
               Labor Hours are total crew labor hours. Duration is calculated as total labor hours divided by crew size.
             </p>
-          </Panel>
+          </Panel>}
           <Panel title="Proposal Adjustments">
             <div className="grid gap-4 sm:grid-cols-3">
-              <Num
+              {profile?.role!=="Sales"&&<Num
                 l="Additional Labor"
                 v={additionalLabor}
                 set={setAdditionalLabor}
-              />
-              <Num
+              />}
+              {profile?.role!=="Sales"&&<Num
                 l="Additional Materials"
                 v={additionalMaterials}
                 set={setAdditionalMaterials}
-              />
+              />}
               <Num l="Manual Discount %" v={discount} set={setDiscount} />
               <label>
                 <Label t="Manual / Custom Final Price" />
@@ -1068,6 +1068,7 @@ function Summary({
   save: () => Promise<void>;
   editing: boolean;
 }) {
+  const { profile } = useAuth();
   const purchasedAddonTotal = r.adjustments
     .filter((item) => Boolean(item.catalogAddonId))
     .reduce((sum, item) => sum + item.amount, 0);
@@ -1127,10 +1128,12 @@ function Summary({
             r.monthlyTotal !== null ? money(r.monthlyTotal) : "—",
           ],
           ]),
-          ["Labor Hours", String(r.laborHours)],
-          ["Crew", String(r.crewRecommendation)],
-          ["Duration", `${r.estimatedDuration} hrs`],
-          ["Profit", money(r.estimatedProfit)],
+          ...(profile?.role==="Sales"?[]:[
+            ["Labor Hours", String(r.laborHours)],
+            ["Crew", String(r.crewRecommendation)],
+            ["Duration", `${r.estimatedDuration} hrs`],
+            ["Profit", money(r.estimatedProfit)],
+          ]),
         ].map(([a, b]) => (
           <div key={a} className="flex justify-between py-3 text-sm">
             <dt className="text-white/60">{a}</dt>
