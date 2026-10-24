@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
-import ts from "typescript";
 const read=path=>readFileSync(path,"utf8");
 const migration=read("supabase/migrations/20261023132000_sales_estimate_approval_guards.sql");
 const estimates=read("lib/services/estimates.ts");
@@ -34,6 +33,11 @@ test("signed-in role checks protect approval RPCs and snapshots are not client-s
   assert.match(migration,/Proposal approval must be recorded by an authorized reviewer/);
   assert.match(migration,/approved_pricing_snapshot IS DISTINCT FROM private\.estimate_approval_snapshot\(new\)/);
   assert.match(migration,/Source estimate requires approval of its current pricing/);
+  assert.match(
+    migration,
+    /WHERE approval_status='Approved'[\s\S]*?AND is_current_revision[\s\S]*?AND superseded_at IS NULL[\s\S]*?AND archived_at IS NULL/,
+    "approved pricing grandfathering must not mutate immutable historical revisions",
+  );
 });
 test("review UI allows Sales submit and Manager decisions, blocks unapproved sends",()=>{
   assert.match(estimates,/export async function submitEstimateForApproval/);

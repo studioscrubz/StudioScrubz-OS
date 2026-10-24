@@ -230,7 +230,14 @@ ALTER TABLE public.proposals ADD COLUMN IF NOT EXISTS approved_pricing_snapshot 
 UPDATE public.proposals SET approved_pricing_snapshot=jsonb_build_object(
   'result',result,'notes',notes,'frequency',frequency,'expiration_date',expiration_date,
   'estimate_id',estimate_id,'walkthrough_id',walkthrough_id
-) WHERE approval_status='Approved' AND approved_pricing_snapshot IS NULL;
+) WHERE approval_status='Approved'
+    AND approved_pricing_snapshot IS NULL
+    -- Historical revisions are deliberately immutable. They cannot be sent or
+    -- edited again, so only grandfather the current, non-archived revision.
+    AND is_current_revision
+    AND superseded_at IS NULL
+    AND archived_at IS NULL
+    AND status <> 'Archived';
 CREATE OR REPLACE FUNCTION private.proposal_approved_snapshot(p_row public.proposals)
 RETURNS jsonb LANGUAGE sql STABLE SET search_path='' AS $$
  SELECT jsonb_build_object('result',p_row.result,'notes',p_row.notes,'frequency',p_row.frequency,
