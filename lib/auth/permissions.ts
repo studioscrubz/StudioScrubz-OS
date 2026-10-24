@@ -9,7 +9,7 @@ export const PERMISSIONS = [
   "walkthroughs.field",
   "dashboard.view", "clients.view", "clients.create", "clients.edit", "clients.archive",
   "properties.view", "properties.create", "properties.edit", "properties.archive",
-  "estimates.view", "estimates.create", "estimates.edit",
+  "estimates.view", "estimates.create", "estimates.edit", "estimates.approve",
   "walkthroughs.view", "walkthroughs.create", "walkthroughs.edit",
   "proposals.view", "proposals.create", "proposals.approve", "proposals.send",
   "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
@@ -83,6 +83,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     "dashboard.view",
     "clients.view", "clients.edit",
     "properties.view", "properties.edit",
+    "estimates.view", "estimates.approve", "proposals.view", "proposals.approve",
     "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
     "schedule.view", "schedule.edit",
     "employees.directory_view", "employees.scrubTechRosterView", "employees.view",
@@ -161,6 +162,11 @@ export function hasPermission(
   );
 }
 
+/** Manager inherits Crew Lead employee-facing tools while retaining all management grants. */
+export function canViewOwnJobFeedback(profile: UserProfile | null): boolean {
+  return Boolean(profile?.is_active && profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role));
+}
+
 export function isMasterAdmin(profile: UserProfile | null): boolean {
   return profile?.is_active === true && profile.role === "Master Admin";
 }
@@ -237,6 +243,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
 
   ["/estimates", "estimates.create"],
   ["/open-estimates", "estimates.view"],
+  ["/estimate-preview", "estimates.view"],
 
   ["/walkthroughs", "walkthroughs.view"],
 

@@ -1,6 +1,7 @@
 import type { Condition, EstimateResult, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
 import type { PostConstructionV2Input, PostConstructionV2Result } from "@/types/estimate";
 import { requireMinimumWorkerHourlyPay } from "@/lib/pricing/workerHourlyPay";
+import { estimatedMonthlyTotal as scheduleMonthlyTotal, estimatedVisitsPerMonth as scheduleVisitsPerMonth } from "@/lib/scheduling/frequency";
 
 export const POST_CONSTRUCTION_BASE_HOURS_PER_1K_SQUARE_FEET = 19;
 export const POST_CONSTRUCTION_MAX_MARGIN_PERCENT = 70;
@@ -121,8 +122,8 @@ export function calculatePostConstructionEstimate(input: PostConstructionCalcula
     taxes: money(taxes),
     calculatedFinalPrice: money(finalPrice),
     finalPrice: money(finalPrice),
-    monthlyPrice: estimatedMonthlyTotal(finalPrice, input.frequency, input.customIntervalDays),
-    visitsPerMonth: estimatedVisitsPerMonth(input.frequency, input.customIntervalDays),
+    monthlyPrice: scheduleMonthlyTotal(finalPrice, input.frequency, input.customIntervalDays, input.serviceDaysOfWeek),
+    visitsPerMonth: scheduleVisitsPerMonth(input.frequency, input.customIntervalDays, input.serviceDaysOfWeek),
     laborHours: roundedLaborHours,
     crewSize: recommendedCrewSize,
     estimatedDuration: tenth(totalLaborHours / recommendedCrewSize),
@@ -175,17 +176,3 @@ function whole(value: number): number { return Math.floor(nonnegative(value)); }
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, finite(value))); }
 function money(value: number): number { return Math.round(finite(value) * 100) / 100; }
 function tenth(value: number): number { return Math.round(finite(value) * 10) / 10; }
-function estimatedVisitsPerMonth(frequency: string, customIntervalDays?: number | null): number {
-  if (frequency === "Daily") return 365 / 12;
-  if (frequency === "Weekly") return 52 / 12;
-  if (frequency === "Biweekly") return 26 / 12;
-  if (frequency === "Twice Monthly") return 2;
-  if (frequency === "Monthly") return 1;
-  if (frequency === "Custom") return Number.isInteger(customIntervalDays) && Number(customIntervalDays) >= 1 ? 365 / Number(customIntervalDays) / 12 : 0;
-  return frequency === "One-Time" ? 1 : 0;
-}
-function estimatedMonthlyTotal(perVisit: number, frequency: string, customIntervalDays?: number | null): number | null {
-  if (frequency === "One-Time") return null;
-  const visits = estimatedVisitsPerMonth(frequency, customIntervalDays);
-  return visits > 0 ? money(perVisit * visits) : null;
-}

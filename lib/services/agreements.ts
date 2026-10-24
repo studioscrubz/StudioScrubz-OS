@@ -91,7 +91,7 @@ export async function createAgreement(input: AgreementInput) {
     const catalog = await getServiceCatalog();
     const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
     if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
-    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
+    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceDaysOfWeek:input.days_of_week, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
     prepared = { ...input, billing_amount:input.billing_type !== "Per Visit" ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
   }
   for (let i = 0; i < 5; i++) {
@@ -231,6 +231,8 @@ function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_wee
   if (input.end_date && input.end_date < input.start_date) return "End date must be on or after the start date.";
   if (["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(input.frequency) && !input.days_of_week.length)
     return `Select at least one service day for ${input.frequency}.`;
+  if (input.frequency === "Multiple Days Per Week" && (input.days_of_week.length < 2 || new Set(input.days_of_week).size !== input.days_of_week.length))
+    return "Select at least two distinct service days each week.";
   if (input.frequency === "Monthly" && (!input.day_of_month || input.day_of_month < 1 || input.day_of_month > 31))
     return "Select a monthly service day from 1 through 31.";
   if (input.frequency === "Twice Monthly" && (!input.day_of_month || !input.second_day_of_month || input.day_of_month < 1 || input.day_of_month > 28 || input.second_day_of_month < 1 || input.second_day_of_month > 28 || input.day_of_month === input.second_day_of_month))
@@ -400,6 +402,7 @@ export function validateAgreementConfiguration(
   if (agreement.service_name === "StudioScrubz Upkeep Plan" && (!agreement.day_of_month || !agreement.second_day_of_month || !agreement.third_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.third_day_of_month < 1 || agreement.third_day_of_month > 28 || new Set([agreement.day_of_month, agreement.second_day_of_month, agreement.third_day_of_month]).size !== 3)) return "Upkeep Plan requires three distinct calendar days from 1 through 28.";
   const weekdayFrequency = ["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(agreement.frequency);
   if (weekdayFrequency && !agreement.days_of_week.length) return `Select at least one service day for ${agreement.frequency}.`;
+  if (agreement.frequency === "Multiple Days Per Week" && (agreement.days_of_week.length < 2 || new Set(agreement.days_of_week).size !== agreement.days_of_week.length)) return "Select at least two distinct service days each week.";
   if (agreement.frequency === "Multiple Days Per Week" && (!Number.isInteger(agreement.interval_weeks) || agreement.interval_weeks < 1)) return "Interval weeks must be at least 1.";
   if (agreement.frequency === "Monthly" && (!agreement.day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 31)) return "Select a monthly service day from 1 through 31.";
   if (agreement.frequency === "Twice Monthly" && (!agreement.day_of_month || !agreement.second_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.day_of_month === agreement.second_day_of_month)) return "Select two distinct monthly service days from 1 through 28.";

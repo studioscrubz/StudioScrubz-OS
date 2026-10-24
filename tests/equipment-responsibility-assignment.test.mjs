@@ -16,13 +16,14 @@ const equipmentMigrationNames=[
   "20261021001000_equipment_confirmation_catalog_exceptions.sql",
   "20261021002000_equipment_handoffs_notifications.sql",
   "20261022132515_automatic_equipment_responsibility_assignment.sql",
+  "20261024004132_finalize_equipment_accountability_release.sql",
 ];
 const equipmentMigrations=equipmentMigrationNames.map(name=>({
   name,
   sql:readFileSync(new URL(`../supabase/migrations/${name}`,import.meta.url),"utf8"),
 }));
 
-test("the eight equipment migrations are ordered, transactional and use valid dollar quoting",()=>{
+test("the equipment migrations are ordered, transactional and use valid dollar quoting",()=>{
   assert.deepEqual([...equipmentMigrationNames].sort(),equipmentMigrationNames);
   for(const {name,sql} of equipmentMigrations){
     assert.match(sql,/^(?:--[^\r\n]*(?:\r?\n))*begin;/i,`${name} must begin transactionally`);
@@ -61,8 +62,21 @@ test("assignment is one eligible crew member and authorized server-side",()=>{
   assert.match(migration,/cardinality\(p_employee_ids\)<>1/);
   assert.match(migration,/public\.has_role\('Master Admin'\)/);
   assert.match(migration,/public\.current_employee_id\(\)=task\.crew_lead_employee_id/);
+  assert.doesNotMatch(migration,/public\.has_role\('Crew Lead'\)/);
   assert.match(migration,/public\.crew_members/);
   assert.match(assignment,/type="radio"/);
+  assert.match(assignment,/role==="Master Admin"\|\|Boolean\(employeeId&&employeeId===crewLeadId\)/);
+});
+
+test("multi-role employees retain authority only as the assigned Crew Lead",()=>{
+  const handoff=equipmentMigrations.find(row=>row.name==="20261021002000_equipment_handoffs_notifications.sql")?.sql??"";
+  const release=equipmentMigrations.find(row=>row.name==="20261024004132_finalize_equipment_accountability_release.sql")?.sql??"";
+  assert.match(handoff,/c\.id=j\.assigned_crew_id and c\.crew_lead_id=public\.current_employee_id\(\)/);
+  assert.doesNotMatch(handoff,/public\.has_role\('Crew Lead'\)/);
+  assert.match(migration,/task\.crew_lead_employee_id/);
+  assert.match(release,/public\.current_employee_id\(\)=task\.crew_lead_employee_id/);
+  assert.match(release,/equipment_responsibility_confirmed_at is not null/);
+  assert.doesNotMatch(release,/public\.has_role\('Crew Lead'\)/);
 });
 
 test("Attention messages are exact, durable and deep-link to the job workflow",()=>{

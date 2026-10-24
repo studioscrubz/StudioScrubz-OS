@@ -6,7 +6,9 @@ import type { EligibleJobTech } from "@/types/job";
 export function EquipmentAssignmentControl({jobId,crewLeadId,employeeId,role,techs,disabled=false}:{
   jobId:string;crewLeadId:string|null;employeeId:string|null;role:string|null;techs:EligibleJobTech[];disabled?:boolean;
 }) {
-  const canEdit=role==="Master Admin"||(role==="Crew Lead"&&employeeId===crewLeadId);
+  // Crew Lead is determined by the assigned crew, so multi-role employees keep
+  // their field authority without broadening access to another crew's Job.
+  const canEdit=role==="Master Admin"||Boolean(employeeId&&employeeId===crewLeadId);
   const options=useMemo(()=>{const byId=new Map(techs.map(row=>[row.employee_id,row]));if(crewLeadId&&!byId.has(crewLeadId))byId.set(crewLeadId,{employee_id:crewLeadId,display_name:"Crew Lead",operational_role:"Crew Lead"});return [...byId.values()]},[techs,crewLeadId]);
   const [selected,setSelected]=useState("");
   const [saved,setSaved]=useState("");

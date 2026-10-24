@@ -1,6 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { hasPermission } from "@/lib/auth/permissions";
 import { calculateCommercialEstimate, calculatePostConstructionCatalogEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { calculatePostConstructionV2 } from "@/lib/pricing/postConstruction";
 import type { PostConstructionEstimateInput } from "@/lib/pricing/estimates";
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
 
     const profile = profileData as UserProfile;
 
-    if (!hasPermission(profile, "proposals.create")) {
+    if (!profile.is_active || !["Manager", "Master Admin"].includes(profile.role)) {
       return Response.json(
         { error: "Proposal pricing permission is required." },
         { status: 403 }

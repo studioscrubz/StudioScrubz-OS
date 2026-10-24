@@ -4,8 +4,11 @@ import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
 
 export const ESTIMATE_DIVISIONS = ["Residential", "Commercial"] as const;
 export type EstimateDivision = (typeof ESTIMATE_DIVISIONS)[number];
+export type EstimateApprovalStatus = "Draft" | "Pending Approval" | "Approved" | "Changes Requested";
 export type EstimateStatus = "Open" | "Converted" | "Superseded" | "Declined" | "Archived";
-export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Custom";
+export type Frequency = "One-Time" | "Daily" | "Weekly" | "Biweekly" | "Twice Monthly" | "Monthly" | "Multiple Days Per Week" | "Custom";
+export type ServiceWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type WeeklyMixedVisit = { day: ServiceWeekday; serviceLevel: string; scope: string; hours: number; price: number };
 export type Condition = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionSeverity = "Light" | "Average" | "Heavy" | "Extreme";
 export type PostConstructionDetailLevel = "Standard" | "Detailed" | "High Detail";
@@ -32,6 +35,7 @@ export type ResidentialCalculatorInput = {
   serviceType: string;
   frequency: Frequency;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: ServiceWeekday[];
   recurringPricingRuleId?: string | null;
   condition: Condition;
   squareFeet: number;
@@ -52,6 +56,8 @@ export type CommercialCalculatorInput = {
   commercialType: string;
   frequency: Frequency;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: ServiceWeekday[];
+  weeklyMixedVisits?: WeeklyMixedVisit[];
   recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;
@@ -78,6 +84,7 @@ export type PostConstructionCalculatorInput = {
   serviceCode?: string | null;
   frequency: Frequency;
   customIntervalDays?: number | null;
+  serviceDaysOfWeek?: ServiceWeekday[];
   recurringPricingRuleId?: string | null;
   squareFeet: number;
   floors: number;
@@ -158,6 +165,8 @@ export type EstimateResult = {
   manualPrice?: number | null;
   finalPrice: number;
   monthlyPrice: number | null;
+  weeklyMixedVisits?: WeeklyMixedVisit[];
+  weeklyContractTotal?: number;
   visitsPerMonth: number;
   upkeepPlan?: { standardCleaningValue: number; adjustmentPercent: number; upkeepVisitValue: number; visitsIncluded: 3; monthlyPackage: number } | null;
   laborHours: number;
@@ -186,7 +195,7 @@ export type EstimateResult = {
   };
 };
 
-export type Estimate = {
+export type Estimate = { approval_status: EstimateApprovalStatus; approval_version: number; approval_created_by: string | null; approval_submitted_by: string | null; approval_submitted_at: string | null; approval_reviewed_by: string | null; approval_reviewed_at: string | null; approval_notes: string | null; approved_pricing_snapshot: Record<string,unknown> | null;
   lead_representative_id?: string | null;
   id: string;
   estimate_number: string;
@@ -219,6 +228,6 @@ export type Estimate = {
   superseded_reason?: string | null;
 };
 
-export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at" | "declined_at" | "decline_reason" | "sent_at" | "sent_to" | "sent_by" | "client_access_token" | "client_access_token_expires_at" | "client_delivery_snapshot"> & { archived_at?: string | null; declined_at?: string | null; decline_reason?: string | null; sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; client_delivery_snapshot?: Record<string, unknown> | null };
-export type EstimateUpdate = Partial<Omit<Estimate, "id" | "created_at" | "updated_at">>;
+export type EstimateInsert = Omit<Estimate, "id" | "created_at" | "updated_at" | "archived_at" | "declined_at" | "decline_reason" | "sent_at" | "sent_to" | "sent_by" | "client_access_token" | "client_access_token_expires_at" | "client_delivery_snapshot" | "approval_status" | "approval_version" | "approval_created_by" | "approval_submitted_by" | "approval_submitted_at" | "approval_reviewed_by" | "approval_reviewed_at" | "approval_notes" | "approved_pricing_snapshot"> & { archived_at?: string | null; declined_at?: string | null; decline_reason?: string | null; sent_at?: string | null; sent_to?: string | null; sent_by?: string | null; client_access_token?: string | null; client_access_token_expires_at?: string | null; client_delivery_snapshot?: Record<string, unknown> | null };
+export type EstimateUpdate = Partial<Omit<Estimate, "id" | "created_at" | "updated_at" | "approval_status" | "approval_version" | "approval_created_by" | "approval_submitted_by" | "approval_submitted_at" | "approval_reviewed_by" | "approval_reviewed_at" | "approval_notes" | "approved_pricing_snapshot">>;
 export type EstimateWithRelations = Estimate & { client: Client | null; property: Property | null };

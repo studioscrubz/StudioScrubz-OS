@@ -3,7 +3,7 @@ import { normalizeSmsPhoneNumber, openDeviceSmsApp } from "@/lib/deviceSms";
 import { useEffect, useMemo, useState } from "react";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
+import { canPermanentlyDelete, canViewOwnJobFeedback, hasPermission } from "@/lib/auth/permissions";
 import {
   archiveJob,
   assignJobWorker,
@@ -305,8 +305,8 @@ export function JobsPage() {
     <>
       {communication.composer}
       <Header canCreate={hasPermission(profile, "jobs.create")} create={() => setCreating(true)} />
-      {profile && ["Crew Lead", "Scrub Technician"].includes(profile.role) && <MyTeamworkEvents />}
-      {profile && ["Crew Lead", "Scrub Technician"].includes(profile.role) && <MyPerformanceReviews />}
+      {canViewOwnJobFeedback(profile) && <MyTeamworkEvents employeeId={profile!.employee_id!} />}
+      {canViewOwnJobFeedback(profile) && <MyPerformanceReviews />}
       {notice && <Alert text={notice} success />}
       {error && <Alert text={error} />}
       <section aria-label="Job overview" className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

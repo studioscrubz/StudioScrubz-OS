@@ -1,8 +1,11 @@
 "use client";
 
 import type { EstimateResult, PostConstructionCalculatorInput } from "@/types/estimate";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export function PostConstructionBidSummary({result,manualPrice,setManualPrice,saving,save,editing}:{result:EstimateResult;manualPrice:number|null;setManualPrice:(value:number|null)=>void;saving:boolean;save:()=>Promise<void>;editing:boolean}){
+  const { profile } = useAuth();
+  if(profile?.role==="Sales")return <aside className="sticky top-6 rounded-2xl bg-[#143d1a] p-6 text-white"><p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#d4af37]">Customer pricing</p><h2 className="mt-2 text-xl font-extrabold">Post-Construction Estimate</h2><label className="mt-5 block text-xs font-bold text-white/70">Manual / Custom Estimate Amount<input aria-label="Manual or custom estimate amount" type="number" min="0" step="0.01" value={manualPrice??""} placeholder={String(result.calculatedFinalPrice??result.finalPrice)} onChange={event=>setManualPrice(event.target.value===""?null:Number(event.target.value))} className="mt-2 h-11 w-full rounded-lg bg-white px-3 text-sm font-bold text-[#143d1a]"/></label><p className="mt-5 text-xs font-bold uppercase tracking-[.12em] text-white/55">Final Price</p><p className="mt-1 text-4xl font-extrabold text-[#d4af37]">{currency(result.finalPrice)}</p><button type="button" disabled={saving} onClick={()=>void save()} className="mt-5 w-full rounded-lg bg-[#d4af37] px-5 py-3 text-sm font-extrabold text-[#143d1a] disabled:opacity-60">{saving?"Saving…":editing?"Update Estimate":"Save Estimate"}</button></aside>;
   const breakdown=result.postConstructionBreakdown;
   const input=result.calculatorInput as PostConstructionCalculatorInput;
   if(!breakdown)return null;

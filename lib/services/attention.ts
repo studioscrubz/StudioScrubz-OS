@@ -1,6 +1,7 @@
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { getJobProposalIds, getJobs } from "@/lib/services/jobs";
+import { getActiveCrews } from "@/lib/services/crews";
 import { getProposals } from "@/lib/services/proposals";
 import { getAgreements } from "@/lib/services/agreements";
 import { getFinanciallyResolvedJobIds, getInvoices } from "@/lib/services/invoices";
@@ -86,7 +87,21 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     if (!row || typeof row !== "object" || Array.isArray(row) || typeof row.id !== "string" || typeof row.walkthrough_date !== "string") return [];
     return [{ id: row.id, employeeId: profile.employee_id!, date: row.walkthrough_date, time: typeof row.walkthrough_time === "string" ? row.walkthrough_time : null }];
   }) : [];
-  const operationalEmployee = Boolean(profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role));
+  // Managers can act as Crew Leads on their own assignments while keeping management visibility.
+  // Their broader management job list must not generate personal alerts for everyone.
+  const managerCrewIds = profile.role === "Manager" && profile.employee_id
+    ? new Set((await getActiveCrews()).filter(crew =>
+        crew.crew_lead_id === profile.employee_id ||
+        crew.members.some(member => member.employee_id === profile.employee_id),
+      ).map(crew => crew.id))
+    : new Set<string>();
+  const assignedOperationalJobIds = profile.role === "Manager"
+    ? jobs.filter(job => Boolean(profile.employee_id && (
+        job.assigned_employee_id === profile.employee_id ||
+        (job.assigned_crew_id && managerCrewIds.has(job.assigned_crew_id))
+      ))).map(job => job.id)
+    : undefined;
+  const operationalEmployee = Boolean(profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role));
   const [discoveries, decisions] = await Promise.all([
     jobs.length && canReviewFieldDiscovery(profile.role)
       ? getSupabaseClient().from("field_discoveries_operational").select("id,job_id,status,created_at").eq("status", "Open").in("job_id", jobs.map(job => job.id))
@@ -105,7 +120,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     const event = Array.isArray(row.event) ? row.event[0] : row.event;
     return event && event.status === "Scheduled" ? [{ id: event.id, title: event.title, startsAt: event.starts_at, location: event.location, invitedAt: row.invited_at }] : [];
   });
-  const input: AttentionRuleInput = { equipmentResponsibilityTasks, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const input: AttentionRuleInput = { equipmentResponsibilityTasks, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -117,6 +132,8 @@ export type AssignedWalkthroughAttention = { id: string; employeeId: string; dat
 
 export type AttentionRuleInput = {
   equipmentResponsibilityTasks?: EquipmentResponsibilityAttention[];
+  /** When Manager can see all Jobs, personal Crew Lead alerts must be limited to the Manager\'s own employee/crew assignments. */
+  assignedOperationalJobIds?: string[];
   assignedEvents?: Array<{ id: string; title: string; startsAt: string; location: string | null; invitedAt: string }>;
   porterNotifications?: PorterNotificationEvent[];
   laborThresholdEvents?: JobLaborThresholdEvent[];
@@ -158,6 +175,40 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     }
   }
 
+  // Estimate approval requests and decisions are version-specific Attention items.
+  // Never include cost, profit or other internal pricing details in these notifications.
+  for (const estimate of estimates) {
+    if (estimate.archived_at || estimate.status !== "Open") continue;
+    const approval = estimate.approval_status ?? "Draft";
+    const v = estimate.approval_version ?? 1;
+    if (approval === "Pending Approval" && hasPermission(profile,"estimates.approve")) {
+      items.push(item(
+        `estimate-approval:${estimate.id}:v${v}:pending`,
+        "Estimate Approval Request", "Attention", "Estimates",
+        "Estimate Awaiting Approval", `${estimate.estimate_number} requires a pricing review.`,
+        "Estimate", estimate.id, estimate.client_id, estimate.estimate_number,
+        null, null, estimate.approval_submitted_at || estimate.updated_at,
+        `/open-estimates?estimateId=${estimate.id}`, "Review Estimate",
+      ));
+    }
+    if (profile.role === "Sales" && (estimate.approval_created_by === profile.id || estimate.approval_submitted_by === profile.id)) {
+      if (approval === "Approved" || approval === "Changes Requested") {
+        items.push(item(
+          `estimate-approval:${estimate.id}:v${v}:${approval}`,
+          "Estimate Approval Decision", approval==="Approved"?"Info":"Attention", "Estimates",
+          approval==="Approved"?"Estimate Approved":"Estimate Changes Requested",
+          `${estimate.estimate_number}: ${approval}.`,
+          "Estimate", estimate.id, estimate.client_id, estimate.estimate_number,
+          null, null, estimate.approval_reviewed_at || estimate.updated_at,
+          `/open-estimates?estimateId=${estimate.id}`, "View Estimate",
+        ));
+      }
+    }
+  }
+
+  const ownAssignedJobs = new Set(input.assignedOperationalJobIds ?? []);
+  const mayReceiveEmployeeJobAlert = (jobId:string) =>
+    profile.role !== "Manager" || ownAssignedJobs.has(jobId);
   for (const event of input.assignedEvents ?? []) {
     if (Date.parse(event.startsAt) < clock.now.getTime()) continue;
     items.push(item(`internal-event:${event.id}:assigned`, "Event Invitation", "Attention", "Events", "Event Assigned", `${event.title} — ${new Date(event.startsAt).toLocaleString("en-US")}${event.location ? ` — ${event.location}` : ""}`, "Internal Event", event.id, null, event.title, event.startsAt, event.startsAt.slice(0, 10), event.invitedAt, "/schedule", "View Schedule"));
@@ -219,10 +270,10 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
         items.push(item(`field-discovery:${discovery.id}:submitted`, "Field Discovery Submitted", "Attention", "Jobs", "Field Discovery Submitted", "A field discovery requires review. Open the Job Discoveries tab.", "Job", job.id, null, job.job_number || "Job", null, null, discovery.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
       }
     }
-    if (profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
+    if (profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role)) {
       for (const decision of input.changeRequestDecisions ?? []) {
         const job = activeJobs.get(decision.job_id);
-        if ((!job?.assigned_crew_id && !job?.assigned_employee_id) || !decision.decided_at || (decision.status !== "Approved" && decision.status !== "Declined")) continue;
+        if (!mayReceiveEmployeeJobAlert(decision.job_id) || (!job?.assigned_crew_id && !job?.assigned_employee_id) || !decision.decided_at || (decision.status !== "Approved" && decision.status !== "Declined")) continue;
         const title = decision.status === "Approved" ? "Change Request Approved" : "Change Request Declined";
         items.push(item(`change-request:${decision.id}:${decision.status}:${profile.employee_id}`, title, "Attention", "Jobs", title, `${title}. Open the Job to review Scope and Changes.`, "Job", job.id, null, job.job_number || "Job", null, null, decision.decided_at, `/jobs?jobId=${job.id}`, "Open Job"));
       }
@@ -230,9 +281,9 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   }
 
   // Global lifecycle timestamps are separate from employee Join/payroll entries.
-  if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
+  if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role)) {
     for (const job of jobs) {
-      if ((!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Cancelled", "Archived"].includes(job.status)) continue;
+      if (!mayReceiveEmployeeJobAlert(job.id) || (!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Cancelled", "Archived"].includes(job.status)) continue;
       const label = job.job_number || "Job";
       if (job.status === "In Progress" && job.operational_started_at) {
         items.push(item(`job:${job.id}:started:${profile.employee_id}`, "Job Started", "Attention", "Jobs", "Job Started", "The Job has started.", "Job", job.id, null, label, null, null, job.operational_started_at, `/jobs?jobId=${job.id}`, "Open Job"));
@@ -244,9 +295,9 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   }
 
   // Both loaders restrict operational employees' jobs to their assigned crews.
-  if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)) {
+  if (profile.is_active && hasPermission(profile, "jobs.view") && profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role)) {
     for (const job of jobs) {
-      if ((!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || (job.scheduled_date && job.scheduled_date < today)) continue;
+      if (!mayReceiveEmployeeJobAlert(job.id) || (!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || (job.scheduled_date && job.scheduled_date < today)) continue;
       const label = job.job_number || "Job";
       const description = `${label}${job.service_name ? ` - ${job.service_name}` : ""}${job.scheduled_date ? ` - ${friendlyDate(job.scheduled_date)}${job.start_time ? ` at ${friendlyTime(job.start_time)}` : ""}` : ""}`;
       items.push(item(`job:${job.id}:assigned:${profile.employee_id}:${job.assigned_employee_id||job.assigned_crew_id}`, "Job Assigned", "Attention", "Jobs", "Job Assigned", description, "Job", job.id, null, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));

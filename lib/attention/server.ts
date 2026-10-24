@@ -60,6 +60,12 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
   const input: AttentionRuleInput = {
     profile,
     equipmentResponsibilityTasks:(snapshot.equipmentResponsibilityTasks??[]).filter(task=>task.crew_lead_employee_id===profile.employee_id||task.responsible_employee_id===profile.employee_id),
+    assignedOperationalJobIds: profile.role === "Manager"
+      ? visibleJobs.filter(job => Boolean(profile.employee_id && (
+          job.assigned_employee_id === profile.employee_id ||
+          (job.assigned_crew_id && crewIds.has(job.assigned_crew_id))
+        ))).map(job => job.id)
+      : undefined,
     assignedEvents: profile.employee_id ? snapshot.eventAttendees.filter(row => row.employee_id === profile.employee_id && row.event?.status === "Scheduled").map(row => ({ id: row.event!.id, title: row.event!.title, startsAt: row.event!.starts_at, location: row.event!.location, invitedAt: row.invited_at })) : [],
     porterNotifications: (snapshot.porterNotifications ?? []).filter((event) => event.recipient_user_id === profile.id),
     laborThresholdEvents: snapshot.laborThresholdEvents,
@@ -70,8 +76,12 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
     estimates: hasPermission(profile, "estimates.view") ? snapshot.estimates : [],
     jobs: visibleJobs,
     fieldDiscoveries: management ? (snapshot.fieldDiscoveries ?? []).filter(row => visibleJobs.some(job => job.id === row.job_id)) : [],
-    changeRequestDecisions: profile.employee_id && ["Crew Lead", "Scrub Technician"].includes(profile.role)
-      ? (snapshot.changeRequestDecisions ?? []).filter(row => visibleJobs.some(job => job.id === row.job_id)) : [],
+    changeRequestDecisions: profile.employee_id && ["Manager", "Crew Lead", "Scrub Technician"].includes(profile.role)
+      ? (snapshot.changeRequestDecisions ?? []).filter(row => visibleJobs.some(job =>
+          job.id === row.job_id && (profile.role !== "Manager" ||
+            job.assigned_employee_id === profile.employee_id ||
+            Boolean(job.assigned_crew_id && crewIds.has(job.assigned_crew_id)))
+        )) : [],
     walkthroughs: hasPermission(profile, "walkthroughs.view") ? snapshot.walkthroughs : [],
     proposals: hasPermission(profile, "proposals.view") ? snapshot.proposals : [],
     agreements: hasPermission(profile, "agreements.view") ? snapshot.agreements : [],

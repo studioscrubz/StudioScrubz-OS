@@ -31,7 +31,9 @@ import type {
   ServiceCatalogBundle,
 } from "@/types/serviceCatalog";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
-import type { EstimateResult, EstimateWithRelations, Frequency } from "@/types/estimate";
+import type { EstimateResult, EstimateWithRelations, Frequency, ServiceWeekday } from "@/types/estimate";
+import { WeeklyServiceDaysField } from "@/components/forms/WeeklyServiceDaysField";
+import { validServiceWeekdays } from "@/lib/scheduling/frequency";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import type {
   ProposalAdjustment,
@@ -57,6 +59,7 @@ const termsDefault: ProposalTerms = {
 };
 function proposalPricingFingerprint(value: {
   frequency: Frequency;
+  serviceDaysOfWeek: ServiceWeekday[];
   ruleId: string;
   additionalLabor: number;
   additionalMaterials: number;
@@ -111,6 +114,7 @@ export function ProposalBuilder({
   const [frequency, setFrequency] = useState<Frequency>(
     proposal?.frequency ?? "One-Time",
   );
+  const [serviceDaysOfWeek, setServiceDaysOfWeek] = useState<ServiceWeekday[]>(proposal?.result.serviceDaysOfWeek ?? []);
   const [selectedRuleId, setSelectedRuleId] = useState(
     proposal?.result.recurringPricingRuleId ?? "",
   );
@@ -177,6 +181,7 @@ export function ProposalBuilder({
   const [initialPricingFingerprint] = useState(() =>
     proposalPricingFingerprint({
       frequency: proposal?.frequency ?? "One-Time",
+      serviceDaysOfWeek: proposal?.result.serviceDaysOfWeek ?? [],
       ruleId: proposal?.result.recurringPricingRuleId ?? "",
       additionalLabor: proposal?.result.additionalLabor ?? 0,
       additionalMaterials: proposal?.result.additionalMaterials ?? 0,
@@ -194,6 +199,7 @@ export function ProposalBuilder({
   );
   const pricingFingerprint = proposalPricingFingerprint({
     frequency,
+    serviceDaysOfWeek,
     ruleId: selectedRuleId,
     additionalLabor,
     additionalMaterials,
@@ -301,7 +307,8 @@ export function ProposalBuilder({
       ? getAvailableServiceAddons(catalog, catalogService.id, proposalDivision)
       : [];
   const selectedAddonSnapshots = proposalAddonSnapshots(adjustments, availableAddons);
-  const matchingRules = catalogService
+  const weeklyMixedSource = Boolean(estimate?.result.weeklyMixedVisits?.length || walkthrough?.pricing_review?.estimateResult.weeklyMixedVisits?.length || proposal?.result.weeklyMixedVisits?.length);
+  const matchingRules = weeklyMixedSource ? [] : catalogService
     ? matchingRecurringRules(frequency, rules, catalogService.id)
     : [];
   const effectiveRuleId =
@@ -319,13 +326,16 @@ export function ProposalBuilder({
     catalogService &&
     (frequency !== authoritativeEstimate.calculatorInput.frequency ||
       resolvedServiceName !== authoritativeEstimate.serviceName ||
-      effectiveRuleId !== (authoritativeEstimate.recurringPricingRuleId ?? ""))
+      effectiveRuleId !== (authoritativeEstimate.recurringPricingRuleId ?? "") ||
+      (frequency === "Multiple Days Per Week" && JSON.stringify(serviceDaysOfWeek) !== JSON.stringify(authoritativeEstimate.calculatorInput.serviceDaysOfWeek ?? [])))
       ? repriceEstimateFrequency(
           authoritativeEstimate,
           frequency,
           pricingRules,
           catalogService.id,
           effectiveRuleId || null,
+          null,
+          serviceDaysOfWeek,
         )
       : authoritativeEstimate;
   const calculatedResult = calculateProposal({
@@ -342,6 +352,7 @@ export function ProposalBuilder({
         authoritativeEstimate?.serviceDescription ||
         null,
     frequency,
+    serviceDaysOfWeek,
     estimatedCleaningDays: postConstruction ? estimatedCleaningDays : null,
     estimatedHoursPerDay: postConstruction ? estimatedHoursPerDay : null,
     adjustments,
@@ -463,6 +474,7 @@ export function ProposalBuilder({
       setFrequency(
         approved?.frequency ?? selectedEstimate?.frequency ?? "One-Time",
       );
+      setServiceDaysOfWeek(approved?.estimateResult.calculatorInput.serviceDaysOfWeek ?? selectedEstimate?.result.calculatorInput.serviceDaysOfWeek ?? []);
       setRequestedDate(
         selectedEstimate?.result.submission?.preferredServiceDate ?? "",
       );
@@ -480,6 +492,10 @@ export function ProposalBuilder({
       return setError("Select a saved Estimate or Walkthrough.");
     if (matchingRules.length > 1 && !effectiveRuleId)
       return setError("Select the recurring pricing rule for this Proposal.");
+    if (frequency === "Multiple Days Per Week" && !validServiceWeekdays(serviceDaysOfWeek))
+      return setError("Choose at least two distinct weekly service days before saving the proposal.");
+    if (weeklyMixedSource && (frequency !== "Multiple Days Per Week" || JSON.stringify([...(serviceDaysOfWeek??[])].sort()) !== JSON.stringify([...(sourceEstimate?.calculatorInput.serviceDaysOfWeek??proposal?.result.serviceDaysOfWeek??[])].sort()) || manualPrice !== null || discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.some(item=>!item.inherited)))
+      return setError("Mixed-scope weekly proposals must preserve the approved individual day prices. Edit weekday prices in the source Estimate; do not apply a uniform per-visit change or discount.");
     if (!proposal && walkthrough && !walkthrough.pricing_review)
       return setError(
         "Review and approve Walkthrough pricing before creating the Proposal.",
@@ -719,7 +735,7 @@ export function ProposalBuilder({
               </p>
             </Panel>
           )}
-          <Panel title="Labor Planning">
+          {profile?.role!=="Sales"&&<Panel title="Labor Planning">
             <div className="grid gap-4 sm:grid-cols-2">
               <LaborPlanInput
                 label="Crew Size"
@@ -740,19 +756,19 @@ export function ProposalBuilder({
             <p className="mt-3 text-sm text-neutral-600">
               Labor Hours are total crew labor hours. Duration is calculated as total labor hours divided by crew size.
             </p>
-          </Panel>
+          </Panel>}
           <Panel title="Proposal Adjustments">
             <div className="grid gap-4 sm:grid-cols-3">
-              <Num
+              {profile?.role!=="Sales"&&<Num
                 l="Additional Labor"
                 v={additionalLabor}
                 set={setAdditionalLabor}
-              />
-              <Num
+              />}
+              {profile?.role!=="Sales"&&<Num
                 l="Additional Materials"
                 v={additionalMaterials}
                 set={setAdditionalMaterials}
-              />
+              />}
               <Num l="Manual Discount %" v={discount} set={setDiscount} />
               <label>
                 <Label t="Manual / Custom Final Price" />
@@ -803,8 +819,11 @@ export function ProposalBuilder({
                   "Biweekly",
                   "Twice Monthly",
                   "Monthly",
+                  "Multiple Days Per Week",
+                  ...(frequency === "Custom" ? ["Custom"] : []),
                 ]}
               />
+              {frequency === "Multiple Days Per Week" && <WeeklyServiceDaysField value={serviceDaysOfWeek} onChange={setServiceDaysOfWeek} />}
               {matchingRules.length > 0 && (
                 <Select
                   l="Pricing Rule"
@@ -1049,12 +1068,14 @@ function Summary({
   save: () => Promise<void>;
   editing: boolean;
 }) {
+  const { profile } = useAuth();
   const purchasedAddonTotal = r.adjustments
     .filter((item) => Boolean(item.catalogAddonId))
     .reduce((sum, item) => sum + item.amount, 0);
   const customServiceAdjustments = r.adjustments
     .filter((item) => !item.catalogAddonId)
     .reduce((sum, item) => sum + item.amount, 0) + r.additionalLabor + r.additionalMaterials;
+  const mixed = r.weeklyMixedVisits?.length ? r.weeklyMixedVisits : null;
   const discountedService = Math.max(
     0,
     r.baseEstimateAmount + customServiceAdjustments -
@@ -1076,6 +1097,7 @@ function Summary({
       </div>
       <dl className="mt-5 divide-y divide-white/10">
         {[
+          ...(mixed ? [...mixed.map(v => [["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][v.day]+" — "+v.serviceLevel, money(v.price)]), ["Weekly Contract Total",money(r.weeklyContractTotal??0)],["Average Monthly Contract",money(r.monthlyTotal??0)]] : [
           ["Base Service Price", money(r.baseEstimateAmount)],
           [
             "Custom Service Adjustments",
@@ -1105,10 +1127,13 @@ function Summary({
             "Estimated Monthly",
             r.monthlyTotal !== null ? money(r.monthlyTotal) : "—",
           ],
-          ["Labor Hours", String(r.laborHours)],
-          ["Crew", String(r.crewRecommendation)],
-          ["Duration", `${r.estimatedDuration} hrs`],
-          ["Profit", money(r.estimatedProfit)],
+          ]),
+          ...(profile?.role==="Sales"?[]:[
+            ["Labor Hours", String(r.laborHours)],
+            ["Crew", String(r.crewRecommendation)],
+            ["Duration", `${r.estimatedDuration} hrs`],
+            ["Profit", money(r.estimatedProfit)],
+          ]),
         ].map(([a, b]) => (
           <div key={a} className="flex justify-between py-3 text-sm">
             <dt className="text-white/60">{a}</dt>

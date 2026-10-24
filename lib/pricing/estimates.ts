@@ -14,6 +14,7 @@ import {
   residentialCatalogPrice,
 } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
+import { withMixedVisitEstimate } from "@/lib/pricing/weeklyMixedVisits";
 import {
   estimatedMonthlyTotal,
   estimatedVisitsPerMonth,
@@ -167,6 +168,7 @@ export function calculatePostConstructionCatalogEstimate(
     subtotal: oneTimePrice,
     frequency: input.frequency,
     customIntervalDays: input.customIntervalDays,
+    serviceDaysOfWeek: input.serviceDaysOfWeek,
     rules: catalog.recurringRules,
     serviceId: resolved.id,
     recurringPricingRuleId: input.recurringPricingRuleId,
@@ -206,10 +208,12 @@ export function calculatePostConstructionCatalogEstimate(
             pricing.finalPrice,
             input.frequency,
             input.customIntervalDays,
+            input.serviceDaysOfWeek,
           ),
     visitsPerMonth: estimatedVisitsPerMonth(
       input.frequency,
       input.customIntervalDays,
+      input.serviceDaysOfWeek,
     ),
     estimatedProfit: money(
       pricing.finalPrice - core.laborCost - core.supplyCost,
@@ -397,6 +401,7 @@ export function calculateResidentialEstimate(
     addonTotal,
     frequency: input.frequency,
     customIntervalDays: input.customIntervalDays,
+    serviceDaysOfWeek: input.serviceDaysOfWeek,
     rules: catalog.recurringRules,
     serviceId: service.id,
     recurringPricingRuleId: input.recurringPricingRuleId,
@@ -674,6 +679,7 @@ export function calculateCommercialEstimate(
     addonTotal: configured.addonAdjustments.reduce((sum, item) => sum + item.amount, 0),
     frequency: input.frequency,
     customIntervalDays: input.customIntervalDays,
+    serviceDaysOfWeek: input.serviceDaysOfWeek,
     rules: catalog.recurringRules,
     serviceId: service.id,
     recurringPricingRuleId: input.recurringPricingRuleId,
@@ -709,7 +715,7 @@ export function calculateCommercialEstimate(
     protectedTotalDiscount - recurringDiscount,
   );
 
-  return result({
+  const commercialEstimate = result({
     input,
     serviceName: service.service_name,
     catalogAddons: snapshots(
@@ -734,6 +740,7 @@ export function calculateCommercialEstimate(
     supplyCost,
     scope: [],
   });
+  return withMixedVisitEstimate(commercialEstimate, input);
 }
 
 function commercialServiceFloor(
@@ -915,10 +922,12 @@ function result(values: {
       values.finalPrice,
       frequency,
       values.input.customIntervalDays,
+      values.input.serviceDaysOfWeek,
     ),
     visitsPerMonth: estimatedVisitsPerMonth(
       frequency,
       values.input.customIntervalDays,
+      values.input.serviceDaysOfWeek,
     ),
     laborHours: tenth(values.laborHours),
     crewSize: values.crewSize,

@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const load = (path) => readFileSync(resolve(path), "utf8");
+const openPage = load("components/estimates/OpenEstimatesPage.tsx");
+const staff = load("components/estimates/StaffEstimatePreview.tsx");
+const layout = load("app/(estimate-preview)/layout.tsx");
+const printCss = load("app/globals.css");
+const perms = load("lib/auth/permissions.ts");
+const docs = load("components/estimates/EstimateDocument.tsx");
+const publicService = load("lib/services/publicEstimates.ts");
+
+assert.match(openPage, /Copy Preview Link/);
+assert.match(openPage, /navigator\.clipboard\.writeText/);
+assert.match(openPage, /window\.location\.origin/);
+assert.match(openPage, /\/estimate-preview\/\$\{encodeURIComponent\(id\)\}/);
+assert.match(openPage, /openEstimatePrintPreview\(estimate\.id\)/);
+assert.doesNotMatch(openPage, /onClick=\{\(\)=>window\.print\(\)\}/);
+assert.match(openPage, /onClick=\{\(\)=>openEstimatePreview\(estimate\.id\)\}/);
+const previewCopyHelper = openPage.slice(openPage.indexOf("async function copyEstimatePreviewLink"), openPage.indexOf("function Summary("));
+assert.doesNotMatch(previewCopyHelper, /markEstimateSent/);
+assert.match(layout, /<ProtectedWorkspace>/);
+assert.match(perms, /\["\/estimate-preview", "estimates\.view"\]/);
+assert.match(staff, /getEstimateById\(estimateId\)/);
+assert.match(staff, /EstimateDocument document=\{estimateDocumentFromRecord\(estimate\)\}/);
+assert.match(staff, /document\.fonts\?\.ready/);
+assert.match(staff, /window\.print\(\)/);
+assert.match(printCss, /\.estimate-standalone-print \{ display: block; min-height: 0; overflow: visible;/);
+assert.match(printCss, /#estimate-document section \{ break-inside: auto; \}/);
+assert.match(docs, /weekly-visit-print-card/);
+assert.match(publicService, /get_estimate_by_token/);
+assert.match(openPage, /const reviewUrl=\x60\$\{getPublicSiteUrl\(\)\}\/estimate\/\$\{token\}\x60/);
+console.log("Staff-only unsent estimate preview links and standalone print routing validated");

@@ -6,6 +6,7 @@ import {
   calculateResidentialEstimate,
 } from "@/lib/pricing/estimates";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
+import { matchingRecurringRules } from "@/lib/pricing/pricingEngine";
 import { publicAddonSelections } from "@/lib/pricing/publicAddons";
 import type {
   CommercialCalculatorInput,
@@ -33,6 +34,7 @@ export type PublicCatalog = {
     description: string | null;
     division: EstimateDivision;
     recurring: boolean;
+    discounts: Partial<Record<Frequency, number>>;
     fields: string[];
     addons: Array<{
       name: string;
@@ -172,6 +174,15 @@ export function publicCatalog(
           description: service.description,
           division,
           recurring: service.is_recurring_available,
+          discounts: Object.fromEntries(
+            (["Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly"] as Frequency[]).flatMap((frequency) => {
+              const matching = matchingRecurringRules(frequency, catalog.recurringRules, service.id);
+              const rule = matching.length === 1 ? matching[0] : null;
+              return rule?.adjustment_type === "Percentage" && Number(rule.adjustment_value) > 0
+                ? [[frequency, Number(rule.adjustment_value)]]
+                : [];
+            })
+          ),
           fields:
             division === "Residential"
               ? ["bedrooms", "bathrooms", "occupied", "pets"]

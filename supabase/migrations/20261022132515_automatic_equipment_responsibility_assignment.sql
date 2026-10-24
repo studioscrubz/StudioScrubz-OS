@@ -200,7 +200,10 @@ begin
  if not found or j.archived_at is not null or j.status in ('Completed','Cancelled','Archived') then raise exception 'Equipment responsibility requires an active or planned Job.'; end if;
  select * into task from public.job_equipment_responsibility_tasks where job_id=p_job_id for update;
  if not found or task.crew_id is distinct from j.assigned_crew_id or task.crew_lead_employee_id is null then raise exception 'An assigned crew with a Crew Lead is required.'; end if;
- if not (public.has_role('Master Admin') or (public.has_role('Crew Lead') and public.current_employee_id()=task.crew_lead_employee_id)) then
+ -- Crew leadership is an operational assignment, not an exclusive profile role.
+ -- Managers, Sales staff, or other multi-role employees retain Crew Lead authority
+ -- only when their linked employee is the lead of this exact Job crew.
+ if not (public.has_role('Master Admin') or public.current_employee_id()=task.crew_lead_employee_id) then
    raise exception 'Only the assigned Crew Lead or Master Admin may assign equipment responsibility.' using errcode='42501';
  end if;
  if not exists(select 1 from public.employees e where e.id=chosen and e.archived_at is null and e.employment_status='Active'
@@ -242,7 +245,7 @@ begin
  select * into task from public.job_equipment_responsibility_tasks where job_id=p_job_id for update;
  if not found or task.responsible_employee_id is null or task.status='Pending Assignment' then raise exception 'Select one responsible crew member before confirming.'; end if;
  if j.status in ('Completed','Cancelled','Archived') then raise exception 'Active job required.'; end if;
- if not (public.has_role('Master Admin') or (public.has_role('Crew Lead') and public.current_employee_id()=task.crew_lead_employee_id)) then raise exception 'Assigned Crew Lead or Master Admin required.' using errcode='42501'; end if;
+ if not (public.has_role('Master Admin') or public.current_employee_id()=task.crew_lead_employee_id) then raise exception 'Assigned Crew Lead or Master Admin required.' using errcode='42501'; end if;
  if exists(select 1 from public.job_equipment_handoffs h where h.job_id=p_job_id and h.acknowledged_at is null) then raise exception 'Incoming custodians must acknowledge outstanding equipment handoffs before job start.'; end if;
  update public.jobs set equipment_responsibility_confirmed_at=now(),equipment_responsibility_confirmed_by=auth.uid() where id=p_job_id;
 end; $$;

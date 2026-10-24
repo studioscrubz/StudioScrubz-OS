@@ -7,7 +7,7 @@ begin
  if p_from_employee_id=p_to_employee_id then raise exception 'Handoff requires two different custodians.'; end if;
  select * into j from public.jobs where id=p_job_id for update;
  if not found or j.status in ('Completed','Cancelled','Archived') then raise exception 'Active or planned job required.'; end if;
- if not(public.has_role('Master Admin') or (public.has_role('Crew Lead') and exists(select 1 from public.crews c where c.id=j.assigned_crew_id and c.crew_lead_id=public.current_employee_id()))) then raise exception 'Crew Lead or Master Admin required.'; end if;
+ if not(public.has_role('Master Admin') or exists(select 1 from public.crews c where c.id=j.assigned_crew_id and c.crew_lead_id=public.current_employee_id())) then raise exception 'Assigned Crew Lead or Master Admin required.'; end if;
  select * into a from public.job_equipment_assignments where job_id=p_job_id and employee_id=p_from_employee_id and released_at is null for update;
  if not found then raise exception 'Outgoing custodian is not assigned.'; end if;
  if not exists(select 1 from public.employees e where e.id=p_to_employee_id and e.archived_at is null and e.employment_status='Active' and (e.id=j.assigned_employee_id or exists(select 1 from public.crew_members cm where cm.crew_id=j.assigned_crew_id and cm.employee_id=e.id) or exists(select 1 from public.crews c where c.id=j.assigned_crew_id and c.crew_lead_id=e.id))) then raise exception 'Incoming custodian must be assigned to this job.'; end if;
