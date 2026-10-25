@@ -36,6 +36,7 @@ import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmen
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
 import { EquipmentExceptionResolution } from "@/components/jobs/EquipmentExceptionResolution";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
+import { JobsiteGpsVerification } from "@/components/jobs/JobsiteGpsVerification";
 import { getAuthorizedVehicles } from "@/lib/services/vehicles";
 import { getCurrentPosition } from "@/lib/geo/currentPosition";
 import { getGpsTrips, startGpsTrip, finishGpsTrip, cancelGpsTrip, GPS_TRIP_CHANGED_EVENT } from "@/lib/services/gpsMileage";
@@ -738,6 +739,24 @@ function JobModal({
         ]}
       />
       <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
+      <JobsiteGpsVerification
+        jobId={job.id}
+        propertyId={job.property_id}
+        employeeId={employeeId}
+        management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}
+        assigned={Boolean(employeeId && (job.assigned_employee_id === employeeId
+          || (job.assigned_crew_id && (
+            (crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id ?? activeCrew?.crew_lead_id) === employeeId
+            || crews.find(c => c.id === job.assigned_crew_id)?.members.some(m => m.employee_id === employeeId)
+          ))))}
+        assignedEmployees={Array.from(new Set([
+          ...(job.assigned_employee_id ? [job.assigned_employee_id] : []),
+          ...(job.assigned_crew_id ? [
+            ...[crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id].filter((id): id is string => Boolean(id)),
+            ...(crews.find(c => c.id === job.assigned_crew_id)?.members.map(m => m.employee_id) ?? []),
+          ] : []),
+        ])).map(id => ({ id, name: activeTechs.find(e => e.employee_id === id)?.display_name ?? id }))}
+      />
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />

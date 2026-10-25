@@ -41,3 +41,21 @@ jobs:
       - run: npm run test:contracts
       - run: npm run build:production
       - run: npm run check:diff
+
+  jobsite-gps-postgres:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Build schema-only GPS test database
+        run: |
+          sudo -u postgres createdb studioscrubz_jobsite_gps_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_jobsite_gps_test -f supabase/tests/workforce_time_off_phase_1_fixture.sql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_jobsite_gps_test -f supabase/tests/jobsite_gps_fixture.sql
+      - name: Test external migration rollback
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_jobsite_gps_test -f supabase/tests/jobsite_gps_rollback.sql
+      - name: Apply actual GPS migration
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_jobsite_gps_test -f supabase/migrations/20261025164300_jobsite_gps_arrival_v1.sql
+      - name: Verify GPS authorization and payroll isolation
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_jobsite_gps_test -f supabase/tests/jobsite_gps_postgres.sql
