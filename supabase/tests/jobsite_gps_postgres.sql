@@ -32,8 +32,6 @@ select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001'
 select public.verify_jobsite_arrival('40000000-0000-0000-0000-000000000001',
  jsonb_build_object('latitude',34.1001,'longitude',-118.3001,'accuracy',12,'capturedAt',now()));
 do $$ begin
- if (select result from public.get_jobsite_arrival_summary('40000000-0000-0000-0000-000000000001') s,
-   lateral jsonb_to_record(s) as x(result jsonb)) is null then null; end if;
  if (public.get_jobsite_arrival_summary('40000000-0000-0000-0000-000000000001')->'lastCheck'->>'result') <> 'Within Radius'
  then raise exception 'Expected within-radius arrival'; end if;
 end $$;
