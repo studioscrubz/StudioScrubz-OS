@@ -24,6 +24,7 @@ import type { ChangeRequest } from "@/types/changeRequest";
 import type { PorterNotificationEvent, PorterNotificationType } from "@/types/porterNotification";
 import type { JobLaborThresholdEvent } from "@/types/job";
 import { getMyEquipmentResponsibilityTasks, type EquipmentResponsibilityAttention } from "@/lib/services/equipmentAccountability";
+import { getMyTimeOffNotifications, type TimeOffNotification } from "@/lib/services/timeOff";
 
 const GOOGLE_REVIEW_URL = "https://g.page/r/CT2X4ZAN1E8oEAI/review";
 
@@ -44,13 +45,15 @@ export const ATTENTION_REALTIME_TABLES = [
   "internal_schedule_events",
   "internal_schedule_event_attendees",
   "job_equipment_responsibility_tasks",
+  "employee_time_off_requests",
+  "employee_time_off_notifications",
 ] as const;
 
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
   const badgeRequest = beginAppBadgeSync();
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
-  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings, equipmentResponsibilityTasks] = await Promise.all([
+  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings, equipmentResponsibilityTasks, timeOffNotifications] = await Promise.all([
     hasPermission(profile, "estimates.view") ? getEstimates() : Promise.resolve([]),
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
     hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
@@ -63,6 +66,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     getAttentionItemStates(),
     getBusinessSettings().catch(() => null),
     getMyEquipmentResponsibilityTasks().catch(() => []),
+    getMyTimeOffNotifications().catch(() => []),
   ]);
   const [jobRouteIds, agreementRoutes] = await Promise.all([
     hasPermission(profile, "jobs.view")
@@ -120,7 +124,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     const event = Array.isArray(row.event) ? row.event[0] : row.event;
     return event && event.status === "Scheduled" ? [{ id: event.id, title: event.title, startsAt: event.starts_at, location: event.location, invitedAt: row.invited_at }] : [];
   });
-  const input: AttentionRuleInput = { equipmentResponsibilityTasks, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const input: AttentionRuleInput = { equipmentResponsibilityTasks, timeOffNotifications, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -132,6 +136,7 @@ export type AssignedWalkthroughAttention = { id: string; employeeId: string; dat
 
 export type AttentionRuleInput = {
   equipmentResponsibilityTasks?: EquipmentResponsibilityAttention[];
+  timeOffNotifications?: TimeOffNotification[];
   /** When Manager can see all Jobs, personal Crew Lead alerts must be limited to the Manager\'s own employee/crew assignments. */
   assignedOperationalJobIds?: string[];
   assignedEvents?: Array<{ id: string; title: string; startsAt: string; location: string | null; invitedAt: string }>;
@@ -173,6 +178,32 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     } else if(task.responsible_employee_id&&profile.employee_id===task.responsible_employee_id&&task.status!=="Reconciled") {
       items.push(item(`equipment-responsibility:${task.task_id}:assigned:${task.revision}:${profile.employee_id}`,"Equipment Check-Off Assigned","Attention","Jobs","Equipment & Supplies Check-Off Assigned",`You are responsible for equipment and supplies verification for ${label}. Open your assigned job to review and complete the checklist.`,"Job",task.job_id,null,label,null,null,task.assigned_at??task.updated_at,`/jobs?jobId=${task.job_id}&equipment=checkoff`,"Open Checklist"));
     }
+  }
+
+  for (const notification of input.timeOffNotifications ?? []) {
+    const range = notification.start_date === notification.end_date
+      ? notification.start_date
+      : `${notification.start_date} through ${notification.end_date}`;
+    const managementReview = notification.event_type === "Review Required";
+    items.push(item(
+      `time-off:${notification.id}:${notification.request_revision}`,
+      "Event Invitation",
+      managementReview ? "Attention" : "Info",
+      "Time",
+      managementReview ? "Time-Off Request Requires Review" : `Time-Off Request ${notification.event_type}`,
+      managementReview
+        ? `${notification.employee_name} requested time off for ${range}.`
+        : `Your time-off request for ${range} was ${notification.event_type.toLowerCase()}.`,
+      "Time-Off Request",
+      notification.request_id,
+      null,
+      notification.employee_name,
+      null,
+      notification.start_date,
+      notification.created_at,
+      "/time-off",
+      managementReview ? "Review Request" : "View Request",
+    ));
   }
 
   // Estimate approval requests and decisions are version-specific Attention items.

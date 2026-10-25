@@ -49,6 +49,8 @@ import type {
   InternalEventAccessLevel,
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
+import { getApprovedAbsences } from "@/lib/services/timeOff";
+import type { ApprovedAbsence } from "@/types/timeOff";
 type View = "Day" | "Week" | "Month" | "List";
 type EventSource = "All Events" | "Jobs" | "Recurring Services" | "Walkthroughs" | "Internal Events";
 type CrewDisplayOption = { id: string; crew_name: string };
@@ -124,6 +126,7 @@ export function SchedulePage() {
   const communication = useJobCommunication();
   const { profile } = useAuth();
   const canViewWalkthroughs = hasPermission(profile, "walkthroughs.view");
+  const canManageTimeOff = hasPermission(profile, "timeOff.manage");
   const canEditSchedule = hasPermission(profile, "schedule.edit");
   const canViewJobTime = hasPermission(profile, "jobs.view");
   const salesReadOnly = profile?.role === "Sales";
@@ -141,6 +144,7 @@ export function SchedulePage() {
     null,
   );
   const [crews, setCrews] = useState<CrewWithRelations[]>([]);
+  const [approvedAbsences, setApprovedAbsences] = useState<ApprovedAbsence[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -160,7 +164,7 @@ export function SchedulePage() {
   >(null);
 
   async function load() {
-    const [j, w, c, i, o] = await Promise.all([
+    const [j, w, c, i, o, a] = await Promise.all([
       getCalendarJobs(),
       canViewWalkthroughs ? getScheduledWalkthroughs() : Promise.resolve([]),
       salesReadOnly ? Promise.resolve([]) : getActiveCrews(),
@@ -168,15 +172,17 @@ export function SchedulePage() {
         ? getInternalScheduleEvents()
         : Promise.resolve([]),
       getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
+      canManageTimeOff ? getApprovedAbsences(addDays(today(), -30), addDays(today(), 365)) : Promise.resolve([]),
     ]);
     setJobs(j.filter((x) => !x.archived_at));
     setOccurrences(o);
     setWalkthroughs(w);
     setCrews(c);
     setInternalEvents(i);
+    setApprovedAbsences(a);
   }
 
-  useOperationalRealtime(["jobs", "walkthroughs", "crews", "employees", "service_occurrences", "service_agreements"], load);
+  useOperationalRealtime(["jobs", "walkthroughs", "crews", "employees", "service_occurrences", "service_agreements", "employee_time_off_requests"], load);
 
   useEffect(() => {
     let active = true;
@@ -217,14 +223,16 @@ export function SchedulePage() {
         ? getInternalScheduleEvents()
         : Promise.resolve([]),
       getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
+      canManageTimeOff ? getApprovedAbsences(addDays(today(), -30), addDays(today(), 365)) : Promise.resolve([]),
     ])
-      .then(([j, w, c, i, o]) => {
+      .then(([j, w, c, i, o, a]) => {
         if (active) {
           setJobs(j.filter((x) => !x.archived_at));
           setOccurrences(o);
           setWalkthroughs(w);
           setCrews(c);
           setInternalEvents(i);
+          setApprovedAbsences(a);
         }
       })
       .catch((x: unknown) => {
@@ -237,7 +245,7 @@ export function SchedulePage() {
     return () => {
       active = false;
     };
-  }, [canViewWalkthroughs, internalAccess, salesReadOnly]);
+  }, [canManageTimeOff, canViewWalkthroughs, internalAccess, salesReadOnly]);
 
   const crewFilterOptions = useMemo<CrewDisplayOption[]>(
     () =>
@@ -464,6 +472,16 @@ export function SchedulePage() {
       />
       {notice && <Alert text={notice} good />}
       {error && <Alert text={error} />}{" "}
+      {canManageTimeOff && approvedAbsences.some((absence) => absence.start_date <= week[6] && absence.end_date >= week[0]) && (
+        <section aria-label="Approved employee absences" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <h2 className="font-extrabold">Approved absences affecting this week</h2>
+          <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+            {approvedAbsences.filter((absence) => absence.start_date <= week[6] && absence.end_date >= week[0]).map((absence) => (
+              <li key={absence.id}><b>{absence.employee_name}</b>: {absence.start_date}{absence.end_date !== absence.start_date ? ` through ${absence.end_date}` : ""}{absence.is_full_day ? " (full day)" : ` (${formatTime(absence.start_time)}–${formatTime(absence.end_time)})`}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       {loading ? (
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" />
       ) : (
@@ -529,6 +547,7 @@ export function SchedulePage() {
         <ScheduleModal
           job={edit}
           crews={crews}
+          approvedAbsences={approvedAbsences}
           close={() => setEdit(null)}
           saved={async (text, job) => {
             void communication.expose(job, "service_scheduled");
@@ -876,11 +895,13 @@ function ListView({
 function ScheduleModal({
   job,
   crews,
+  approvedAbsences,
   close,
   saved,
 }: {
   job: JobWithRelations;
   crews: CrewWithRelations[];
+  approvedAbsences: ApprovedAbsence[];
   close: () => void;
   saved: (text: string, job: JobWithRelations) => Promise<void>;
 }) {
@@ -897,6 +918,7 @@ function ScheduleModal({
     );
   const [techOptions, setTechOptions] = useState<EligibleJobTech[]>([]),
     [conflicts, setConflicts] = useState<CrewConflict[]>([]),
+    [absenceConflicts, setAbsenceConflicts] = useState<ApprovedAbsence[]>([]),
     [confirm, setConfirm] = useState(false),
     [saving, setSaving] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -928,8 +950,15 @@ function ScheduleModal({
                 duration,
               )
             : [];
-      if (found.length && !override) {
+      const assignedEmployeeIds = kind === "individual" && employeeId
+        ? [employeeId]
+        : kind === "crew" && selected
+          ? [selected.crew_lead_id, ...selected.members.map((member) => member.employee_id)].filter((id): id is string => Boolean(id))
+          : [];
+      const foundAbsences = approvedAbsences.filter((absence) => assignedEmployeeIds.includes(absence.employee_id) && absenceOverlapsSchedule(absence, date, time, duration));
+      if ((found.length || foundAbsences.length) && !override) {
         setConflicts(found);
+        setAbsenceConflicts(foundAbsences);
         setConfirm(true);
         setSaving(false);
         return;
@@ -1033,9 +1062,11 @@ function ScheduleModal({
       {confirm && (
         <ConflictWarning
           rows={conflicts}
+          absences={absenceConflicts}
           cancel={() => {
             setConfirm(false);
             setConflicts([]);
+            setAbsenceConflicts([]);
           }}
           anyway={() => void submit(true)}
         />
@@ -1059,23 +1090,31 @@ function ScheduleModal({
 }
 function ConflictWarning({
   rows,
+  absences,
   cancel,
   anyway,
 }: {
   rows: CrewConflict[];
+  absences: ApprovedAbsence[];
   cancel: () => void;
   anyway: () => void;
 }) {
   return (
     <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
       <p className="font-extrabold text-amber-900">
-        This crew is already assigned to another job during this time.
+        This schedule has assignment conflicts that require review.
       </p>
       {rows.map((j) => (
         <div key={j.id} className="mt-3 text-sm">
           <b>{j.job_number}</b> | {j.client_name} | {j.property_name}
           <br />
           {formatTime(j.start_time)} for {j.estimated_duration ?? 0} hours
+        </div>
+      ))}
+      {absences.map((absence) => (
+        <div key={absence.id} className="mt-3 text-sm">
+          <b>{absence.employee_name}</b> has approved time off on this date
+          {!absence.is_full_day && ` from ${formatTime(absence.start_time)} to ${formatTime(absence.end_time)}`}.
         </div>
       ))}
       <div className="mt-4 flex gap-2">
@@ -1276,6 +1315,23 @@ function addDays(date: string, n: number) {
   const d = new Date(`${date}T12:00:00`);
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+export function absenceOverlapsSchedule(
+  absence: ApprovedAbsence,
+  date: string,
+  startTime: string,
+  durationHours: number,
+) {
+  if (date < absence.start_date || date > absence.end_date) return false;
+  if (absence.is_full_day || !absence.start_time || !absence.end_time) return true;
+  const minutes = (value: string) => {
+    const [hours, mins] = value.slice(0, 5).split(":").map(Number);
+    return hours * 60 + mins;
+  };
+  const scheduledStart = minutes(startTime);
+  const scheduledEnd = scheduledStart + Math.max(0, durationHours) * 60;
+  return scheduledStart < minutes(absence.end_time) && scheduledEnd > minutes(absence.start_time);
 }
 function weekDates(date: string) {
   const d = new Date(`${date}T12:00:00`);

@@ -594,6 +594,18 @@ const navItems: Array<NavLink | NavGroup> = [
 
       },
 
+      {
+
+        label: "Time Off",
+
+        href: "/time-off",
+
+        marker: "",
+
+        permission: "timeOff.view",
+
+      },
+
     ],
 
   },
