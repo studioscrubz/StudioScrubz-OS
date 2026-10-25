@@ -20,8 +20,7 @@ create table public.jobsite_arrival_checks (
   reported_accuracy_meters double precision not null check (reported_accuracy_meters between 0 and 100),
   distance_meters double precision not null check (distance_meters >= 0),
   radius_meters integer not null check (radius_meters between 100 and 500),
-  result text not null check (result in ('Within Radius','Outside Radius')),
-  unique (job_id, employee_id)
+  result text not null check (result in ('Within Radius','Outside Radius'))
 );
 create index jobsite_arrival_checks_job_idx on public.jobsite_arrival_checks(job_id,checked_at desc);
 
@@ -39,7 +38,8 @@ alter table public.jobsite_geofence_settings enable row level security;
 alter table public.jobsite_arrival_checks enable row level security;
 alter table public.jobsite_arrival_exceptions enable row level security;
 revoke all on public.jobsite_geofence_settings,public.jobsite_arrival_checks,public.jobsite_arrival_exceptions from public,anon,authenticated;
-grant select,insert,update on public.jobsite_geofence_settings,public.jobsite_arrival_checks to service_role;
+grant select,insert,update on public.jobsite_geofence_settings to service_role;
+grant select,insert on public.jobsite_arrival_checks to service_role;
 grant select,insert on public.jobsite_arrival_exceptions to service_role;
 
 create function private.jobsite_manager(p_actor uuid)
@@ -113,7 +113,8 @@ begin
  select * into setting from public.jobsite_geofence_settings s where s.property_id=job.property_id and s.enabled;
  if employee is not null then
   select * into latest from public.jobsite_arrival_checks c
-    where c.job_id=p_job_id and c.employee_id=employee;
+    where c.job_id=p_job_id and c.employee_id=employee
+    order by c.checked_at desc,c.id desc limit 1;
  end if;
  return jsonb_build_object(
    'configured',setting.property_id is not null,
@@ -162,9 +163,6 @@ begin
  verdict:=case when dist<=setting.radius_meters then 'Within Radius' else 'Outside Radius' end;
  insert into public.jobsite_arrival_checks(job_id,employee_id,checked_by,reported_accuracy_meters,distance_meters,radius_meters,result)
  values(p_job_id,employee,actor,(p_position->>'accuracy')::double precision,dist,setting.radius_meters,verdict)
- on conflict(job_id,employee_id) do update set checked_by=excluded.checked_by,
-  checked_at=now(),reported_accuracy_meters=excluded.reported_accuracy_meters,
-  distance_meters=excluded.distance_meters,radius_meters=excluded.radius_meters,result=excluded.result
  returning * into result;
  return jsonb_build_object('result',result.result,'distanceMeters',round(result.distance_meters::numeric,1),
    'accuracyMeters',result.reported_accuracy_meters,'checkedAt',result.checked_at,
@@ -189,14 +187,16 @@ begin
  return jsonb_build_object('exceptionId',approved,'approved',true);
 end $$;
 
-create function private.prevent_jobsite_exception_changes()
+create function private.prevent_jobsite_evidence_changes()
 returns trigger language plpgsql set search_path='' as $$
-begin raise exception 'Job-site verification exception audit is append-only.'; end $$;
+begin raise exception 'Job-site GPS evidence and exceptions are append-only.'; end $;
 create trigger jobsite_exceptions_immutable
-before update or delete on public.jobsite_arrival_exceptions for each row execute function private.prevent_jobsite_exception_changes();
+before update or delete on public.jobsite_arrival_exceptions for each row execute function private.prevent_jobsite_evidence_changes();
+create trigger jobsite_arrival_checks_immutable
+before update or delete on public.jobsite_arrival_checks for each row execute function private.prevent_jobsite_evidence_changes();
 
 revoke all on function private.jobsite_manager(uuid),private.jobsite_employee_authorized(public.jobs,uuid),
-  private.jobsite_validate_position(jsonb),private.prevent_jobsite_exception_changes() from public,anon,authenticated;
+  private.jobsite_validate_position(jsonb),private.prevent_jobsite_evidence_changes() from public,anon,authenticated;
 revoke all on function public.set_jobsite_geofence(uuid,jsonb,integer),
  public.get_jobsite_arrival_summary(uuid),public.verify_jobsite_arrival(uuid,jsonb),
  public.approve_jobsite_arrival_exception(uuid,uuid,text) from public,anon,authenticated;
