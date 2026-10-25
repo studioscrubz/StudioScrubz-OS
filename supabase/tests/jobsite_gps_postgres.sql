@@ -60,7 +60,12 @@ do $$ declare failed boolean:=false; begin
  begin update public.jobsite_arrival_exceptions set reason='changed';
  exception when others then failed:=true; end;
  if not failed then raise exception 'Exception audit was mutable.'; end if;
- if (select count(*) from public.jobsite_arrival_checks)<>1 then raise exception 'Arrival check was not idempotent.'; end if;
+ if (select count(*) from public.jobsite_arrival_checks)<>2 then raise exception 'Arrival attempts must be retained as separate evidence.'; end if;
+ if (select count(distinct result) from public.jobsite_arrival_checks)<>2 then raise exception 'Both within and outside radius results must remain in evidence.'; end if;
+ failed:=false;
+ begin update public.jobsite_arrival_checks set result='Within Radius';
+ exception when others then failed:=true; end;
+ if not failed then raise exception 'Arrival evidence was mutable.'; end if;
  if (select status from public.time_entries where job_id='40000000-0000-0000-0000-000000000001')<>'Open'
  then raise exception 'GPS changed payroll.'; end if;
  if (select status from public.jobs where id='40000000-0000-0000-0000-000000000001')<>'Crew Assigned'
