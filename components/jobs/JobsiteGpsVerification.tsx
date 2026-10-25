@@ -74,7 +74,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
 
   return <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4" aria-label="Job-site GPS verification">
     <h3 className="font-extrabold text-[#143d1a]">Job-site GPS arrival</h3>
-    <p className="mt-1 text-xs text-neutral-600">One-time device location check, on request only. No background tracking. This pilot does not start jobs or change payroll.</p>
+    <p className="mt-1 text-xs text-neutral-600">GPS is requested only when you tap Verify. No background tracking, and your exact GPS coordinates are not saved in the arrival record—only the distance, accuracy, and time of each check. This pilot does not start jobs or change payroll.</p>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     {!summary ? <p className="mt-3 text-sm text-neutral-600">Loading job-site verification…</p> : <>
