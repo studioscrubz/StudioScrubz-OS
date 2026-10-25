@@ -1,5 +1,5 @@
 -- Workforce Phase 1: time-off requests only. Employee platform presence is unchanged.
-begin;
+-- Transaction boundaries are intentionally managed by the migration runner.
 
 create table public.employee_time_off_requests (
   id uuid primary key default gen_random_uuid(),
@@ -54,12 +54,29 @@ create table public.employee_time_off_notifications (
   unique(request_id,recipient_user_id,event_type,request_revision)
 );
 
+create table public.employee_time_off_schedule_overrides (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.employee_time_off_requests(id) on delete restrict,
+  job_id uuid not null references public.jobs(id) on delete restrict,
+  employee_id uuid not null references public.employees(id) on delete restrict,
+  actor_user_id uuid not null references public.user_profiles(id) on delete restrict,
+  override_reason text not null check (char_length(btrim(override_reason)) between 10 and 2000),
+  scheduled_date date not null,
+  start_time time,
+  estimated_duration numeric,
+  assignment_kind text not null check (assignment_kind in ('individual','crew')),
+  created_at timestamptz not null default now()
+);
+create index employee_time_off_schedule_overrides_job_idx on public.employee_time_off_schedule_overrides(job_id,created_at desc);
+
 alter table public.employee_time_off_requests enable row level security;
 alter table public.employee_time_off_events enable row level security;
 alter table public.employee_time_off_notifications enable row level security;
-revoke all on public.employee_time_off_requests,public.employee_time_off_events,public.employee_time_off_notifications from public,anon,authenticated;
+alter table public.employee_time_off_schedule_overrides enable row level security;
+revoke all on public.employee_time_off_requests,public.employee_time_off_events,public.employee_time_off_notifications,public.employee_time_off_schedule_overrides from public,anon,authenticated;
 grant select,insert,update on public.employee_time_off_requests,public.employee_time_off_events,public.employee_time_off_notifications to service_role;
-grant select on public.employee_time_off_requests,public.employee_time_off_events,public.employee_time_off_notifications to authenticated;
+grant select,insert on public.employee_time_off_schedule_overrides to service_role;
+grant select on public.employee_time_off_requests,public.employee_time_off_events,public.employee_time_off_notifications,public.employee_time_off_schedule_overrides to authenticated;
 
 create function private.is_time_off_manager(p_user_id uuid)
 returns boolean language sql stable security definer set search_path='' as $$
@@ -75,7 +92,7 @@ $$;
 create policy employee_time_off_requests_authorized_read on public.employee_time_off_requests
 for select to authenticated using (
  exists(select 1 from public.user_profiles p where p.id=(select auth.uid()) and p.is_active
-   and (p.employee_id=employee_id or p.role in ('Master Admin','Administrator','Manager')))
+   and (p.employee_id=employee_time_off_requests.employee_id or p.role in ('Master Admin','Administrator','Manager')))
 );
 create policy employee_time_off_events_authorized_read on public.employee_time_off_events
 for select to authenticated using (exists(
@@ -85,6 +102,11 @@ for select to authenticated using (exists(
 ));
 create policy employee_time_off_notifications_recipient_read on public.employee_time_off_notifications
 for select to authenticated using (recipient_user_id=(select auth.uid()));
+create policy employee_time_off_schedule_overrides_management_read on public.employee_time_off_schedule_overrides
+for select to authenticated using (exists(
+ select 1 from public.user_profiles p where p.id=(select auth.uid()) and p.is_active
+ and p.role in ('Master Admin','Administrator','Manager')
+));
 
 do $$
 declare table_name text;
@@ -97,6 +119,125 @@ begin
    execute format('alter publication supabase_realtime add table public.%I',table_name);
   end if;
  end loop;
+end $$;
+
+create function private.job_time_off_conflicts(
+ p_scheduled_date date,p_start_time time,p_estimated_duration numeric,
+ p_assigned_employee_id uuid,p_assigned_crew_id uuid
+) returns table(request_id uuid,employee_id uuid)
+language sql stable security definer set search_path='' as $$
+ with assigned as (
+  select p_assigned_employee_id as employee_id where p_assigned_employee_id is not null
+  union
+  select c.crew_lead_id from public.crews c where c.id=p_assigned_crew_id and c.crew_lead_id is not null
+  union
+  select cm.employee_id from public.crew_members cm where cm.crew_id=p_assigned_crew_id
+ ), job_window as (
+  select
+   case when p_start_time is null or p_estimated_duration is null or p_estimated_duration<=0
+    then p_scheduled_date::timestamp else p_scheduled_date+p_start_time end as starts_at,
+   case when p_start_time is null or p_estimated_duration is null or p_estimated_duration<=0
+    then (p_scheduled_date+1)::timestamp else p_scheduled_date+p_start_time+(p_estimated_duration*interval '1 hour') end as ends_at
+ )
+ select r.id,a.employee_id from assigned a
+ join public.employee_time_off_requests r on r.employee_id=a.employee_id and r.status='Approved'
+ cross join job_window w
+ where p_scheduled_date is not null
+ and w.starts_at < case when r.is_full_day then (r.end_date+1)::timestamp else r.end_date+r.end_time end
+ and w.ends_at > case when r.is_full_day then r.start_date::timestamp else r.start_date+r.start_time end
+$$;
+
+create function private.enforce_job_time_off_conflicts()
+returns trigger language plpgsql security definer set search_path='' as $$
+declare conflict record; reason text:=nullif(btrim(current_setting('app.time_off_override_reason',true)),''); actor uuid:=(select auth.uid());
+begin
+ if new.archived_at is not null or new.status in ('Cancelled','Archived')
+   or new.scheduled_date is null or num_nonnulls(new.assigned_employee_id,new.assigned_crew_id)=0 then return new; end if;
+ if not exists(select 1 from private.job_time_off_conflicts(new.scheduled_date,new.start_time,new.estimated_duration,new.assigned_employee_id,new.assigned_crew_id)) then return new; end if;
+ if reason is null then
+  raise exception 'The selected employee or crew has approved time off during this Job. Management must provide an override reason.' using errcode='23514';
+ end if;
+ if char_length(reason)<10 or char_length(reason)>2000 or not private.is_time_off_manager(actor) then
+  raise exception 'A valid management time-off override reason is required.' using errcode='42501';
+ end if;
+ for conflict in select * from private.job_time_off_conflicts(new.scheduled_date,new.start_time,new.estimated_duration,new.assigned_employee_id,new.assigned_crew_id) loop
+  insert into public.employee_time_off_schedule_overrides(
+   request_id,job_id,employee_id,actor_user_id,override_reason,scheduled_date,start_time,estimated_duration,assignment_kind
+  ) values (
+   conflict.request_id,new.id,conflict.employee_id,actor,reason,new.scheduled_date,new.start_time,new.estimated_duration,
+   case when new.assigned_employee_id is not null then 'individual' else 'crew' end
+  );
+ end loop;
+ return new;
+end $$;
+create trigger enforce_job_time_off_conflicts
+after insert or update of scheduled_date,start_time,estimated_duration,assigned_employee_id,assigned_crew_id on public.jobs
+for each row execute function private.enforce_job_time_off_conflicts();
+
+create function public.schedule_job_with_time_off_protection(
+ p_job_id uuid,p_scheduled_date date,p_start_time time,p_estimated_duration numeric,
+ p_assignment_kind text,p_employee_id uuid default null,p_crew_id uuid default null,
+ p_override_reason text default null
+) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
+declare job public.jobs; employee public.employees; crew public.crews; team jsonb:='[]'::jsonb; safe public.jobs_operational_safe;
+begin
+ if not private.is_time_off_manager((select auth.uid())) then raise exception 'Management scheduling permission is required.' using errcode='42501'; end if;
+ if p_scheduled_date is null or p_start_time is null or p_estimated_duration is null or p_estimated_duration<=0 then raise exception 'A date, start time, and positive duration are required.'; end if;
+ if p_assignment_kind not in ('unassigned','individual','crew')
+  or (p_assignment_kind='individual' and (p_employee_id is null or p_crew_id is not null))
+  or (p_assignment_kind='crew' and (p_crew_id is null or p_employee_id is not null))
+  or (p_assignment_kind='unassigned' and (p_employee_id is not null or p_crew_id is not null)) then raise exception 'Choose one valid Job assignment target.'; end if;
+ select * into job from public.jobs where id=p_job_id for update;
+ if not found then raise exception 'Job not found.'; end if;
+ if job.archived_at is not null or job.status in ('In Progress','Completed','Cancelled','Archived') then raise exception 'This Job can no longer be scheduled.'; end if;
+ if p_assignment_kind='individual' then
+  select * into employee from public.employees where id=p_employee_id and public.is_eligible_job_tech(id);
+  if not found then raise exception 'Select an active eligible employee.'; end if;
+ elsif p_assignment_kind='crew' then
+  select * into crew from public.crews where id=p_crew_id and status='Active' and archived_at is null;
+  if not found then raise exception 'Select an active Crew.'; end if;
+  select coalesce(jsonb_agg(coalesce(nullif(btrim(e.preferred_name),''),btrim(e.first_name||' '||e.last_name)) order by e.last_name,e.first_name),'[]'::jsonb)
+   into team from public.crew_members cm join public.employees e on e.id=cm.employee_id
+   where cm.crew_id=crew.id and e.employment_status='Active' and e.archived_at is null;
+ end if;
+ perform set_config('app.time_off_override_reason',coalesce(p_override_reason,''),true);
+ update public.jobs set scheduled_date=p_scheduled_date,start_time=p_start_time,estimated_duration=p_estimated_duration,
+  assigned_employee_id=case when p_assignment_kind='individual' then employee.id end,
+  assigned_employee_name=case when p_assignment_kind='individual' then coalesce(nullif(btrim(employee.preferred_name),''),btrim(employee.first_name||' '||employee.last_name)) end,
+  assigned_crew_id=case when p_assignment_kind='crew' then crew.id end,
+  assigned_crew_name=case when p_assignment_kind='crew' then crew.crew_name end,
+  crew_lead_name=case when p_assignment_kind='crew' then (select coalesce(nullif(btrim(e.preferred_name),''),btrim(e.first_name||' '||e.last_name)) from public.employees e where e.id=crew.crew_lead_id) end,
+  assigned_team=case when p_assignment_kind='crew' then team else '[]'::jsonb end,
+  status=case when p_assignment_kind='unassigned' then 'Scheduled' else 'Crew Assigned' end
+ where id=job.id;
+ select * into safe from public.jobs_operational_safe where id=job.id;
+ return safe;
+end $$;
+
+create function public.update_job_schedule_with_time_off_protection(
+ p_job_id uuid,p_scheduled_date date,p_start_time time,p_estimated_duration numeric,
+ p_override_reason text default null
+) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
+declare current_status text;
+begin
+ if not private.is_time_off_manager((select auth.uid())) then raise exception 'Management scheduling permission is required.' using errcode='42501'; end if;
+ select status into current_status from public.jobs where id=p_job_id for update;
+ if not found then raise exception 'Job not found.'; end if;
+ perform set_config('app.time_off_override_reason',coalesce(p_override_reason,''),true);
+ return public.update_operational_job(
+  p_job_id,p_scheduled_date,p_start_time,p_estimated_duration,null,null,
+  case when current_status='Ready to Schedule' then 'Scheduled' else null end
+ );
+end $$;
+
+create function public.assign_job_worker_with_time_off_protection(
+ p_job_id uuid,p_assignment_kind text,p_employee_id uuid default null,p_crew_id uuid default null,
+ p_override_reason text default null
+) returns jsonb language plpgsql security definer set search_path='' as $$
+begin
+ if not private.is_time_off_manager((select auth.uid())) then raise exception 'Management assignment permission is required.' using errcode='42501'; end if;
+ perform set_config('app.time_off_override_reason',coalesce(p_override_reason,''),true);
+ return public.set_job_worker_assignment(p_job_id,p_assignment_kind,p_employee_id,p_crew_id);
 end $$;
 
 create function public.submit_employee_time_off_request(
@@ -188,10 +329,10 @@ end $$;
 create function private.protect_employee_time_off_event()
 returns trigger language plpgsql security definer set search_path='' as $$ begin raise exception 'Time-off audit history is append-only.'; end $$;
 create trigger employee_time_off_events_append_only before update or delete on public.employee_time_off_events for each row execute function private.protect_employee_time_off_event();
+create trigger employee_time_off_schedule_overrides_append_only before update or delete on public.employee_time_off_schedule_overrides for each row execute function private.protect_employee_time_off_event();
 
-revoke all on function private.is_time_off_manager(uuid),private.current_active_employee_id(),private.protect_employee_time_off_event() from public,anon,authenticated;
-revoke all on function public.submit_employee_time_off_request(date,date,boolean,time,time,text,text),public.cancel_employee_time_off_request(uuid,text),public.review_employee_time_off_request(uuid,text,text),public.get_my_employee_time_off_requests(),public.get_employee_time_off_review_queue(),public.get_approved_employee_absences(date,date),public.get_my_time_off_notifications() from public,anon,authenticated;
+revoke all on function private.is_time_off_manager(uuid),private.current_active_employee_id(),private.job_time_off_conflicts(date,time,numeric,uuid,uuid),private.enforce_job_time_off_conflicts(),private.protect_employee_time_off_event() from public,anon,authenticated;
+revoke all on function public.submit_employee_time_off_request(date,date,boolean,time,time,text,text),public.cancel_employee_time_off_request(uuid,text),public.review_employee_time_off_request(uuid,text,text),public.get_my_employee_time_off_requests(),public.get_employee_time_off_review_queue(),public.get_approved_employee_absences(date,date),public.get_my_time_off_notifications(),public.schedule_job_with_time_off_protection(uuid,date,time,numeric,text,uuid,uuid,text),public.update_job_schedule_with_time_off_protection(uuid,date,time,numeric,text),public.assign_job_worker_with_time_off_protection(uuid,text,uuid,uuid,text) from public,anon,authenticated;
 grant execute on function public.submit_employee_time_off_request(date,date,boolean,time,time,text,text),public.cancel_employee_time_off_request(uuid,text),public.get_my_employee_time_off_requests(),public.get_approved_employee_absences(date,date),public.get_my_time_off_notifications() to authenticated;
-grant execute on function public.review_employee_time_off_request(uuid,text,text),public.get_employee_time_off_review_queue() to authenticated;
+grant execute on function public.review_employee_time_off_request(uuid,text,text),public.get_employee_time_off_review_queue(),public.schedule_job_with_time_off_protection(uuid,date,time,numeric,text,uuid,uuid,text),public.update_job_schedule_with_time_off_protection(uuid,date,time,numeric,text),public.assign_job_worker_with_time_off_protection(uuid,text,uuid,uuid,text) to authenticated;
 notify pgrst,'reload schema';
-commit;

@@ -934,7 +934,7 @@ function ScheduleModal({
       : kind === "crew"
         ? { kind, crewId }
         : { kind: "unassigned" };
-  async function submit(override = false) {
+  async function submit(overrideReason?: string | null) {
     setSaving(true);
     setError(null);
     try {
@@ -956,7 +956,7 @@ function ScheduleModal({
           ? [selected.crew_lead_id, ...selected.members.map((member) => member.employee_id)].filter((id): id is string => Boolean(id))
           : [];
       const foundAbsences = approvedAbsences.filter((absence) => assignedEmployeeIds.includes(absence.employee_id) && absenceOverlapsSchedule(absence, date, time, duration));
-      if ((found.length || foundAbsences.length) && !override) {
+      if ((found.length || foundAbsences.length) && overrideReason === undefined) {
         setConflicts(found);
         setAbsenceConflicts(foundAbsences);
         setConfirm(true);
@@ -970,6 +970,7 @@ function ScheduleModal({
         duration,
         target,
         job.status,
+        overrideReason ?? null,
       );
       await saved(job.scheduled_date ? "Job rescheduled." : "Job scheduled.", {
         ...updated,
@@ -1068,7 +1069,18 @@ function ScheduleModal({
             setConflicts([]);
             setAbsenceConflicts([]);
           }}
-          anyway={() => void submit(true)}
+          anyway={() => {
+            if (!absenceConflicts.length) {
+              void submit(null);
+              return;
+            }
+            const reason = window.prompt("Explain why scheduling over approved time off is necessary (minimum 10 characters):")?.trim() ?? "";
+            if (reason.length < 10) {
+              setError("A management override reason of at least 10 characters is required.");
+              return;
+            }
+            void submit(reason);
+          }}
         />
       )}{" "}
       {error && <Alert text={error} />}{" "}
