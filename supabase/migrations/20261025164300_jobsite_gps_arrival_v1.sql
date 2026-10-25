@@ -71,7 +71,6 @@ begin
   captured:=(p_position->>'capturedAt')::timestamptz;
  exception when others then raise exception 'Invalid GPS coordinates or timestamp.'; end;
  if lat is null or lon is null or accuracy is null or captured is null or
-   not isfinite(lat) or not isfinite(lon) or not isfinite(accuracy) or
    lat not between -90 and 90 or lon not between -180 and 180 or
    accuracy<0 or accuracy>100 or
    captured<now()-interval '60 seconds' or captured>now()+interval '10 seconds' then
