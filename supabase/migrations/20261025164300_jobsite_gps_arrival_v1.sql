@@ -189,7 +189,7 @@ end $$;
 
 create function private.prevent_jobsite_evidence_changes()
 returns trigger language plpgsql set search_path='' as $$
-begin raise exception 'Job-site GPS evidence and exceptions are append-only.'; end $;
+begin raise exception 'Job-site GPS evidence and exceptions are append-only.'; end $$;
 create trigger jobsite_exceptions_immutable
 before update or delete on public.jobsite_arrival_exceptions for each row execute function private.prevent_jobsite_evidence_changes();
 create trigger jobsite_arrival_checks_immutable
