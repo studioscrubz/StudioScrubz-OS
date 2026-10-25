@@ -85,8 +85,8 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
       {assigned && employeeId && summary.configured && <button type="button" disabled={busy} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50" onClick={() => void verify()}>
         {busy ? "Checking…" : "Verify my arrival using GPS"}
       </button>}
-      {management && !summary.configured && <>
-        <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
+      {management && <>
+        {!summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
           <p className="text-sm font-bold text-[#143d1a]">Manager: configure property GPS</p>
           <p className="mt-1 text-xs text-neutral-600">Use your device at the actual property. This avoids paid address geocoding and prevents guessing coordinates.</p>
           <label className="mt-3 block text-sm font-semibold">Allowed radius
@@ -100,7 +100,8 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
           <button type="button" disabled={busy || !propertyId} className="mt-3 rounded-lg border border-[#143d1a] px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50" onClick={() => void configure()}>
             {summary.configured ? "Update property GPS at my current location" : "Set property GPS from my current location"}
           </button>
-        </div>
+        </div>}
+
         {assignedEmployees.length > 0 && <div className="mt-3 rounded-lg border bg-white p-3">
           <p className="text-sm font-bold text-[#143d1a]">Manager exception (not GPS verified)</p>
           <label className="mt-2 block text-xs font-bold">Assigned employee
