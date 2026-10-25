@@ -209,3 +209,9 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 
 
 2026-10-23 Sales financial read restriction (unapplied): `read_sales_estimates`, `read_sales_proposals`, `read_sales_walkthroughs`, and `read_sales_catalog` return authorized customer-facing JSON only, and restrictive Sales SELECT policies deny direct reads of raw financial table records. Source is `20261023132000_sales_estimate_approval_guards.sql`. Do not deploy until Sales write RPCs and pricing screens are adapted: PostgreSQL UPDATE with RLS also requires SELECT.
+
+## 2026-10-25 Walkthrough GPS registration
+
+- RPCs: `get_walkthrough_jobsite_gps`, `capture_walkthrough_jobsite_gps`.
+- Source: `supabase/migrations/20261025194500_walkthrough_jobsite_gps.sql`.
+- Both RPCs resolve the property from the authorized scheduled walkthrough and reuse the protected `jobsite_geofence_settings` relation.

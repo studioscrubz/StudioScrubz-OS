@@ -13,6 +13,7 @@ import { DeepCleaningFieldWalkthrough, deepCleaningCompletionIssues, isDeepClean
 import { isMoveInOutService, MoveInOutFieldWalkthrough, moveInOutCompletionIssues } from "@/components/walkthroughs/MoveInOutFieldWalkthrough";
 import { CommercialJanitorialFieldWalkthrough, commercialJanitorialCompletionIssues, isCommercialJanitorialService } from "@/components/walkthroughs/CommercialJanitorialFieldWalkthrough";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { WalkthroughGpsCapture } from "@/components/walkthroughs/WalkthroughGpsCapture";
 import { getServiceCatalog, getAvailableServiceAddons, findCatalogService } from "@/lib/services/serviceCatalog";
 import type { ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { confirmedAddonSnapshot, interpretAssessmentPricing } from "@/lib/pricing/assessmentPricing";
@@ -435,6 +436,8 @@ function FieldForm({
         </p>
 
         <p className="mt-3 font-bold">{row.service}</p>
+
+        <WalkthroughGpsCapture walkthroughId={row.id} readOnly={readOnly} />
 
         <h3 className="mt-5 font-bold">Assessment Scope</h3>
 
