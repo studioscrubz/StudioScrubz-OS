@@ -295,15 +295,16 @@ export async function getEligibleJobTechs(): Promise<EligibleJobTech[]> {
   if (error) throw new Error(safeDatabaseMessage(error, "Eligible Job Techs could not be loaded."));
   return data;
 }
-export async function assignJobWorker(id: string, target: JobWorkerTarget): Promise<JobWithRelations> {
-  const { data, error } = await getSupabaseClient().rpc("set_job_worker_assignment", {
+export async function assignJobWorker(id: string, target: JobWorkerTarget, timeOffOverrideReason: string | null = null): Promise<JobWithRelations> {
+  const { data, error } = await getSupabaseClient().rpc("assign_job_worker_with_time_off_protection", {
     p_job_id: id,
     p_assignment_kind: target.kind,
     p_employee_id: target.kind === "individual" ? target.employeeId : null,
     p_crew_id: target.kind === "crew" ? target.crewId : null,
+    p_override_reason: timeOffOverrideReason,
   });
   if (error) throw new Error(safeDatabaseMessage(error, "Job assignment could not be saved."));
-  const job = await getJobById(id).catch(() => fullJob(data));
+  const job = await getJobById(id).catch(() => fullJob(data as Job));
   await requestPendingJobCalendarSync(id);
   await requestJobAttentionPush(job);
   return job;
@@ -387,14 +388,21 @@ export async function scheduleJob(
   time: string,
   duration: number | null,
   current: JobStatus,
+  timeOffOverrideReason: string | null = null,
 ) {
   if (!date) throw new Error("Scheduled date is required.");
-  return updateJob(id, {
-    scheduled_date: date,
-    start_time: time || null,
-    estimated_duration: duration,
-    status: current === "Ready to Schedule" ? "Scheduled" : current,
+  const { data, error } = await getSupabaseClient().rpc("update_job_schedule_with_time_off_protection", {
+    p_job_id: id,
+    p_scheduled_date: date,
+    p_start_time: time || null,
+    p_estimated_duration: duration,
+    p_override_reason: timeOffOverrideReason,
   });
+  if (error) throw new Error(safeDatabaseMessage(error, "Job schedule could not be saved."));
+  const job = await getJobById(id).catch(() => operationalJob(data as Parameters<typeof operationalJob>[0]));
+  await requestPendingJobCalendarSync(id);
+  await requestJobAttentionPush(job);
+  return { ...job, status: current === "Ready to Schedule" ? "Scheduled" : current };
 }
 export async function rescheduleJob(
   id: string,
@@ -403,6 +411,7 @@ export async function rescheduleJob(
   duration: number | null,
   target: JobWorkerTarget,
   current: JobStatus,
+  timeOffOverrideReason: string | null = null,
 ) {
   if (!date || !time)
     throw new Error("Scheduled date and start time are required.");
@@ -413,13 +422,21 @@ export async function rescheduleJob(
       : current === "Crew Assigned"
         ? "Scheduled"
         : current;
-  await updateJob(id, {
-    scheduled_date: date,
-    start_time: time,
-    estimated_duration: duration,
-    status: next,
+  const { data, error } = await getSupabaseClient().rpc("schedule_job_with_time_off_protection", {
+    p_job_id: id,
+    p_scheduled_date: date,
+    p_start_time: time,
+    p_estimated_duration: duration ?? 0,
+    p_assignment_kind: target.kind,
+    p_employee_id: target.kind === "individual" ? target.employeeId : null,
+    p_crew_id: target.kind === "crew" ? target.crewId : null,
+    p_override_reason: timeOffOverrideReason,
   });
-  return assignJobWorker(id,target);
+  if (error) throw new Error(safeDatabaseMessage(error, "Job schedule could not be saved."));
+  const job = await getJobById(id).catch(() => operationalJob(data as Parameters<typeof operationalJob>[0]));
+  await requestPendingJobCalendarSync(id);
+  await requestJobAttentionPush(job);
+  return { ...job, status: next };
 }
 export async function getCurrentJobClockState(jobId: string): Promise<JobClockState> {
   const profile = await getCurrentProfile();

@@ -584,6 +584,20 @@ function JobModal({
     if (next === "Scheduled" && !job.scheduled_date) return;
     mutate(() => updateJobStatus(job.id, next), `Job moved to ${next}.`, undefined, close);
   }
+  function requestTimeOffOverrideReason(cause: unknown) {
+    const detail = message(cause, "The Job could not be saved.");
+    if (!detail.toLowerCase().includes("approved time off")) throw cause;
+    const reason = window.prompt("Explain why scheduling over approved time off is necessary (minimum 10 characters):")?.trim() ?? "";
+    if (reason.length < 10) throw new Error("A management override reason of at least 10 characters is required.");
+    return reason;
+  }
+  async function saveSchedule() {
+    try {
+      return await scheduleJob(job.id, date, time, duration || null, job.status);
+    } catch (cause) {
+      return scheduleJob(job.id, date, time, duration || null, job.status, requestTimeOffOverrideReason(cause));
+    }
+  }
   async function assign() {
     const target:JobWorkerTarget=assignmentKind==="individual"?{kind:"individual",employeeId:employeeIdTarget}:assignmentKind==="crew"?{kind:"crew",crewId}:{kind:"unassigned"};
     const conflicts = assignmentKind==="crew"&&crewId?await getCrewConflicts(job.id,crewId,date,time||null):assignmentKind==="individual"&&employeeIdTarget?await findIndividualTechConflicts(job.id,employeeIdTarget,date,time,duration):[];
@@ -592,7 +606,11 @@ function JobModal({
         ? "This worker may already be assigned during this time."
         : null,
     );
-    await assignJobWorker(job.id,target);
+    try {
+      await assignJobWorker(job.id,target);
+    } catch (cause) {
+      await assignJobWorker(job.id,target,requestTimeOffOverrideReason(cause));
+    }
   }
   const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
   const canSupervisorComplete = canComplete;
@@ -651,7 +669,7 @@ function JobModal({
           onClick={() =>
             mutate(
               () =>
-                scheduleJob(job.id, date, time, duration || null, job.status),
+                saveSchedule(),
               "Schedule saved.",
               undefined,
               close,

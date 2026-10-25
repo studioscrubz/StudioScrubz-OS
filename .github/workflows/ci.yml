@@ -8,6 +8,23 @@ permissions:
   contents: read
 
 jobs:
+  workforce-time-off-postgres:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Create isolated schema-only test database
+        run: |
+          sudo -u postgres createdb studioscrubz_time_off_test
+          sudo -u postgres psql --set ON_ERROR_STOP=1 --dbname studioscrubz_time_off_test --file supabase/tests/workforce_time_off_phase_1_fixture.sql
+      - name: Verify externally managed rollback
+        run: sudo -u postgres psql --set ON_ERROR_STOP=1 --dbname studioscrubz_time_off_test --file supabase/tests/workforce_time_off_phase_1_rollback.sql
+      - name: Apply actual migration
+        run: sudo -u postgres psql --set ON_ERROR_STOP=1 --dbname studioscrubz_time_off_test --file supabase/migrations/20261025145923_workforce_time_off_phase_1.sql
+      - name: Run authorization and workflow tests
+        run: sudo -u postgres psql --set ON_ERROR_STOP=1 --dbname studioscrubz_time_off_test --file supabase/tests/workforce_time_off_phase_1_postgres.sql
+
   non-database-checks:
     runs-on: ubuntu-latest
     env:

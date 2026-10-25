@@ -2188,6 +2188,16 @@ export interface Database {
     };
 
     Functions: {
+      get_my_employee_time_off_requests: { Args: Record<PropertyKey, never>; Returns: unknown[] };
+      get_employee_time_off_review_queue: { Args: Record<PropertyKey, never>; Returns: unknown[] };
+      get_approved_employee_absences: { Args: { p_start_date: string; p_end_date: string }; Returns: unknown[] };
+      submit_employee_time_off_request: { Args: { p_start_date: string; p_end_date: string; p_is_full_day: boolean; p_start_time: string | null; p_end_time: string | null; p_leave_category: string; p_notes: string }; Returns: string };
+      cancel_employee_time_off_request: { Args: { p_request_id: string; p_notes?: string }; Returns: undefined };
+      review_employee_time_off_request: { Args: { p_request_id: string; p_decision: string; p_notes?: string }; Returns: unknown };
+      get_my_time_off_notifications: { Args: Record<PropertyKey, never>; Returns: unknown[] };
+      schedule_job_with_time_off_protection: { Args: { p_job_id: string; p_scheduled_date: string; p_start_time: string; p_estimated_duration: number; p_assignment_kind: string; p_employee_id?: string | null; p_crew_id?: string | null; p_override_reason?: string | null }; Returns: unknown };
+      update_job_schedule_with_time_off_protection: { Args: { p_job_id: string; p_scheduled_date: string; p_start_time?: string | null; p_estimated_duration?: number | null; p_override_reason?: string | null }; Returns: unknown };
+      assign_job_worker_with_time_off_protection: { Args: { p_job_id: string; p_assignment_kind: string; p_employee_id?: string | null; p_crew_id?: string | null; p_override_reason?: string | null }; Returns: unknown };
       prepare_marketing_material_delivery: {
         Args: {
           p_id: string;
