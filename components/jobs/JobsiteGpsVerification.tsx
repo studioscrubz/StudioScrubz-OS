@@ -32,7 +32,17 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
     try { setSummary(await getJobsiteGpsSummary(jobId)); setError(null); }
     catch (e) { setError(e instanceof Error ? e.message : "Job-site verification unavailable."); }
   }, [jobId]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    let live = true;
+    getJobsiteGpsSummary(jobId)
+      .then(result => {
+        if (live) { setSummary(result); setError(null); }
+      })
+      .catch(error => {
+        if (live) setError(error instanceof Error ? error.message : "Job-site verification unavailable.");
+      });
+    return () => { live = false; };
+  }, [jobId]);
 
   if (!management && (!assigned || !employeeId)) return null;
 

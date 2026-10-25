@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCurrentPosition } from "@/lib/geo/currentPosition";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -9,12 +9,23 @@ export function WalkthroughGpsCapture({ walkthroughId, readOnly }: { walkthrough
   const [radius, setRadius] = useState(250);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const { data, error } = await getSupabaseClient().rpc("get_walkthrough_jobsite_gps" as never, { p_walkthrough_id: walkthroughId } as never);
     if (error) throw error;
     setStatus(data as unknown as Status);
-  }
-  useEffect(() => { void refresh().catch(e => setError(e instanceof Error ? e.message : "GPS unavailable")); }, [walkthroughId]);
+  }, [walkthroughId]);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve(getSupabaseClient().rpc("get_walkthrough_jobsite_gps" as never, { p_walkthrough_id: walkthroughId } as never))
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (live) setStatus(data as unknown as Status);
+      })
+      .catch(error => {
+        if (live) setError(error instanceof Error ? error.message : "GPS unavailable");
+      });
+    return () => { live = false; };
+  }, [walkthroughId]);
   async function capture() {
     if (!window.confirm("Capture this property's GPS reference from your current onsite position?")) return;
     setBusy(true); setError("");
@@ -28,7 +39,7 @@ export function WalkthroughGpsCapture({ walkthroughId, readOnly }: { walkthrough
   }
   return <section className="mt-5 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4" aria-label="Property GPS reference">
     <h3 className="font-bold text-[#143d1a]">Property GPS Reference</h3>
-    <p className="mt-1 text-xs text-neutral-600">Save the property's location while physically onsite. One-time capture only; no background tracking.</p>
+    <p className="mt-1 text-xs text-neutral-600">Save the property&apos;s location while physically onsite. One-time capture only; no background tracking.</p>
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     {!status ? <p className="mt-2 text-sm">Checking GPS registration…</p> : status.configured ?
       <p className="mt-2 font-semibold text-green-800">GPS registered · {status.radiusMeters} meter radius. Future jobs reuse this reference.</p> :
