@@ -28,6 +28,14 @@ create table public.user_profiles (
   display_name text,
   email text
 );
+-- Mirror the production authenticated-profile SELECT grant and self-read RLS.
+-- Employee-owned time-off policies reference this profile through invoker SELECT.
+alter table public.user_profiles enable row level security;
+grant select on public.user_profiles to authenticated;
+create policy user_profiles_self_read on public.user_profiles
+  for select to authenticated
+  using (id = (select auth.uid()));
+
 create table public.crews (
   id uuid primary key,
   crew_name text not null,
