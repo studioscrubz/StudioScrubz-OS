@@ -153,7 +153,7 @@ begin
  end if;
  if not private.jobsite_employee_authorized(job,employee) then raise exception 'You are not assigned to this Job.' using errcode='42501'; end if;
  select * into setting from public.jobsite_geofence_settings s where s.property_id=job.property_id and s.enabled;
- if setting.property_id is null then raise exception 'Management must configure this property's GPS location before verification.'; end if;
+ if setting.property_id is null then raise exception 'Management must configure the property GPS location before verification.'; end if;
  perform private.jobsite_validate_position(p_position);
  dist:=2*6371000*asin(sqrt(least(1.0,greatest(0.0,
    power(sin(radians(((p_position->>'latitude')::double precision-setting.latitude)/2)),2)+
