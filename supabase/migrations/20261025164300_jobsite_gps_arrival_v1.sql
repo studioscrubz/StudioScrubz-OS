@@ -16,7 +16,7 @@ create table public.jobsite_arrival_checks (
   job_id uuid not null references public.jobs(id) on delete restrict,
   employee_id uuid not null references public.employees(id) on delete restrict,
   checked_by uuid not null references public.user_profiles(id) on delete restrict,
-  checked_at timestamptz not null default now(),
+  checked_at timestamptz not null default clock_timestamp(),
   reported_accuracy_meters double precision not null check (reported_accuracy_meters between 0 and 100),
   distance_meters double precision not null check (distance_meters >= 0),
   radius_meters integer not null check (radius_meters between 100 and 500),
