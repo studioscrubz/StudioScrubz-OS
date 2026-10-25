@@ -179,7 +179,7 @@ create function public.schedule_job_with_time_off_protection(
  p_assignment_kind text,p_employee_id uuid default null,p_crew_id uuid default null,
  p_override_reason text default null
 ) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
-declare job public.jobs; employee public.employees; crew public.crews; team jsonb:='[]'::jsonb; safe public.jobs_operational_safe;
+declare job public.jobs; employee public.employees; crew public.crews; team jsonb:='[]'::jsonb; safe public.jobs_operational_safe; prior_reason text:=current_setting('app.time_off_override_reason',true);
 begin
  if not private.is_time_off_manager((select auth.uid())) then raise exception 'Management scheduling permission is required.' using errcode='42501'; end if;
  if p_scheduled_date is null or p_start_time is null or p_estimated_duration is null or p_estimated_duration<=0 then raise exception 'A date, start time, and positive duration are required.'; end if;
@@ -201,16 +201,22 @@ begin
    where cm.crew_id=crew.id and e.employment_status='Active' and e.archived_at is null;
  end if;
  perform set_config('app.time_off_override_reason',coalesce(p_override_reason,''),true);
- update public.jobs set scheduled_date=p_scheduled_date,start_time=p_start_time,estimated_duration=p_estimated_duration,
-  assigned_employee_id=case when p_assignment_kind='individual' then employee.id end,
-  assigned_employee_name=case when p_assignment_kind='individual' then coalesce(nullif(btrim(employee.preferred_name),''),btrim(employee.first_name||' '||employee.last_name)) end,
-  assigned_crew_id=case when p_assignment_kind='crew' then crew.id end,
-  assigned_crew_name=case when p_assignment_kind='crew' then crew.crew_name end,
-  crew_lead_name=case when p_assignment_kind='crew' then (select coalesce(nullif(btrim(e.preferred_name),''),btrim(e.first_name||' '||e.last_name)) from public.employees e where e.id=crew.crew_lead_id) end,
-  assigned_team=case when p_assignment_kind='crew' then team else '[]'::jsonb end,
-  status=case when p_assignment_kind='unassigned' then 'Scheduled' else 'Crew Assigned' end
- where id=job.id;
- select * into safe from public.jobs_operational_safe where id=job.id;
+ begin
+  update public.jobs set scheduled_date=p_scheduled_date,start_time=p_start_time,estimated_duration=p_estimated_duration,
+   assigned_employee_id=case when p_assignment_kind='individual' then employee.id end,
+   assigned_employee_name=case when p_assignment_kind='individual' then coalesce(nullif(btrim(employee.preferred_name),''),btrim(employee.first_name||' '||employee.last_name)) end,
+   assigned_crew_id=case when p_assignment_kind='crew' then crew.id end,
+   assigned_crew_name=case when p_assignment_kind='crew' then crew.crew_name end,
+   crew_lead_name=case when p_assignment_kind='crew' then (select coalesce(nullif(btrim(e.preferred_name),''),btrim(e.first_name||' '||e.last_name)) from public.employees e where e.id=crew.crew_lead_id) end,
+   assigned_team=case when p_assignment_kind='crew' then team else '[]'::jsonb end,
+   status=case when p_assignment_kind='unassigned' then 'Scheduled' else 'Crew Assigned' end
+  where id=job.id;
+  select * into safe from public.jobs_operational_safe where id=job.id;
+ exception when others then
+  perform set_config('app.time_off_override_reason',coalesce(prior_reason,''),true);
+  raise;
+ end;
+ perform set_config('app.time_off_override_reason',coalesce(prior_reason,''),true);
  return safe;
 end $$;
 
@@ -218,26 +224,41 @@ create function public.update_job_schedule_with_time_off_protection(
  p_job_id uuid,p_scheduled_date date,p_start_time time,p_estimated_duration numeric,
  p_override_reason text default null
 ) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$
-declare current_status text;
+declare current_status text; prior_reason text:=current_setting('app.time_off_override_reason',true); safe public.jobs_operational_safe;
 begin
  if not private.is_time_off_manager((select auth.uid())) then raise exception 'Management scheduling permission is required.' using errcode='42501'; end if;
  select status into current_status from public.jobs where id=p_job_id for update;
  if not found then raise exception 'Job not found.'; end if;
  perform set_config('app.time_off_override_reason',coalesce(p_override_reason,''),true);
- return public.update_operational_job(
-  p_job_id,p_scheduled_date,p_start_time,p_estimated_duration,null,null,
-  case when current_status='Ready to Schedule' then 'Scheduled' else null end
- );
+ begin
+  safe:=public.update_operational_job(
+   p_job_id,p_scheduled_date,p_start_time,p_estimated_duration,null,null,
+   case when current_status='Ready to Schedule' then 'Scheduled' else null end
+  );
+ exception when others then
+  perform set_config('app.time_off_override_reason',coalesce(prior_reason,''),true);
+  raise;
+ end;
+ perform set_config('app.time_off_override_reason',coalesce(prior_reason,''),true);
+ return safe;
 end $$;
 
 create function public.assign_job_worker_with_time_off_protection(
  p_job_id uuid,p_assignment_kind text,p_employee_id uuid default null,p_crew_id uuid default null,
  p_override_reason text default null
 ) returns jsonb language plpgsql security definer set search_path='' as $$
+declare prior_reason text:=current_setting('app.time_off_override_reason',true); assigned jsonb;
 begin
  if not private.is_time_off_manager((select auth.uid())) then raise exception 'Management assignment permission is required.' using errcode='42501'; end if;
  perform set_config('app.time_off_override_reason',coalesce(p_override_reason,''),true);
- return public.set_job_worker_assignment(p_job_id,p_assignment_kind,p_employee_id,p_crew_id);
+ begin
+  assigned:=public.set_job_worker_assignment(p_job_id,p_assignment_kind,p_employee_id,p_crew_id);
+ exception when others then
+  perform set_config('app.time_off_override_reason',coalesce(prior_reason,''),true);
+  raise;
+ end;
+ perform set_config('app.time_off_override_reason',coalesce(prior_reason,''),true);
+ return assigned;
 end $$;
 
 create function public.submit_employee_time_off_request(

@@ -74,6 +74,7 @@ test("job scheduling conflicts are enforced and audited by PostgreSQL", () => {
   assert.match(migration, /not private\.is_time_off_manager\(actor\)/);
   assert.match(migration, /char_length\(reason\)<10/);
   assert.match(migration, /insert into public\.employee_time_off_schedule_overrides/);
+  assert.match(migration, /prior_reason text:=current_setting\('app\.time_off_override_reason',true\)/);
 });
 
 test("Schedule uses the atomic protected RPC and requires a reason for absence overrides", () => {
