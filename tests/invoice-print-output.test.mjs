@@ -95,3 +95,18 @@ test("empty customer notes are omitted from the direct print document", () => {
   assert.equal(result.printed, true);
   assert.doesNotMatch(result.html, /<h3>Invoice Notes<\/h3>/);
 });
+
+test("invoice service photos retain their full image and caption within print margins", () => {
+  const page = read("components/invoices/PublicInvoicePage.tsx");
+  const css = read("app/globals.css");
+  assert.match(page, /invoice-service-photos mt-8/);
+  assert.match(page, /invoice-service-photo-grid mt-3 grid/);
+  assert.match(page, /invoice-service-photo overflow-hidden/);
+  assert.match(page, /loading="eager"/);
+  assert.match(page, /photo\.caption&&<figcaption/);
+  assert.match(css, /#public-invoice \.invoice-service-photo-grid \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /#public-invoice \.invoice-service-photo \{[^}]*break-inside: avoid-page;[^}]*page-break-inside: avoid;/);
+  assert.match(css, /#public-invoice \.invoice-service-photo img \{[^}]*max-width: 100%;[^}]*max-height: 3\.1in;[^}]*aspect-ratio: auto;[^}]*object-fit: contain;/);
+  assert.match(css, /#public-invoice \.invoice-service-photo figcaption \{[^}]*overflow-wrap: anywhere;/);
+  assert.doesNotMatch(css, /#public-invoice \.invoice-service-photo img \{[^}]*object-fit: cover;/);
+});
