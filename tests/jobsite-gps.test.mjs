@@ -43,7 +43,7 @@ test("walkthrough GPS RPCs preserve authenticated assignment authorization", () 
 });
 
 test("configured properties hide GPS setup but retain management exceptions", () => {
- assert.match(ui, /\{!summary\.configured && <div[\s\S]*Manager: configure property GPS/);
+ assert.match(ui, /\{isAssignedCrewLead && !summary\.configured && <div[\s\S]*Crew Lead: register property GPS/);
  assert.match(ui, /Manager exception \(not GPS verified\)/);
 });
 test("server enforces staff assignments and management controls", () => {

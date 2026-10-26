@@ -33,6 +33,7 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
+import { JobCardGpsRegistration } from "@/components/jobs/JobCardGpsRegistration";
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
 import { EquipmentExceptionResolution } from "@/components/jobs/EquipmentExceptionResolution";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
@@ -434,13 +435,14 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
     </div>
     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#143d1a]/15 pt-2">
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
+      {job.assigned_crew_id && employeeId === activeCrewLeadId && eligibility.showStart && <JobCardGpsRegistration jobId={job.id} onRegistered={open} />}
       {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} min-w-32`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} min-w-32`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} min-w-32`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
-      {job.assigned_crew_id && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
+      {job.assigned_crew_id && employeeId===activeCrewLeadId && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
       {job.status === "In Progress" && currentEntry && <div className="w-full"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job" /></div>}
       {["Master Admin","Administrator","Manager"].includes(role ?? "") && job.status === "In Progress" && <div className="w-full"><EquipmentExceptionResolution jobId={job.id} /></div>}
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
@@ -744,6 +746,7 @@ function JobModal({
         propertyId={job.property_id}
         employeeId={employeeId}
         management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}
+        isAssignedCrewLead={Boolean(employeeId && activeCrewLeadId === employeeId)}
         assigned={Boolean(employeeId && (job.assigned_employee_id === employeeId
           || (job.assigned_crew_id && (
             (crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id ?? activeCrew?.crew_lead_id) === employeeId
@@ -760,7 +763,7 @@ function JobModal({
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
-      {job.assigned_crew_id&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-6"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
@@ -1357,7 +1360,10 @@ function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: {
         setTrip(result.trip);
         if (result.initiated && phone) {
           const greeting = firstName?.trim() || "there";
-          const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
+          const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!
+
+— StudioScrubz
+No mess. No stress.`;
           try { openDeviceSmsApp(phone, body); }
           catch { setError("Mileage tracking started, but the SMS composer could not be opened."); }
         }

@@ -5,7 +5,7 @@ import { getCurrentPosition } from "@/lib/geo/currentPosition";
 import {
   approveJobsiteGpsException,
   getJobsiteGpsSummary,
-  setJobsiteGpsLocation,
+  registerJobPropertyGpsByCrewLead,
   verifyJobsiteArrival,
   type JobsiteGpsSummary,
 } from "@/lib/services/jobsiteGps";
@@ -16,11 +16,12 @@ type Props = {
   propertyId: string | null;
   employeeId: string | null;
   management: boolean;
+  isAssignedCrewLead: boolean;
   assigned: boolean;
   assignedEmployees: AssignedEmployee[];
 };
 
-export function JobsiteGpsVerification({ jobId, propertyId, employeeId, management, assigned, assignedEmployees }: Props) {
+export function JobsiteGpsVerification({ jobId, propertyId, employeeId, management, isAssignedCrewLead, assigned, assignedEmployees }: Props) {
   const [summary, setSummary] = useState<JobsiteGpsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
     if (!window.confirm("Set this property's job-site location from your CURRENT device GPS? Only do this while physically on site.")) return;
     setBusy(true); setError(null); setNotice(null);
     try {
-      await setJobsiteGpsLocation(propertyId, await getCurrentPosition(), Number(radius));
+      await registerJobPropertyGpsByCrewLead(jobId, await getCurrentPosition(), Number(radius));
       setNotice("Job-site reference saved. This location is shared by jobs at the same property.");
       await refresh();
     } catch (e) { setError(e instanceof Error ? e.message : "Property GPS setup failed."); }
@@ -84,20 +85,21 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
 
   return <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4" aria-label="Job-site GPS verification">
     <h3 className="font-extrabold text-[#143d1a]">Job-site GPS arrival</h3>
-    <p className="mt-1 text-xs text-neutral-600">GPS is requested only when you tap Verify. No background tracking, and your exact GPS coordinates are not saved in the arrival record—only the distance, accuracy, and time of each check. This pilot does not start jobs or change payroll.</p>
+    <p className="mt-1 text-xs text-neutral-600">GPS is requested only when you tap Verify. No background tracking, and your exact GPS coordinates are not saved in the arrival record—only the distance, accuracy, and time of each check. The assigned Crew Lead must verify arrival within the property's GPS radius before the job can be started. GPS verification does not itself start the job or change payroll.</p>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     {!summary ? <p className="mt-3 text-sm text-neutral-600">Loading job-site verification…</p> : <>
       <p className="mt-3 text-sm font-semibold">
-        {summary.configured ? `Location configured · ${summary.radiusMeters} m radius` : "Job-site reference not configured"}
+        {summary.configured ? `Location configured · ${summary.radiusMeters} m radius` : "Job-site reference not configured — Job Start blocked"}
       </p>
+      {!summary.configured && <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">Required before Start Job: register the property GPS reference at the site, then have the assigned Crew Lead verify arrival. Manager exceptions do not register the property GPS location.</p>}
       {summary.lastCheck && <p className="mt-2 text-sm">Your last check: <strong>{summary.lastCheck.result}</strong> · {Math.round(summary.lastCheck.distanceMeters)} m from property reference · accuracy ±{Math.round(summary.lastCheck.accuracyMeters)} m</p>}
       {assigned && employeeId && summary.configured && <button type="button" disabled={busy} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50" onClick={() => void verify()}>
         {busy ? "Checking…" : "Verify my arrival using GPS"}
       </button>}
-      {management && <>
-        {!summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
-          <p className="text-sm font-bold text-[#143d1a]">Manager: configure property GPS</p>
+      {(management || isAssignedCrewLead) && <>
+        {isAssignedCrewLead && !summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
+          <p className="text-sm font-bold text-[#143d1a]">Crew Lead: register property GPS</p>
           <p className="mt-1 text-xs text-neutral-600">Use your device at the actual property. This avoids paid address geocoding and prevents guessing coordinates.</p>
           <label className="mt-3 block text-sm font-semibold">Allowed radius
             <select className="mt-1 block rounded border px-3 py-2" value={radius} onChange={e => setRadius(e.target.value)}>
@@ -112,7 +114,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
           </button>
         </div>}
 
-        {assignedEmployees.length > 0 && <div className="mt-3 rounded-lg border bg-white p-3">
+        {management && assignedEmployees.length > 0 && <div className="mt-3 rounded-lg border bg-white p-3">
           <p className="text-sm font-bold text-[#143d1a]">Manager exception (not GPS verified)</p>
           <label className="mt-2 block text-xs font-bold">Assigned employee
             <select className="mt-1 block w-full rounded border px-3 py-2 text-sm" value={exceptionEmployee} onChange={e => setExceptionEmployee(e.target.value)}>

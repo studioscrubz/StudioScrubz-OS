@@ -41,3 +41,8 @@ export const approveJobsiteGpsException = (jobId: string, employeeId: string, re
   call<{ approved: boolean; exceptionId: string }>("approve_jobsite_arrival_exception", {
     p_job_id: jobId, p_employee_id: employeeId, p_reason: reason,
   });
+
+export const registerJobPropertyGpsByCrewLead = (jobId: string, position: GpsPosition, radiusMeters = 250) =>
+  call<{configured:boolean;radiusMeters:number}>("register_job_property_gps_by_crew_lead", {
+    p_job_id: jobId, p_position: position, p_radius_meters: radiusMeters,
+  });
