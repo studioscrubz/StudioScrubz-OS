@@ -84,6 +84,12 @@ test("public receipt photos remain token-scoped, customer-visible, and privately
   assert.match(publicPhotosRoute, /\/api\/public\/invoices\/\$\{encodeURIComponent\(token\)\}\/photos\/\$\{encodeURIComponent\(photo\.id\)\}/);
   assert.match(thumbnailRoute, /client_access_token_expires_at/);
   assert.match(thumbnailRoute, /UUID_PATTERN\.test\(photoId\)/);
+  assert.match(thumbnailRoute, /\{4\}-\[0-9a-f\]\{12\}/i);
+  const uuidPattern = thumbnailRoute.match(/const UUID_PATTERN = (\/\^.*?\/[a-z]*);/)?.[1];
+  assert.ok(uuidPattern, "Photo route UUID validation pattern was not found");
+  const validatePhotoId = Function(`return ${uuidPattern}`)();
+  assert.equal(validatePhotoId.test("d4181449-dbf8-4880-983a-2ff7556a0c5a"), true);
+  assert.equal(validatePhotoId.test("d4181449-dbf8-4880-983a-2ff7556a0c5a-extra"), false);
   assert.match(thumbnailRoute, /\.eq\("id", photoId\)\.eq\("invoice_id", invoice\.id\)/);
   assert.match(thumbnailRoute, /\.eq\("customer_visible", true\)/);
   assert.match(thumbnailRoute, /"Cache-Control": "private, no-store, max-age=0"/);
