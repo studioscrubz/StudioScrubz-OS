@@ -14,6 +14,9 @@ export function PublicInvoicePage({ token, paymentPending = false }: { token: st
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [confirmationState, setConfirmationState] = useState<ConfirmationState>(paymentPending ? "checking" : "idle");
   const [photos, setPhotos] = useState<PublicInvoicePhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(true);
+  const [photosError, setPhotosError] = useState<string | null>(null);
+  const [photoLoadState, setPhotoLoadState] = useState<Record<string, "loaded" | "failed">>({});
   async function load() {
     setLoading(true); setError(null);
     try { setInvoice(await getPublicInvoice(token)); }
@@ -21,7 +24,19 @@ export function PublicInvoicePage({ token, paymentPending = false }: { token: st
     finally { setLoading(false); }
   }
   useEffect(() => { let active=true;void getPublicInvoice(token).then(value=>{if(active)setInvoice(value)}).catch(cause=>{if(active)setError(message(cause))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}; }, [token]);
-  useEffect(() => { let active=true;void fetch(`/api/public/invoices/${encodeURIComponent(token)}/photos`,{cache:"no-store"}).then(async response=>response.ok?response.json() as Promise<{photos:PublicInvoicePhoto[]}>:{photos:[]}).then(body=>{if(active)setPhotos(body.photos)}).catch(()=>{if(active)setPhotos([])});return()=>{active=false}; }, [token]);
+  useEffect(() => {
+    let active = true;
+    setPhotosLoading(true); setPhotosError(null); setPhotoLoadState({});
+    void fetch(`/api/public/invoices/${encodeURIComponent(token)}/photos`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Service photos could not be loaded.");
+        return response.json() as Promise<{ photos: PublicInvoicePhoto[] }>;
+      })
+      .then((body) => { if (active) setPhotos(body.photos); })
+      .catch(() => { if (active) { setPhotos([]); setPhotosError("Service photos are unavailable. Refresh before printing."); } })
+      .finally(() => { if (active) setPhotosLoading(false); });
+    return () => { active = false; };
+  }, [token]);
   useEffect(() => { if(!paymentPending)return;let active=true,attempts=0,timer:ReturnType<typeof setTimeout>;const poll=()=>{void Promise.all([getPublicInvoice(token),getPublicInvoicePaymentConfirmation(token).catch(()=>null)]).then(([value,status])=>{if(!active)return;setInvoice(value);attempts++;if(value.status==="Paid"||value.balance_due<=0){setConfirmationState("complete");return}if(status==="Failed"){setConfirmationState("failed");return}if(status==="Cancelled"){setConfirmationState("cancelled");return}if(attempts<15)timer=setTimeout(poll,2000);else setConfirmationState("delayed")}).catch(()=>{attempts++;if(!active)return;if(attempts<15)timer=setTimeout(poll,2000);else setConfirmationState("delayed")})};timer=setTimeout(poll,1500);return()=>{active=false;clearTimeout(timer)}; }, [paymentPending,token]);
   if (loading) return <Shell><p className="p-8">Loading your Invoice...</p></Shell>;
   if (error || !invoice) return <Shell><div className="p-8"><h1 className="text-2xl font-bold text-[#143d1a]">Invoice unavailable</h1><p className="mt-3 text-neutral-600">{error}</p></div></Shell>;
@@ -30,6 +45,12 @@ export function PublicInvoicePage({ token, paymentPending = false }: { token: st
   const paid = invoice.status === "Paid" || invoice.balance_due <= 0;
   const totalReceived = invoice.payments.reduce((sum, payment) => sum + payment.received_amount, 0);
   const totalUnapplied = invoice.payments.reduce((sum, payment) => sum + payment.unapplied_amount, 0);
+  const readyPhotoCount = photos.filter((photo) => photoLoadState[photo.id] === "loaded").length;
+  const photoFailed = photos.some((photo) => photoLoadState[photo.id] === "failed");
+  const printReady = !photosLoading && !photosError && !photoFailed && readyPhotoCount === photos.length;
+  const printStatus = photosError || (photoFailed ? "At least one service photo failed to load. Refresh before printing." :
+    photosLoading ? "Preparing invoice service photos…" :
+    !printReady ? `Loading service photos (${readyPhotoCount}/${photos.length})…` : null);
   return <Shell>
     <article className="p-6 sm:p-10">
       <header className="border-b-4 border-[#d6b923] pb-6"><p className="text-sm font-extrabold uppercase tracking-[.22em] text-[#9a7a17]">{invoice.business_name}</p><h1 className="mt-2 text-4xl font-extrabold text-[#143d1a]">INVOICE</h1><p className="mt-2 text-lg font-bold">{invoice.invoice_number}</p>{invoice.tagline&&<p className="mt-2 text-neutral-600">{invoice.tagline}</p>}</header>
@@ -39,11 +60,30 @@ export function PublicInvoicePage({ token, paymentPending = false }: { token: st
       <h2 className="mt-8 text-lg font-extrabold text-[#143d1a]">Services</h2><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[560px] text-sm"><thead className="bg-[#edf1eb]"><tr><th className="p-3 text-left">Description</th><th className="p-3 text-right">Quantity</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr></thead><tbody>{invoice.line_items.map(item=><tr key={item.id} className="border-b"><td className="p-3">{item.description}</td><td className="p-3 text-right">{item.quantity}</td><td className="p-3 text-right">{money(item.rate)}</td><td className="p-3 text-right font-bold">{money(item.amount)}</td></tr>)}</tbody></table></div>
       <div className="ml-auto mt-6 max-w-sm"><Block title="Totals" rows={[["Subtotal",money(invoice.subtotal)],...(invoice.discount>0?[["Discount",`-${money(invoice.discount)}`]]:[]),...(invoice.tax>0?[["Tax",money(invoice.tax)]]:[]),["Total",money(invoice.total)],["Full Payments Received",money(totalReceived)],["Applied to Invoice",money(invoice.amount_paid)],...(totalUnapplied>0?[["Unapplied Customer Credit",money(totalUnapplied)]]:[]),["Remaining Balance",money(invoice.balance_due)]]}/></div>
       {invoice.payments.length>0&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Payments Received</h2>{invoice.payments.map((payment,index)=><div key={`${payment.payment_date}-${index}`} className="mt-2 rounded-lg border p-3 text-sm"><div className="flex justify-between gap-4"><span>{date(payment.payment_date)} - {payment.payment_method}</span><b>{money(payment.received_amount)}</b></div>{payment.received_amount!==payment.amount&&<p className="mt-1 text-neutral-600">Applied to Invoice: <b>{money(payment.amount)}</b></p>}{payment.tip_amount>0&&<p className="mt-1 text-neutral-600">Tip: <b>{money(payment.tip_amount)}</b></p>}{payment.unapplied_amount>0&&<p className="mt-1 font-bold text-amber-800">Unapplied Customer Credit: {money(payment.unapplied_amount)}</p>}</div>)}</section>}
-      {invoice.customer_notes&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Invoice Notes</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{invoice.customer_notes}</p></section>}{invoice.terms&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Payment Terms</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{invoice.terms}</p></section>}
-      {photos.length>0&&<section className="invoice-service-photos mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Service Photos</h2><div className="invoice-service-photo-grid mt-3 grid gap-4 sm:grid-cols-2">{photos.map(photo=><figure key={photo.id} className="invoice-service-photo overflow-hidden rounded-xl border"><img src={photo.url} alt={photo.caption||photo.originalFilename} loading="eager" className="aspect-[4/3] w-full object-cover"/>{photo.caption&&<figcaption className="p-3 text-sm text-neutral-600">{photo.caption}</figcaption>}</figure>)}</div></section>}
+      {invoice.customer_notes&&<section className="invoice-customer-notes mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Invoice Notes</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{invoice.customer_notes}</p></section>}{invoice.terms&&<section className="mt-8"><h2 className="text-lg font-extrabold text-[#143d1a]">Payment Terms</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{invoice.terms}</p></section>}
+      {photos.length>0&&<section className="invoice-service-photos mt-8">
+        <h2 className="text-lg font-extrabold text-[#143d1a]">Service Photos</h2>
+        <div className="invoice-service-photo-pages mt-3">
+          {Array.from({ length: Math.ceil(photos.length / 4) }, (_, pageIndex) =>
+            <div className="invoice-service-photo-sheet" key={pageIndex}>
+              {[0, 1].map((rowIndex) => {
+                const pair = photos.slice(pageIndex * 4 + rowIndex * 2, pageIndex * 4 + rowIndex * 2 + 2);
+                return pair.length ? <div className="invoice-service-photo-row grid grid-cols-1 gap-4 sm:grid-cols-2" key={rowIndex}>
+                  {pair.map((photo) => <figure key={photo.id} className="invoice-service-photo overflow-hidden rounded-xl border">
+                    <img src={photo.url} alt={photo.caption||photo.originalFilename} loading="eager"
+                      onLoad={() => setPhotoLoadState((current) => current[photo.id] === "loaded" ? current : { ...current, [photo.id]: "loaded" })}
+                      onError={() => setPhotoLoadState((current) => current[photo.id] === "failed" ? current : { ...current, [photo.id]: "failed" })}
+                      className="aspect-[4/3] w-full object-cover"/>
+                    {photo.caption&&<figcaption className="p-3 text-sm text-neutral-600">{photo.caption}</figcaption>}
+                  </figure>)}
+                </div> : null;
+              })}
+            </div>)}
+        </div>
+      </section>}
       <footer className="mt-10 border-t pt-5 text-sm text-neutral-600">{[invoice.business_email,invoice.business_phone,invoice.website].filter(Boolean).join(" | ")}<br/>{[invoice.address,invoice.city,invoice.state,invoice.zip].filter(Boolean).join(", ")}</footer>
     </article>
-    <section className="border-t bg-neutral-50 p-6 print:hidden"><div className="flex flex-wrap gap-3">{payable&&!awaitingConfirmation&&<button disabled={checkoutBusy} className="rounded-lg bg-[#143d1a] px-5 py-2.5 font-bold text-white disabled:opacity-50" onClick={()=>void startCheckout()}>{checkoutBusy?"Preparing secure checkout...":invoice.status==="Partially Paid"?"Pay Remaining Balance":"Pay Invoice"}</button>}<button className="rounded-lg border px-5 py-2.5 font-bold text-[#143d1a]" onClick={()=>window.print()}>Print / Save as PDF</button><button className="rounded-lg border px-5 py-2.5 font-bold text-[#143d1a]" onClick={()=>void load()}>Refresh</button></div>{checkoutError&&<p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{checkoutError}</p>}{paid?<p className="mt-4 rounded-lg bg-green-50 p-4 font-bold text-green-800">Payment Complete. Thank you for your payment.</p>:invoice.status==="Cancelled"||invoice.status==="Archived"?<p className="mt-4 rounded-lg bg-neutral-200 p-4 font-bold">This Invoice is {invoice.status.toLowerCase()} and cannot be paid.</p>:confirmationState==="checking"?<p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm font-bold text-amber-900">Payment received by Square. Confirming your payment...</p>:confirmationState==="delayed"?<p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">Your payment is still being confirmed. Refresh this page in a moment.</p>:confirmationState==="failed"?<p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">Your payment was not completed. No charge was recorded by StudioScrubz. You may try again.</p>:confirmationState==="cancelled"?<p className="mt-4 rounded-lg bg-neutral-100 p-4 text-sm text-neutral-700">Checkout was cancelled and no payment was recorded. You may return to payment when ready.</p>:null}</section>
+    <section className="border-t bg-neutral-50 p-6 print:hidden"><div className="flex flex-wrap gap-3">{payable&&!awaitingConfirmation&&<button disabled={checkoutBusy} className="rounded-lg bg-[#143d1a] px-5 py-2.5 font-bold text-white disabled:opacity-50" onClick={()=>void startCheckout()}>{checkoutBusy?"Preparing secure checkout...":invoice.status==="Partially Paid"?"Pay Remaining Balance":"Pay Invoice"}</button>}<button disabled={!printReady} className="rounded-lg border px-5 py-2.5 font-bold text-[#143d1a] disabled:cursor-not-allowed disabled:opacity-50" onClick={()=>window.print()}>{printReady?"Print / Save as PDF":"Preparing photos…"}</button><button className="rounded-lg border px-5 py-2.5 font-bold text-[#143d1a]" onClick={()=>void load()}>Refresh</button></div>{printStatus&&<p role="status" className={`mt-4 text-sm ${photosError||photoFailed?"text-red-700":"text-neutral-600"}`}>{printStatus}</p>}{checkoutError&&<p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{checkoutError}</p>}{paid?<p className="mt-4 rounded-lg bg-green-50 p-4 font-bold text-green-800">Payment Complete. Thank you for your payment.</p>:invoice.status==="Cancelled"||invoice.status==="Archived"?<p className="mt-4 rounded-lg bg-neutral-200 p-4 font-bold">This Invoice is {invoice.status.toLowerCase()} and cannot be paid.</p>:confirmationState==="checking"?<p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm font-bold text-amber-900">Payment received by Square. Confirming your payment...</p>:confirmationState==="delayed"?<p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">Your payment is still being confirmed. Refresh this page in a moment.</p>:confirmationState==="failed"?<p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">Your payment was not completed. No charge was recorded by StudioScrubz. You may try again.</p>:confirmationState==="cancelled"?<p className="mt-4 rounded-lg bg-neutral-100 p-4 text-sm text-neutral-700">Checkout was cancelled and no payment was recorded. You may return to payment when ready.</p>:null}</section>
   </Shell>;
 
   async function startCheckout(){setCheckoutBusy(true);setCheckoutError(null);try{const response=await fetch(`/api/public/invoices/${encodeURIComponent(token)}/square-checkout`,{method:"POST"});const body=await response.json() as {checkoutUrl?:string;error?:string};if(!response.ok||!body.checkoutUrl)throw new Error(body.error||"Secure checkout could not be prepared.");window.location.assign(body.checkoutUrl)}catch(cause){setCheckoutError(message(cause));setCheckoutBusy(false)}}
