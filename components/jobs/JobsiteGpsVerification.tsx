@@ -97,8 +97,8 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
       {assigned && employeeId && summary.configured && <button type="button" disabled={busy} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50" onClick={() => void verify()}>
         {busy ? "Checking…" : "Verify my arrival using GPS"}
       </button>}
-      {management && <>
-        {!summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
+      {(management || isAssignedCrewLead) && <>
+        {isAssignedCrewLead && !summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
           <p className="text-sm font-bold text-[#143d1a]">Crew Lead: register property GPS</p>
           <p className="mt-1 text-xs text-neutral-600">Use your device at the actual property. This avoids paid address geocoding and prevents guessing coordinates.</p>
           <label className="mt-3 block text-sm font-semibold">Allowed radius
