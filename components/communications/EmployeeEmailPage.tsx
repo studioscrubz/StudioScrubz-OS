@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { EmailAttachmentPicker, encodeEmailFiles } from "@/components/communications/EmailAttachmentPicker";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getEmployeeEmailWorkspace, previewEmployeeEmail, sendEmployeeEmail } from "@/lib/services/employeeEmails";
 import type { EmployeeDepartment } from "@/types/employee";
@@ -15,6 +16,7 @@ export function EmployeeEmailPage() {
   const [department, setDepartment] = useState<EmployeeDepartment>("Scrub Technicians");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [preview, setPreview] = useState<EmployeeEmailPreview | null>(null);
   const [requestId, setRequestId] = useState("");
   const [bulkConfirmed, setBulkConfirmed] = useState(false);
@@ -46,6 +48,7 @@ export function EmployeeEmailPage() {
           : <div className="mt-5"><p className="text-sm font-bold text-neutral-700">Employees</p><div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-neutral-200">{loading ? <p className="p-4 text-sm text-neutral-500">Loading Employee Directory...</p> : workspace?.employees.map((employee) => <label key={employee.id} className={`flex items-start gap-3 border-b border-neutral-100 p-3 last:border-0 ${employee.available ? "cursor-pointer" : "bg-neutral-50 text-neutral-400"}`}><input type="checkbox" className="mt-1 size-4 accent-[#143d1a]" disabled={!employee.available} checked={selectedIds.includes(employee.id)} onChange={() => toggle(employee.id)} /><span className="min-w-0"><span className="block font-bold">{employee.name}</span><span className="block break-all text-xs">{employee.email || employee.unavailableReason}</span><span className="block text-xs">{employee.department}{!employee.available ? " - unavailable" : ""}</span></span></label>)}</div></div>}
         <label className="mt-5 block text-sm font-bold text-neutral-700">Subject<input className={input} maxLength={200} value={subject} onChange={(event) => { changed(); setSubject(event.target.value); }} /></label>
         <label className="mt-5 block text-sm font-bold text-neutral-700">Message<textarea className={`${input} min-h-48 resize-y py-3`} maxLength={10000} value={message} onChange={(event) => { changed(); setMessage(event.target.value); }} /></label>
+        <div className="mt-5"><EmailAttachmentPicker files={attachments} onChange={(files) => { changed(); setAttachments(files); }} disabled={working} /></div>
         <div className="mt-6 flex justify-end"><button className={primary} disabled={working || (mode === "selected" && !selectedIds.length) || !subject.trim() || !message.trim()} onClick={() => void buildPreview()}>{working ? "Preparing..." : "Preview recipients"}</button></div>
       </section>
 
@@ -55,7 +58,7 @@ export function EmployeeEmailPage() {
           <p className="mt-4 text-sm"><b>{preview.recipientCount}</b> individual email{preview.recipientCount === 1 ? "" : "s"} will be submitted to Resend.</p>
           <div className="mt-4 max-h-52 overflow-y-auto rounded-xl border border-neutral-200">{preview.recipients.map((recipient) => <div key={recipient.employeeId} className="border-b p-3 text-sm last:border-0"><b>{recipient.name}</b><div className="break-all text-neutral-600">{recipient.email}</div><div className="text-xs text-neutral-500">{recipient.department}</div></div>)}</div>
           {preview.unavailable.length > 0 && <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="text-sm font-bold text-amber-900">Unavailable - not included</p>{preview.unavailable.map((employee) => <p key={employee.id} className="mt-1 text-xs text-amber-900">{employee.name}: {employee.unavailableReason}</p>)}</div>}
-          <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-sm"><p className="font-bold text-[#143d1a]">{subject}</p><p className="mt-2 whitespace-pre-wrap text-neutral-700">{message}</p></div>
+          <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-sm"><p className="font-bold text-[#143d1a]">{subject}</p><p className="mt-2 whitespace-pre-wrap text-neutral-700">{message}</p>{attachments.length>0 && <p className="mt-2 text-xs text-neutral-500">Attachments: {attachments.map(file => file.name).join(", ")}</p>}</div>
           {preview.recipientCount > 1 && <label className="mt-4 flex items-start gap-3 rounded-xl border border-[#143d1a]/20 p-3 text-sm font-semibold"><input type="checkbox" className="mt-1 size-4 accent-[#143d1a]" checked={bulkConfirmed} onChange={(event) => setBulkConfirmed(event.target.checked)} />I confirm this bulk email should be sent separately to all {preview.recipientCount} listed employees.</label>}
           <button className={`${primary} mt-5 w-full`} disabled={working || !preview.recipientCount || (preview.recipientCount > 1 && !bulkConfirmed)} onClick={() => void send()}>{working ? "Submitting..." : `Send ${preview.recipientCount} email${preview.recipientCount === 1 ? "" : "s"}`}</button>
         </>}
@@ -66,7 +69,7 @@ export function EmployeeEmailPage() {
   </>;
 
   async function buildPreview() { setWorking(true); setError(null); setNotice(null); try { const result = await previewEmployeeEmail(selection); setPreview(result); setBulkConfirmed(false); setRequestId(crypto.randomUUID()); } catch (cause) { setError(messageFrom(cause)); } finally { setWorking(false); } }
-  async function send() { if (!preview || !requestId) return; setWorking(true); setError(null); setNotice(null); try { const result = await sendEmployeeEmail({ requestId, selection, subject, message, confirmed: preview.recipientCount <= 1 || bulkConfirmed }); setNotice(`${result.accepted} accepted, ${result.failed} failed, and ${result.pending} pending. Provider acceptance is not inbox-delivery confirmation.`); await load(); } catch (cause) { setError(messageFrom(cause)); } finally { setWorking(false); } }
+  async function send() { if (!preview || !requestId) return; setWorking(true); setError(null); setNotice(null); try { const result = await sendEmployeeEmail({ requestId, selection, subject, message, attachments: await encodeEmailFiles(attachments), confirmed: preview.recipientCount <= 1 || bulkConfirmed }); setNotice(`${result.accepted} accepted, ${result.failed} failed, and ${result.pending} pending. Provider acceptance is not inbox-delivery confirmation.`); await load(); } catch (cause) { setError(messageFrom(cause)); } finally { setWorking(false); } }
 }
 
 function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" onClick={onClick} className={`rounded-lg px-4 py-2 text-sm font-bold ${active ? "bg-[#143d1a] text-white" : "border border-neutral-200 text-[#143d1a]"}`}>{children}</button>; }
