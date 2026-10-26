@@ -743,7 +743,8 @@ function JobModal({
         jobId={job.id}
         propertyId={job.property_id}
         employeeId={employeeId}
-        management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}\n        isAssignedCrewLead={Boolean(employeeId && activeCrewLeadId === employeeId)}
+        management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}
+        isAssignedCrewLead={Boolean(employeeId && activeCrewLeadId === employeeId)}
         assigned={Boolean(employeeId && (job.assigned_employee_id === employeeId
           || (job.assigned_crew_id && (
             (crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id ?? activeCrew?.crew_lead_id) === employeeId
@@ -1357,7 +1358,10 @@ function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: {
         setTrip(result.trip);
         if (result.initiated && phone) {
           const greeting = firstName?.trim() || "there";
-          const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!\n\n— StudioScrubz\nNo mess. No stress.`;
+          const body = `Hi ${greeting}, your StudioScrubz technician is on the way for your scheduled service and is expected to arrive around ${formatJobTime(job.start_time)}. We’ll see you soon!
+
+— StudioScrubz
+No mess. No stress.`;
           try { openDeviceSmsApp(phone, body); }
           catch { setError("Mileage tracking started, but the SMS composer could not be opened."); }
         }
