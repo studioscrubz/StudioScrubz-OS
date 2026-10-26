@@ -173,6 +173,19 @@ a:focus-visible {
   #estimate-document section { break-inside: auto; }
   #estimate-document section > h3 { break-after: avoid-page; }
   #estimate-document .weekly-visit-print-card { break-inside: avoid-page; page-break-inside: avoid; }
+  /* Public invoices must be a visible, paginated print document, not a hidden app shell. */
+  @page public-invoice { size: Letter portrait; margin: 0.45in; }
+  #public-invoice.document-print-root { page: public-invoice; min-height: 0; padding: 0; margin: 0; overflow: visible; }
+  #public-invoice > div { max-width: none; width: 100%; overflow: visible; border: 0; border-radius: 0; box-shadow: none; }
+  #public-invoice article { padding: 0; }
+  #public-invoice .overflow-x-auto { overflow: visible; }
+  #public-invoice table { width: 100%; min-width: 0; font-size: 9pt; }
+  #public-invoice th, #public-invoice td { padding: 0.08in; overflow-wrap: anywhere; }
+  #public-invoice thead { display: table-header-group; }
+  #public-invoice tr { break-inside: avoid-page; }
+  #public-invoice section { break-inside: auto; }
+  #public-invoice section > h2 { break-after: avoid-page; }
+  #public-invoice header { break-inside: avoid-page; }
 
   #public-agreement.document-print-root { page: public-agreement; font-size: 9pt; line-height: 1.25; }
   #public-agreement .agreement-print-page { display: block; }
