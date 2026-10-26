@@ -36,5 +36,8 @@ export function parseEmailAttachments(input: unknown): { files: EmailAttachmentI
   return { files, manifest };
 }
 export function sameAttachmentManifest(a: unknown, b: EmailAttachmentManifest[]): boolean {
-  return JSON.stringify(a ?? []) === JSON.stringify(b);
+  if (!Array.isArray(a) || a.length !== b.length) return false;
+  return a.every((stored, i) => stored && typeof stored === "object" &&
+    stored.filename === b[i].filename && stored.contentType === b[i].contentType &&
+    stored.bytes === b[i].bytes && stored.sha256 === b[i].sha256);
 }
