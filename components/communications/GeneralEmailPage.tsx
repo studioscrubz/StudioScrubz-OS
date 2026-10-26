@@ -5,6 +5,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getClients } from "@/lib/services/clients";
 import { sendCommunicationsEmail } from "@/lib/services/communicationsEmail";
+import { EmailAttachmentPicker, encodeEmailFiles } from "@/components/communications/EmailAttachmentPicker";
 import type { Client } from "@/types/client";
 
 export function GeneralEmailPage() {
@@ -18,6 +19,7 @@ export function GeneralEmailPage() {
   const [newEmail, setNewEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -43,12 +45,13 @@ export function GeneralEmailPage() {
     if (!recipientEmail || !subject.trim() || !message.trim()) { setError("Recipient, subject, and message are required."); return; }
     setSending(true);
     try {
+      const encodedAttachments = await encodeEmailFiles(attachments);
       await sendCommunicationsEmail({
         requestId, recipientEmail, subject: subject.trim(), messageBody: message.trim(),
-        communicationType: "General", clientId: recipientMode === "client" ? clientId : null,
+        communicationType: "General", clientId: recipientMode === "client" ? clientId : null, attachments: encodedAttachments,
       });
       setSuccess(`Email sent to ${recipientEmail} through StudioScrubz.`);
-      setSubject(""); setMessage(""); setRequestId(crypto.randomUUID());
+      setSubject(""); setMessage(""); setAttachments([]); setRequestId(crypto.randomUUID());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Email could not be sent.");
     } finally { setSending(false); }
@@ -72,6 +75,7 @@ export function GeneralEmailPage() {
       {loadError && recipientMode === "client" && <p role="alert" className="text-sm text-amber-700">{loadError}</p>}
       <label className="block space-y-2 text-sm font-semibold text-neutral-700">Subject<input required maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} disabled={sending} className="w-full rounded-lg border border-neutral-300 p-3 text-sm" /></label>
       <label className="block space-y-2 text-sm font-semibold text-neutral-700">Message<textarea required rows={9} value={message} onChange={(event) => setMessage(event.target.value)} disabled={sending} className="w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm" /></label>
+      <EmailAttachmentPicker files={attachments} onChange={setAttachments} disabled={sending} />
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {success && <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800">{success}</p>}
       <div className="flex justify-end"><button type="submit" disabled={sending || !recipientEmail || !subject.trim() || !message.trim()} className="rounded-lg bg-[#143d1a] px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sending ? "Sending…" : "Send General Email"}</button></div>
