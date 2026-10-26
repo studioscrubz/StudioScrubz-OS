@@ -440,7 +440,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} min-w-32`}>END JOB</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
-      {job.assigned_crew_id && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
+      {job.assigned_crew_id && employeeId===activeCrewLeadId && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
       {job.status === "In Progress" && currentEntry && <div className="w-full"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job" /></div>}
       {["Master Admin","Administrator","Manager"].includes(role ?? "") && job.status === "In Progress" && <div className="w-full"><EquipmentExceptionResolution jobId={job.id} /></div>}
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
@@ -760,7 +760,7 @@ function JobModal({
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
-      {job.assigned_crew_id&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-6"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
