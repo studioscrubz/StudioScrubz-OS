@@ -1,5 +1,7 @@
 import "server-only";
 import { sendResendEmail } from "@/lib/email/resend";
+import { parseEmailAttachments, sameAttachmentManifest, AttachmentError } from "@/lib/email/attachments";
+import type { EmailAttachmentInput, EmailAttachmentManifest } from "@/lib/email/attachmentLimits";
 import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -12,7 +14,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const AUTHORIZED_ROLES = new Set(["Master Admin", "Administrator"]);
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 type EmployeeRow = { id: string; first_name: string; last_name: string; preferred_name: string | null; email: string | null; department: EmployeeDepartment; employment_status: string; archived_at: string | null };
-type DeliveryRow = { id: string; event_key: string; request_id: string; employee_id: string; employee_name: string; recipient_email: string; department: EmployeeDepartment; subject: string; message_body: string; sender_id: string | null; sender_name: string; sender_role: string; status: "Pending" | "Accepted" | "Failed"; provider_message_id: string | null; provider_submission_started_at: string | null; accepted_at: string | null; failed_at: string | null; failure_reason: string | null; created_at: string };
+type DeliveryRow = { id: string; event_key: string; request_id: string; employee_id: string; employee_name: string; recipient_email: string; department: EmployeeDepartment; subject: string; message_body: string; sender_id: string | null; sender_name: string; sender_role: string; status: "Pending" | "Accepted" | "Failed"; attachments_manifest: EmailAttachmentManifest[]; provider_message_id: string | null; provider_submission_started_at: string | null; accepted_at: string | null; failed_at: string | null; failure_reason: string | null; created_at: string };
 class InputError extends Error { constructor(message: string, readonly status = 400) { super(message); } }
 
 export async function GET() {
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
   try {
     const { profile, admin } = await authorize();
     const raw = await request.text();
-    if (raw.length > 30000) throw new InputError("The employee email request is too large.");
+    if (raw.length > 3_000_000) throw new InputError("The employee email request is too large.");
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { throw new InputError("Invalid employee email request."); }
     const action = body.action;
@@ -46,10 +48,11 @@ export async function POST(request: Request) {
     const subject = requiredText(body.subject, "Subject", 200);
     if (/[\r\n]/.test(subject)) throw new InputError("Subject must be a single line.");
     const message = requiredText(body.message, "Message", 10000);
-    const deliveries = await prepareDeliveries(admin, profile, requestId, subject, message, preview.recipients);
+    const { files: attachments, manifest } = parseEmailAttachments(body.attachments);
+    const deliveries = await prepareDeliveries(admin, profile, requestId, subject, message, preview.recipients, manifest);
     const results: DeliveryRow[] = [];
     for (let index = 0; index < deliveries.length; index += 5) {
-      results.push(...await Promise.all(deliveries.slice(index, index + 5).map((delivery) => deliverOne(admin, delivery))));
+      results.push(...await Promise.all(deliveries.slice(index, index + 5).map((delivery) => deliverOne(admin, delivery, attachments))));
     }
     return Response.json({ requestId, accepted: results.filter((row) => row.status === "Accepted").length, failed: results.filter((row) => row.status === "Failed").length, pending: results.filter((row) => row.status === "Pending").length, deliveries: results.map(historyEntry) });
   } catch (cause) { return failure(cause); }
@@ -89,25 +92,25 @@ async function resolveRecipients(admin: Admin, selection: EmployeeEmailSelection
   return { recipients, unavailable: entries.filter((entry) => !entry.available), recipientCount: recipients.length };
 }
 
-async function prepareDeliveries(admin: Admin, profile: UserProfile, requestId: string, subject: string, message: string, recipients: EmployeeEmailRecipient[]): Promise<DeliveryRow[]> {
+async function prepareDeliveries(admin: Admin, profile: UserProfile, requestId: string, subject: string, message: string, recipients: EmployeeEmailRecipient[], manifest: EmailAttachmentManifest[]): Promise<DeliveryRow[]> {
   const senderName = profile.display_name?.trim() || profile.email || profile.role;
   const output: DeliveryRow[] = [];
   for (const recipient of recipients) {
     const eventKey = `employee-email:${profile.id}:${requestId}:${recipient.employeeId}`;
-    const record = { event_key: eventKey, request_id: requestId, employee_id: recipient.employeeId, employee_name: recipient.name, recipient_email: recipient.email, department: recipient.department, subject, message_body: message, sender_id: profile.id, sender_name: senderName, sender_role: profile.role, status: "Pending", provider: "resend" };
+    const record = { event_key: eventKey, request_id: requestId, employee_id: recipient.employeeId, employee_name: recipient.name, recipient_email: recipient.email, department: recipient.department, subject, message_body: message, attachments_manifest: manifest, sender_id: profile.id, sender_name: senderName, sender_role: profile.role, status: "Pending", provider: "resend" };
     const { data, error } = await admin.from("employee_email_deliveries").insert(record).select("*").single();
     if (!error && data) { output.push(data as DeliveryRow); continue; }
     if (error?.code !== "23505") throw error ?? new Error("Employee email delivery could not be prepared.");
     const { data: existing, error: existingError } = await admin.from("employee_email_deliveries").select("*").eq("event_key", eventKey).single();
     if (existingError || !existing) throw existingError ?? new Error("Employee email delivery could not be recovered.");
     const row = existing as DeliveryRow;
-    if (row.employee_id !== recipient.employeeId || row.recipient_email.toLowerCase() !== recipient.email.toLowerCase() || row.subject !== subject || row.message_body !== message || row.sender_id !== profile.id) throw new InputError("This request identifier was already used for different employee email content.", 409);
+    if (row.employee_id !== recipient.employeeId || row.recipient_email.toLowerCase() !== recipient.email.toLowerCase() || row.subject !== subject || row.message_body !== message || row.sender_id !== profile.id || !sameAttachmentManifest(row.attachments_manifest, manifest)) throw new InputError("This request identifier was already used for different employee email content.", 409);
     output.push(row);
   }
   return output;
 }
 
-async function deliverOne(admin: Admin, delivery: DeliveryRow): Promise<DeliveryRow> {
+async function deliverOne(admin: Admin, delivery: DeliveryRow, attachments: EmailAttachmentInput[]): Promise<DeliveryRow> {
   const receipt = await providerReceipt(admin, delivery.id);
   if (receipt) return finalizeAccepted(admin, delivery.id, receipt.provider_message_id, receipt.accepted_at);
   if (delivery.status !== "Pending" || delivery.provider_submission_started_at) return delivery;
@@ -122,7 +125,7 @@ async function deliverOne(admin: Admin, delivery: DeliveryRow): Promise<Delivery
   let providerAccepted = false;
   try {
     const sender = resolveEmailSenderProfile("general");
-    const sent = await sendResendEmail({ recipientEmail: delivery.recipient_email, subject: delivery.subject, text: delivery.message_body, html: `<div style="white-space:pre-wrap">${escapeHtml(delivery.message_body)}</div>`, idempotencyKey: delivery.event_key, ...sender });
+    const sent = await sendResendEmail({ recipientEmail: delivery.recipient_email, subject: delivery.subject, text: delivery.message_body, html: `<div style="white-space:pre-wrap">${escapeHtml(delivery.message_body)}</div>`, idempotencyKey: delivery.event_key, attachments, ...sender });
     const providerMessageId = uuid(sent.id, "Provider message identifier");
     providerAccepted = true;
     const acceptedAt = new Date().toISOString();
@@ -156,4 +159,4 @@ function requiredText(value: unknown, label: string, max: number) { if (typeof v
 function uuid(value: unknown, label: string) { const text = requiredText(value, label, 36); if (!UUID_PATTERN.test(text)) throw new InputError(`${label} is invalid.`); return text; }
 function escapeHtml(value: string) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
 function providerFailure(cause: unknown) { const message = cause instanceof Error ? cause.message.trim() : ""; return (message || "Resend did not accept the employee email.").slice(0, 500); }
-function failure(cause: unknown) { if (cause instanceof InputError) return Response.json({ error: cause.message }, { status: cause.status }); console.error("Employee email operation failed", cause instanceof Error ? { name: cause.name, message: cause.message } : { name: "UnknownError" }); return Response.json({ error: "Employee email processing failed." }, { status: 500 }); }
+function failure(cause: unknown) { if (cause instanceof InputError || cause instanceof AttachmentError) return Response.json({ error: cause.message }, { status: cause instanceof InputError ? cause.status : 400 }); console.error("Employee email operation failed", cause instanceof Error ? { name: cause.name, message: cause.message } : { name: "UnknownError" }); return Response.json({ error: "Employee email processing failed." }, { status: 500 }); }
