@@ -743,7 +743,7 @@ function JobModal({
         jobId={job.id}
         propertyId={job.property_id}
         employeeId={employeeId}
-        management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}
+        management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}\n        isAssignedCrewLead={Boolean(employeeId && activeCrewLeadId === employeeId)}
         assigned={Boolean(employeeId && (job.assigned_employee_id === employeeId
           || (job.assigned_crew_id && (
             (crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id ?? activeCrew?.crew_lead_id) === employeeId
