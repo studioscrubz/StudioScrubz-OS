@@ -186,6 +186,37 @@ a:focus-visible {
   #public-invoice section { break-inside: auto; }
   #public-invoice section > h2 { break-after: avoid-page; }
   #public-invoice header { break-inside: avoid-page; }
+  /* Keep every service photo and caption together within US Letter margins. */
+  #public-invoice .invoice-service-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0.18in;
+    overflow: visible;
+  }
+  #public-invoice .invoice-service-photo {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+  #public-invoice .invoice-service-photo img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 3.1in;
+    aspect-ratio: auto;
+    object-fit: contain;
+    object-position: center;
+  }
+  #public-invoice .invoice-service-photo figcaption {
+    padding: 0.08in 0.1in;
+    font-size: 9pt;
+    overflow-wrap: anywhere;
+  }
 
   #public-agreement.document-print-root { page: public-agreement; font-size: 9pt; line-height: 1.25; }
   #public-agreement .agreement-print-page { display: block; }
