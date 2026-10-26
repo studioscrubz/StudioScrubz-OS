@@ -73,11 +73,22 @@ test("Job JSON and private Storage deletion retain invoiced references", () => {
   assert.match(migration, /public\.can_delete_proposal_photo_path\(name\)/);
 });
 
-test("public receipt photos remain token-scoped, customer-visible, and short-lived", () => {
+test("public receipt photos remain token-scoped, customer-visible, and privately served", () => {
+  const thumbnailRoute = fs.readFileSync(
+    new URL("../../app/api/public/invoices/[token]/photos/[photoId]/route.ts", import.meta.url),
+    "utf8",
+  );
   assert.match(publicPhotosRoute, /token\.length < 40/);
   assert.match(publicPhotosRoute, /client_access_token_expires_at/);
   assert.match(publicPhotosRoute, /\.eq\("invoice_id", invoice\.id\)\.eq\("customer_visible", true\)/);
-  assert.match(publicPhotosRoute, /createSignedUrls\([^,]+, 5 \* 60\)/);
+  assert.match(publicPhotosRoute, /\/api\/public\/invoices\/\$\{encodeURIComponent\(token\)\}\/photos\/\$\{encodeURIComponent\(photo\.id\)\}/);
+  assert.match(thumbnailRoute, /client_access_token_expires_at/);
+  assert.match(thumbnailRoute, /UUID_PATTERN\.test\(photoId\)/);
+  assert.match(thumbnailRoute, /\.eq\("id", photoId\)\.eq\("invoice_id", invoice\.id\)/);
+  assert.match(thumbnailRoute, /\.eq\("customer_visible", true\)/);
+  assert.match(thumbnailRoute, /"Cache-Control": "private, no-store, max-age=0"/);
+  assert.match(thumbnailRoute, /\.resize\(\{ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true \}\)/);
+  assert.doesNotMatch(publicPhotosRoute, /createSignedUrls/);
   assert.doesNotMatch(migration, /grant select on table public\.invoice_job_photos to anon/);
 });
 
