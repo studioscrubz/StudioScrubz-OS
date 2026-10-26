@@ -1,9 +1,10 @@
+import type { EmailAttachmentInput } from "@/lib/email/attachmentLimits";
 import type { ClientCommunication, CommunicationMetadata, CommunicationType } from "@/types/clientCommunication";
 
 export type CommunicationsEmailInput = {
   requestId: string; recipientEmail: string; subject: string; messageBody: string; communicationType: CommunicationType;
   clientId?: string | null; propertyId?: string | null; estimateId?: string | null; proposalId?: string | null;
-  agreementId?: string | null; invoiceId?: string | null; metadata?: CommunicationMetadata;
+  agreementId?: string | null; invoiceId?: string | null; metadata?: CommunicationMetadata; attachments?: EmailAttachmentInput[];
 };
 
 export async function sendCommunicationsEmail(input: CommunicationsEmailInput): Promise<ClientCommunication> {
