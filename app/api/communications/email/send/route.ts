@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { hasPermission } from "@/lib/auth/permissions";
 import { sendResendEmail } from "@/lib/email/resend";
+import { parseEmailAttachments, sameAttachmentManifest, AttachmentError } from "@/lib/email/attachments";
+import type { EmailAttachmentManifest } from "@/lib/email/attachmentLimits";
 import { resolveEmailSenderProfile, type EmailSenderProfileKey } from "@/lib/email/senderProfiles";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
     if (!hasPermission(profile, "communications.create")) return Response.json({ error: "You do not have permission to send Communications email." }, { status: 403 });
 
     const raw = await request.text();
-    if (raw.length > 25000) throw new InputError("The email request is too large.");
+    if (raw.length > 3_000_000) throw new InputError("The email request is too large.");
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { throw new InputError("Invalid email request."); }
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Invalid email request.");
@@ -48,13 +50,14 @@ export async function POST(request: Request) {
       agreementId: optionalUuid(body.agreementId, "Service Agreement"), invoiceId: optionalUuid(body.invoiceId, "Invoice"),
     };
     const metadata = metadataObject(body.metadata);
+    const { files: attachments, manifest } = parseEmailAttachments(body.attachments);
 
     admin = createSupabaseAdminClient();
     await validateLinks(admin, links);
     const defaultSender = resolveEmailSenderProfile(await senderProfileForCommunication(admin, communicationType, metadata));
     const sender = profile.role === "Sales" ? salesSenderIdentity(profile) : defaultSender;
     const eventKey = `communications-email:${profile.id}:${requestId}`;
-    const expected = { recipientEmail, subject, messageBody, communicationType, ...links };
+    const expected = { recipientEmail, subject, messageBody, communicationType, ...links, manifest };
     const { data: found, error: findError } = await admin.from("client_communications").select("*").eq("event_key", eventKey).maybeSingle();
     if (findError) throw findError;
     let communication = found as ClientCommunication | null;
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
         communication_type: communicationType, channel: "Email" as const, direction: "Outbound" as const, status: "Prepared" as const,
         provider: "resend", recipient_email: recipientEmail, subject, message_body: messageBody,
         sent_by_user_id: profile.id, sent_by_name: profile.display_name || profile.email || profile.role,
-        metadata: { ...metadata, delivery: "communications-resend", provider_from: sender.from, provider_reply_to: sender.replyTo }, event_key: eventKey,
+        metadata: { ...metadata, attachment_manifest: manifest, delivery: "communications-resend", provider_from: sender.from, provider_reply_to: sender.replyTo }, event_key: eventKey,
       };
       const { data: created, error: createError } = await admin.from("client_communications").insert(insert).select("*").single();
       if (createError?.code === "23505") {
@@ -91,13 +94,13 @@ export async function POST(request: Request) {
     if (communication.status === "Sent" || communication.provider_message_id) throw new UnconfirmedProviderStateError("This communication is marked Sent, but no matching durable Resend acceptance receipt exists. It was not sent again.");
 
     const content = renderEmail(messageBody);
-    const sent = await sendResendEmail({ recipientEmail, subject, ...content, ...sender, idempotencyKey: eventKey });
+    const sent = await sendResendEmail({ recipientEmail, subject, ...content, ...sender, idempotencyKey: eventKey, attachments });
     providerMessageId = confirmedProviderMessageId(sent.id);
     await persistProviderSubmission(admin, communicationId, eventKey, providerMessageId);
     const finalized = await finalize(admin, communicationId, providerMessageId, null);
     return acceptedResponse(finalized, providerMessageId);
   } catch (cause) {
-    if (cause instanceof InputError) return Response.json({ error: cause.message }, { status: cause.status });
+    if (cause instanceof InputError || cause instanceof AttachmentError) return Response.json({ error: cause.message }, { status: cause instanceof InputError ? cause.status : 400 });
     if (cause instanceof UnconfirmedProviderStateError) return Response.json({ error: cause.message }, { status: 409 });
     if (providerMessageId) {
       console.error("Communications email was accepted by Resend but delivery finalization failed", {
@@ -232,8 +235,8 @@ function providerFailureMessage(cause: unknown) {
   return "Resend did not accept the email. Please retry after checking the provider configuration and sender domain.";
 }
 
-function assertSameRequest(row: ClientCommunication, expected: { recipientEmail: string; subject: string; messageBody: string; communicationType: CommunicationType } & Links) {
-  if (row.provider !== "resend" || row.channel !== "Email" || row.direction !== "Outbound" || row.recipient_email?.toLowerCase() !== expected.recipientEmail || row.subject !== expected.subject || row.message_body !== expected.messageBody || row.communication_type !== expected.communicationType || row.client_id !== expected.clientId || row.property_id !== expected.propertyId || row.estimate_id !== expected.estimateId || row.proposal_id !== expected.proposalId || row.agreement_id !== expected.agreementId || row.invoice_id !== expected.invoiceId) throw new InputError("This request identifier was already used for different email content.", 409);
+function assertSameRequest(row: ClientCommunication, expected: { recipientEmail: string; subject: string; messageBody: string; communicationType: CommunicationType; manifest: EmailAttachmentManifest[] } & Links) {
+  if (row.provider !== "resend" || row.channel !== "Email" || row.direction !== "Outbound" || row.recipient_email?.toLowerCase() !== expected.recipientEmail || row.subject !== expected.subject || row.message_body !== expected.messageBody || row.communication_type !== expected.communicationType || row.client_id !== expected.clientId || row.property_id !== expected.propertyId || row.estimate_id !== expected.estimateId || row.proposal_id !== expected.proposalId || row.agreement_id !== expected.agreementId || row.invoice_id !== expected.invoiceId || !sameAttachmentManifest((row.metadata as Record<string, unknown> | null)?.attachment_manifest, expected.manifest)) throw new InputError("This request identifier was already used for different email content.", 409);
 }
 function text(value: unknown, label: string, max: number) { if (typeof value !== "string" || !value.trim() || value.trim().length > max) throw new InputError(`${label} is required and must be at most ${max} characters.`); return value.trim(); }
 function uuid(value: unknown, label: string) { const result = text(value, label, 36); if (!UUID_PATTERN.test(result)) throw new InputError(`${label} is invalid.`); return result; }
