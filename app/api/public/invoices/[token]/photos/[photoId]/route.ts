@@ -42,17 +42,29 @@ export async function GET(
       return NextResponse.json({ error: "Photo unavailable." }, { status: 404, headers: PRIVATE_HEADERS });
     }
 
-    // Small thumbnails print reliably on mobile instead of decoding original multi-megabyte photos.
-    const thumbnail = await sharp(Buffer.from(await blob.arrayBuffer()), { limitInputPixels: 36_000_000 })
-      .rotate()
-      .resize({ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 78, mozjpeg: true })
-      .toBuffer();
-
-    return new Response(new Uint8Array(thumbnail), {
-      status: 200,
-      headers: { ...PRIVATE_HEADERS, "Content-Type": "image/jpeg", "Content-Disposition": "inline" },
-    });
+    // A thumbnail is preferable for print, but its conversion must not hide a valid JPEG.
+    const original = Buffer.from(await blob.arrayBuffer());
+    try {
+      const thumbnail = await sharp(original, { limitInputPixels: 36_000_000 })
+        .rotate()
+        .resize({ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 78, mozjpeg: true })
+        .toBuffer();
+      return new Response(new Uint8Array(thumbnail), {
+        status: 200,
+        headers: { ...PRIVATE_HEADERS, "Content-Type": "image/jpeg", "Content-Disposition": "inline" },
+      });
+    } catch (error) {
+      // This fallback is restricted to actual JPEG input, not arbitrary private files.
+      const jpeg = original.length > 4 && original[0] === 0xff && original[1] === 0xd8
+        && original[original.length - 2] === 0xff && original[original.length - 1] === 0xd9;
+      console.error("Public invoice thumbnail conversion failed", error instanceof Error ? error.name : "UnknownError");
+      if (!jpeg) return NextResponse.json({ error: "Photo unavailable." }, { status: 422, headers: PRIVATE_HEADERS });
+      return new Response(new Uint8Array(original), {
+        status: 200,
+        headers: { ...PRIVATE_HEADERS, "Content-Type": "image/jpeg", "Content-Disposition": "inline" },
+      });
+    }
   } catch (error) {
     console.error("Public invoice photo thumbnail failed", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Photo unavailable." }, { status: 500, headers: PRIVATE_HEADERS });
