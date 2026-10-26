@@ -96,17 +96,33 @@ test("empty customer notes are omitted from the direct print document", () => {
   assert.doesNotMatch(result.html, /<h3>Invoice Notes<\/h3>/);
 });
 
-test("invoice service photos retain their full image and caption within print margins", () => {
+test("public invoice photos print in fixed groups without fragmenting across pages", () => {
   const page = read("components/invoices/PublicInvoicePage.tsx");
   const css = read("app/globals.css");
+
   assert.match(page, /invoice-service-photos mt-8/);
-  assert.match(page, /invoice-service-photo-grid mt-3 grid/);
-  assert.match(page, /invoice-service-photo overflow-hidden/);
-  assert.match(page, /loading="eager"/);
+  assert.match(page, /invoice-service-photo-pages mt-3/);
+  assert.match(page, /Math\.ceil\(photos\.length \/ 4\)/);
+  assert.match(page, /photos\.slice\(pageIndex \* 4 \+ rowIndex \* 2, pageIndex \* 4 \+ rowIndex \* 2 \+ 2\)/);
+  assert.match(page, /invoice-service-photo-sheet/);
+  assert.match(page, /invoice-service-photo-row grid grid-cols-1 gap-4 sm:grid-cols-2/);
   assert.match(page, /photo\.caption&&<figcaption/);
-  assert.match(css, /#public-invoice \.invoice-service-photo-grid \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
-  assert.match(css, /#public-invoice \.invoice-service-photo \{[^}]*break-inside: avoid-page;[^}]*page-break-inside: avoid;/);
-  assert.match(css, /#public-invoice \.invoice-service-photo img \{[^}]*max-width: 100%;[^}]*max-height: 3\.1in;[^}]*aspect-ratio: auto;[^}]*object-fit: contain;/);
-  assert.match(css, /#public-invoice \.invoice-service-photo figcaption \{[^}]*overflow-wrap: anywhere;/);
-  assert.doesNotMatch(css, /#public-invoice \.invoice-service-photo img \{[^}]*object-fit: cover;/);
+  assert.match(css, /#public-invoice \.invoice-service-photos \{[^}]*break-before: page;/);
+  assert.match(css, /#public-invoice \.invoice-service-photo-sheet \+ \.invoice-service-photo-sheet \{[^}]*page-break-before: always;/);
+  assert.match(css, /#public-invoice \.invoice-service-photo-row \{[^}]*display: flex;[^}]*page-break-inside: avoid;/);
+  assert.match(css, /#public-invoice \.invoice-service-photo \{[^}]*border: 0;[^}]*page-break-inside: avoid;/);
+  assert.match(css, /#public-invoice \.invoice-service-photo img \{[^}]*max-width: 100%;[^}]*max-height: 3\.25in;[^}]*object-fit: contain;/);
+  assert.doesNotMatch(css, /#public-invoice \.invoice-service-photo-grid \{[^}]*display: grid;/);
+});
+
+test("public invoice print requires all photos to load successfully", () => {
+  const page = read("components/invoices/PublicInvoicePage.tsx");
+  const css = read("app/globals.css");
+  assert.match(page, /const printReady = !photosLoading && !photosError && !photoFailed && readyPhotoCount === photos\.length;/);
+  assert.match(page, /onLoad=\{\(\) => setPhotoLoadState/);
+  assert.match(page, /onError=\{\(\) => setPhotoLoadState/);
+  assert.match(page, /disabled=\{!printReady\}/);
+  assert.match(page, /Service photos are unavailable\. Refresh before printing/);
+  assert.match(css, /#public-invoice \.invoice-customer-notes \{[^}]*break-inside: avoid-page;/);
+  assert.match(css, /#public-invoice > div > article > footer \{[^}]*break-inside: avoid-page;/);
 });
