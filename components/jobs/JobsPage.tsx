@@ -33,6 +33,7 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
+import { JobCardGpsRegistration } from "@/components/jobs/JobCardGpsRegistration";
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
 import { EquipmentExceptionResolution } from "@/components/jobs/EquipmentExceptionResolution";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
@@ -434,6 +435,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
     </div>
     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#143d1a]/15 pt-2">
       <OnMyWayButton job={job} employeeId={employeeId} role={role} />
+      {job.assigned_crew_id && employeeId === activeCrewLeadId && eligibility.showStart && <JobCardGpsRegistration jobId={job.id} onRegistered={open} />}
       {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} min-w-32`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} min-w-32`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
