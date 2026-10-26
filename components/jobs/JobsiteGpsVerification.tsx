@@ -15,7 +15,8 @@ type Props = {
   jobId: string;
   propertyId: string | null;
   employeeId: string | null;
-  management: boolean;\n  isAssignedCrewLead: boolean;
+  management: boolean;
+  isAssignedCrewLead: boolean;
   assigned: boolean;
   assignedEmployees: AssignedEmployee[];
 };
@@ -91,7 +92,8 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
       <p className="mt-3 text-sm font-semibold">
         {summary.configured ? `Location configured · ${summary.radiusMeters} m radius` : "Job-site reference not configured — Job Start blocked"}
       </p>
-      {!summary.configured && <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">Required before Start Job: register the property GPS reference at the site, then have the assigned Crew Lead verify arrival. Manager exceptions do not register the property GPS location.</p>}\n      {summary.lastCheck && <p className="mt-2 text-sm">Your last check: <strong>{summary.lastCheck.result}</strong> · {Math.round(summary.lastCheck.distanceMeters)} m from property reference · accuracy ±{Math.round(summary.lastCheck.accuracyMeters)} m</p>}
+      {!summary.configured && <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">Required before Start Job: register the property GPS reference at the site, then have the assigned Crew Lead verify arrival. Manager exceptions do not register the property GPS location.</p>}
+      {summary.lastCheck && <p className="mt-2 text-sm">Your last check: <strong>{summary.lastCheck.result}</strong> · {Math.round(summary.lastCheck.distanceMeters)} m from property reference · accuracy ±{Math.round(summary.lastCheck.accuracyMeters)} m</p>}
       {assigned && employeeId && summary.configured && <button type="button" disabled={busy} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50" onClick={() => void verify()}>
         {busy ? "Checking…" : "Verify my arrival using GPS"}
       </button>}
