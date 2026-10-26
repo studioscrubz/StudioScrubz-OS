@@ -105,7 +105,7 @@ test("public invoice photos print in fixed groups without fragmenting across pag
   assert.match(page, /Math\.ceil\(photos\.length \/ 4\)/);
   assert.match(page, /photos\.slice\(pageIndex \* 4 \+ rowIndex \* 2, pageIndex \* 4 \+ rowIndex \* 2 \+ 2\)/);
   assert.match(page, /invoice-service-photo-sheet/);
-  assert.match(page, /invoice-service-photo-row grid grid-cols-1 gap-4 sm:grid-cols-2/);
+  assert.match(page, /invoice-service-photo-row grid grid-cols-2 gap-3/);
   assert.match(page, /photo\.caption&&<figcaption/);
   assert.match(css, /#public-invoice \.invoice-service-photos \{[^}]*break-before: page;/);
   assert.match(css, /#public-invoice \.invoice-service-photo-sheet \+ \.invoice-service-photo-sheet \{[^}]*page-break-before: always;/);
@@ -125,4 +125,24 @@ test("public invoice print requires all photos to load successfully", () => {
   assert.match(page, /Service photos are unavailable\. Refresh before printing/);
   assert.match(css, /#public-invoice \.invoice-customer-notes \{[^}]*break-inside: avoid-page;/);
   assert.match(css, /#public-invoice > div > article > footer \{[^}]*break-inside: avoid-page;/);
+});
+
+test("invoice photos use stable, access-scoped, resized previews rather than expiring full-size links", () => {
+  const listing = read("app/api/public/invoices/[token]/photos/route.ts");
+  const photo = read("app/api/public/invoices/[token]/photos/[photoId]/route.ts");
+  const page = read("components/invoices/PublicInvoicePage.tsx");
+  assert.doesNotMatch(listing, /createSignedUrls|signedUrl/);
+  assert.match(listing, /photos: data\.map\(\(photo\) =>/);
+  assert.match(listing, /photos\/\$\{encodeURIComponent\(photo\.id\)\}/);
+  assert.match(photo, /client_access_token_expires_at/);
+  assert.match(photo, /\.eq\("invoice_id", invoice\.id\)/);
+  assert.match(photo, /\.eq\("customer_visible", true\)/);
+  assert.match(photo, /OPERATIONAL_PHOTO_BUCKET/);
+  assert.match(photo, /\.resize\(\{ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true \}\)/);
+  assert.match(photo, /\.jpeg\(\{ quality: 78, mozjpeg: true \}\)/);
+  assert.match(photo, /"Cache-Control": "private, no-store, max-age=0"/);
+  assert.match(page, /photoLoadState\[photo\.id\] === "failed" \? "Photo unavailable\. Retry photos below\."/);
+  assert.match(page, /setPhotoRevision\(\(value\)=>value\+1\)/);
+  assert.match(page, /max-h-56 w-full object-contain/);
+  assert.doesNotMatch(page, /aspect-\[4\/3\] w-full object-cover/);
 });
