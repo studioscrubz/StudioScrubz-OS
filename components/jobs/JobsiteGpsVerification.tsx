@@ -5,7 +5,7 @@ import { getCurrentPosition } from "@/lib/geo/currentPosition";
 import {
   approveJobsiteGpsException,
   getJobsiteGpsSummary,
-  setJobsiteGpsLocation,
+  registerJobPropertyGpsByCrewLead,
   verifyJobsiteArrival,
   type JobsiteGpsSummary,
 } from "@/lib/services/jobsiteGps";
@@ -15,12 +15,12 @@ type Props = {
   jobId: string;
   propertyId: string | null;
   employeeId: string | null;
-  management: boolean;
+  management: boolean;\n  isAssignedCrewLead: boolean;
   assigned: boolean;
   assignedEmployees: AssignedEmployee[];
 };
 
-export function JobsiteGpsVerification({ jobId, propertyId, employeeId, management, assigned, assignedEmployees }: Props) {
+export function JobsiteGpsVerification({ jobId, propertyId, employeeId, management, isAssignedCrewLead, assigned, assignedEmployees }: Props) {
   const [summary, setSummary] = useState<JobsiteGpsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
     if (!window.confirm("Set this property's job-site location from your CURRENT device GPS? Only do this while physically on site.")) return;
     setBusy(true); setError(null); setNotice(null);
     try {
-      await setJobsiteGpsLocation(propertyId, await getCurrentPosition(), Number(radius));
+      await registerJobPropertyGpsByCrewLead(jobId, await getCurrentPosition(), Number(radius));
       setNotice("Job-site reference saved. This location is shared by jobs at the same property.");
       await refresh();
     } catch (e) { setError(e instanceof Error ? e.message : "Property GPS setup failed."); }
@@ -97,7 +97,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
       </button>}
       {management && <>
         {!summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
-          <p className="text-sm font-bold text-[#143d1a]">Manager: configure property GPS</p>
+          <p className="text-sm font-bold text-[#143d1a]">Crew Lead: register property GPS</p>
           <p className="mt-1 text-xs text-neutral-600">Use your device at the actual property. This avoids paid address geocoding and prevents guessing coordinates.</p>
           <label className="mt-3 block text-sm font-semibold">Allowed radius
             <select className="mt-1 block rounded border px-3 py-2" value={radius} onChange={e => setRadius(e.target.value)}>
@@ -112,7 +112,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
           </button>
         </div>}
 
-        {assignedEmployees.length > 0 && <div className="mt-3 rounded-lg border bg-white p-3">
+        {management && assignedEmployees.length > 0 && <div className="mt-3 rounded-lg border bg-white p-3">
           <p className="text-sm font-bold text-[#143d1a]">Manager exception (not GPS verified)</p>
           <label className="mt-2 block text-xs font-bold">Assigned employee
             <select className="mt-1 block w-full rounded border px-3 py-2 text-sm" value={exceptionEmployee} onChange={e => setExceptionEmployee(e.target.value)}>
