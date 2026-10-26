@@ -30,6 +30,7 @@ test("attachment validation checks file identity, MIME, signatures and total siz
   assert.equal(result.length, 1);
   assert.equal(manifest[0].sha256, createHash("sha256").update(Buffer.from("%PDF-1.6\ninvoice")).digest("hex"));
   assert.equal(parser.sameAttachmentManifest(manifest, manifest), true);
+  assert.equal(parser.sameAttachmentManifest([{sha256: manifest[0].sha256, bytes: manifest[0].bytes, contentType: manifest[0].contentType, filename: manifest[0].filename}],manifest),true);
   assert.equal(parser.sameAttachmentManifest([], manifest), false);
   for (const bad of [
     [{ ...valid, filename: "../invoice.pdf" }],
