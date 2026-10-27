@@ -213,7 +213,7 @@ test("UI summary consumes result breakdown and does not preserve an unreconciled
 test("proposal document shows a separate final price adjustment instead of mislabeling a price override as a manual discount", () => {
   const source = readFileSync(new URL("../components/proposals/ProposalDocument.tsx", import.meta.url), "utf8");
   assert.match(source, /finalPriceAdjustment=Math\.round\(\(document\.per_visit_total-subtotal-\(document\.taxes\?\?0\)\)\*100\)\/100/);
-  assert.match(source, /Math\.abs\(finalPriceAdjustment\)>=0\.01&&<Price label="Final Price Adjustment" value=\{finalPriceAdjustment\}/);
+  assert.match(source, /Math\.abs\(finalPriceAdjustment\)>=0\.01&&<Price label=\{document\.final_price_adjustment_label\?\.trim\(\)\|\|"Final Price Adjustment"\} value=\{finalPriceAdjustment\}/);
   const base = 135, recurring = 0, manualDiscount = 0, taxes = 0, final = 100;
   const subtotal = base - recurring - manualDiscount;
   const adjustment = Math.round((final - subtotal - taxes) * 100) / 100;
