@@ -85,3 +85,109 @@ BEGIN
  END IF;
  RETURN new;
 END $function$;
+
+-- The same invoker/private-EXECUTE mismatch affects ordinary estimate editing
+-- and approved estimate delivery. Preserve state-change audit and delivery checks.
+CREATE OR REPLACE FUNCTION private.guard_estimate_approval()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  controlled boolean;
+  changed boolean;
+  previous_status text;
+BEGIN
+  IF TG_OP='INSERT' THEN
+    IF new.approval_created_by IS NOT NULL
+      AND NOT (current_setting('studioscrubz.sales_estimate_write_rpc',true)='on'
+        AND new.approval_created_by::text=current_setting('studioscrubz.sales_estimate_actor',true))
+      OR new.approval_submitted_at IS NOT NULL
+      OR new.approval_reviewed_at IS NOT NULL
+      OR new.approval_notes IS NOT NULL THEN
+      RAISE EXCEPTION 'Estimate approval audit fields are server-generated' USING ERRCODE='42501';
+    END IF;
+    IF new.approval_status <> 'Draft'
+      OR new.approval_version <> 1
+      OR new.approval_reviewed_by IS NOT NULL OR new.approval_submitted_by IS NOT NULL
+      OR new.approved_pricing_snapshot IS NOT NULL THEN
+      RAISE EXCEPTION 'Estimate approval fields cannot be supplied by the client' USING ERRCODE='42501';
+    END IF;
+    new.approval_created_by := coalesce(auth.uid(),new.approval_created_by);
+    RETURN new;
+  END IF;
+  controlled := current_setting('studioscrubz.estimate_review_rpc',true)='on'
+    AND current_user = (
+      SELECT pg_catalog.pg_get_userbyid(p.proowner) FROM pg_catalog.pg_proc p
+      WHERE p.oid='public.review_estimate_approval(uuid,text,text)'::pg_catalog.regprocedure
+    );
+  IF NOT controlled AND (
+      new.approval_status IS DISTINCT FROM old.approval_status
+      OR new.approval_version IS DISTINCT FROM old.approval_version
+      OR new.approval_submitted_by IS DISTINCT FROM old.approval_submitted_by
+      OR new.approval_submitted_at IS DISTINCT FROM old.approval_submitted_at
+      OR new.approval_reviewed_by IS DISTINCT FROM old.approval_reviewed_by
+      OR new.approval_reviewed_at IS DISTINCT FROM old.approval_reviewed_at
+      OR new.approval_notes IS DISTINCT FROM old.approval_notes
+      OR new.approved_pricing_snapshot IS DISTINCT FROM old.approved_pricing_snapshot
+      OR new.approval_created_by IS DISTINCT FROM old.approval_created_by
+    ) THEN
+    -- Submit RPC is an equally authenticated and audited controlled transition.
+    IF NOT (current_setting('studioscrubz.estimate_submit_rpc',true)='on'
+      AND current_user = (
+        SELECT pg_catalog.pg_get_userbyid(p.proowner) FROM pg_catalog.pg_proc p
+        WHERE p.oid='public.submit_estimate_for_approval(uuid)'::pg_catalog.regprocedure
+      )) THEN
+      RAISE EXCEPTION 'Use the estimate approval workflow to change approval fields' USING ERRCODE='42501';
+    END IF;
+  END IF;
+  changed := pg_catalog.jsonb_build_object(
+      'client_id',new.client_id,'property_id',new.property_id,
+      'customer_first_name',new.customer_first_name,'customer_last_name',new.customer_last_name,
+      'customer_address',new.customer_address,'customer_email',new.customer_email,
+      'frequency',new.frequency,'service_name',new.service_name,
+      'result',new.result,'notes',new.notes,'terms',new.terms
+    ) IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'client_id',old.client_id,'property_id',old.property_id,
+      'customer_first_name',old.customer_first_name,'customer_last_name',old.customer_last_name,
+      'customer_address',old.customer_address,'customer_email',old.customer_email,
+      'frequency',old.frequency,'service_name',old.service_name,
+      'result',old.result,'notes',old.notes,'terms',old.terms
+    );
+  IF changed AND old.approval_status IN ('Pending Approval','Approved','Changes Requested') THEN
+    IF controlled OR current_setting('studioscrubz.estimate_submit_rpc',true)='on' THEN
+      RAISE EXCEPTION 'Pricing and scope cannot change during an approval decision';
+    END IF;
+    new.approval_status := 'Draft';
+    new.approval_version := old.approval_version+1;
+    new.approval_submitted_by := NULL;
+    new.approval_submitted_at := NULL;
+    new.approval_reviewed_by := NULL;
+    new.approval_reviewed_at := NULL;
+    new.approval_notes := NULL;
+    new.approved_pricing_snapshot := NULL;
+  END IF;
+  RETURN new;
+END $function$;
+
+CREATE OR REPLACE FUNCTION private.require_approved_estimate_delivery()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF (new.sent_at IS DISTINCT FROM old.sent_at
+    OR new.client_access_token IS DISTINCT FROM old.client_access_token
+    OR new.client_delivery_snapshot IS DISTINCT FROM old.client_delivery_snapshot)
+    AND (new.approval_status <> 'Approved' OR new.approved_pricing_snapshot IS NULL
+      OR new.approved_pricing_snapshot IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'client_id',new.client_id,'property_id',new.property_id,
+      'customer_first_name',new.customer_first_name,'customer_last_name',new.customer_last_name,
+      'customer_address',new.customer_address,'customer_email',new.customer_email,
+      'frequency',new.frequency,'service_name',new.service_name,
+      'result',new.result,'notes',new.notes,'terms',new.terms
+    )) THEN
+    RAISE EXCEPTION 'Estimate requires approval of its current pricing before customer delivery' USING ERRCODE='42501';
+  END IF;
+  RETURN new;
+END $function$;
