@@ -10,9 +10,14 @@ import {
   type JobsiteGpsSummary,
 } from "@/lib/services/jobsiteGps";
 
+import { CompactJobSection } from "@/components/jobs/CompactJobSection";
+import { jobGpsStatus } from "@/lib/jobs/manageJobSummary";
+import { useDisplayTime } from "@/lib/hooks/useDisplayTime";
+
 type AssignedEmployee = { id: string; name: string };
 type Props = {
   jobId: string;
+  crewLeadId: string | null;
   propertyId: string | null;
   employeeId: string | null;
   management: boolean;
@@ -21,7 +26,8 @@ type Props = {
   assignedEmployees: AssignedEmployee[];
 };
 
-export function JobsiteGpsVerification({ jobId, propertyId, employeeId, management, isAssignedCrewLead, assigned, assignedEmployees }: Props) {
+export function JobsiteGpsVerification({ jobId, crewLeadId, propertyId, employeeId, management, isAssignedCrewLead, assigned, assignedEmployees }: Props) {
+  const now = useDisplayTime(60_000);
   const [summary, setSummary] = useState<JobsiteGpsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -83,14 +89,13 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
     finally { setBusy(false); }
   }
 
-  return <section className="mt-2 rounded-lg border border-[#143d1a]/15 bg-[#f6f8f5] p-3" aria-label="Job-site GPS verification">
-    <h3 className="font-extrabold text-[#143d1a]">Job-site GPS arrival</h3>
+  return <CompactJobSection title="Job-site GPS" subtitle={error ? "Status unavailable" : jobGpsStatus(summary, crewLeadId, employeeId, now)}>
     <details className="mt-1 text-xs text-neutral-600"><summary className="cursor-pointer font-medium">How GPS verification works</summary><p className="mt-1">GPS is requested only when you tap Verify. No background tracking; the arrival record stores distance, accuracy and time, not exact coordinates. The assigned Crew Lead must verify onsite arrival before starting. This does not start jobs or change payroll.</p></details>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     {!summary ? <p className="mt-3 text-sm text-neutral-600">Loading job-site verification…</p> : <>
       <p className="mt-3 text-sm font-semibold">
-        {summary.configured ? `Location configured · ${summary.radiusMeters} m radius` : "Job-site reference not configured — Job Start blocked"}
+        {summary.configured ? `Location configured · ${summary.radiusMeters} m radius` : "Setup required — START JOB blocked"}
       </p>
       {!summary.configured && <p role="alert" className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-950">Register property GPS onsite, then verify Crew Lead arrival before START JOB. A manager exception does not register GPS.</p>}
       {summary.lastCheck && <p className="mt-2 text-sm">Your last check: <strong>{summary.lastCheck.result}</strong> · {Math.round(summary.lastCheck.distanceMeters)} m from property reference · accuracy ±{Math.round(summary.lastCheck.accuracyMeters)} m</p>}
@@ -100,7 +105,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
       {(management || isAssignedCrewLead) && <>
         {isAssignedCrewLead && !summary.configured && <div className="mt-4 rounded-lg border border-[#143d1a]/15 bg-white p-3">
           <p className="text-sm font-bold text-[#143d1a]">Crew Lead: register property GPS</p>
-          <p className="mt-1 text-xs text-neutral-600">Use your device at the actual property. This avoids paid address geocoding and prevents guessing coordinates.</p>
+          <p className="mt-1 text-xs text-neutral-600">Register from your device while physically at the property.</p>
           <label className="mt-3 block text-sm font-semibold">Allowed radius
             <select className="mt-1 block rounded border px-3 py-2" value={radius} onChange={e => setRadius(e.target.value)}>
               <option value="150">150 meters</option>
@@ -117,7 +122,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
         {management && assignedEmployees.length > 0 && <details className="mt-2 rounded-lg border bg-white p-2">
           <summary className="cursor-pointer text-xs font-semibold text-[#143d1a]">Manager exception (not GPS verified)</summary>
           <label className="mt-2 block text-xs font-bold">Assigned employee
-            <select className="mt-1 block w-full rounded border px-3 py-2 text-sm" value={exceptionEmployee} onChange={e => setExceptionEmployee(e.target.value)}>
+            <select aria-label="Assigned employee" className="mt-1 block w-full rounded border px-3 py-2 text-sm" value={exceptionEmployee} onChange={e => setExceptionEmployee(e.target.value)}>
               <option value="">Choose employee</option>
               {assignedEmployees.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
@@ -131,5 +136,5 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
         {summary.exceptions.length > 0 && <div className="mt-1 text-xs text-neutral-600">Recorded exceptions: {summary.exceptions.length}</div>}
       </>}
     </>}
-  </section>;
+  </CompactJobSection>;
 }
