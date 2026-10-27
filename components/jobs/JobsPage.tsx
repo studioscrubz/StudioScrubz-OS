@@ -412,10 +412,10 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
     <div className="grid gap-2 text-left sm:grid-cols-[6rem_minmax(0,1.4fr)_minmax(10rem,1fr)] lg:grid-cols-[6rem_minmax(0,1.4fr)_minmax(10rem,1fr)_auto] md:items-start">
       <div>
         <p className="text-base font-extrabold text-[#143d1a]">{formatJobTime(job.start_time)}</p>
-        <p className="mt-1 text-xs font-bold text-neutral-500">{job.job_number}</p>
+        <p className="mt-1 text-[10px] font-medium tracking-wide text-neutral-500">{job.job_number}</p>
       </div>
       <div className="min-w-0">
-        <p className="font-extrabold text-neutral-800">{job.client_name || "Unnamed client"}</p>
+        <h3 className="text-lg font-extrabold leading-tight text-[#143d1a]">{job.client_name || "Unnamed client"}</h3>
         <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
         <p className="mt-1 text-xs font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
       </div>
@@ -623,7 +623,8 @@ function JobModal({
     && (eligibility.showStart || (canClock && eligibility.canJoin) || (job.status === "In Progress" && canSupervisorComplete));
   const lifecycleAct = (fn: () => Promise<unknown>, text: string, onSuccess?: () => void) => { setLifecycleError(null); mutate(fn, text, setLifecycleError, onSuccess); };
   return (
-    <Modal title={job.job_number} close={close}>
+    <Modal title={job.client_name || "Unnamed client"} close={close}>
+      <p className="-mt-3 mb-3 text-xs font-medium tracking-wide text-neutral-500">{job.job_number}</p>
       <div className="mb-5 flex gap-2 border-b border-neutral-200" role="tablist" aria-label="Job details">
         {(["Overview", "Scope", "Discoveries", "Changes", "Timeline"] as const).map((item) => (
           <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={`border-b-2 px-3 py-2 text-sm font-bold ${tab === item ? "border-[#9a7a17] text-[#143d1a]" : "border-transparent text-neutral-500"}`}>{item}</button>
