@@ -1,15 +1,24 @@
 // Browser-only fixtures for the isolated component gallery.
 import { createRoot } from 'react-dom/client';
-import { JobModal } from '../../components/jobs/JobsPage';
+import { JobModal, JobCard } from '../../components/jobs/JobsPage';
 
 const employee = (id,first_name,last_name) => ({id,first_name,last_name,preferred_name:null});
 const lead=employee('lead','Crystal','Garcia'),member=employee('member','Kris','Greer');
 const crew={id:'crew',crew_name:'Crew B',crew_lead_id:'lead',crew_lead:lead,members:[{employee_id:'lead',employee:lead},{employee_id:'member',employee:member}]};
 const job={id:'job',job_number:'JOB-TEST',client_name:'Manage Job test client',property_name:'Test property',property_id:'property',status:new URLSearchParams(location.search).get('active')?'In Progress':'Crew Assigned',assigned_crew_id:'crew',assigned_crew_name:'Crew B',crew_lead_name:'Crystal Garcia',assigned_employee_id:null,assigned_team:['Crystal Garcia','Kris Greer'],scheduled_date:'2026-10-27',start_time:'22:00:00',estimated_duration:3,service_name:'Cleaning',frequency:'One Time',division:'Commercial',price:300,labor_hours:3,recommended_crew_size:2,scope:[],internal_notes:'Bring entry key',access_instructions:null,financials_available:false,operational_started_at:new URLSearchParams(location.search).get('active')?new Date(Date.now()-3_600_000).toISOString():null,operational_ended_at:null};
 const calls=[];
+job.client={phone:'+12135550123',first_name:'Test'};
+job.client_phone='+12135550123';
+let trip=null;
 let photos=[];
 let gps={configured:false,radiusMeters:null,lastCheck:null,employeeChecks:[],exceptions:[]};
 window.fixture={calls,call(name,...args){calls.push({name,args});switch(name){
+case 'jobAssignmentLabel':return 'Crew B';
+case 'displayJobStatus':return args[0];
+case 'getAuthorizedVehicles':return Promise.resolve([{id:'vehicle',status:'Active',nickname:'Crew Van',vehicle_number:'V1'}]);
+case 'getGpsTrips':return Promise.resolve(trip?[trip]:[]);
+case 'startGpsTrip':trip={id:'trip',job_id:'job',user_id:'user',employee_id:'lead',status:'Active'};return Promise.resolve({trip,initiated:false});
+case 'finishGpsTrip':trip={...trip,status:'Completed',estimated_miles:2};return Promise.resolve(trip);
 case 'getActiveCrews':return Promise.resolve([crew]);
 case 'getEligibleJobTechs':return Promise.resolve([{employee_id:'lead',display_name:'Crystal Garcia',operational_role:'Crew Lead'}]);
 case 'jobWorkerTarget':return {kind:'crew',crewId:'crew'};
@@ -37,4 +46,6 @@ window.fetch=(input,init)=>{
 };
 const mutate=async(fn)=>{try{await fn();}catch(e){console.error(e);}};
 const readonly=new URLSearchParams(location.search).has('readonly');
-createRoot(document.getElementById('root')).render(<JobModal job={job} busy={false} close={()=>{}} mutate={mutate} canEdit={!readonly} canSchedule={!readonly} canArchive={false} canComplete={!readonly} canClock={!readonly} employeeId="lead" role="Master Admin" activeCrew={crew} activeTechs={[{employee_id:'lead',display_name:'Crystal Garcia'}]} canDeletePhotos />);
+createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('card')
+ ? <JobCard job={job} open={()=>calls.push({name:'openManageJob',args:[]})} timeEntries={[]} employeeId="lead" role="Master Admin" activeCrew={crew} activeTechs={[]} canComplete canDelete={false} busy={false} requestDelete={()=>{}} act={mutate}/>
+ : <JobModal job={job} busy={false} close={()=>{}} mutate={mutate} canEdit={!readonly} canSchedule={!readonly} canArchive={false} canComplete={!readonly} canClock={!readonly} employeeId="lead" role="Master Admin" activeCrew={crew} activeTechs={[{employee_id:'lead',display_name:'Crystal Garcia'}]} canDeletePhotos />);

@@ -411,13 +411,14 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
   const lifecycleAct = (fn: () => Promise<unknown>, text: string, onSuccess?: () => void) => { setLifecycleError(null); act(fn, text, setLifecycleError, onSuccess); };
   const content = (
     <>
-    <div className="grid gap-2 text-left sm:grid-cols-[6rem_minmax(0,1.4fr)_minmax(10rem,1fr)] lg:grid-cols-[6rem_minmax(0,1.4fr)_minmax(10rem,1fr)_auto] md:items-start">
-      <div>
-        <p className="text-base font-extrabold text-[#143d1a]">{formatJobTime(job.start_time)}</p>
-        <p className="mt-1 text-[10px] font-medium tracking-wide text-neutral-500">{job.job_number}</p>
-      </div>
+    <div className="mb-2 flex items-center justify-between gap-2" data-testid="job-service-time-row">
+      <p className="text-base font-extrabold text-[#143d1a]">{formatJobTime(job.start_time)}</p>
+      {!["Completed", "Cancelled", "Archived"].includes(job.status) && <OnMyWayButton job={job} employeeId={employeeId} role={role} compact />}
+    </div>
+    <div className="grid gap-2 text-left sm:grid-cols-[minmax(0,1.4fr)_minmax(10rem,1fr)] lg:grid-cols-[minmax(0,1.4fr)_minmax(10rem,1fr)_auto] md:items-start">
       <div className="min-w-0">
         <h3 className="text-lg font-extrabold leading-tight text-[#143d1a]">{job.client_name || "Unnamed client"}</h3>
+        <p className="mt-1 text-[10px] font-medium tracking-wide text-neutral-500">{job.job_number}</p>
         <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
         <p className="mt-1 text-xs font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
       </div>
@@ -1317,7 +1318,7 @@ function money(v: number) {
   }).format(v);
 }
 function shortDuration(milliseconds: number) { const minutes = Math.max(0, Math.floor(milliseconds / 60_000)); return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`; }
-function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; employeeId: string | null; role: string | null }) {
+function OnMyWayButton({ job, employeeId, role, compact = false }: { job: JobWithRelations; employeeId: string | null; role: string | null; compact?: boolean }) {
   const { profile } = useAuth();
   const supported = ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(role ?? "");
   const management = ["Master Admin", "Administrator", "Manager"].includes(role ?? "");
@@ -1326,10 +1327,11 @@ function OnMyWayButton({ job, employeeId, role }: { job: JobWithRelations; emplo
   const firstName = management ? job.client?.first_name : job.client_first_name;
   const phone = clientPhone ? normalizeSmsPhoneNumber(clientPhone) : null;
   if (!supported || !profile) return null;
-  return <GpsOnMyWay key={`${job.id}:${profile.id}`} job={job} userId={profile.id} employeeId={employeeId} management={management} phone={phone} firstName={firstName}/>;
+  return <GpsOnMyWay key={`${job.id}:${profile.id}`} job={job} userId={profile.id} employeeId={employeeId} management={management} phone={phone} firstName={firstName} compact={compact}/>;
 }
 
-function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName }: { job: JobWithRelations; userId: string; employeeId: string | null; management: boolean; phone: string | null; firstName: string | null | undefined }) {
+function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName, compact = false }: { job: JobWithRelations; userId: string; employeeId: string | null; management: boolean; phone: string | null; firstName: string | null | undefined; compact?: boolean }) {
+  const [choosingVehicle, setChoosingVehicle] = useState(false);
   const [trip, setTrip] = useState<GpsMileageTrip | null>(null);
   const [vehicles, setVehicles] = useState<AuthorizedVehicle[]>([]);
   const [vehicleId, setVehicleId] = useState("");
@@ -1383,14 +1385,31 @@ No mess. No stress.`;
           catch { setError("Mileage tracking started, but the SMS composer could not be opened."); }
         }
       }
+      setChoosingVehicle(false);
     } catch (cause) { setError(message(cause, "GPS mileage could not be saved. Retry safely or use manual mileage later.")); }
     finally { setBusy(false); }
   }
+  if (compact) return <div className="relative shrink-0 text-right">
+    {completed ? <span className="text-xs font-bold text-[#143d1a]">Mileage saved</span> : <button type="button"
+      disabled={busy || !loaded || (!active && (!eligible || vehicles.length === 0))}
+      title={!active && !eligible ? "Requires a scheduled job and valid client phone number" : !active && !vehicles.length ? "No eligible active vehicle available" : undefined}
+      className="min-h-10 rounded-lg bg-[#143d1a] px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+      onClick={() => { if (!active && !vehicleId) { setChoosingVehicle(true); return; } void act(); }}>
+      {busy ? "Locating…" : active ? "ARRIVED" : "ON MY WAY"}
+    </button>}
+    {choosingVehicle && <div className="absolute right-0 top-full z-10 mt-1 w-60 max-w-[calc(100vw-2rem)] rounded-lg border border-[#143d1a]/20 bg-white p-3 text-left shadow-lg">
+      <label className="block text-xs font-bold">Mileage vehicle<select aria-label="Mileage vehicle" className={`${input} mt-1`} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}>
+        <option value="">Select active vehicle</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}
+      </select></label>
+      <div className="mt-2 flex flex-wrap gap-2"><button type="button" disabled={busy || !vehicleId} onClick={() => void act()} className={`${primary} text-xs`}>Confirm ON MY WAY</button><button type="button" disabled={busy} onClick={() => setChoosingVehicle(false)} className={secondary}>Close</button></div>
+    </div>}
+    {error && <p role="alert" className="mt-1 max-w-60 break-words text-xs text-red-700">{error}</p>}
+  </div>;
   return <div className="space-y-2">
-    <p className="text-sm font-bold text-[#143d1a]">{active ? "Mileage Tracking Active" : completed ? "GPS mileage saved" : "Automatic GPS mileage"}</p>
-    <p className="text-[11px] leading-snug text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>
+    {!compact && <p className="text-sm font-bold text-[#143d1a]">{active ? "Mileage Tracking Active" : completed ? "GPS mileage saved" : "Automatic GPS mileage"}</p>}
+    {!compact && <p className="text-[11px] leading-snug text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>}
     {!active && !completed && <>
-      {vehicles.length > 0 ? <label className="block text-xs">Vehicle<select className={input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">{management ? "Select active vehicle" : "Select assigned vehicle"}</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">{management ? "No active vehicle is available. Add or reactivate a vehicle before starting GPS mileage." : "No eligible active assigned vehicle. Contact management; manual mileage remains available separately."}</p>}
+      {vehicles.length > 0 ? <label className={compact ? "min-w-0 max-w-full text-xs" : "block text-xs"}>Vehicle<select aria-label="Mileage vehicle" className={compact ? `${input} max-w-48` : input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">{management ? "Select active vehicle" : "Select assigned vehicle"}</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">{management ? "No active vehicle is available. Add or reactivate a vehicle before starting GPS mileage." : "No eligible active assigned vehicle. Contact management; manual mileage remains available separately."}</p>}
       {!eligible && <p className="text-sm">On My Way requires an eligible scheduled Job and a valid client phone number.</p>}
     </>}
     {!completed && <button type="button" disabled={busy || !loaded || (!active && (!eligible || !vehicleId))} className={primary} onClick={() => void act()}>{busy ? "Saving / locating…" : active ? "ARRIVED" : "ON MY WAY"}</button>}
