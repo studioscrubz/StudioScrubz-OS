@@ -31,7 +31,10 @@ import type {
   ServiceCatalogBundle,
 } from "@/types/serviceCatalog";
 import { CatalogAddonPicker } from "@/components/serviceCatalog/CatalogAddonPicker";
-import type { EstimateResult, EstimateWithRelations, Frequency, ServiceWeekday } from "@/types/estimate";
+import type { EstimateResult, EstimateWithRelations, Frequency, ServiceWeekday, WeeklyMixedVisit } from "@/types/estimate";
+import { WeeklyMixedScopeCalculator, newWeeklyVisit } from "@/components/estimates/WeeklyMixedScopeCalculator";
+import { mixedVisitTotals } from "@/lib/pricing/weeklyMixedVisits";
+import { recoverWeeklyVisitsFromScope, withProposalWeeklyVisitPrices } from "@/lib/pricing/proposalWeeklyVisits";
 import { WeeklyServiceDaysField } from "@/components/forms/WeeklyServiceDaysField";
 import { validServiceWeekdays } from "@/lib/scheduling/frequency";
 import type { WalkthroughWithRelations } from "@/types/walkthrough";
@@ -115,6 +118,7 @@ export function ProposalBuilder({
     proposal?.frequency ?? "One-Time",
   );
   const [serviceDaysOfWeek, setServiceDaysOfWeek] = useState<ServiceWeekday[]>(proposal?.result.serviceDaysOfWeek ?? []);
+  const [weeklyMixedVisits, setWeeklyMixedVisits] = useState<WeeklyMixedVisit[] | null>(() => proposal?.result.weeklyMixedVisits ?? (proposal?.frequency === "Multiple Days Per Week" ? recoverWeeklyVisitsFromScope(proposal.result.scope, proposal.result.serviceDaysOfWeek ?? []) : null) ?? null);
   const [selectedRuleId, setSelectedRuleId] = useState(
     proposal?.result.recurringPricingRuleId ?? "",
   );
@@ -308,7 +312,8 @@ export function ProposalBuilder({
       : [];
   const selectedAddonSnapshots = proposalAddonSnapshots(adjustments, availableAddons);
   const weeklyMixedSource = Boolean(estimate?.result.weeklyMixedVisits?.length || walkthrough?.pricing_review?.estimateResult.weeklyMixedVisits?.length || proposal?.result.weeklyMixedVisits?.length);
-  const matchingRules = weeklyMixedSource ? [] : catalogService
+  const mixedWeeklyMode = frequency === "Multiple Days Per Week" && weeklyMixedVisits !== null;
+  const matchingRules = (weeklyMixedSource || mixedWeeklyMode) ? [] : catalogService
     ? matchingRecurringRules(frequency, rules, catalogService.id)
     : [];
   const effectiveRuleId =
@@ -366,19 +371,19 @@ export function ProposalBuilder({
   });
   const preserveStoredPrice = Boolean(
     proposal &&
+      !mixedWeeklyMode &&
       preserveStoredPriceBaseline &&
       manualPrice === null &&
       pricingFingerprint === initialPricingFingerprint &&
       Math.round(proposal.result.perVisitTotal * 100) ===
         Math.round(calculatedResult.perVisitTotal * 100),
   );
-  const result = preserveStoredPrice
-    ? withPreservedProposalPrice(
-        calculatedResult,
-        proposal!.result.perVisitTotal,
-        frequency,
-      )
-    : withAuthoritativeProposalPrice(calculatedResult, manualPrice, frequency);
+  const pricedResult = preserveStoredPrice
+    ? withPreservedProposalPrice(calculatedResult, proposal!.result.perVisitTotal, frequency)
+    : withAuthoritativeProposalPrice(calculatedResult, mixedWeeklyMode ? null : manualPrice, frequency);
+  const result = mixedWeeklyMode
+    ? withProposalWeeklyVisitPrices(pricedResult, weeklyMixedVisits, serviceDaysOfWeek)
+    : pricedResult;
   useEffect(() => {
     if (proposal || !sourceId) return;
     const selectedWalkthrough =
@@ -475,6 +480,9 @@ export function ProposalBuilder({
         approved?.frequency ?? selectedEstimate?.frequency ?? "One-Time",
       );
       setServiceDaysOfWeek(approved?.estimateResult.calculatorInput.serviceDaysOfWeek ?? selectedEstimate?.result.calculatorInput.serviceDaysOfWeek ?? []);
+      const incomingDays = approved?.estimateResult.calculatorInput.serviceDaysOfWeek ?? selectedEstimate?.result.calculatorInput.serviceDaysOfWeek ?? [];
+      const incomingVisits = approved?.estimateResult.weeklyMixedVisits ?? selectedEstimate?.result.weeklyMixedVisits ?? recoverWeeklyVisitsFromScope(unique.map((text,index) => ({id: `source-${index}`,text})), incomingDays);
+      setWeeklyMixedVisits(incomingVisits?.map(visit => ({ ...visit })) ?? null);
       setRequestedDate(
         selectedEstimate?.result.submission?.preferredServiceDate ?? "",
       );
@@ -494,8 +502,18 @@ export function ProposalBuilder({
       return setError("Select the recurring pricing rule for this Proposal.");
     if (frequency === "Multiple Days Per Week" && !validServiceWeekdays(serviceDaysOfWeek))
       return setError("Choose at least two distinct weekly service days before saving the proposal.");
-    if (weeklyMixedSource && (frequency !== "Multiple Days Per Week" || JSON.stringify([...(serviceDaysOfWeek??[])].sort()) !== JSON.stringify([...(sourceEstimate?.calculatorInput.serviceDaysOfWeek??proposal?.result.serviceDaysOfWeek??[])].sort()) || manualPrice !== null || discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.some(item=>!item.inherited)))
-      return setError("Mixed-scope weekly proposals must preserve the approved individual day prices. Edit weekday prices in the source Estimate; do not apply a uniform per-visit change or discount.");
+    if (weeklyMixedSource && !mixedWeeklyMode)
+      return setError("This source uses separate weekday prices. Keep the mixed-weekly pricing breakdown enabled.");
+    if (mixedWeeklyMode) {
+      if (manualPrice !== null || discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.length > 0)
+        return setError("Set all mixed-weekly prices per weekday. Clear uniform price overrides, discounts, and add-ons first.");
+      try {
+        const hourlyPay = (sourceEstimate?.calculatorInput as {workerHourlyPay?: number} | undefined)?.workerHourlyPay ?? 0;
+        mixedVisitTotals(weeklyMixedVisits, serviceDaysOfWeek, hourlyPay);
+      } catch (cause) {
+        return setError(cause instanceof Error ? cause.message : "Complete the separate weekday prices and scopes.");
+      }
+    }
     if (!proposal && walkthrough && !walkthrough.pricing_review)
       return setError(
         "Review and approve Walkthrough pricing before creating the Proposal.",
@@ -770,7 +788,7 @@ export function ProposalBuilder({
                 set={setAdditionalMaterials}
               />}
               <Num l="Manual Discount %" v={discount} set={setDiscount} />
-              <label>
+              {!mixedWeeklyMode ? <label>
                 <Label t="Manual / Custom Final Price" />
                 <span className="relative block">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-bold text-neutral-500">
@@ -805,7 +823,7 @@ export function ProposalBuilder({
                 >
                   Use Calculated Price
                 </button>
-              </label>
+              </label> : <p className="col-span-full rounded-lg bg-[#f6faf4] px-3 py-2 text-xs text-[#143d1a]">Separate weekday visit prices are authoritative. Weekly total: {new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(result.weeklyContractTotal ?? 0)}. No uniform per-visit price is applied.</p>}
               <Select
                 l="Frequency"
                 v={frequency}
@@ -823,7 +841,25 @@ export function ProposalBuilder({
                   ...(frequency === "Custom" ? ["Custom"] : []),
                 ]}
               />
-              {frequency === "Multiple Days Per Week" && <WeeklyServiceDaysField value={serviceDaysOfWeek} onChange={setServiceDaysOfWeek} />}
+              {frequency === "Multiple Days Per Week" && <WeeklyServiceDaysField value={serviceDaysOfWeek} onChange={days => {
+                setServiceDaysOfWeek(days);
+                setWeeklyMixedVisits(current => current === null ? null : days.map(day => current.find(visit => visit.day === day) ?? newWeeklyVisit(day)));
+              }} />}
+              {frequency === "Multiple Days Per Week" && <label className="col-span-full mt-2 flex items-center gap-2 rounded-lg border border-[#143d1a]/20 bg-[#f6faf4] px-3 py-2 text-sm font-bold text-[#143d1a]">
+                <input type="checkbox" checked={mixedWeeklyMode} disabled={weeklyMixedSource} onChange={event => {
+                  if (event.target.checked) {
+                    setWeeklyMixedVisits(serviceDaysOfWeek.map(day => weeklyMixedVisits?.find(visit => visit.day === day) ?? newWeeklyVisit(day)));
+                    setManualPrice(null);
+                    setPreserveStoredPriceBaseline(false);
+                    setDiscount(0);
+                    setAdditionalLabor(0);
+                    setAdditionalMaterials(0);
+                    setAdjustments([]);
+                  } else setWeeklyMixedVisits(null);
+                }}/>
+                Different service scope and price for each weekday
+              </label>}
+              {mixedWeeklyMode && <WeeklyMixedScopeCalculator days={serviceDaysOfWeek} visits={weeklyMixedVisits} onChange={setWeeklyMixedVisits} />}
               {matchingRules.length > 0 && (
                 <Select
                   l="Pricing Rule"
