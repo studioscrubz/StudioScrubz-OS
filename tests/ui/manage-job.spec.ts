@@ -72,3 +72,23 @@ test('read-only users keep summaries without scheduling or assignment inputs',as
  await expect(page.getByLabel('Worker Target')).toHaveCount(0);
  await expect(page.getByText('Assigned Team:',{exact:false}).locator('..')).toContainText('Kris Greer');
 });
+
+test('small ON MY WAY and ARRIVED buttons stay at the top right of service time',async({page},testInfo)=>{
+ await page.goto('/?card=1');
+ const start=page.getByRole('button',{name:'START JOB',exact:true});
+ const manage=page.getByRole('button',{name:'MANAGE JOB',exact:true});
+ const onMyWay=page.getByRole('button',{name:'ON MY WAY',exact:true});
+ await expect(start).toBeVisible();await expect(manage).toBeVisible();await expect(onMyWay).toBeVisible();
+ await onMyWay.click();await page.getByRole('combobox',{name:'Mileage vehicle',exact:true}).selectOption('vehicle');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByRole('button',{name:'Confirm ON MY WAY',exact:true}).click();
+ const arrived=page.getByRole('button',{name:'ARRIVED',exact:true});await expect(arrived).toBeEnabled();
+ await expect.poll(()=>page.evaluate(()=>window.fixture.calls.some(c=>c.name==='startGpsTrip'&&c.args[1]==='vehicle'))).toBe(true);
+ await page.screenshot({path:testInfo.outputPath('card-actions.png')});
+ await expect(page.getByTestId('job-service-time-row')).toContainText('10:00 PM');
+ expect(await arrived.evaluate(el=>el.closest('[data-testid="job-service-time-row"]')!==null)).toBe(true);
+ const box=await arrived.boundingBox();expect(box!.height).toBeLessThanOrEqual(44);
+ await arrived.click();await expect.poll(()=>page.evaluate(()=>window.fixture.calls.some(c=>c.name==='finishGpsTrip'))).toBe(true);
+ await manage.click();await expect.poll(()=>page.evaluate(()=>window.fixture.calls.some(c=>c.name==='openManageJob'))).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

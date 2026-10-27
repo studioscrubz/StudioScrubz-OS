@@ -9,7 +9,7 @@ import tailwind from '@tailwindcss/postcss';
 
 const realComponents = /\/(JobsPage|CompactJobSection|JobsiteGpsVerification|JobTimeSummary|JobCalendarStatus|JobMileageSummary|JobLaborSummary|PhotoUploader|PhotoCaptureQueue|PhotoGallery|PhotoViewerModal)$/;
 const plugin = { name: 'isolated-services', setup(bundler) {
-  bundler.onLoad({ filter: /[\\/]components[\\/]jobs[\\/]JobsPage\.tsx$/ }, async args => ({ contents: (await readFile(args.path,'utf8')).replace('function JobModal({','export function JobModal({'), loader:'tsx', resolveDir:resolve('components/jobs') }));
+  bundler.onLoad({ filter: /[\\/]components[\\/]jobs[\\/]JobsPage\.tsx$/ }, async args => ({ contents: (await readFile(args.path,'utf8')).replace('function JobModal({','export function JobModal({').replace('function JobCard({','export function JobCard({'), loader:'tsx', resolveDir:resolve('components/jobs') }));
   bundler.onResolve({ filter: /^@\/(lib\/services\/|components\/|lib\/geo\/currentPosition)/ }, async args => {
     if (realComponents.test(args.path)) return;
     const source=ts.createSourceFile(args.importer,await readFile(args.importer,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
@@ -18,7 +18,7 @@ const plugin = { name: 'isolated-services', setup(bundler) {
   });
   bundler.onLoad({ filter:/.*/,namespace:'fixture' },args=>{
     const {path,names}=JSON.parse(args.path);
-    return { contents:names.map(name=>`export const ${name} = ${path.startsWith('@/components/') ? name==='useAuth' ? '()=>({profile:{role:"Master Admin"},loading:false})' : name.startsWith('use') ? '()=>({})' : '()=>null' : name.endsWith('_EVENT') ? JSON.stringify(name) : `(...args)=>window.fixture.call(${JSON.stringify(name)},...args)`};`).join('\n'),loader:'js' };
+    return { contents:names.map(name=>`export const ${name} = ${path.startsWith('@/components/') ? name==='useAuth' ? '()=>({profile:{id:"user",role:"Master Admin"},loading:false})' : name.startsWith('use') ? '()=>({})' : '()=>null' : name.endsWith('_EVENT') ? JSON.stringify(name) : `(...args)=>window.fixture.call(${JSON.stringify(name)},...args)`};`).join('\n'),loader:'js' };
   });
 }};
 const result=await build({entryPoints:['tests/ui/manage-job-gallery.jsx'],bundle:true,write:false,jsx:'automatic',tsconfig:'tsconfig.json',plugins:[plugin],define:{'process.env.NODE_ENV':'"development"'}});
