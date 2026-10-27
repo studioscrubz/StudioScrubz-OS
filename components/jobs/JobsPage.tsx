@@ -513,7 +513,8 @@ function JobCardCompletedTime({ job, entries }: { job: JobWithRelations; entries
   return <div className="mt-3 rounded-lg bg-[#f6f8f5] p-2 text-xs text-neutral-700"><p className="font-extrabold text-[#143d1a]">COMPLETED</p><p className="mt-1">{job.operational_started_at ? `Started ${displayTime(job.operational_started_at)}` : "Start time unavailable"}</p><p>{job.operational_ended_at ? `Ended ${displayTime(job.operational_ended_at)}` : "End time unavailable"}</p><p className="mt-1">Actual {actualDuration} · Total labor {shortDuration(totalLabor * 3_600_000)}</p></div>;
 }
 function CompactJobSection({ title, subtitle, children, defaultOpen = false }: { title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean }) {
-  return <details className="group mt-3 rounded-lg border border-[#143d1a]/15 bg-white" >
+  const [expanded, setExpanded] = useState(defaultOpen);
+  return <details open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className="group mt-3 rounded-lg border border-[#143d1a]/15 bg-white">
     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-bold text-[#143d1a] marker:hidden [&::-webkit-details-marker]:hidden">
       <span className="min-w-0">{title}{subtitle && <span className="ml-2 text-[11px] font-normal text-neutral-500">{subtitle}</span>}</span>
       <span aria-hidden="true" className="shrink-0 text-neutral-500 group-open:rotate-180">⌄</span>
@@ -671,7 +672,7 @@ function JobModal({
         ))}
       </ul>
       </CompactJobSection>
-      {canSchedule && <CompactJobSection title="Edit schedule & assignment" subtitle={job.assigned_crew_name || job.assigned_employee_name || "Unassigned"}>}
+      {canSchedule && <CompactJobSection title="Edit schedule & assignment" subtitle={job.assigned_crew_name || job.assigned_employee_name || "Unassigned"}>
       {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-6 grid gap-3 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
         <Field label="Start Time" type="time" value={time} set={setTime} />
