@@ -48,3 +48,14 @@ export async function getPendingEquipmentSignouts(): Promise<PendingEquipmentSig
   if (error) throw new Error(error.message);
   return data ?? [];
 }
+
+export type PendingJobEquipmentHandoff = { handoff_id: string; reason: string; created_at: string };
+export async function getMyPendingJobEquipmentHandoffs(jobId: string): Promise<PendingJobEquipmentHandoff[]> {
+  const client = getSupabaseClient() as unknown as {
+    rpc: (name: "get_my_pending_job_equipment_handoffs", args: { p_job_id: string }) =>
+      Promise<{ data: PendingJobEquipmentHandoff[] | null; error: { message: string } | null }>;
+  };
+  const { data, error } = await client.rpc("get_my_pending_job_equipment_handoffs", { p_job_id: jobId });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
