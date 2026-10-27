@@ -1,5 +1,13 @@
 \set ON_ERROR_STOP on
 begin;
+do $$ begin
+  assert (select responsible_employee_id='00000000-0000-0000-0000-000000000001' from public.job_equipment_responsibility_tasks where job_id='00000000-0000-0000-0000-000000000004'),'Safe backfill';
+  assert (select count(*)=2 from public.job_equipment_responsibility_events where reason like 'RESOLUTION REQUIRED:%'),'Unsafe backfill flagged';
+  assert (select count(*)=3 from public.job_equipment_assignments where released_at is null and employee_id='00000000-0000-0000-0000-000000000002'),'Unsafe and historical assignments preserved';
+  assert (select status='Cancelled' and mileage_entry_id is null from public.job_mileage_trips where job_id='00000000-0000-0000-0000-000000000007'),'Existing stale GPS cleanup';
+  assert not has_function_privilege('authenticated','public.start_operational_job_before_equipment(uuid)','execute'),'Internal start is not an API';
+  assert not has_function_privilege('authenticated','private.reconcile_job_equipment_responsibility_task(uuid,uuid,uuid)','execute'),'Reconciliation is private';
+end $$;
 create function pg_temp.expect_error(sql text,pattern text) returns void language plpgsql as $$
 begin
   begin execute sql; exception when others then
@@ -42,13 +50,13 @@ begin
   select to_jsonb(t) into prior from public.job_mileage_trips t where id=trip;
   perform public.start_job_gps_trip(next_job,vehicle,'{"latitude":34,"longitude":-118,"accuracy":5}');
   update public.jobs set status='Cancelled' where id=next_job;
-  assert not exists(select 1 from public.job_mileage_trips where status='Active'),'Cancelled closes trip';
+  assert not exists(select 1 from public.job_mileage_trips where user_id=u and status='Active'),'Cancelled closes trip';
   update public.jobs set status='Archived' where id=job;
   assert (select to_jsonb(t)=prior from public.job_mileage_trips t where id=trip),'Cancelled history unchanged';
   update public.jobs set status='Crew Assigned' where id=next_job;
   perform public.start_job_gps_trip(next_job,vehicle,'{"latitude":34,"longitude":-118,"accuracy":5}');
   update public.jobs set archived_at=now() where id=next_job;
-  assert not exists(select 1 from public.job_mileage_trips where status='Active'),'Archive timestamp closes trip';
+  assert not exists(select 1 from public.job_mileage_trips where user_id=u and status='Active'),'Archive timestamp closes trip';
   insert into public.job_mileage_trips(job_id,user_id,status,ended_at,mileage_entry_id) values(job,u,'Completed',now(),gen_random_uuid()) returning id into done;
   select to_jsonb(t) into prior from public.job_mileage_trips t where id=done;
   update public.jobs set status='Completed' where id=job;

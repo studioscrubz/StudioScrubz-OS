@@ -46,11 +46,6 @@ begin
     raise exception 'Assigned Crew Lead required.' using errcode='42501';
   end if;
   perform private.reconcile_job_equipment_responsibility_task(p_job_id,j.assigned_crew_id,auth.uid());
-  if auth.uid() is null or not exists(select 1 from public.crews c where c.id=j.assigned_crew_id
-    and c.crew_lead_id=public.current_employee_id() and c.status='Active' and c.archived_at is null) then
-    raise exception 'Assigned Crew Lead required.' using errcode='42501';
-  end if;
-  perform private.reconcile_job_equipment_responsibility_task(p_job_id,j.assigned_crew_id,auth.uid());
   select * into task from public.job_equipment_responsibility_tasks where job_id=p_job_id for update;
   if not found or task.crew_id is distinct from j.assigned_crew_id or task.crew_lead_employee_id is null then
     raise exception 'An assigned crew with a Crew Lead is required.';
@@ -115,11 +110,6 @@ begin
   if not found or j.archived_at is not null or j.status in ('Completed','Cancelled','Archived') then
     raise exception 'Active job required.';
   end if;
-  if auth.uid() is null or not exists(select 1 from public.crews c where c.id=j.assigned_crew_id
-    and c.crew_lead_id=public.current_employee_id() and c.status='Active' and c.archived_at is null) then
-    raise exception 'Assigned Crew Lead required.' using errcode='42501';
-  end if;
-  perform private.reconcile_job_equipment_responsibility_task(p_job_id,j.assigned_crew_id,auth.uid());
   if auth.uid() is null or not exists(select 1 from public.crews c where c.id=j.assigned_crew_id
     and c.crew_lead_id=public.current_employee_id() and c.status='Active' and c.archived_at is null) then
     raise exception 'Assigned Crew Lead required.' using errcode='42501';
@@ -370,6 +360,9 @@ create trigger guard_lead_equipment_job_start before update of status on public.
 for each row execute function private.guard_lead_equipment_job_start();
 revoke all on function private.guard_lead_equipment_assignment(),private.guard_lead_equipment_job_start(),
   private.reconcile_job_equipment_responsibility_task(uuid,uuid,uuid) from public,anon,authenticated,service_role;
+-- Renamed implementation functions are internal; callers use the guarded public wrappers.
+revoke all on function public.start_operational_job_before_equipment(uuid),
+  public.start_operational_job_with_presence_before_equipment(uuid,jsonb) from public,anon,authenticated;
 
 -- Backfill only unfinished jobs. Unsafe custody remains intact and gets a durable resolution flag.
 do $$ declare j record; t public.job_equipment_responsibility_tasks;

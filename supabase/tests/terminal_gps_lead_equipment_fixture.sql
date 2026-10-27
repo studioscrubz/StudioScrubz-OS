@@ -35,6 +35,21 @@ create function private.require_job_start_gps(uuid) returns void language plpgsq
 create function public.start_operational_job_before_equipment(uuid) returns public.jobs_operational_safe language plpgsql as $$ declare j public.jobs_operational_safe; begin update public.jobs set status='In Progress' where id=$1 returning * into j; return j; end $$;
 create function public.start_operational_job_with_presence_before_equipment(uuid,jsonb) returns public.jobs_operational_safe language sql as $$ select public.start_operational_job_before_equipment($1) $$;
 
+-- Pre-policy records exercise the actual migration backfill, including unsafe custody.
+insert into public.employees(id) values('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');
+insert into public.crews(id,crew_lead_id) values('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001');
+insert into public.jobs(id,assigned_crew_id,status)
+select ('00000000-0000-0000-0000-00000000000'||n)::uuid,'00000000-0000-0000-0000-000000000003',case when n=7 then 'Completed' else 'Crew Assigned' end from generate_series(4,7) n;
+insert into public.job_equipment_responsibility_tasks(job_id,crew_id,crew_lead_employee_id,responsible_employee_id,status,assigned_at)
+select id,assigned_crew_id,'00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','Assigned',now() from public.jobs;
+insert into public.job_equipment_assignments(job_id,employee_id,assigned_by_user_id)
+select id,'00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000009' from public.jobs;
+insert into public.job_equipment_clearances(assignment_id,job_id,status,checkpoint)
+select id,job_id,'Pending','End Job' from public.job_equipment_assignments where job_id='00000000-0000-0000-0000-000000000005';
+insert into public.job_equipment_handoffs(job_id,from_employee_id,to_employee_id)
+values('00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001');
+insert into public.job_mileage_trips(job_id,status) values('00000000-0000-0000-0000-000000000007','Active');
+
 -- Existing trigger entrypoints call the replaced reconciler at execution time.
 create function private.sync_job_equipment_responsibility_task() returns trigger language plpgsql as $$ begin perform private.reconcile_job_equipment_responsibility_task(new.id,new.assigned_crew_id,auth.uid()); return new; end $$;
 create trigger sync_job_equipment_responsibility_task after insert or update of assigned_crew_id on public.jobs for each row execute function private.sync_job_equipment_responsibility_task();
