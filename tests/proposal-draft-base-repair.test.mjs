@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+const sql=readFileSync("supabase/migrations/20261027213500_restore_tina_proposal_service_base.sql","utf8");
+test("targeted draft-only repair protects completed/approved and previously delivered proposals",()=>{
+  assert.match(sql,/eb590b18-7152-4013-9434-e037fa5832e0/);
+  assert.match(sql,/quote\.status <> 'Draft'/);
+  assert.match(sql,/quote\.approval_status <> 'Changes Requested'/);
+  assert.match(sql,/quote\.approved_pricing_snapshot IS NOT NULL/);
+  assert.match(sql,/quote\.client_delivery_snapshot IS NOT NULL/);
+  assert.match(sql,/quote\.is_current_revision IS DISTINCT FROM false/);
+  assert.match(sql,/quote\.superseded_at IS NOT NULL/);
+  assert.match(sql,/quote\.result->>'baseEstimateAmount' <> '101\.27'/);
+  assert.match(sql,/quote\.result->>'perVisitTotal' <> '750'/);
+  assert.match(sql,/quote\.result->>'manualPerVisitTotal' <> '750'/);
+  assert.match(sql,/source_subtotal - source_addon_total IS DISTINCT FROM 370\.27/);
+  assert.match(sql,/sum\(\(a->>'amount'\)::numeric\)/);
+  assert.match(sql,/\{baseEstimateAmount\}.*370\.27/);
+  assert.match(sql,/\{calculatedPerVisitTotal\}.*630\.27/);
+  assert.match(sql,/Property Condition & Additional Labor Adjustment/);
+  assert.match(sql,/INSERT INTO public\.proposal_history/);
+  assert.doesNotMatch(sql,/UPDATE public\.estimates/);
+  assert.doesNotMatch(sql,/UPDATE public\.jobs/);
+  assert.doesNotMatch(sql,/UPDATE public\.agreements/);
+  assert.doesNotMatch(sql,/approved_pricing_snapshot\s*=/);
+});
