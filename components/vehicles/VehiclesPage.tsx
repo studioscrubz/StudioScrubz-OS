@@ -869,7 +869,7 @@ function MileageForm({
               <div className="grid gap-2 sm:grid-cols-2">
                 <Field l="Address" v={stop.address} set={(address) => updateStop(index, { address })} />
                 {index > 0 && <>
-                  <Assoc l="Job (optional)" v={stop.job_id} set={(id) => chooseStopJob(index, id)} rows={jobs.map((job) => [job.id, `${job.job_number} · ${job.client_name || job.property_name || "Client"} · ${job.status}`])} />
+                  <Assoc l="Job (optional)" v={stop.job_id} set={(id) => chooseStopJob(index, id)} rows={jobs.map((job) => [job.id, `${job.client_name || job.property_name || "Client"} · ${job.status} (${job.job_number})`])} />
                   <Assoc l="Property (optional)" v={stop.property_id} set={(id) => chooseStopProperty(index, id)} rows={properties.map((property) => [property.id, property.property_name || property.address])} />
                   <Field l="Label (optional)" v={stop.label ?? ""} set={(label) => updateStop(index, { label: label || null })} />
                   <label className="text-sm font-bold">
