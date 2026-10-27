@@ -83,16 +83,16 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
     finally { setBusy(false); }
   }
 
-  return <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4" aria-label="Job-site GPS verification">
+  return <section className="mt-2 rounded-lg border border-[#143d1a]/15 bg-[#f6f8f5] p-3" aria-label="Job-site GPS verification">
     <h3 className="font-extrabold text-[#143d1a]">Job-site GPS arrival</h3>
-    <p className="mt-1 text-xs text-neutral-600">GPS is requested only when you tap Verify. No background tracking, and your exact GPS coordinates are not saved in the arrival record—only the distance, accuracy, and time of each check. The assigned Crew Lead must verify arrival within the property's GPS radius before the job can be started. GPS verification does not itself start the job or change payroll.</p>
+    <details className="mt-1 text-xs text-neutral-600"><summary className="cursor-pointer font-medium">How GPS verification works</summary><p className="mt-1">GPS is requested only when you tap Verify. No background tracking; the arrival record stores distance, accuracy and time, not exact coordinates. The assigned Crew Lead must verify onsite arrival before starting. This does not start jobs or change payroll.</p></details>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     {!summary ? <p className="mt-3 text-sm text-neutral-600">Loading job-site verification…</p> : <>
       <p className="mt-3 text-sm font-semibold">
         {summary.configured ? `Location configured · ${summary.radiusMeters} m radius` : "Job-site reference not configured — Job Start blocked"}
       </p>
-      {!summary.configured && <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">Required before Start Job: register the property GPS reference at the site, then have the assigned Crew Lead verify arrival. Manager exceptions do not register the property GPS location.</p>}
+      {!summary.configured && <p role="alert" className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-950">Register property GPS onsite, then verify Crew Lead arrival before START JOB. A manager exception does not register GPS.</p>}
       {summary.lastCheck && <p className="mt-2 text-sm">Your last check: <strong>{summary.lastCheck.result}</strong> · {Math.round(summary.lastCheck.distanceMeters)} m from property reference · accuracy ±{Math.round(summary.lastCheck.accuracyMeters)} m</p>}
       {assigned && employeeId && summary.configured && <button type="button" disabled={busy} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50" onClick={() => void verify()}>
         {busy ? "Checking…" : "Verify my arrival using GPS"}
@@ -114,8 +114,8 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
           </button>
         </div>}
 
-        {management && assignedEmployees.length > 0 && <div className="mt-3 rounded-lg border bg-white p-3">
-          <p className="text-sm font-bold text-[#143d1a]">Manager exception (not GPS verified)</p>
+        {management && assignedEmployees.length > 0 && <details className="mt-2 rounded-lg border bg-white p-2">
+          <summary className="cursor-pointer text-xs font-semibold text-[#143d1a]">Manager exception (not GPS verified)</summary>
           <label className="mt-2 block text-xs font-bold">Assigned employee
             <select className="mt-1 block w-full rounded border px-3 py-2 text-sm" value={exceptionEmployee} onChange={e => setExceptionEmployee(e.target.value)}>
               <option value="">Choose employee</option>
@@ -126,7 +126,7 @@ export function JobsiteGpsVerification({ jobId, propertyId, employeeId, manageme
             <textarea className="mt-1 block w-full rounded border px-3 py-2 text-sm" maxLength={2000} rows={2} value={exceptionReason} onChange={e => setExceptionReason(e.target.value)} placeholder="Explain why GPS verification could not be completed…" />
           </label>
           <button type="button" disabled={busy || !exceptionEmployee || exceptionReason.trim().length < 15} className="mt-3 rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50" onClick={() => void exception()}>Record exception</button>
-        </div>}
+        </details>}
         {summary.employeeChecks.length > 0 && <div className="mt-3 text-xs text-neutral-600">Recorded employee checks: {summary.employeeChecks.length}</div>}
         {summary.exceptions.length > 0 && <div className="mt-1 text-xs text-neutral-600">Recorded exceptions: {summary.exceptions.length}</div>}
       </>}
