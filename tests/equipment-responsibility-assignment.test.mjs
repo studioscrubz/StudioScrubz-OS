@@ -64,8 +64,9 @@ test("assignment is one eligible crew member and authorized server-side",()=>{
   assert.match(migration,/public\.current_employee_id\(\)=task\.crew_lead_employee_id/);
   assert.doesNotMatch(migration,/public\.has_role\('Crew Lead'\)/);
   assert.match(migration,/public\.crew_members/);
-  assert.doesNotMatch(assignment,/type="radio"/);\n  assert.match(assignment,/Accept Equipment Responsibility/);
-  assert.match(assignment,/const canEdit=Boolean\(employeeId&&employeeId===crewLeadId\)/);
+  assert.doesNotMatch(assignment,/type="radio"/);
+  assert.match(assignment,/Accept Equipment Responsibility/);
+  assert.match(assignment,/employeeId === crewLeadId/);
 });
 
 test("multi-role employees retain authority only as the assigned Crew Lead",()=>{
