@@ -14,5 +14,5 @@ test("job start uses a server-side assigned lead GPS gate",()=>{
 test("equipment responsibility updates require assigned lead",()=>{
  assert.match(responsibility,/public\.current_employee_id\(\)=task\.crew_lead_employee_id/);
  assert.doesNotMatch(responsibility,/public\.has_role\('Master Admin'\)/);
- assert.match(panel,/if \(!canEdit\) return null/);
+ assert.match(panel,/if \(!isAssignedLead \|\| !crewLeadId\) return null/);
 });

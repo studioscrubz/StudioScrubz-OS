@@ -1,0 +1,57 @@
+\set ON_ERROR_STOP on
+create role anon nologin;
+create role authenticated nologin;
+create role service_role nologin;
+create schema private;
+create schema auth;
+create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+create table auth.users(id uuid primary key);
+create table public.employees(id uuid primary key,archived_at timestamptz,employment_status text default 'Active');
+create table public.user_profiles(id uuid primary key,employee_id uuid,role text);
+create function public.current_employee_id() returns uuid language sql as $$ select employee_id from public.user_profiles where id=auth.uid() $$;
+create function public.current_user_role() returns text language sql as $$ select role from public.user_profiles where id=auth.uid() $$;
+create function public.has_role(text) returns boolean language sql as $$ select coalesce(public.current_user_role()=$1,false) $$;
+create function public.has_any_role(text[]) returns boolean language sql as $$ select coalesce(public.current_user_role()=any($1),false) $$;
+create table public.crews(id uuid primary key,crew_lead_id uuid,status text default 'Active',archived_at timestamptz);
+create table public.crew_members(crew_id uuid,employee_id uuid);
+create table public.jobs(id uuid primary key,status text default 'Crew Assigned',assigned_crew_id uuid,assigned_employee_id uuid,archived_at timestamptz,equipment_responsibility_confirmed_at timestamptz,equipment_responsibility_confirmed_by uuid);
+create view public.jobs_operational_safe as select * from public.jobs;
+create table public.job_equipment_responsibility_tasks(id uuid primary key default gen_random_uuid(),job_id uuid unique,crew_id uuid,crew_lead_employee_id uuid,responsible_employee_id uuid,status text default 'Pending Assignment',revision integer default 1,assigned_at timestamptz,updated_at timestamptz default now(),check ((status='Pending Assignment' and responsible_employee_id is null and assigned_at is null) or (status<>'Pending Assignment' and responsible_employee_id is not null and assigned_at is not null)));
+create table public.job_equipment_assignments(id uuid primary key default gen_random_uuid(),job_id uuid,employee_id uuid,assigned_by_user_id uuid not null,assigned_at timestamptz default now(),released_at timestamptz,released_by_user_id uuid,release_reason text);
+create unique index one_active_equipment on public.job_equipment_assignments(job_id,employee_id) where released_at is null;
+create table public.job_equipment_assignment_audit(id uuid default gen_random_uuid(),assignment_id uuid,action text check(action in ('Assigned','Released','Reassigned','Master Admin Override')),actor_user_id uuid not null,details jsonb);
+create table public.job_equipment_responsibility_events(id uuid default gen_random_uuid(),task_id uuid,job_id uuid,revision integer,event_type text check(event_type in ('Pending','Assigned','Reassigned','Status Changed','Crew Removed')),crew_id uuid,crew_lead_employee_id uuid,responsible_employee_id uuid,actor_user_id uuid,reason text);
+create table public.job_equipment_clearances(id uuid default gen_random_uuid(),assignment_id uuid,job_id uuid,status text default 'Pending',checkpoint text);
+create table public.job_equipment_handoffs(id uuid default gen_random_uuid(),job_id uuid,from_employee_id uuid,to_employee_id uuid,actor_user_id uuid,reason text,acknowledged_at timestamptz);
+create table public.job_equipment_notifications(job_id uuid,employee_id uuid,event_type text,details jsonb);
+create table public.job_mileage_trips(id uuid primary key default gen_random_uuid(),job_id uuid,user_id uuid,employee_id uuid,vehicle_id uuid,status text default 'Active',started_at timestamptz default now(),ended_at timestamptz,updated_at timestamptz default now(),mileage_entry_id uuid,start_latitude float8,start_longitude float8,start_accuracy float8);
+create unique index one_active_trip on public.job_mileage_trips(user_id) where status='Active';
+create table public.vehicles(id uuid,status text default 'Active',archived_at timestamptz,assigned_employee_id uuid,assigned_crew_id uuid);
+create function public.can_access_job(uuid) returns boolean language sql as $$ select auth.uid() is not null $$;
+create function public.is_assigned_to_crew(uuid) returns boolean language sql as $$ select exists(select 1 from public.crews where id=$1 and crew_lead_id=public.current_employee_id()) $$;
+create function public.validate_job_gps_position(jsonb) returns void language plpgsql as $$ begin if $1->>'latitude' is null then raise exception 'GPS required'; end if; end $$;
+create function public.initiate_job_on_my_way(uuid) returns jsonb language sql as $$ select '{"initiated":true}'::jsonb $$;
+create function private.require_job_start_gps(uuid) returns void language plpgsql as $$ begin if current_setting('test.gps',true) is distinct from 'verified' then raise exception 'GPS required'; end if; end $$;
+create function public.start_operational_job_before_equipment(uuid) returns public.jobs_operational_safe language plpgsql as $$ declare j public.jobs_operational_safe; begin update public.jobs set status='In Progress' where id=$1 returning * into j; return j; end $$;
+create function public.start_operational_job_with_presence_before_equipment(uuid,jsonb) returns public.jobs_operational_safe language sql as $$ select public.start_operational_job_before_equipment($1) $$;
+
+-- Pre-policy records exercise the actual migration backfill, including unsafe custody.
+insert into public.employees(id) values('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');
+insert into public.crews(id,crew_lead_id) values('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001');
+insert into public.jobs(id,assigned_crew_id,status)
+select ('00000000-0000-0000-0000-00000000000'||n)::uuid,'00000000-0000-0000-0000-000000000003',case when n=7 then 'Completed' else 'Crew Assigned' end from generate_series(4,7) n;
+insert into public.job_equipment_responsibility_tasks(job_id,crew_id,crew_lead_employee_id,responsible_employee_id,status,assigned_at)
+select id,assigned_crew_id,'00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','Assigned',now() from public.jobs;
+insert into public.job_equipment_assignments(job_id,employee_id,assigned_by_user_id)
+select id,'00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000009' from public.jobs;
+insert into public.job_equipment_clearances(assignment_id,job_id,status,checkpoint)
+select id,job_id,'Pending','End Job' from public.job_equipment_assignments where job_id='00000000-0000-0000-0000-000000000005';
+insert into public.job_equipment_handoffs(job_id,from_employee_id,to_employee_id)
+values('00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001');
+insert into public.job_mileage_trips(job_id,status) values('00000000-0000-0000-0000-000000000007','Active');
+
+-- Existing trigger entrypoints call the replaced reconciler at execution time.
+create function private.sync_job_equipment_responsibility_task() returns trigger language plpgsql as $$ begin perform private.reconcile_job_equipment_responsibility_task(new.id,new.assigned_crew_id,auth.uid()); return new; end $$;
+create trigger sync_job_equipment_responsibility_task after insert or update of assigned_crew_id on public.jobs for each row execute function private.sync_job_equipment_responsibility_task();
+create function private.sync_crew_equipment_responsibility_tasks() returns trigger language plpgsql as $$ declare j record; begin for j in select id,assigned_crew_id from public.jobs where assigned_crew_id=new.id loop perform private.reconcile_job_equipment_responsibility_task(j.id,j.assigned_crew_id,auth.uid()); end loop; return new; end $$;
+create trigger sync_crew_equipment_responsibility_tasks after update of crew_lead_id,status,archived_at on public.crews for each row execute function private.sync_crew_equipment_responsibility_tasks();
