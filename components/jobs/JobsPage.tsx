@@ -732,7 +732,7 @@ function JobModal({
           </button>
         </section>
       )}
-      {canSchedule && </CompactJobSection>}
+      </CompactJobSection>}
       <CompactJobSection title="Assigned team & notes" subtitle={job.assigned_crew_name || job.assigned_employee_name || "Unassigned"}>
       <Details
         title="Assigned Worker"
