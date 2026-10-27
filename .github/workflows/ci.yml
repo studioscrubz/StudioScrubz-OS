@@ -8,6 +8,23 @@ permissions:
   contents: read
 
 jobs:
+  job-finished-photo-postgres:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Build isolated schema-only Job completion database
+        run: |
+          sudo -u postgres createdb studioscrubz_finished_photo_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_finished_photo_test -f supabase/tests/job_finished_photo_completion_fixture.sql
+      - name: Verify external migration rollback
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_finished_photo_test -f supabase/tests/job_finished_photo_completion_rollback.sql
+      - name: Apply actual finished-photo migration
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_finished_photo_test -f supabase/migrations/20261027003242_require_finished_job_photo_before_completion.sql
+      - name: Verify completion, authorization, and team clock-out
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_finished_photo_test -f supabase/tests/job_finished_photo_completion_postgres.sql
+
   workforce-time-off-postgres:
     runs-on: ubuntu-24.04
     steps:

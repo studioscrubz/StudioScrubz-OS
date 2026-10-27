@@ -439,7 +439,8 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} min-w-32`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} min-w-32`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
       {lifecycleError && <p role="alert" className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{lifecycleError}</p>}
-      {canCardComplete && <button type="button" disabled={busy} onClick={() => act(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} min-w-32`}>END JOB</button>}
+      {canCardComplete && <button type="button" disabled={busy} onClick={() => lifecycleAct(() => completeInProgressJob(job.id), "Job ended by supervisor.")} className={`${primary} min-w-32`}>END JOB</button>}
+      {lifecycleError === "Upload finished-job photos before ending this job." && <button type="button" onClick={open} className={secondary}>UPLOAD FINISHED PHOTOS</button>}
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
       {job.assigned_crew_id && employeeId===activeCrewLeadId && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
@@ -555,6 +556,7 @@ function JobModal({
   const [clock, setClock] = useState<Awaited<ReturnType<typeof getCurrentJobClockState>> | null>(null);
   const [clockError, setClockError] = useState<string | null>(null);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [hasFinishedPhoto, setHasFinishedPhoto] = useState<boolean | null>(null);
   const [showPresence, setShowPresence] = useState(false);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
   const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
@@ -740,7 +742,9 @@ function JobModal({
           ],
         ]}
       />
-      <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" />
+      <div id="finished-job-photos">
+        <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosChanged={(photos) => setHasFinishedPhoto(photos.some((photo) => photo.category === "After"))} />
+      </div>
       <JobsiteGpsVerification
         jobId={job.id}
         propertyId={job.property_id}
@@ -787,7 +791,9 @@ function JobModal({
           {lifecycleError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{lifecycleError}</p>}
           {job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Crew members currently on Job: {clock.activeWorkerCount}</p>}
           {job.status === "In Progress" && canSupervisorComplete && clock && clock.activeWorkerCount > 0 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">END JOB will stop payroll for all {clock.activeWorkerCount} joined crew {clock.activeWorkerCount === 1 ? "member" : "members"} at the same time.</p>}
-          {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.", undefined, close)} className={`${primary} mt-3`}>END JOB</button>}
+          {job.status === "In Progress" && canSupervisorComplete && hasFinishedPhoto === false && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">Upload finished-job photos before ending this job. <a className="underline" href="#finished-job-photos">Open the photo uploader.</a></p>}
+          {job.status === "In Progress" && canSupervisorComplete && hasFinishedPhoto === null && <p role="status" className="mt-3 text-sm text-neutral-600">Checking finished-job photos…</p>}
+          {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy || hasFinishedPhoto !== true} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.", undefined, close)} className={`${primary} mt-3`}>END JOB</button>}
         </section>
       )}
       <div className="mt-6 flex flex-wrap gap-2">

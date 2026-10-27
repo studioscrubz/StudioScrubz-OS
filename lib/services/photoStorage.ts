@@ -110,8 +110,9 @@ function assertSavedRecordId(recordId: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-
 function jobFolder(category: OperationalPhotoCategory) { return category === "Before" ? "before" : category === "After" ? "after" : category === "Damage / Issue" ? "damage" : "other"; }
 
 export function defaultOperationalPhotoCustomerVisibility(recordType: OperationalPhotoRecordType, category: OperationalPhotoCategory) {
+  void category;
   if (recordType === "walkthroughs") return true;
-  return category !== "Other";
+  return false;
 }
 
 export async function prepareOperationalPhoto(file: File): Promise<File> {
