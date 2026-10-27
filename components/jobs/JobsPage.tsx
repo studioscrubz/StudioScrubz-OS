@@ -1,6 +1,6 @@
 "use client";
 import { normalizeSmsPhoneNumber, openDeviceSmsApp } from "@/lib/deviceSms";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete, canViewOwnJobFeedback, hasPermission } from "@/lib/auth/permissions";
@@ -512,6 +512,15 @@ function JobCardCompletedTime({ job, entries }: { job: JobWithRelations; entries
   const actualDuration = job.operational_started_at && job.operational_ended_at ? shortDuration(Date.parse(job.operational_ended_at) - Date.parse(job.operational_started_at)) : "—";
   return <div className="mt-3 rounded-lg bg-[#f6f8f5] p-2 text-xs text-neutral-700"><p className="font-extrabold text-[#143d1a]">COMPLETED</p><p className="mt-1">{job.operational_started_at ? `Started ${displayTime(job.operational_started_at)}` : "Start time unavailable"}</p><p>{job.operational_ended_at ? `Ended ${displayTime(job.operational_ended_at)}` : "End time unavailable"}</p><p className="mt-1">Actual {actualDuration} · Total labor {shortDuration(totalLabor * 3_600_000)}</p></div>;
 }
+function CompactJobSection({ title, subtitle, children, defaultOpen = false }: { title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean }) {
+  return <details className="group mt-3 rounded-lg border border-[#143d1a]/15 bg-white" >
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-bold text-[#143d1a] marker:hidden [&::-webkit-details-marker]:hidden">
+      <span className="min-w-0">{title}{subtitle && <span className="ml-2 text-[11px] font-normal text-neutral-500">{subtitle}</span>}</span>
+      <span aria-hidden="true" className="shrink-0 text-neutral-500 group-open:rotate-180">⌄</span>
+    </summary>
+    <div className="border-t border-[#143d1a]/10 px-3 pb-3 pt-1">{children}</div>
+  </details>;
+}
 function JobModal({
   job,
   busy,
@@ -631,7 +640,7 @@ function JobModal({
         ))}
       </div>
       {tab === "Overview" ? <>
-      <div className="grid gap-5 sm:grid-cols-2">
+      <CompactJobSection title="Service, property & scope"><div className="grid gap-5 sm:grid-cols-2">
         <Details
           title="Relationships"
           rows={[
@@ -661,6 +670,8 @@ function JobModal({
           <li key={x.id}>{x.text}</li>
         ))}
       </ul>
+      </CompactJobSection>
+      {canSchedule && <CompactJobSection title="Edit schedule & assignment" subtitle={job.assigned_crew_name || job.assigned_employee_name || "Unassigned"}>}
       {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-6 grid gap-3 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
         <Field label="Start Time" type="time" value={time} set={setTime} />
@@ -720,6 +731,8 @@ function JobModal({
           </button>
         </section>
       )}
+      {canSchedule && </CompactJobSection>}
+      <CompactJobSection title="Assigned team & notes" subtitle={job.assigned_crew_name || job.assigned_employee_name || "Unassigned"}>
       <Details
         title="Assigned Worker"
         rows={[
@@ -743,9 +756,13 @@ function JobModal({
           ],
         ]}
       />
+      </CompactJobSection>
+      <CompactJobSection title="Finished photos" subtitle="Required before END JOB" defaultOpen={job.status === "In Progress"}>
       <div id="finished-job-photos">
         <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosChanged={(photos) => setHasFinishedPhoto(photos.some((photo) => photo.category === "After"))} />
       </div>
+      </CompactJobSection>
+      <CompactJobSection title="Job-site GPS" subtitle="Required before START JOB">
       <JobsiteGpsVerification
         jobId={job.id}
         propertyId={job.property_id}
@@ -765,9 +782,12 @@ function JobModal({
           ] : []),
         ])).map(id => ({ id, name: activeTechs.find(e => e.employee_id === id)?.display_name ?? id }))}
       />
+      </CompactJobSection>
+      <CompactJobSection title="Mileage, time & calendar">
       <JobMileageSummary jobId={job.id} />
       <JobTimeSummary job={job} />
       <JobCalendarStatus jobId={job.id} />
+      </CompactJobSection>
       {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-6"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
