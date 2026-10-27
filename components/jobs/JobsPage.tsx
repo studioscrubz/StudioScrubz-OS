@@ -673,7 +673,7 @@ function JobModal({
       </ul>
       </CompactJobSection>
       {canSchedule && <CompactJobSection title="Edit schedule & assignment" subtitle={job.assigned_crew_name || job.assigned_employee_name || "Unassigned"}>
-      {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-6 grid gap-3 sm:grid-cols-3">
+      {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-2 grid gap-2 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
         <Field label="Start Time" type="time" value={time} set={setTime} />
         <Field
@@ -701,7 +701,7 @@ function JobModal({
       {canSchedule && (job.status === "Ready to Schedule" ||
         job.status === "Scheduled" ||
         job.status === "Crew Assigned") && (
-        <section className="mt-6">
+        <section className="mt-3">
           <label className="text-sm font-bold">
             Worker Target
             <select
@@ -760,7 +760,7 @@ function JobModal({
       </CompactJobSection>
       <CompactJobSection title="Finished photos" subtitle="Required before END JOB" defaultOpen={job.status === "In Progress"}>
       <div id="finished-job-photos">
-        <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosChanged={(photos) => setHasFinishedPhoto(photos.some((photo) => photo.category === "After"))} />
+        <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" compact featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosChanged={(photos) => setHasFinishedPhoto(photos.some((photo) => photo.category === "After"))} />
       </div>
       </CompactJobSection>
       <CompactJobSection title="Job-site GPS" subtitle="Required before START JOB">
