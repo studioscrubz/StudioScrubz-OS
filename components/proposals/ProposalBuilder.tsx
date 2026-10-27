@@ -132,6 +132,7 @@ export function ProposalBuilder({
   const [manualPrice, setManualPrice] = useState<number | null>(
     proposal?.result.manualPerVisitTotal ?? null,
   );
+  const [adjustmentLabel, setAdjustmentLabel] = useState(proposal?.result.finalPriceAdjustmentLabel ?? "");
   const [preserveStoredPriceBaseline, setPreserveStoredPriceBaseline] =
     useState(Boolean(proposal && proposal.result.manualPerVisitTotal == null));
   const [additionalLabor, setAdditionalLabor] = useState(
@@ -381,9 +382,10 @@ export function ProposalBuilder({
   const pricedResult = preserveStoredPrice
     ? withPreservedProposalPrice(calculatedResult, proposal!.result.perVisitTotal, frequency)
     : withAuthoritativeProposalPrice(calculatedResult, mixedWeeklyMode ? null : manualPrice, frequency);
-  const result = mixedWeeklyMode
-    ? withProposalWeeklyVisitPrices(pricedResult, weeklyMixedVisits, serviceDaysOfWeek)
-    : pricedResult;
+  const result = {
+    ...(mixedWeeklyMode ? withProposalWeeklyVisitPrices(pricedResult, weeklyMixedVisits, serviceDaysOfWeek) : pricedResult),
+    finalPriceAdjustmentLabel: adjustmentLabel.trim() || null,
+  };
   useEffect(() => {
     if (proposal || !sourceId) return;
     const selectedWalkthrough =
@@ -824,6 +826,11 @@ export function ProposalBuilder({
                   Use Calculated Price
                 </button>
               </label> : <p className="col-span-full rounded-lg bg-[#f6faf4] px-3 py-2 text-xs text-[#143d1a]">Separate weekday visit prices are authoritative. Weekly total: {new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(result.weeklyContractTotal ?? 0)}. No uniform per-visit price is applied.</p>}
+              {!mixedWeeklyMode && (manualPrice !== null || Boolean(proposal?.result.finalPriceAdjustmentLabel)) && <label className="col-span-full">
+                <Label t="Final Price Adjustment Label (customer-facing)" />
+                <input type="text" maxLength={90} value={adjustmentLabel} onChange={event => setAdjustmentLabel(event.target.value)} placeholder="Final Price Adjustment" className={input} />
+                <p className="mt-1 text-xs text-neutral-500">For example: Property Condition &amp; Additional Labor Adjustment. Leave blank to use the standard label.</p>
+              </label>}
               <Select
                 l="Frequency"
                 v={frequency}
@@ -1154,7 +1161,7 @@ function Summary({
           ...(r.taxes > 0 ? [["Taxes", money(r.taxes)]] : []),
           ...(r.manualPerVisitTotal != null
             ? [[
-                "Manual Final Price Adjustment",
+                r.finalPriceAdjustmentLabel?.trim() || "Manual Final Price Adjustment",
                 money(r.perVisitTotal - (r.calculatedPerVisitTotal ?? r.perVisitTotal)),
               ]]
             : []),
