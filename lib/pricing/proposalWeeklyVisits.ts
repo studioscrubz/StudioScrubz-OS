@@ -72,7 +72,7 @@ export function withProposalWeeklyVisitPrices(
       if (!matchingVisit || !/\$[\d,]+(?:\.\d{1,2})?\s*per\s*visit/i.test(item.text)) return item;
       return {
         ...item,
-        text: `${DAY_NAMES[matchingVisit.day]} — ${matchingVisit.serviceLevel.trim()}, ${matchingVisit.hours} hours, ${cents(matchingVisit.price).toFixed(2)} per visit. Scope: ${matchingVisit.scope.trim()}`,
+        text: `${DAY_NAMES[matchingVisit.day]} — ${matchingVisit.serviceLevel.trim()}, ${matchingVisit.hours} hours, $${cents(matchingVisit.price).toFixed(2)} per visit. Scope: ${matchingVisit.scope.trim()}`,
       };
     }),
   };
