@@ -33,6 +33,18 @@ test("approval enforcement and delivery guards stay in place for reviewed and se
   assert.match(migration, /current_setting\('studioscrubz\.proposal_review_rpc',true\)/);
 });
 
+test("estimate edit and delivery triggers also avoid revoked private helper calls", () => {
+  assert.match(migration, /CREATE OR REPLACE FUNCTION private\\.guard_estimate_approval\\(\\)/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION private\\.require_approved_estimate_delivery\\(\\)/);
+  assert.doesNotMatch(migration, /private\\.estimate_approval_snapshot\\(new\\)/);
+  assert.doesNotMatch(migration, /private\\.estimate_approval_snapshot\\(old\\)/);
+  assert.match(migration, /Pricing and scope cannot change during an approval decision/);
+  assert.match(migration, /Use the estimate approval workflow to change approval fields/);
+  assert.match(migration, /Estimate requires approval of its current pricing before customer delivery/);
+  assert.match(migration, /'customer_first_name',new\\.customer_first_name/);
+  assert.match(migration, /'customer_email',old\\.customer_email/);
+});
+
 test("Proposal Builder shows safe plain-object PostgREST error details", () => {
   assert.match(builder, /x instanceof Error \? x\.message/);
   assert.match(builder, /"message" in x && typeof x\.message === "string"/);
