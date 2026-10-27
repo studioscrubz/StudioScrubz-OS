@@ -646,9 +646,15 @@ function JobModal({
         ))}
       </div>
       {tab === "Overview" ? <div className="min-w-0 space-y-2 [overflow-wrap:anywhere]">
-      <CompactJobSection title="Service & property" subtitle={[job.service_name, job.property_name].filter(Boolean).join(" · ")}><div className="grid gap-5 sm:grid-cols-2">
+      <section
+        aria-label="Service and property details"
+        data-testid="manage-job-service-property"
+        className="min-w-0 rounded-lg border border-[#143d1a]/15 bg-white p-3"
+      >
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
         <Details
-          title="Relationships"
+          title="Property"
+          testId="manage-job-property-details"
           rows={[
             ["Client", job.client_name || "—"],
             ["Property", job.property_name || "—"],
@@ -659,6 +665,7 @@ function JobModal({
         />
         <Details
           title="Service"
+          testId="manage-job-service-details"
           rows={[
             ["Service", job.service_name || "—"],
             ["Frequency", job.frequency],
@@ -669,14 +676,16 @@ function JobModal({
           ]}
         />
       </div>
-      {((job.contracted_addons??job.pricing_snapshot?.addons)?.length??0)>0?<><h3 className="mt-6 font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-2 list-disc pl-5 text-sm">{(job.contracted_addons??job.pricing_snapshot!.addons).map((item)=><li key={item.id}>{item.pricingType==="Per Unit"?`${item.label} — ${item.quantity} ${item.unitName}${item.quantity===1?"":"s"}`:item.label}</li>)}</ul></>:(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-6 font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-2 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
-      <h3 className="mt-6 font-extrabold text-[#143d1a]">Operational Scope / Instructions</h3>
-      <ul className="mt-2 list-disc pl-5 text-sm">
-        {job.scope.map((x) => (
-          <li key={x.id}>{x.text}</li>
-        ))}
-      </ul>
-      </CompactJobSection>
+      {((job.contracted_addons??job.pricing_snapshot?.addons)?.length??0)>0?<><h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-1.5 list-disc pl-5 text-sm">{(job.contracted_addons??job.pricing_snapshot!.addons).map((item)=><li key={item.id}>{item.pricingType==="Per Unit"?`${item.label} — ${item.quantity} ${item.unitName}${item.quantity===1?"":"s"}`:item.label}</li>)}</ul></>:(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-1.5 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
+      {job.scope.length > 0 && <>
+        <h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Operational Scope / Instructions</h3>
+        <ul className="mt-1.5 list-disc pl-5 text-sm">
+          {job.scope.map((x) => (
+            <li key={x.id}>{x.text}</li>
+          ))}
+        </ul>
+      </>}
+      </section>
       <CompactJobSection title="Schedule" subtitle={scheduleSummary} actionLabel={canSchedule ? "Edit Schedule" : "Details"}>
       {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-2 grid gap-2 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
@@ -1215,12 +1224,12 @@ function Modal({
     </div>
   );
 }
-function Details({ title, rows }: { title: string; rows: string[][] }) {
+function Details({ title, rows, testId }: { title: string; rows: string[][]; testId: string }) {
   return (
-    <section className="mt-5">
-      <h3 className="font-extrabold text-[#143d1a]">{title}</h3>
+    <section data-testid={testId} className="min-w-0 rounded-md bg-[#f6f8f5] p-2.5">
+      <h3 className="text-sm font-extrabold text-[#143d1a]">{title}</h3>
       {rows.filter(([, value]) => value && value !== "—").map(([a, b]) => (
-        <div key={a} className="mt-2 flex justify-between gap-4 text-sm">
+        <div key={a} className="mt-1.5 flex justify-between gap-3 text-sm">
           <span className="text-neutral-500">{a}</span>
           <b className="min-w-0 break-words text-right [overflow-wrap:anywhere]">{b}</b>
         </div>

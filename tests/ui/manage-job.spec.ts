@@ -1,19 +1,32 @@
 import { test, expect } from '@playwright/test';
 declare global { interface Window { fixture: { calls: Array<{name:string;args:unknown[]}> } } }
 
-test('all sections toggle, preserve edits, and expose existing save handlers without overflow',async({page},testInfo)=>{
+test('service and property stay visible while other sections toggle without overflow',async({page},testInfo)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');
  await expect(page.locator('summary').filter({hasText:'Schedule'})).toContainText('Oct 27');
  await expect(page.locator('summary').filter({hasText:'Assigned Crew'})).toContainText('Crystal Garcia (Lead)');
  await expect(page.getByRole('button',{name:'ON MY WAY',exact:true,includeHidden:true})).toHaveCount(1);
  await expect(page.getByRole('button',{name:'START JOB',exact:true})).toBeVisible();
+ const property=page.getByTestId('manage-job-property-details');
+ const service=page.getByTestId('manage-job-service-details');
+ await expect(property).toBeVisible();await expect(property).toContainText('Manage Job test client');await expect(property).toContainText('Test property');
+ await expect(service).toBeVisible();await expect(service).toContainText('Cleaning');await expect(service).toContainText('One Time');await expect(service).toContainText('Commercial');
+ await expect(page.getByTestId('manage-job-service-property')).toContainText('Clean customer-facing areas');
+ expect(await property.evaluate(el=>el.closest('details'))).toBeNull();expect(await service.evaluate(el=>el.closest('details'))).toBeNull();
+ await expect(page.locator('summary').filter({hasText:'Service & property'})).toHaveCount(0);
+ const propertyBox=await property.boundingBox(),serviceBox=await service.boundingBox();
+ expect(propertyBox).not.toBeNull();expect(serviceBox).not.toBeNull();
+ if(page.viewportSize()!.width>=640){expect(Math.abs(propertyBox!.y-serviceBox!.y)).toBeLessThanOrEqual(2);expect(serviceBox!.x).toBeGreaterThan(propertyBox!.x);}
+ else{expect(serviceBox!.y).toBeGreaterThan(propertyBox!.y);expect(Math.abs(propertyBox!.x-serviceBox!.x)).toBeLessThanOrEqual(2);}
  await page.screenshot({path:testInfo.outputPath('overview.png')});
- for(const title of ['Service & property','Schedule','Assigned Crew','Job Notes','Finished Photos','Job-site GPS','Mileage','Job Time','Google Calendar']){
+ for(const title of ['Schedule','Assigned Crew','Job Notes','Finished Photos','Job-site GPS','Mileage','Job Time','Google Calendar']){
    const summary=page.locator('summary').filter({hasText:title}).first();
+   await expect(summary.locator('..')).not.toHaveAttribute('open');
    await summary.click();await expect(summary.locator('..')).toHaveAttribute('open','');
    await summary.click();await expect(summary.locator('..')).not.toHaveAttribute('open');
  }
+ await expect(property).toBeVisible();await expect(service).toBeVisible();
  const notes=page.locator('summary').filter({hasText:'Job Notes'});await notes.focus();await notes.press('Enter');await expect(notes.locator('..')).toHaveAttribute('open','');await notes.press('Space');await expect(notes.locator('..')).not.toHaveAttribute('open');
  const schedule=page.locator('summary').filter({hasText:'Schedule'}).first();await schedule.click();
  await page.getByLabel('Scheduled Date').fill('2026-11-02');
