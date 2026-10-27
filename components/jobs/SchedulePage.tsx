@@ -809,8 +809,8 @@ function JobCard({ job, open }: { job: JobWithRelations; open: () => void }) {
           {job.division}
         </span>
       </div>
-      <p className="mt-1 text-sm font-extrabold leading-tight text-[#143d1a]">{job.client_name || "Unnamed client"}</p>
-      <p className="text-[10px] font-medium text-neutral-500">{job.job_number}</p>
+      <p className="mt-1 text-xs font-extrabold">{job.job_number}</p>
+      <p className="text-xs">{job.client_name}</p>
       <p className="truncate text-[11px] text-neutral-500">
         {job.property_name}
       </p>
@@ -836,9 +836,10 @@ function Unscheduled({
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {jobs.map((j) => (
           <article key={j.id} className="rounded-xl bg-neutral-50 p-4">
-            <p className="font-extrabold text-[#143d1a]">{j.client_name || "Unnamed client"}</p>
-            <p className="text-[10px] text-neutral-500">{j.job_number}</p>
-            <p className="text-sm">{j.service_name}</p>
+            <b>{j.job_number}</b>
+            <p className="text-sm">
+              {j.client_name} | {j.service_name}
+            </p>
             <button className={`${primary} mt-3`} onClick={() => schedule(j)}>
               Schedule Job
             </button>
@@ -1117,7 +1118,7 @@ function ConflictWarning({
       </p>
       {rows.map((j) => (
         <div key={j.id} className="mt-3 text-sm">
-          <b className="text-[#143d1a]">{j.client_name || "Unnamed client"}</b> <span className="text-xs text-neutral-500">{j.job_number}</span> | {j.property_name}
+          <b>{j.job_number}</b> | {j.client_name} | {j.property_name}
           <br />
           {formatTime(j.start_time)} for {j.estimated_duration ?? 0} hours
         </div>
@@ -1170,8 +1171,7 @@ function QuickDetail({
     }
   }
   return (
-    <Modal title={job.client_name || "Unnamed client"} close={close}>
-      <p className="mb-3 text-xs text-neutral-500">{job.job_number}</p>
+    <Modal title={job.job_number} close={close}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Details
           rows={[

@@ -8,6 +8,19 @@ permissions:
   contents: read
 
 jobs:
+  terminal-gps-lead-equipment-postgres:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Verify actual migration and lifecycle regression cases
+        run: |
+          sudo -u postgres createdb studioscrubz_terminal_equipment_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_terminal_equipment_test -f supabase/tests/terminal_gps_lead_equipment_fixture.sql
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_terminal_equipment_test -f supabase/migrations/20261027090000_terminal_gps_and_crew_lead_equipment_custody.sql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_terminal_equipment_test -f supabase/tests/terminal_gps_lead_equipment_postgres.sql
+
   job-finished-photo-postgres:
     runs-on: ubuntu-24.04
     steps:

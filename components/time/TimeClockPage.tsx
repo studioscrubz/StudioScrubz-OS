@@ -461,7 +461,7 @@ function EntryForm({
           set={job}
           rows={jobs.map((x) => [
             x.id,
-            `${x.client_name || "Client"} · ${x.property_name || "Property"} — ${x.status} (${x.job_number})`,
+            `${x.job_number} · ${x.client_name || "Client"} / ${x.property_name || "Property"} — ${x.status}`,
           ])}
         />
         <Assoc

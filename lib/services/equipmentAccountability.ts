@@ -4,7 +4,7 @@ import { withImmediateAttentionPush } from "@/lib/push/client";
 type EquipmentAssignmentRow = {
   employee_id: string;
   assigned_at: string;
-  assigned_by_user_id: string;
+  assigned_by_user_id: string | null;
 };
 type EquipmentRpc = {
   rpc: (

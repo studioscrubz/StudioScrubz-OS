@@ -18,7 +18,7 @@ type Props = {
   disabled?: boolean;
 };
 
-export function EquipmentAssignmentControl({ jobId, crewLeadId, employeeId, disabled = false }: Props) {
+export function EquipmentAssignmentControl({ jobId, crewLeadId, employeeId, techs, disabled = false }: Props) {
   // Access is based on Manage Crews lead assignment, independent of account role.
   const isAssignedLead = Boolean(employeeId && crewLeadId && employeeId === crewLeadId);
   const [responsibleId, setResponsibleId] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export function EquipmentAssignmentControl({ jobId, crewLeadId, employeeId, disa
       <h3 className="text-sm font-extrabold text-[#143d1a]">Equipment &amp; Supplies Responsibility</h3>
       <span className="rounded-full border border-[#d4af37]/50 bg-amber-50 px-2 py-0.5 text-xs font-bold text-[#71570c]">{status}</span>
     </div>
-    <p className="mt-1 text-xs text-neutral-700">Responsible: <strong>Assigned Crew Lead (you)</strong></p>
+    <p className="mt-1 text-xs text-neutral-700">Responsible: <strong>{techs.find(tech => tech.employee_id === crewLeadId)?.display_name || "Assigned Crew Lead"} (you)</strong></p>
     {loading ? <p className="mt-2 text-xs">Loading…</p> : <div className="mt-2 flex flex-wrap gap-2">
       {!assignedToLead && !disabled && <button type="button" disabled={saving} className="rounded-lg bg-[#143d1a] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50" onClick={() => void assignToLead()}>{saving ? "Saving…" : "Accept Equipment Responsibility"}</button>}
       {assignedToLead && !disabled && <button type="button" disabled={saving || confirmed} className="rounded-lg border border-[#143d1a] px-3 py-1.5 text-xs font-bold text-[#143d1a] disabled:opacity-50" onClick={() => void confirm()}>{confirmed ? "Responsibility Confirmed" : saving ? "Confirming…" : "Confirm Responsibility"}</button>}
