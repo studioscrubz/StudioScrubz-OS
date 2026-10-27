@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getMileageForJob, MILEAGE_CHANGED_EVENT } from "@/lib/services/mileage";
 import { vehicleLabel } from "@/types/vehicle";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getGpsMileageForJob } from "@/lib/services/gpsMileage";
 import { GPS_DISTANCE_NOTICE, type GpsMileageSummary } from "@/types/gpsMileage";
 
-export function JobMileageSummary({ jobId }: { jobId: string }) {
+import { CompactJobSection } from "@/components/jobs/CompactJobSection";
+
+export function JobMileageSummary({ jobId, compact = false, children }: { jobId: string; compact?: boolean; children?: ReactNode }) {
   const { profile, loading } = useAuth();
   const role = profile?.role;
   const [rows, setRows] = useState<Array<GpsMileageSummary & { note?: string | null }>>([]);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   useEffect(() => {
     if (loading || !role) return;
@@ -23,6 +26,7 @@ export function JobMileageSummary({ jobId }: { jobId: string }) {
         : getGpsMileageForJob(jobId).then(entries => entries.map(row => ({ ...row, note: GPS_DISTANCE_NOTICE })));
       void query.then((nextRows) => {
         if (disposed || request !== revision) return;
+        setLoaded(true);
         setRows(nextRows);
         setError(false);
       }).catch((cause) => {
@@ -40,7 +44,8 @@ export function JobMileageSummary({ jobId }: { jobId: string }) {
   }, [jobId, role, loading]);
   const active = rows;
   const total = active.reduce((sum, row) => sum + row.miles, 0);
-  return <section className="mt-6"><h3 className="font-extrabold text-[#143d1a]">Mileage</h3>{error ? <p className="mt-2 text-sm text-red-700">Job mileage could not be loaded.</p> : active.length ? <><div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr>{["Vehicle", "Driver / Crew", "Date", "Miles", "Purpose", "Potential Deduction"].map((label) => <th key={label} className="p-2 text-left">{label}</th>)}</tr></thead><tbody>{active.map((row) => <tr key={row.id} className="border-t"><td className="p-2">{row.vehicle_label}</td><td className="p-2">{row.employee_name}</td><td className="p-2">{row.trip_date}</td><td className="p-2">{row.miles.toFixed(1)}</td><td className="p-2">{row.trip_purpose}{row.note === GPS_DISTANCE_NOTICE && <p className="text-xs text-neutral-500">{GPS_DISTANCE_NOTICE}</p>}</td><td className="p-2">{money(row.deductible_amount)}</td></tr>)}</tbody></table></div><p className="mt-2 font-bold">Job Mileage Total: {total.toFixed(1)} miles</p></> : <p className="mt-2 text-sm text-neutral-500">No mileage is linked to this job.</p>}</section>;
+  const content = <section className={compact ? "min-w-0" : "mt-6"}>{!compact && <h3 className="font-extrabold text-[#143d1a]">Mileage</h3>}{error ? <p className="mt-2 text-sm text-red-700">Job mileage could not be loaded.</p> : active.length ? <><div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr>{["Vehicle", "Driver / Crew", "Date", "Miles", "Purpose", "Potential Deduction"].map((label) => <th key={label} className="p-2 text-left">{label}</th>)}</tr></thead><tbody>{active.map((row) => <tr key={row.id} className="border-t"><td className="p-2">{row.vehicle_label}</td><td className="p-2">{row.employee_name}</td><td className="p-2">{row.trip_date}</td><td className="p-2">{row.miles.toFixed(1)}</td><td className="p-2">{row.trip_purpose}{row.note === GPS_DISTANCE_NOTICE && <p className="text-xs text-neutral-500">{GPS_DISTANCE_NOTICE}</p>}</td><td className="p-2">{money(row.deductible_amount)}</td></tr>)}</tbody></table></div><p className="mt-2 font-bold">Job Mileage Total: {total.toFixed(1)} miles</p></> : <p className="mt-2 text-sm text-neutral-500">No mileage is linked to this job.</p>}{children && <div className="mt-3">{children}</div>}</section>;
+  return compact ? <CompactJobSection title="Mileage" subtitle={error ? "Mileage unavailable" : !loaded ? "Loading mileage…" : active.length ? total.toFixed(1) + " miles · " + active.length + " records" : "No mileage recorded"}>{content}</CompactJobSection> : content;
 }
 
 function money(value: number) {

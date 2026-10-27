@@ -37,7 +37,8 @@ test("a completion transition trigger closes alternate status-write bypasses", (
 
 test("UI blocks until persisted photos load and reacts to successful upload or deletion", () => {
   assert.match(jobsPage, /hasFinishedPhoto !== true/);
-  assert.match(jobsPage, /onPhotosChanged=\{\(photos\) => setHasFinishedPhoto\(photos\.some\(\(photo\) => photo\.category === "After"\)\)\}/);
+  assert.match(jobsPage, /setHasFinishedPhoto\(photos\.some\(\(photo\) => photo\.category === "After"\)\)/);
+  assert.match(jobsPage, /setFinishedPhotoCount\(photos\.filter\(photo => photo\.category === "After"\)\.length\)/);
   assert.match(jobsPage, /Upload finished-job photos before ending this job\./);
   assert.match(jobsPage, /href="#finished-job-photos"/);
   assert.match(uploader, /onPhotosChangedRef\.current\?\.\(items\)/);

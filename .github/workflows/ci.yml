@@ -8,6 +8,21 @@ permissions:
   contents: read
 
 jobs:
+  manage-job-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check changed UI components
+        run: npx eslint components/jobs/JobsPage.tsx components/jobs/CompactJobSection.tsx components/jobs/JobsiteGpsVerification.tsx components/jobs/JobTimeSummary.tsx components/jobs/JobCalendarStatus.tsx components/vehicles/JobMileageSummary.tsx components/photos/PhotoUploader.tsx lib/jobs/manageJobSummary.ts lib/hooks/useDisplayTime.ts
+      - run: node --test tests/manage-job-summary.test.mjs tests/job-start-crew-lead-gps-contract.test.mjs
+      - run: npm run test:manage-job-ui
+
   terminal-gps-lead-equipment-postgres:
     runs-on: ubuntu-24.04
     steps:

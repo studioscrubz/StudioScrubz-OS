@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { getTimeEntriesForJob } from "@/lib/services/timeEntries";
 import { employeeName } from "@/types/employee";
 import type { JobWithRelations } from "@/types/job";
 import type { TimeEntryWithRelations } from "@/types/timeEntry";
 
-export function JobTimeSummary({ job }: { job: JobWithRelations }) {
+import { CompactJobSection } from "@/components/jobs/CompactJobSection";
+
+export function JobTimeSummary({ job, compact = false, children }: { job: JobWithRelations; compact?: boolean; children?: ReactNode }) {
   const [entries, setEntries] = useState<TimeEntryWithRelations[]>([]);
   const [error, setError] = useState<string | null>(null);
   const now = useCurrentTime(job.status === "In Progress" || entries.some(isOpen));
@@ -46,11 +48,11 @@ export function JobTimeSummary({ job }: { job: JobWithRelations }) {
       : "—";
   const totalLaborHours = completed.reduce((sum, entry) => sum + Number(entry.total_hours || 0), 0);
 
-  return (
-    <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-white p-4">
+  const content = (
+    <section className={compact ? "min-w-0" : "mt-6 rounded-xl border border-[#143d1a]/20 bg-white p-4"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-extrabold text-[#143d1a]">Job Time</h3>
+          {!compact && <h3 className="font-extrabold text-[#143d1a]">Job Time</h3>}
           <p className="mt-1 text-xs text-neutral-500">Operational duration and individual labor time are tracked separately.</p>
         </div>
         {open.length > 0 && <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-extrabold text-green-800">ACTIVE · {open.length} {open.length === 1 ? "TECH" : "TECHS"}</span>}
@@ -66,8 +68,10 @@ export function JobTimeSummary({ job }: { job: JobWithRelations }) {
         {completed.length > 0 && <><h4 className="mt-5 font-bold text-[#143d1a]">Crew Time</h4><div className="mt-2 grid gap-2">{completed.map((entry) => <CrewRow key={entry.id} entry={entry} now={now ?? Date.parse(entry.clock_in)} />)}</div></>}
         {!ordered.length && <p className="mt-4 text-sm text-neutral-500">No Job time has been recorded.</p>}
       </>}
+      {children}
     </section>
   );
+  return compact ? <CompactJobSection title="Job Time" subtitle={error ? "Time unavailable" : startedAt ? (job.status === "In Progress" ? "Running · " : "Duration · ") + jobDuration : "Not Started"}>{content}</CompactJobSection> : content;
 }
 
 function CrewRow({ entry, now, active = false }: { entry: TimeEntryWithRelations; now: number; active?: boolean }) {

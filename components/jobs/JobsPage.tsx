@@ -51,6 +51,8 @@ import { useOperationalRealtime } from "@/components/realtime/OperationalRealtim
 import { DirectJobModal } from "@/components/jobs/DirectJobModal";
 import { ContractServiceRecordAction } from "@/components/jobs/ContractServiceRecord";
 import { JobTimeSummary } from "@/components/jobs/JobTimeSummary";
+import { CompactJobSection } from "@/components/jobs/CompactJobSection";
+import { employeeName } from "@/types/employee";
 import { JobCalendarStatus } from "@/components/jobs/JobCalendarStatus";
 import { getTimeEntries } from "@/lib/services/timeEntries";
 import {
@@ -434,7 +436,6 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {job.status === "Completed" && <JobCardCompletedTime job={job} entries={timeEntries} />}
     </div>
     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#143d1a]/15 pt-2">
-      <OnMyWayButton job={job} employeeId={employeeId} role={role} />
       {job.assigned_crew_id && employeeId === activeCrewLeadId && eligibility.showStart && <JobCardGpsRegistration jobId={job.id} onRegistered={open} />}
       {eligibility.showStart && <button type="button" disabled={busy} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job."); }} className={`${primary} min-w-32`}>START JOB</button>}
       {eligibility.canJoin && <button type="button" disabled={busy || Boolean(currentEntry)} onClick={() => lifecycleAct(() => joinJob(job.id), "You joined the Job.")} className={`${currentEntry ? joined : primary} min-w-32`}>{currentEntry ? "ALREADY JOINED" : "JOIN JOB"}</button>}
@@ -556,6 +557,9 @@ function JobModal({
   const [clock, setClock] = useState<Awaited<ReturnType<typeof getCurrentJobClockState>> | null>(null);
   const [clockError, setClockError] = useState<string | null>(null);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [finishedPhotoCount, setFinishedPhotoCount] = useState<number | null>(null);
+  const [photoLoadError, setPhotoLoadError] = useState(false);
+  const [photosExpanded, setPhotosExpanded] = useState(false);
   const [hasFinishedPhoto, setHasFinishedPhoto] = useState<boolean | null>(null);
   const [showPresence, setShowPresence] = useState(false);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
@@ -617,6 +621,16 @@ function JobModal({
       await assignJobWorker(job.id,target,requestTimeOffOverrideReason(cause));
     }
   }
+  const assignedCrew = crews.find(crew => crew.id === job.assigned_crew_id) ?? activeCrew;
+  const assignedLeadName = assignedCrew?.crew_lead ? employeeName(assignedCrew.crew_lead) : job.crew_lead_name;
+  const assignmentSummary = job.assigned_crew_id
+    ? [assignedCrew?.crew_name || job.assigned_crew_name || "Assigned crew", assignedLeadName ? assignedLeadName + " (Lead)" : "Lead not assigned"].join(" · ")
+    : job.assigned_employee_name || "Unassigned";
+  const assignedTeam = assignedCrew
+    ? Array.from(new Set([assignedLeadName ? assignedLeadName + " (Lead)" : "", ...assignedCrew.members.filter(member => member.employee_id !== assignedCrew.crew_lead_id).map(member => employeeName(member.employee))].filter(Boolean))).join(" · ")
+    : job.assigned_team.join(" · ") || job.assigned_employee_name || "Unassigned";
+  const notes = [["Access instructions", job.access_instructions], ["Internal notes", job.internal_notes]].filter((row): row is [string, string] => Boolean(row[1]?.trim()));
+  const scheduleSummary = [job.scheduled_date ? new Date(job.scheduled_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Not scheduled", job.start_time ? new Date("2000-01-01T" + job.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "", job.estimated_duration ? job.estimated_duration + (job.estimated_duration === 1 ? " hour" : " hours") : ""].filter(Boolean).join(" · ");
   const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
   const canSupervisorComplete = canComplete;
   const showLifecycle = ["Scheduled", "Crew Assigned", "In Progress"].includes(job.status)
@@ -624,14 +638,14 @@ function JobModal({
   const lifecycleAct = (fn: () => Promise<unknown>, text: string, onSuccess?: () => void) => { setLifecycleError(null); mutate(fn, text, setLifecycleError, onSuccess); };
   return (
     <Modal title={job.client_name || "Unnamed client"} close={close}>
-      <p className="-mt-3 mb-3 text-xs font-medium tracking-wide text-neutral-500">{job.job_number}</p>
-      <div className="mb-5 flex gap-2 border-b border-neutral-200" role="tablist" aria-label="Job details">
+      <p className="-mt-3 mb-3 text-xs font-medium tracking-wide text-neutral-500">{job.job_number} · {job.status}</p>
+      <div className="mb-3 flex min-w-0 gap-1 overflow-x-auto border-b border-neutral-200" role="tablist" aria-label="Job details">
         {(["Overview", "Scope", "Discoveries", "Changes", "Timeline"] as const).map((item) => (
-          <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={`border-b-2 px-3 py-2 text-sm font-bold ${tab === item ? "border-[#9a7a17] text-[#143d1a]" : "border-transparent text-neutral-500"}`}>{item}</button>
+          <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={`shrink-0 border-b-2 px-2 py-2 text-sm font-bold ${tab === item ? "border-[#9a7a17] text-[#143d1a]" : "border-transparent text-neutral-500"}`}>{item}</button>
         ))}
       </div>
-      {tab === "Overview" ? <>
-      <div className="grid gap-5 sm:grid-cols-2">
+      {tab === "Overview" ? <div className="min-w-0 space-y-2 [overflow-wrap:anywhere]">
+      <CompactJobSection title="Service & property" subtitle={[job.service_name, job.property_name].filter(Boolean).join(" · ")}><div className="grid gap-5 sm:grid-cols-2">
         <Details
           title="Relationships"
           rows={[
@@ -661,7 +675,9 @@ function JobModal({
           <li key={x.id}>{x.text}</li>
         ))}
       </ul>
-      {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-6 grid gap-3 sm:grid-cols-3">
+      </CompactJobSection>
+      <CompactJobSection title="Schedule" subtitle={scheduleSummary} actionLabel={canSchedule ? "Edit Schedule" : "Details"}>
+      {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-2 grid gap-2 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
         <Field label="Start Time" type="time" value={time} set={setTime} />
         <Field
@@ -686,10 +702,14 @@ function JobModal({
           Save Schedule
         </button>
       </section>}
+      {(!canSchedule || ["Completed", "Cancelled", "Archived"].includes(job.status)) && <p className="text-sm">{scheduleSummary}</p>}
+      </CompactJobSection>
+      <CompactJobSection title={job.assigned_crew_id ? "Assigned Crew" : "Worker Assignment"} subtitle={assignmentSummary} actionLabel={canSchedule ? "Edit Assignment" : "Details"}>
+      <p className="mb-2 text-xs text-neutral-600"><strong>Assigned Team:</strong> {assignedTeam}</p>
       {canSchedule && (job.status === "Ready to Schedule" ||
         job.status === "Scheduled" ||
         job.status === "Crew Assigned") && (
-        <section className="mt-6">
+        <section className="mt-3">
           <label className="text-sm font-bold">
             Worker Target
             <select
@@ -700,7 +720,7 @@ function JobModal({
               <option value="unassigned">Unassigned</option><option value="individual">Individual Tech</option><option value="crew">Crew</option>
             </select>
           </label>
-          {assignmentKind==="individual"&&<label className="mt-3 block text-sm font-bold">Individual Tech<select className={`${input} mt-2`} value={employeeIdTarget} onChange={e=>setEmployeeIdTarget(e.target.value)}><option value="">Select active Tech</option>{techs.map(t=><option key={t.employee_id} value={t.employee_id}>{t.display_name} — {t.operational_role}</option>)}</select></label>}
+          {assignmentKind==="individual"&&<label className="mt-3 block text-sm font-bold">Individual Tech<select className={`${input} mt-2`} aria-label="Individual Tech" value={employeeIdTarget} onChange={e=>setEmployeeIdTarget(e.target.value)}><option value="">Select active Tech</option>{techs.map(t=><option key={t.employee_id} value={t.employee_id}>{t.display_name} — {t.operational_role}</option>)}</select></label>}
           {assignmentKind==="crew"&&<label className="mt-3 block text-sm font-bold">Crew<select className={`${input} mt-2`} value={crewId} onChange={e=>setCrewId(e.target.value)}><option value="">Select active Crew</option>{crews.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.crew_name}
@@ -720,34 +740,22 @@ function JobModal({
           </button>
         </section>
       )}
-      <Details
-        title="Assigned Worker"
-        rows={[
-          ["Individual Tech", job.assigned_employee_name || "—"],
-          ["Assigned Crew", job.assigned_crew_name || "—"],
-          ["Crew Lead", job.crew_lead_name || "—"],
-          ["Assigned Team", job.assigned_team.join(", ") || "—"],
-        ]}
-      />
-      <Details
-        title="Job Notes"
-        rows={[
-          ["Access", job.access_instructions || "—"],
-          ["Internal Notes", job.internal_notes || "—"],
-          ["Status", job.status],
-          [
-            "Completed",
-            job.completed_at
-              ? new Date(job.completed_at).toLocaleString()
-              : "—",
-          ],
-        ]}
-      />
+      </CompactJobSection>
+      <CompactJobSection title="Job Notes" subtitle={notes.length ? notes.length + (notes.length === 1 ? " note" : " notes") : "No notes"}>
+        {notes.length ? <dl className="space-y-2 text-sm">{notes.map(([label, value]) => <div key={label}><dt className="text-xs text-neutral-500">{label}</dt><dd className="whitespace-pre-wrap break-words">{value}</dd></div>)}</dl> : <p className="text-sm text-neutral-500">No job notes.</p>}
+        {job.completed_at && <p className="mt-2 text-xs text-neutral-600">Completed {new Date(job.completed_at).toLocaleString()}</p>}
+      </CompactJobSection>
+      <div>
+      <CompactJobSection title="Finished Photos" subtitle={photoLoadError ? "Photos unavailable · Required" : finishedPhotoCount === null ? "Loading photos… · Required" : finishedPhotoCount + " uploaded · " + (finishedPhotoCount ? "Requirement met" : "Required")} open={photosExpanded} onOpenChange={setPhotosExpanded}>
       <div id="finished-job-photos">
-        <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosChanged={(photos) => setHasFinishedPhoto(photos.some((photo) => photo.category === "After"))} />
+        <PhotoUploader recordType="jobs" recordId={job.id} categories={jobPhotoCategories} canDelete={canDeletePhotos} title="Finished Photos & Job Documentation" compact featuredCategory="After" featuredTitle="Finished Photos" cameraLabel="Take Finished Photo" libraryLabel="Upload Finished Photos" uploadLabel="Save Finished / Job Photos" onPhotosLoadError={() => setPhotoLoadError(true)} onPhotosChanged={(photos) => { setHasFinishedPhoto(photos.some((photo) => photo.category === "After")); setFinishedPhotoCount(photos.filter(photo => photo.category === "After").length); setPhotoLoadError(false); }} />
+      </div>
+      </CompactJobSection>
+      {job.status === "In Progress" && hasFinishedPhoto !== true && <button type="button" onClick={() => setPhotosExpanded(true)} className="mt-2 min-h-11 w-full rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-950">{photoLoadError ? "Open Photos — check required finished photos" : "Add Finished Photos — required before END JOB"}</button>}
       </div>
       <JobsiteGpsVerification
         jobId={job.id}
+        crewLeadId={activeCrewLeadId}
         propertyId={job.property_id}
         employeeId={employeeId}
         management={["Master Admin", "Administrator", "Manager"].includes(role ?? "")}
@@ -765,15 +773,15 @@ function JobModal({
           ] : []),
         ])).map(id => ({ id, name: activeTechs.find(e => e.employee_id === id)?.display_name ?? id }))}
       />
-      <JobMileageSummary jobId={job.id} />
-      <JobTimeSummary job={job} />
+      <JobMileageSummary jobId={job.id} compact><OnMyWayButton job={job} employeeId={employeeId} role={role} /></JobMileageSummary>
+      <JobTimeSummary job={job} compact>
+        {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
+      </JobTimeSummary>
       <JobCalendarStatus jobId={job.id} />
-      {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-6"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
-      {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-6"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
-      {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
-      <OnMyWayButton job={job} employeeId={employeeId} role={role} />
+      {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-2"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-2"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {showLifecycle && (
-        <section className="mt-6 rounded-xl border border-[#143d1a]/20 bg-[#f6f8f5] p-4">
+        <section className="mt-2 rounded-lg border border-[#143d1a]/20 bg-[#f6f8f5] p-3">
           <h3 className="font-extrabold text-[#143d1a]">Job Lifecycle</h3>
           {clockError && <p role="alert" className="mt-2 text-sm font-bold text-red-700">{clockError}</p>}
           {eligibility.showStart && <button disabled={busy} className={`${primary} mt-3`} onClick={() => { if (job.assigned_crew_id) { setLifecycleError(null); setShowPresence(true); return; } lifecycleAct(async () => { const startedJob = await startOperationalJob(job.id); await joinJob(job.id); return { communicationEvent: "team_arrived" as const, job: startedJob }; }, "Job started. You were automatically joined to the Job.", close); }}>START JOB</button>}
@@ -792,7 +800,7 @@ function JobModal({
           {lifecycleError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{lifecycleError}</p>}
           {job.status === "In Progress" && clock && <p className="mt-2 text-xs text-neutral-500">Crew members currently on Job: {clock.activeWorkerCount}</p>}
           {job.status === "In Progress" && canSupervisorComplete && clock && clock.activeWorkerCount > 0 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-800">END JOB will stop payroll for all {clock.activeWorkerCount} joined crew {clock.activeWorkerCount === 1 ? "member" : "members"} at the same time.</p>}
-          {job.status === "In Progress" && canSupervisorComplete && hasFinishedPhoto === false && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">Upload finished-job photos before ending this job. <a className="underline" href="#finished-job-photos">Open the photo uploader.</a></p>}
+          {job.status === "In Progress" && canSupervisorComplete && hasFinishedPhoto === false && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">Upload finished-job photos before ending this job. <a className="underline" href="#finished-job-photos" onClick={() => setPhotosExpanded(true)}>Open the photo uploader.</a></p>}
           {job.status === "In Progress" && canSupervisorComplete && hasFinishedPhoto === null && <p role="status" className="mt-3 text-sm text-neutral-600">Checking finished-job photos…</p>}
           {job.status === "In Progress" && canSupervisorComplete && <button disabled={busy || hasFinishedPhoto !== true} onClick={() => mutate(() => completeInProgressJob(job.id), "Job ended. Payroll stopped for everyone joined, who remain Active on the platform.", undefined, close)} className={`${primary} mt-3`}>END JOB</button>}
         </section>
@@ -876,7 +884,7 @@ function JobModal({
   );
 }}
       />}
-      </> : tab === "Scope" ? <JobScopePanel jobId={job.id} recordDiscovery={(question) => { setDiscoveryPrefill(question); setTab("Discoveries"); }} /> : tab === "Discoveries" ? <JobDiscoveriesPanel jobId={job.id} role={role} prefillDescription={discoveryPrefill} clearPrefill={() => setDiscoveryPrefill(null)} createChange={(discovery) => { setChangePrefill(discovery); setTab("Changes"); }} /> : tab === "Changes" ? <JobChangesPanel jobId={job.id} role={role} prefill={changePrefill} clearPrefill={() => setChangePrefill(null)} /> : <JobTimelinePanel jobId={job.id} role={role} />}
+      </div> : tab === "Scope" ? <JobScopePanel jobId={job.id} recordDiscovery={(question) => { setDiscoveryPrefill(question); setTab("Discoveries"); }} /> : tab === "Discoveries" ? <JobDiscoveriesPanel jobId={job.id} role={role} prefillDescription={discoveryPrefill} clearPrefill={() => setDiscoveryPrefill(null)} createChange={(discovery) => { setChangePrefill(discovery); setTab("Changes"); }} /> : tab === "Changes" ? <JobChangesPanel jobId={job.id} role={role} prefill={changePrefill} clearPrefill={() => setChangePrefill(null)} /> : <JobTimelinePanel jobId={job.id} role={role} />}
     </Modal>
   );
 }
@@ -1195,12 +1203,12 @@ function Modal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-[#07190a]/70 p-5">
-      <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6">
-        <button onClick={close} className="float-right text-xl">
+    <div className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-[#07190a]/70 p-2 sm:p-5">
+      <section role="dialog" aria-modal="true" aria-label={title} className="max-h-[94dvh] w-full min-w-0 max-w-4xl overflow-y-auto rounded-xl bg-white p-3 sm:p-5">
+        <button aria-label="Close job details" onClick={close} className="float-right min-h-11 min-w-11 text-xl">
           ×
         </button>
-        <h2 className="mb-6 text-xl font-extrabold text-[#143d1a]">{title}</h2>
+        <h2 className="mb-4 break-words pr-12 text-lg font-extrabold text-[#143d1a]">{title}</h2>
         {children}
       </section>
     </div>
@@ -1210,10 +1218,10 @@ function Details({ title, rows }: { title: string; rows: string[][] }) {
   return (
     <section className="mt-5">
       <h3 className="font-extrabold text-[#143d1a]">{title}</h3>
-      {rows.map(([a, b]) => (
+      {rows.filter(([, value]) => value && value !== "—").map(([a, b]) => (
         <div key={a} className="mt-2 flex justify-between gap-4 text-sm">
           <span className="text-neutral-500">{a}</span>
-          <b className="text-right">{b}</b>
+          <b className="min-w-0 break-words text-right [overflow-wrap:anywhere]">{b}</b>
         </div>
       ))}
     </section>
