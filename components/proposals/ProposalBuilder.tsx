@@ -1489,7 +1489,13 @@ function validDuration(value: number | null, max: number, optional = false) {
     : Number.isFinite(value) && value > 0 && value <= max;
 }
 function msg(x: unknown, f: string) {
-  return x instanceof Error ? x.message : f;
+  // Supabase/PostgREST errors are plain objects, not Error instances.
+  // Preserve the actionable error for administrators without surfacing credentials.
+  const detail = x instanceof Error ? x.message
+    : x && typeof x === "object" && "message" in x && typeof x.message === "string"
+      ? x.message : "";
+  return detail && !/jwt|auth(?:orization)? header|access[_ -]?token|service[_ -]?role|secret|api[_ -]?key/i.test(detail)
+    ? detail : f;
 }
 const input =
   "w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
