@@ -215,3 +215,5 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 - RPCs: `get_walkthrough_jobsite_gps`, `capture_walkthrough_jobsite_gps`.
 - Source: `supabase/migrations/20261025194500_walkthrough_jobsite_gps.sql`.
 - Both RPCs resolve the property from the authorized scheduled walkthrough and reuse the protected `jobsite_geofence_settings` relation.
+
+2026-10-27 equipment action relocation: `get_my_equipment_action_jobs` and `get_my_pending_job_equipment_handoffs` are authenticated, current-employee-scoped read-only RPCs defined by `20261027190000_equipment_action_job_access.sql`. They preserve access to completed financially handed-off Jobs only while the employee has a pending Final Sign Out or incoming handoff, without changing normal operational Job visibility. The My Availability page keeps using `get_my_pending_equipment_signouts` for its server-enforced sign-out guard.

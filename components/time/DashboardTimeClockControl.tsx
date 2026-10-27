@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
-import { EquipmentNotifications } from "@/components/jobs/EquipmentNotifications";
 import { getPendingEquipmentSignouts, type PendingEquipmentSignout } from "@/lib/services/equipmentClearance";
 import { useCallback, useEffect, useState } from "react";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
@@ -60,8 +58,12 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
       <h2 className="text-xs font-extrabold uppercase tracking-[.14em] text-[#143d1a]">My Availability</h2>
       {loading ? <span className="text-xs text-neutral-500">Loading status...</span> : jobEntry ? <span className="inline-flex items-center gap-2 text-xs font-extrabold text-amber-700"><span aria-hidden="true" className="size-2 rounded-full bg-amber-500"/>On Job · Unavailable</span> : session ? <button type="button" disabled={busy} aria-pressed="true" onClick={() => void toggle()} className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 disabled:opacity-60"><span aria-hidden="true" className="size-2 rounded-full bg-emerald-500"/>{busy ? "Deactivating…" : "Active · Available"}</button> : <button type="button" disabled={busy} aria-pressed="false" onClick={() => void toggle()} className="inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-extrabold text-neutral-600 disabled:opacity-60"><span aria-hidden="true" className="size-2 rounded-full bg-neutral-400"/>{busy ? "Activating…" : "Inactive"}</button>}
     </div>
-    <EquipmentNotifications />
-    {session && pendingEquipment.length > 0 && <div className="mt-3 space-y-3"><p className="text-sm font-bold text-amber-800">Final equipment sign-out required before going offline.</p>{pendingEquipment.map(job => <EquipmentClearanceChecklist key={job.job_id} jobId={job.job_id} checkpoint="Final Sign Out" onSubmitted={() => void load()} />)}</div>}
+    {session && pendingEquipment.length > 0 && <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs">
+      <p className="font-bold text-amber-900">Equipment sign-out pending · {pendingEquipment.length} {pendingEquipment.length === 1 ? "job" : "jobs"}</p>
+      <div className="mt-1 flex flex-wrap gap-2">
+        {pendingEquipment.map(job => <Link key={job.job_id} href={`/jobs?jobId=${job.job_id}&equipment=1`} className="rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold text-[#143d1a]">Open {job.job_number}</Link>)}
+      </div>
+    </div>}
     {error && <p role="alert" className="mt-2 rounded-lg bg-red-50 p-2 text-sm font-bold text-red-700">{error}</p>}
     {!loading && jobEntry ? <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <p className="font-extrabold text-[#143d1a]">{jobEntry.job_number ?? "Assigned Job"}</p>

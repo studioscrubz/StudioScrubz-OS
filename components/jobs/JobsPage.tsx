@@ -35,6 +35,7 @@ import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
 import { JobCardGpsRegistration } from "@/components/jobs/JobCardGpsRegistration";
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
+import { JobEquipmentActions } from "@/components/jobs/JobEquipmentActions";
 import { EquipmentExceptionResolution } from "@/components/jobs/EquipmentExceptionResolution";
 import { JobMileageSummary } from "@/components/vehicles/JobMileageSummary";
 import { JobsiteGpsVerification } from "@/components/jobs/JobsiteGpsVerification";
@@ -789,6 +790,7 @@ function JobModal({
       </JobTimeSummary>
       <JobCalendarStatus jobId={job.id} />
       {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-2"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      <JobEquipmentActions jobId={job.id} />
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-2"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {showLifecycle && (
         <section className="mt-2 rounded-lg border border-[#143d1a]/20 bg-[#f6f8f5] p-3">

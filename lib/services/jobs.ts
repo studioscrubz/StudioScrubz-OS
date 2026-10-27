@@ -49,18 +49,39 @@ export function isJobCompletionResult(value: unknown): value is JobCompletionRes
 
 const select =
   "*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)";
+// The ordinary operational list intentionally excludes financially handed-off Jobs.
+// Custodians must still be able to open their specific pending sign-out or handoff.
+async function getMyEquipmentActionJobs(): Promise<JobWithRelations[]> {
+  const client = getSupabaseClient() as unknown as {
+    rpc: (name: "get_my_equipment_action_jobs") => Promise<{
+      data: Parameters<typeof operationalJob>[0][] | null;
+      error: { message: string } | null;
+    }>;
+  };
+  const { data, error } = await client.rpc("get_my_equipment_action_jobs");
+  if (error) throw new Error(safeDatabaseMessage(error, "Equipment action Jobs could not be loaded."));
+  return (data ?? []).map(operationalJob);
+}
+
 export async function getJobs(): Promise<JobWithRelations[]> {
-  if (!(await master())) {
+  const [isMaster, actionJobs] = await Promise.all([master(), getMyEquipmentActionJobs()]);
+  let visible: JobWithRelations[];
+  if (!isMaster) {
     const { data, error } = await getSupabaseClient().rpc("get_operational_jobs", {});
     if (error) throw error;
-    return data.map(operationalJob);
+    visible = data.map(operationalJob);
+  } else {
+    const { data: ids, error: idsError } = await getSupabaseClient().rpc("get_operational_job_ids", {});
+    if (idsError) throw idsError;
+    if (!ids.length) visible = [];
+    else {
+      const result = await getSupabaseClient().from("jobs").select(select).in("id", ids).order("created_at", { ascending: false });
+      if (result.error) throw result.error;
+      visible = result.data as JobWithRelations[];
+    }
   }
-  const { data: ids, error: idsError } = await getSupabaseClient().rpc("get_operational_job_ids", {});
-  if (idsError) throw idsError;
-  if (!ids.length) return [];
-  const jobsResult = await getSupabaseClient().from("jobs").select(select).in("id", ids).order("created_at", { ascending: false });
-  if (jobsResult.error) throw jobsResult.error;
-  return jobsResult.data as JobWithRelations[];
+  const visibleIds = new Set(visible.map(job => job.id));
+  return [...visible, ...actionJobs.filter(job => !visibleIds.has(job.id))];
 }
 export async function getCalendarJobs(): Promise<JobWithRelations[]> {
   const [current, historyResult] = await Promise.all([
