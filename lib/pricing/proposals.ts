@@ -76,14 +76,22 @@ export function withProposalRevisionBaseline(estimate: EstimateResult, proposal:
   const recurringDiscount = proposal.frequencyDiscount ?? 0;
   const inheritedManualDiscount = proposal.inheritedManualDiscount ?? 0;
   const taxes = proposal.taxes ?? 0;
+  // Proposal.baseEstimateAmount represents the service only, whereas an
+  // Estimate.oneTimePrice includes the original catalog add-ons. The normal
+  // Proposal calculation subtracts those source add-ons exactly once before
+  // applying the Proposal's selected add-on lines. Restoring only the service
+  // amount into oneTimePrice makes every subsequent edit subtract them again.
+  const subtotalWithSourceAddons = money(
+    proposal.baseEstimateAmount + catalogAddonTotal(estimate),
+  );
   const finalPrice = money(
-    proposal.baseEstimateAmount - recurringDiscount - inheritedManualDiscount + taxes,
+    subtotalWithSourceAddons - recurringDiscount - inheritedManualDiscount + taxes,
   );
 
   return {
     ...estimate,
     basePrice: proposal.baseEstimateAmount,
-    oneTimePrice: proposal.baseEstimateAmount,
+    oneTimePrice: subtotalWithSourceAddons,
     calculatedFinalPrice: finalPrice,
     manualPrice: null,
     finalPrice,

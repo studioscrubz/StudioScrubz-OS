@@ -147,6 +147,41 @@ test("R2 and R3 inherit the immediately preceding revision pricing", () => {
   assert.equal(r3.perVisitTotal, 400);
 });
 
+test("reopening a source-based proposal repeatedly cannot subtract inherited catalog add-ons more than once", () => {
+  const catalogAddons = [
+    { lineTotal: 45, price: 45 }, // Original refrigerator
+    { lineTotal: 40, price: 40 }, // Original oven
+    { lineTotal: 80, price: 80 }, // Original wall washing
+    { lineTotal: 104, price: 104 }, // 13 original windows
+  ];
+  // Real production walkthrough subtotal was 639.27 INCLUDING 269.00 of
+  // inherited source add-ons. The proposal service base is 370.27.
+  const source = estimate({
+    basePrice: 300, oneTimePrice: 639.27, finalPrice: 639.27,
+    catalogAddons,
+  });
+  const selected = [
+    addon("Wall Washing", 80),
+    addon("Interior Windows", 130, { quantity: 13, unitPrice: 10 }),
+    addon("Inside Refrigerator", 50),
+  ];
+  const seed = { ...calculateProposal(input({ estimate: source, adjustments: selected })),
+    baseEstimateAmount: 370.27, manualPerVisitTotal: 750, perVisitTotal: 750 };
+  let existing = seed;
+  for (let edit = 0; edit < 5; edit++) {
+    const recalculated = calculateProposal(input({
+      estimate: withProposalRevisionBaseline(source, existing),
+      adjustments: selected,
+    }));
+    assert.equal(recalculated.baseEstimateAmount, 370.27, `edit ${edit + 1} must preserve service-only base`);
+    assert.equal(recalculated.perVisitTotal, 630.27);
+    assert.equal(displayedTotal(recalculated), 630.27);
+    existing = { ...recalculated, manualPerVisitTotal: 750, perVisitTotal: 750 };
+  }
+  // Historical broken behavior reduced 370.27 to 101.27 (= -269).
+  assert.notEqual(existing.baseEstimateAmount, 101.27);
+});
+
 test("an intentional revision price change is applied to the inherited baseline", () => {
   const prior = calculateProposal(input({
     estimate: estimate({ finalPrice: 350, oneTimePrice: 350 }),
@@ -178,7 +213,7 @@ test("UI summary consumes result breakdown and does not preserve an unreconciled
 test("proposal document shows a separate final price adjustment instead of mislabeling a price override as a manual discount", () => {
   const source = readFileSync(new URL("../components/proposals/ProposalDocument.tsx", import.meta.url), "utf8");
   assert.match(source, /finalPriceAdjustment=Math\.round\(\(document\.per_visit_total-subtotal-\(document\.taxes\?\?0\)\)\*100\)\/100/);
-  assert.match(source, /Math\.abs\(finalPriceAdjustment\)>=0\.01&&<Price label="Final Price Adjustment" value=\{finalPriceAdjustment\}/);
+  assert.match(source, /Math\.abs\(finalPriceAdjustment\)>=0\.01&&<Price label=\{document\.final_price_adjustment_label\?\.trim\(\)\|\|"Final Price Adjustment"\} value=\{finalPriceAdjustment\}/);
   const base = 135, recurring = 0, manualDiscount = 0, taxes = 0, final = 100;
   const subtotal = base - recurring - manualDiscount;
   const adjustment = Math.round((final - subtotal - taxes) * 100) / 100;
