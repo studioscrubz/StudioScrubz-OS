@@ -505,8 +505,8 @@ export function ProposalBuilder({
     if (weeklyMixedSource && !mixedWeeklyMode)
       return setError("This source uses separate weekday prices. Keep the mixed-weekly pricing breakdown enabled.");
     if (mixedWeeklyMode) {
-      if (manualPrice !== null || discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.length > 0)
-        return setError("Set all mixed-weekly prices per weekday. Clear uniform price overrides, discounts, and add-ons first.");
+      if (discount !== 0 || additionalLabor !== 0 || additionalMaterials !== 0 || adjustments.length > 0)
+        return setError("Set all mixed-weekly prices per weekday. Clear incompatible discounts, extra labor/material charges, and add-ons first.");
       try {
         const hourlyPay = (sourceEstimate?.calculatorInput as {workerHourlyPay?: number} | undefined)?.workerHourlyPay ?? 0;
         mixedVisitTotals(weeklyMixedVisits, serviceDaysOfWeek, hourlyPay);
