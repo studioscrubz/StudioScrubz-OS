@@ -6,6 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: [
         "/",
+        "/sitemap.xml",
         "/residential",
         "/commercial",
         "/property-management",
@@ -19,7 +20,8 @@ export default function robots(): MetadataRoute.Robots {
         "/careers",
       ],
       disallow: [
-        "/site",
+        "/site$",
+        "/site/",
         "/api/",
         "/login",
         "/access-denied",
