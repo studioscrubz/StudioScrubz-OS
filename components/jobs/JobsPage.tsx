@@ -232,7 +232,7 @@ export function JobsPage() {
       setBusy(null);
     }
   }
-  const availableRows = useMemo(() => [...rows, ...archivedRows], [archivedRows, rows]);
+  const availableRows = useMemo(() => rows.filter((job) => job.archived_at === null && job.status !== "Archived"), [rows]);
   const filtered = useMemo(
     () =>
       availableRows
@@ -273,7 +273,6 @@ export function JobsPage() {
   const unscheduled = filtered.filter((job) => !job.scheduled_date && !terminalStatuses.includes(job.status));
   const completed = filtered.filter((job) => job.status === "Completed").sort(compareRecent);
   const cancelled = filtered.filter((job) => job.status === "Cancelled").sort(compareRecent);
-  const archived = filtered.filter((job) => job.status === "Archived" || job.archived_at !== null).sort(compareRecent);
   const active = rows.filter((job) => job.archived_at === null && activeStatuses.includes(job.status));
   const metrics = [
     ["Total Jobs", active.length],
@@ -330,7 +329,7 @@ export function JobsPage() {
           <Select
             value={status}
             set={(v) => setStatus(v as typeof status)}
-            options={["All", ...JOB_STATUSES]}
+            options={["All", ...JOB_STATUSES.filter((item) => item !== "Archived")]}
           />
           <Select
             value={division}
@@ -360,7 +359,6 @@ export function JobsPage() {
           <JobSection title="Unscheduled" count={unscheduled.length} jobs={unscheduled} renderJob={renderJob} muted />
           <JobSection title="Completed" count={completed.length} jobs={completed} renderJob={renderJob} muted />
           <JobSection title="Cancelled" count={cancelled.length} jobs={cancelled} renderJob={renderJob} muted />
-          <JobSection title="Archived" count={archived.length} jobs={archived} renderJob={renderJob} muted />
           {filtered.length === 0 && <div className="rounded-2xl border border-dashed bg-white p-8 text-center text-sm text-neutral-500">No jobs match the current filters.</div>}
         </div>
       )}
