@@ -1,3 +1,4 @@
+import type { HighDustingInputs } from "@/lib/pricing/highDusting";
 import type { Client } from "@/types/client";
 import type { Property } from "@/types/property";
 import type { CatalogAddonSnapshot } from "@/types/serviceCatalog";
@@ -54,6 +55,7 @@ export type ResidentialCalculatorInput = {
 export type CommercialCalculatorInput = {
   division: "Commercial";
   commercialType: string;
+  highDusting?: HighDustingInputs;
   frequency: Frequency;
   customIntervalDays?: number | null;
   serviceDaysOfWeek?: ServiceWeekday[];
