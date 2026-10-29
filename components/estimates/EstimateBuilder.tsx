@@ -322,6 +322,7 @@ function CommercialFields({ value, set, postConstruction, setPostConstruction, c
   const addons=service?getAvailableServiceAddons(catalog,service.id,"Commercial"):[];
   function selectService(next:string){
     const selected=selectedCatalogService(catalog,"Commercial",next);
+    if (selected?.service_code === "COM-HIGH-DUST" || service?.service_code === "COM-HIGH-DUST") setManualPrice(null);
     if(isPostConstructionCatalogService(selected)){
       set({...value,commercialType:next});
     }else{
