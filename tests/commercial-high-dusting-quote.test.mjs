@@ -13,11 +13,11 @@ test("high dusting has a unique independently quoted catalog service and no inve
  assert.match(migration, /0, 0, false, true/);
  assert.doesNotMatch(migration, /insert into public\.service_addons|insert into public\.service_addon_links/i);
 });
-test("client/server require a separate positive high dusting amount", () => {
- assert.match(calculator, /selected\.service_code === "COM-HIGH-DUST"|service\.service_code === "COM-HIGH-DUST"/);
- assert.match(calculator, /separatelyQuotedAmount <= 0/);
+test("high dusting uses normal estimate summary with calculated price", () => {
+ assert.match(calculator, /selected\.service_code === "COM-HIGH-DUST"/);
  assert.match(calculator, /input\.frequency !== "One-Time"/);
- assert.match(builder, /Separate High Dusting Quote Required/);
- assert.match(builder, /Separate high dusting quote amount/);
- assert.match(builder, /setManualPrice=\{setManualPrice\}/);
+ assert.match(builder, /<HighDustingQuoteCalculator value=\{value\.highDusting/);
+ assert.doesNotMatch(builder, /Separate High Dusting Quote Required/);
+ assert.doesNotMatch(builder, /Assessed High Dusting Quote/);
+ assert.doesNotMatch(builder, /Apply Separate Quote/);
 });
