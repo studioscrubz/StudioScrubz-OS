@@ -192,7 +192,7 @@ export function VendorPacketsPage() {
           <div>
             <p className="mb-2 text-sm font-bold text-[#143d1a]">Email documents</p>
             <div className="flex flex-wrap gap-3">
-              <button type="button" disabled={!documentModel} onClick={() => openEmail(previewKind)} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Send {previewKind === "corporate-capability-statement" ? "Statement" : "Packet"}</button>
+              <button type="button" disabled={!documentModel} onClick={() => openEmail(previewKind)} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Send</button>
               <button type="button" disabled={!documentModel} onClick={() => openEmail("corporate-capability-statement", true)} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Send Both Documents</button>
             </div>
           </div>
