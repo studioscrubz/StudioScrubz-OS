@@ -28,6 +28,9 @@ import { PostConstructionCalculatorFields, projectCostingIncompleteMessage, proj
 import { PostConstructionBidSummary } from "@/components/estimates/PostConstructionBidSummary";
 import { MINIMUM_WORKER_HOURLY_PAY } from "@/lib/pricing/workerHourlyPay";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { HighDustingQuoteCalculator } from "./HighDustingQuoteCalculator";
+import { getEstimateById } from "@/lib/services/estimates";
+import { pairHighDustingEstimates } from "@/lib/services/estimatePairs";
 
 const frequencies: Frequency[] = ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Multiple Days Per Week"];
 const frequencyLabelsForService = (catalog: ServiceCatalogBundle, serviceId?: string) => new Map(frequencies.map((frequency) => [frequency, serviceFrequencyDiscountLabel(frequency, catalog.recurringRules, serviceId)]));
@@ -90,6 +93,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [properties,setProperties]=useState<PropertyWithClient[]>([]);
   const [selectedClientId,setSelectedClientId]=useState("");
   const [selectedPropertyId,setSelectedPropertyId]=useState("");
+  const [pairWithEstimateId,setPairWithEstimateId]=useState<string|null>(null);
+  const [pairedServiceRequested,setPairedServiceRequested]=useState(false);
+  const [savedPairEstimateId,setSavedPairEstimateId]=useState<string|null>(null);
   const [salesResult,setSalesResult]=useState<EstimateResult|null>(isSales && estimate ? estimate.result : null);
   const [salesCalculationError,setSalesCalculationError]=useState<string|null>(null);
   const restoredDraft = useRef(false);
@@ -109,6 +115,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   useEffect(()=>{if(!estimate)void loadCustomerOptions().catch(x=>setError(x instanceof Error?x.message:"Clients and properties could not be loaded."))},[estimate]);
   useEffect(() => {
     if (estimate) return;
+    if (new URLSearchParams(window.location.search).has("pairWith")) { restoredDraft.current=true; return; }
     try {
       const saved = window.sessionStorage.getItem(estimateDraftKey);
       if (saved) {
@@ -138,6 +145,39 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       setDraftReady(true);
     }
   }, [estimate]);
+  useEffect(() => {
+    if (estimate) return;
+    const sourceId = new URLSearchParams(window.location.search).get("pairWith");
+    if (!sourceId) return;
+    let active=true;
+    void getEstimateById(sourceId).then(source=>{
+      if (!active) return;
+      if (source.division!=="Commercial" || !source.client_id || !source.property_id || source.archived_at) {
+        throw new Error("Linked estimates require an active commercial source with a client and property.");
+      }
+      const isHighDusting=source.result.serviceName==="High Dusting Cleaning";
+      setPairWithEstimateId(source.id);
+      setSelectedClientId(source.client_id);
+      setSelectedPropertyId(source.property_id);
+      setDivision("Commercial");
+      setCustomer({
+        firstName:source.customer_first_name??"",lastName:source.customer_last_name??"",
+        companyName:source.client?.company_name??"",phone:source.customer_phone??"",
+        email:source.customer_email??"",address:source.customer_address??source.property?.address??"",
+        addressLine2:source.property?.address_line_2??"",city:source.property?.city??"",
+        state:source.property?.state??"",zip:source.property?.zip??"",
+      });
+      setLeadRepresentativeId(source.lead_representative_id??null);
+      const selection=isHighDusting?"Other":"High Dusting";
+      setCommercial({...defaultCommercial,commercialType:selection,frequency:"One-Time",additionalServices:[]});
+      setManualPrice(null);
+      pendingCatalogSelection.current={division:"Commercial",selection};
+      setServiceDescription("");
+      setNotes(`Linked project: ${source.estimate_number}. Each service is quoted and approved separately.`);
+      setDraftReady(true);
+    }).catch(cause=>{if(active) setError(cause instanceof Error?cause.message:"Could not load the estimate to pair.")});
+    return()=>{active=false};
+  },[estimate]);
   useEffect(()=>{let active=true;void Promise.all([getServiceCatalog(),getBusinessSettings()]).then(([loaded,settings])=>{if(!active)return;setCatalog(loaded);setDefaults(settings);const pending=pendingCatalogSelection.current;if(pending){const selected=selectedCatalogService(loaded,pending.division,pending.selection);setServiceDescription(selected?.description?.trim()??"");pendingCatalogSelection.current=null}else if(!restoredDraft.current&&!estimate&&!serviceDescription.trim()){const selected=selectedCatalogService(loaded,division,division==="Residential"?residential.serviceType:commercial.commercialType);setServiceDescription(selected?.description?.trim()??"")}if(!estimate&&!restoredDraft.current){setNotes(value=>value||settings.default_estimate_notes||"");setTerms(settings.default_estimate_terms??"")}}).catch((x:unknown)=>{if(active)setError(x instanceof Error?x.message:"Pricing catalog could not be loaded.")}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[estimate]);
   useEffect(() => {
     if (estimate || !draftReady) return;
@@ -197,6 +237,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       const scopeError = residentialPostConstructionScopeError({ division, measurements: { serviceType: "Post-Construction Cleaning", bedrooms: postConstruction.rooms, bathrooms: postConstruction.bathrooms, floors: postConstruction.floors, kitchenAreas: postConstruction.kitchens, squareFeet: isPostConstructionV2Estimate(postConstruction) ? postConstruction.projectCosting.totalSquareFeet : postConstruction.squareFeet } });
       if (scopeError) return setError(scopeError);
     }
+    if (savedPairEstimateId && pairWithEstimateId) {
+      try {await pairHighDustingEstimates(pairWithEstimateId,savedPairEstimateId);setSavedPairEstimateId(null);router.push("/open-estimates");} catch(cause){setError(cause instanceof Error?cause.message:"Linking failed.");}return;
+    }
     if(!result){setError(calculation.error??"Pricing is not ready.");return}
     const validation = validateCustomer(customer);
     if (validation) { setError(validation); return; }
@@ -211,6 +254,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         await updateEstimate(estimate.id, { ...estimatePayload(estimate.client_id, estimate.property_id, customer, division, result, notes, terms, estimate.status), lead_representative_id: leadRepresentativeId });
         await getEstimates();
         setSuccess("Estimate updated successfully.");
+        if (pairedServiceRequested) {router.push(`/estimates?pairWith=${encodeURIComponent(estimate.id)}`);return;}
       } else {
         const selectedClient = selectedClientId ? clients.find((entry)=>entry.id===selectedClientId) : null;
         if (selectedClientId && !selectedClient) throw new Error("The selected client no longer exists. Choose another client.");
@@ -223,8 +267,18 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         if (selectedProperty && selectedProperty.client_id!==client.id) throw new Error("The selected property does not belong to the selected client.");
         if (selectedProperty && selectedProperty.property_type!==division) throw new Error(`The selected property must be a ${division} property.`);
         const property = selectedProperty ?? await findOrCreateEstimateProperty(client.id, customer, division);
-        await createEstimate({ ...estimatePayload(client.id, property.id, customer, division, result, notes, terms, "Open"), lead_representative_id: leadRepresentativeId });
+        const created = await createEstimate({ ...estimatePayload(client.id, property.id, customer, division, result, notes, terms, "Open"), lead_representative_id: leadRepresentativeId });
+        if (pairWithEstimateId) {
+          setSavedPairEstimateId(created.id);
+          await pairHighDustingEstimates(pairWithEstimateId,created.id);
+          setSavedPairEstimateId(null);
+        }
         await getEstimates();
+        if (pairedServiceRequested) {
+          window.sessionStorage.removeItem(estimateDraftKey);
+          router.push(`/estimates?pairWith=${encodeURIComponent(created.id)}`);
+          return;
+        }
         setSuccess("Estimate saved successfully and is available in Open Estimates.");
         clearNewEstimateDraft();
       }
@@ -235,6 +289,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   }
 
   function clearNewEstimateDraft() {
+    setPairWithEstimateId(null);
+    setPairedServiceRequested(false);
+    setSavedPairEstimateId(null);
     suppressDraftSave.current = true;
     restoredDraft.current = false;
     window.sessionStorage.removeItem(estimateDraftKey);
@@ -288,9 +345,18 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       <div className="space-y-6">
         <Section title="Estimate Calculator" subtitle="Choose a division and configure the service.">
           <DivisionToggle value={division} set={changeDivision} />
-          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:catalog&&<div className="mt-6">{calculation.error&&<div className="mb-4"><Alert kind="error" text={calculation.error}/></div>}{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} salesSafe={isSales} manualPrice={manualPrice} setManualPrice={setManualPrice} />}</div>}
+          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:catalog&&<div className="mt-6">{calculation.error&&<div className="mb-4"><Alert kind="error" text={calculation.error}/></div>}{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} salesSafe={isSales} manualPrice={manualPrice} setManualPrice={setManualPrice} onHighDustingQuote={(amount,scope)=>{setManualPrice(amount);setServiceDescription(scope);}} />}</div>}
         </Section>
         <Section title="Service Description" subtitle="Copied from the selected Service Catalog entry and saved with this Estimate."><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{serviceDescription||"No service description available."}</div></Section>
+        {division==="Commercial"&&!postConstructionMode&&<Section title="Related specialty service" subtitle="Create linked estimates for cleaning and high dusting, each with its own price, scope and approval.">
+          {pairWithEstimateId&&<p className="mb-3 rounded-lg bg-[#f4f7f1] p-3 text-sm font-bold text-[#143d1a]">Preparing a separate estimate linked to the existing commercial project. Saving this estimate will connect both estimates.</p>}
+          <label className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4">
+            <input type="checkbox" checked={pairedServiceRequested} onChange={event=>setPairedServiceRequested(event.target.checked)} className="mt-1 accent-[#143d1a]"/>
+            <span className="text-sm"><strong className="block text-[#143d1a]">{selectedService?.service_code==="COM-HIGH-DUST"?"Also quote commercial cleaning":"Also quote high dusting"}</strong>
+              <span className="mt-1 block text-neutral-600">After saving, automatically open the {selectedService?.service_code==="COM-HIGH-DUST"?"commercial cleaning":"high dusting"} calculator for a second, linked estimate. Nothing is added to this estimate's price.</span>
+            </span>
+          </label>
+        </Section>}
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
         <Section title="Estimate Terms & Conditions"><textarea value={terms} onChange={(event) => setTerms(event.target.value)} rows={6} className={inputClass} placeholder="Terms shown on the client Estimate" /></Section>
       </div>
@@ -316,7 +382,7 @@ function ResidentialFields({ value, set,postConstruction,setPostConstruction,cat
   <div className="sm:col-span-2 xl:col-span-3"><CatalogAddonPicker addons={addons} selected={value.addOns} setSelected={(addOns) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addOns }))} snapshots={value.addonSelections} setSnapshots={(addonSelections) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addonSelections }))} /></div></div>}
 </div>; }
 
-function CommercialFields({ value, set, postConstruction, setPostConstruction, catalog, serviceChanged, salesSafe = false, manualPrice, setManualPrice }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void; postConstruction: PostConstructionCalculatorInput; setPostConstruction: (value: PostConstructionCalculatorInput) => void; catalog: ServiceCatalogBundle; serviceChanged: (selection: string) => void; salesSafe?: boolean; manualPrice: number | null; setManualPrice: (value: number | null) => void }) {
+function CommercialFields({ value, set, postConstruction, setPostConstruction, catalog, serviceChanged, salesSafe = false, manualPrice, setManualPrice, onHighDustingQuote }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void; postConstruction: PostConstructionCalculatorInput; setPostConstruction: (value: PostConstructionCalculatorInput) => void; catalog: ServiceCatalogBundle; serviceChanged: (selection: string) => void; salesSafe?: boolean; manualPrice: number | null; setManualPrice: (value: number | null) => void; onHighDustingQuote:(amount:number,scope:string)=>void }) {
   const services=catalog.services.filter(x=>x.division!=="Residential").map(x=>x.service_name.replace(/ Cleaning$/,""));
   const service=selectedCatalogService(catalog,"Commercial",value.commercialType);
   const addons=service?getAvailableServiceAddons(catalog,service.id,"Commercial"):[];
@@ -340,6 +406,7 @@ function CommercialFields({ value, set, postConstruction, setPostConstruction, c
         <input aria-label="Separate high dusting quote amount" type="number" min="0.01" step="0.01" required value={manualPrice ?? ""} onChange={event => setManualPrice(event.target.value === "" ? null : Number(event.target.value))} placeholder="Enter separately approved quote" className="mt-2 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900" />
       </label>
       <p className="mt-2 text-xs text-neutral-600">The estimate cannot be prepared without a positive amount. This amount belongs to the High Dusting estimate only.</p>
+      {!salesSafe && <HighDustingQuoteCalculator onApply={onHighDustingQuote} />}
     </div> : <p className="text-xs text-neutral-600">Need high dusting too? Select High Dusting Cleaning and create a separate specialty estimate; do not include it in this routine commercial cleaning price.</p>}
 
     {isPostConstructionCatalogService(service)?<PostConstructionCalculatorFields value={{...postConstruction,division:"Commercial",serviceCode:service?.service_code??null}} onChange={setPostConstruction} service={service} catalog={catalog} salesSafe={salesSafe}/>:<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

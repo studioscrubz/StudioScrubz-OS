@@ -519,6 +519,15 @@ export interface Database {
           },
         ];
       };
+      estimate_service_pairs: {
+        Row: { id:string; estimate_a_id:string; estimate_b_id:string; created_at:string; created_by:string };
+        Insert: { id?:string; estimate_a_id:string; estimate_b_id:string; created_at?:string; created_by?:string };
+        Update: { id?:string; estimate_a_id?:string; estimate_b_id?:string; created_at?:string; created_by?:string };
+        Relationships: [
+          { foreignKeyName:"estimate_service_pairs_estimate_a_id_fkey"; columns:["estimate_a_id"]; isOneToOne:false; referencedRelation:"estimates"; referencedColumns:["id"] },
+          { foreignKeyName:"estimate_service_pairs_estimate_b_id_fkey"; columns:["estimate_b_id"]; isOneToOne:false; referencedRelation:"estimates"; referencedColumns:["id"] }
+        ];
+      };
       estimates: {
         Row: Estimate;
         Insert: EstimateInsert & {

@@ -225,3 +225,5 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 - `validate_corporate_capability_profile` is an internal validator with no application execute grant.
 - `business_settings.corporate_capability_profile` is intentionally excluded from the public and workflow business settings projections.
 - Source: `supabase/migrations/20261029090000_corporate_capability_profile.sql`.
+
+2026-10-29 Linked commercial quote addition: `estimate_service_pairs` is created by `20261029193000_estimate_high_dusting_pairs.sql`. Its authenticated read/insert policies use private `estimate_links_private.valid_high_dusting_estimate_pair` to require active same-client/property Commercial estimates with exactly one High Dusting estimate; each retains its own price and approval.
