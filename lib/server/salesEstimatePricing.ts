@@ -23,6 +23,24 @@ export async function loadPrivatePricingCatalog(admin: AdminClient): Promise<Ser
 
 export function calculateSalesEstimate(rawInput: unknown, catalog: ServiceCatalogBundle, manualPrice: unknown, description: unknown): EstimateResult {
   const input = canonicalSalesInput(rawInput, catalog);
+  // High dusting is an independent, assessed scope. Never blend it into
+  // recurring janitorial pricing or create a zero-dollar automatic quote.
+  if (input.division === "Commercial" && !("calculatorType" in input)) {
+    const selected = catalog.services.find(service =>
+      service.service_code === "COM-HIGH-DUST" &&
+      (service.service_name === input.commercialType ||
+        service.service_name.replace(/ Cleaning$/, "") === input.commercialType));
+    if (selected) {
+      const separatelyQuotedAmount = Number(manualPrice);
+      if (manualPrice === null || manualPrice === undefined ||
+        !Number.isFinite(separatelyQuotedAmount) || separatelyQuotedAmount <= 0) {
+        throw new Error("High Dusting requires a separate assessed quote amount before an estimate can be prepared.");
+      }
+      if (input.frequency !== "One-Time" || input.additionalServices.length) {
+        throw new Error("Prepare High Dusting as its own one-time estimate without bundled add-ons.");
+      }
+    }
+  }
   const calculated = isPostConstruction(input)
     ? calculatePostConstructionCatalogEstimate(input, catalog)
     : input.division === "Residential"
