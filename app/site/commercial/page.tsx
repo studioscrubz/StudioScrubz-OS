@@ -45,17 +45,19 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#34734a]">Featured Commercial Project</p>
           <h2 id="commercial-project-title" className="mt-4 text-2xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-3xl">Starbucks — Commercial High-Dusting Services</h2>
-          <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center">
+          <dl className="grid gap-4 text-sm grid-cols-1">
             <div><dt className="font-bold text-neutral-500">Locations Serviced</dt><dd className="mt-1 text-lg font-extrabold text-[#143d1a]">2</dd></div>
             <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Commercial High Dusting</dd></div>
-            <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">Facility Services Subcontract</dd></div>
+            <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">LJ Facility Services Subcontract</dd></div>
           </dl>
+        <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-white px-4 py-5">
+          <img src="https://upload.wikimedia.org/wikipedia/en/d/d3/Starbucks_Corporation_Logo_2011.svg" width="185" height="185" alt="Starbucks logo" loading="lazy" decoding="async" className="aspect-square w-full max-w-[185px] object-contain" />
+        </div>
+          </div>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz successfully completed high-dusting assignments at two Starbucks locations, addressing accessible elevated surfaces, ceiling vents, fixtures, and other designated areas in accordance with the approved scope of work.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our experience supporting commercial facility service providers demonstrates our ability to deliver specialized cleaning services in active business environments.</p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">This work was completed as a facility services subcontract. Reference to Starbucks identifies the serviced locations and does not imply endorsement or a direct contract with Starbucks.</p>
-        </div>
-        <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-white px-6 py-9">
-          <img src="https://upload.wikimedia.org/wikipedia/en/d/d3/Starbucks_Corporation_Logo_2011.svg" width="260" height="260" alt="Starbucks logo" loading="lazy" decoding="async" className="aspect-square w-full max-w-[260px] object-contain" />
         </div>
       </div>
     </div>
@@ -66,17 +68,19 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#34734a]">Featured Commercial Project</p>
           <h2 id="wam-project-title" className="mt-4 text-2xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-3xl">Women&apos;s Audio Mission Academy — Commercial Cleaning</h2>
-          <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center">
+          <dl className="grid gap-4 text-sm grid-cols-1">
             <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Commercial Cleaning</dd></div>
             <div><dt className="font-bold text-neutral-500">Specialty Detail</dt><dd className="mt-1 font-bold text-[#143d1a]">Refrigerator Detailing</dd></div>
           </dl>
+        <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-4 py-5">
+          <div aria-label="Women’s Audio Mission Academy project" className="flex size-40 flex-col items-center justify-center rounded-full border-[10px] border-[#e93431] bg-white px-4 text-center shadow-[inset_0_0_0_5px_#141414]"><span className="text-[10px] font-black uppercase tracking-[.12em] text-[#141414]">Women&apos;s Audio Mission</span><span className="mt-2 text-4xl font-black tracking-[-.08em] text-[#e93431]">WAM</span><span className="mt-2 text-xs font-black uppercase tracking-[.18em] text-[#141414]">Academy</span></div>
+          
+        </div>
+          </div>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provided commercial cleaning services for Women&apos;s Audio Mission Academy, including detailed refrigerator cleaning as part of the service scope.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">From everyday facility upkeep to focused detail work, our commercial cleaning services are tailored to the needs of each space.</p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">StudioScrubz provided these services directly to Women&apos;s Audio Mission Academy. Project reference does not imply a public endorsement.</p>
-        </div>
-        <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-6 py-8">
-          <div aria-label="Women’s Audio Mission Academy project" className="flex size-56 flex-col items-center justify-center rounded-full border-[10px] border-[#e93431] bg-white px-4 text-center shadow-[inset_0_0_0_5px_#141414]"><span className="text-xs font-black uppercase tracking-[.18em] text-[#141414]">Women&apos;s Audio Mission</span><span className="mt-2 text-5xl font-black tracking-[-.08em] text-[#e93431]">WAM</span><span className="mt-2 text-xs font-black uppercase tracking-[.18em] text-[#141414]">Academy</span></div>
-          
         </div>
       </div>
     </div>
