@@ -76,7 +76,7 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
         </div>
         <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-6 py-8">
           <div aria-label="Women’s Audio Mission Academy project" className="flex size-56 flex-col items-center justify-center rounded-full border-[10px] border-[#e93431] bg-white px-4 text-center shadow-[inset_0_0_0_5px_#141414]"><span className="text-xs font-black uppercase tracking-[.18em] text-[#141414]">Women&apos;s Audio Mission</span><span className="mt-2 text-5xl font-black tracking-[-.08em] text-[#e93431]">WAM</span><span className="mt-2 text-xs font-black uppercase tracking-[.18em] text-[#141414]">Academy</span></div>
-          <p className="mt-5 text-center text-sm font-bold text-[#143d1a]">Commercial cleaning &amp; refrigerator detailing</p>
+          
         </div>
       </div>
     </div>
