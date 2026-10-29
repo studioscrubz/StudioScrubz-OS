@@ -31,10 +31,8 @@ export function calculateSalesEstimate(rawInput: unknown, catalog: ServiceCatalo
       (service.service_name === input.commercialType ||
         service.service_name.replace(/ Cleaning$/, "") === input.commercialType));
     if (selected) {
-      const separatelyQuotedAmount = Number(manualPrice);
-      if (manualPrice === null || manualPrice === undefined ||
-        !Number.isFinite(separatelyQuotedAmount) || separatelyQuotedAmount <= 0) {
-        throw new Error("High Dusting requires a separate assessed quote amount before an estimate can be prepared.");
+      if (manualPrice !== null && manualPrice !== undefined) {
+        throw new Error("High Dusting pricing is calculated from the dedicated project inputs.");
       }
       if (input.frequency !== "One-Time" || input.additionalServices.length) {
         throw new Error("Prepare High Dusting as its own one-time estimate without bundled add-ons.");
