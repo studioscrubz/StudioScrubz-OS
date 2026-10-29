@@ -80,10 +80,10 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           <h3 className="mt-8 text-xl font-extrabold text-[#143d1a]">Looking for dependable commercial cleaning?</h3>
           <p className="mt-3 text-base leading-7 text-neutral-700">Contact StudioScrubz to discuss a customized cleaning plan for your facility.</p>
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-base font-extrabold text-[#143d1a]"><a href="tel:+17473656265" className="underline decoration-[#d4af37] underline-offset-4">(747) 365-6265</a><a href="https://www.studioscrubz.com/" className="underline decoration-[#d4af37] underline-offset-4">www.StudioScrubz.com</a></p>
-          <p className="mt-5 text-xs leading-5 text-neutral-500">Project reference describes services performed and does not imply endorsement by Women&apos;s Audio Mission Academy.</p>
+          <p className="mt-5 text-xs leading-5 text-neutral-500">StudioScrubz provided these services directly to Women&apos;s Audio Mission Academy. Project reference does not imply a public endorsement.</p>
         </div>
         <div className="flex min-h-64 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-6 py-8">
-          <img src="/projects/wam-academy-logo.png" alt="Women&apos;s Audio Mission Academy logo" width="280" height="280" loading="lazy" className="h-auto w-full max-w-[250px] object-contain"/>
+          <div aria-label="Women’s Audio Mission Academy project" className="flex size-56 flex-col items-center justify-center rounded-full border-[10px] border-[#e93431] bg-white px-4 text-center shadow-[inset_0_0_0_5px_#141414]"><span className="text-xs font-black uppercase tracking-[.18em] text-[#141414]">Women&apos;s Audio Mission</span><span className="mt-2 text-5xl font-black tracking-[-.08em] text-[#e93431]">WAM</span><span className="mt-2 text-xs font-black uppercase tracking-[.18em] text-[#141414]">Academy</span></div>
           <p className="mt-5 text-center text-sm font-bold text-[#143d1a]">Commercial cleaning &amp; refrigerator detailing</p>
         </div>
       </div>
