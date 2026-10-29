@@ -21,3 +21,8 @@ test("high dusting uses normal estimate summary with calculated price", () => {
  assert.doesNotMatch(builder, /Assessed High Dusting Quote/);
  assert.doesNotMatch(builder, /Apply Separate Quote/);
 });
+
+test("incomplete high dusting form never reports a missing fixed catalog price", () => {
+ assert.match(builder, /selectedService\?\.service_code === "COM-HIGH-DUST" \? "High Dusting estimate"/);
+ assert.match(builder, /The estimate price will calculate automatically here/);
+});
