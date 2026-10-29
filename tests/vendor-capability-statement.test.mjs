@@ -207,7 +207,7 @@ test("send route authorizes active document senders and rebuilds content from au
   assert.match(route, /admin\.from\("properties"\)[\s\S]*?\.eq\("id", identity\.propertyId\)[\s\S]*?\.eq\("client_id", identity\.clientId\)[\s\S]*?\.is\("archived_at", null\)/);
   assert.match(route, /admin\.from\("business_settings"\)[\s\S]*?corporate_capability_profile/);
   assert.match(route, /validateCorporateCapabilityProfile\(business\.corporate_capability_profile\)/);
-  assert.match(route, /buildVendorCapabilityDocumentModel\(\{[\s\S]*?clientName:[\s\S]*?propertyLabel,[\s\S]*?business:[\s\S]*?corporateProfile,[\s\S]*?moduleIds: identity\.moduleIds/);
+  assert.match(route, /buildVendorCapabilityDocumentModel\(\{[\s\S]*?clientName:[\s\S]*?propertyLabel,[\s\S]*?business:[\s\S]*?corporateProfile,[\s\S]*?moduleIds: identity\.documentKind === "both"/);
   assert.doesNotMatch(route, /body\.(?:corporateProfile|business|clientName|propertyLabel)/);
 });
 
@@ -235,14 +235,14 @@ test("send route recovers provider receipts without resending and snapshots exac
   assert.match(route, /Retry this same send request to recover it without sending a duplicate/);
   assert.match(route, /createError\?\.code === "23505"/);
   assert.match(route, /content_snapshot: model\.contentSnapshot/);
-  assert.match(route, /document_kind: model\.documentKind/);
+  assert.match(route, /document_kind: identity\.documentKind/);
   assert.match(route, /document_version: model\.documentVersion/);
-  assert.match(route, /selected_module_ids: \[\.\.\.model\.selectedModuleIds\]/);
+  assert.match(route, /selected_module_ids: \[\.\.\.model\.selectedModuleIds\]|selected_module_ids: \[\.\.\.identity\.moduleIds\]/);
   assert.match(route, /Corporate Capability Statement Sent/);
   assert.match(route, /Vendor Packet Sent/);
   assert.match(route, /capabilityModelFromSnapshot\(metadata\.content_snapshot\)/);
-  assert.match(route, /model\.documentKind !== identity\.documentKind/);
-  assert.match(route, /!sameStringArray\(model\.selectedModuleIds, identity\.moduleIds\)/);
+  assert.match(route, /model\.documentKind !== \(identity\.documentKind === "both"/);
+  assert.match(route, /!sameStringArray\(model\.selectedModuleIds, identity\.documentKind === "both"/);
   assert.match(route, /resolveEmailSenderProfile\("vendor"\)/);
 });
 
