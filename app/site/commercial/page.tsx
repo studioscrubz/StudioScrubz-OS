@@ -40,23 +40,27 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
   <section className="px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Spaces we support" title="Commercial facility cleaning without the one-size-fits-all plan." copy="For business owners, office managers, facility contacts, property and community managers, and operators who need a clear scope for one-time cleaning or recurring janitorial service. We shape each plan around the space, cleaning frequency, access, scheduling, and day-to-day facility needs."/><div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{commercialSpaces.map(([space,copy])=><article id={space === "Property management" ? "property-management" : undefined} key={space} className="rounded-[1.6rem] border border-[#143d1a]/10 bg-[#f4f7f1] p-6"><h2 className="text-xl font-extrabold text-[#143d1a]">{space}</h2><p className="mt-3 text-sm leading-6 text-neutral-600">{copy}</p></article>)}</div><FeatureList items={["Recurring janitorial service","Commercial high dusting by assessment","One-time and detail cleaning","Property and unit turns","Common-area cleaning","Flexible service frequency","Facility walkthroughs"]}/></div></section>
   <section aria-labelledby="commercial-project-title" className="px-5 py-20 sm:px-8 sm:py-24">
     <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#143d1a]/10 bg-[#f4f7f1]">
-      <div className="grid gap-8 p-8 sm:p-12 lg:grid-cols-[minmax(0,1.7fr)_minmax(240px,1fr)] lg:items-center">
+      <div className="grid gap-8 p-8 sm:p-12 lg:grid-cols-[minmax(0,1.65fr)_minmax(240px,1fr)] lg:items-center">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#34734a]">Commercial experience</p>
-          <h2 id="commercial-project-title" className="mt-4 text-3xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-4xl">Trusted Commercial Cleaning Experience</h2>
-          <p className="mt-5 max-w-3xl text-base leading-8 text-neutral-700">From offices and retail spaces to nationally recognized coffeehouse locations, StudioScrubz delivers professional cleaning solutions tailored to each facility.</p>
-          <div className="mt-8 border-l-4 border-[#d4af37] pl-5">
-            <h3 className="text-xl font-extrabold text-[#143d1a]">Recent Project: Starbucks</h3>
-            <p className="mt-3 text-base leading-7 text-neutral-700">Successfully completed commercial high-dusting services at two Starbucks locations through a facility services partnership.</p>
-          </div>
-          <p className="mt-8 font-extrabold text-[#143d1a]">Professional service. Reliable results. No mess. No stress.</p>
-          <p className="mt-3 text-xs leading-5 text-neutral-500">Project completed through a facility services partner. Starbucks is referenced solely to identify the service locations; no endorsement or direct contracting relationship is implied.</p>
+          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#34734a]">Featured Commercial Project</p>
+          <h2 id="commercial-project-title" className="mt-4 text-3xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-4xl">Starbucks — Commercial High-Dusting Services</h2>
+          <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-3">
+            <div><dt className="font-bold text-neutral-500">Locations Serviced</dt><dd className="mt-1 text-lg font-extrabold text-[#143d1a]">2</dd></div>
+            <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Commercial High Dusting</dd></div>
+            <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">Facility Services Subcontract</dd></div>
+          </dl>
+          <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz successfully completed high-dusting assignments at two Starbucks locations, addressing accessible elevated surfaces, ceiling vents, fixtures, and other designated areas in accordance with the approved scope of work.</p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our experience supporting commercial facility service providers demonstrates our ability to deliver specialized cleaning services in active business environments.</p>
+          <h3 className="mt-8 text-xl font-extrabold text-[#143d1a]">Need a dependable commercial cleaning partner?</h3>
+          <p className="mt-3 text-base leading-7 text-neutral-700">Contact StudioScrubz for recurring cleaning, specialty cleaning, and high-dusting services.</p>
+          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-base font-extrabold text-[#143d1a]"><a href="tel:+17473656265" className="underline decoration-[#d4af37] underline-offset-4">(747) 365-6265</a><a href="https://www.studioscrubz.com/" className="underline decoration-[#d4af37] underline-offset-4">www.StudioScrubz.com</a></p>
+          <p className="mt-5 text-xs leading-5 text-neutral-500">This work was completed as a facility services subcontract. Reference to Starbucks identifies the serviced locations and does not imply endorsement or a direct contract with Starbucks.</p>
         </div>
         <div className="flex min-h-64 flex-col items-center justify-center rounded-[1.6rem] bg-[#006241] px-6 py-9 text-center text-white">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-white/75">High dusting project</p>
-          <p className="mt-3 text-5xl font-extrabold tracking-tight">2</p>
+          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-white/75">Commercial high dusting</p>
+          <p className="mt-3 text-6xl font-extrabold tracking-tight">2</p>
           <p className="mt-2 text-lg font-bold">Starbucks locations</p>
-          <p className="mt-5 max-w-xs text-sm leading-6 text-white/80">Specialty elevated-surface cleaning through a facility services partnership</p>
+          <p className="mt-5 max-w-xs text-sm leading-6 text-white/80">Specialty elevated-surface cleaning completed through a facility services subcontract</p>
         </div>
       </div>
     </div>
