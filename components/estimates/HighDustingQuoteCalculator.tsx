@@ -13,7 +13,7 @@ export function HighDustingQuoteCalculator({value,onChange}:{
  const setInputs=(update:(current:HighDustingInputs)=>HighDustingInputs)=>onChange(update(value));
  function field(key:keyof Pick<HighDustingInputs,"cleaners"|"hoursPerCleaner"|"hourlyLaborCost"|"equipment"|"supplies"|"travelAndOverhead"|"targetMarginPercent">,label:string,step="1"){
    return <label className="text-xs font-bold text-neutral-700">{label}
-    <input type="number" min={key==="targetMarginPercent"?"25":"0"} max={key==="targetMarginPercent"?"50":undefined} step={step} value={inputs[key]}
+    <input type="number" min={key==="targetMarginPercent"?"25":key==="hourlyLaborCost"?"30":key==="cleaners"?"1":key==="hoursPerCleaner"?"0.5":"0"} max={key==="targetMarginPercent"?"50":undefined} step={step} value={inputs[key]}
       onChange={event=>setInputs(prev=>({...prev,[key]:Number(event.target.value)}))}
       className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
    </label>;
@@ -45,6 +45,6 @@ export function HighDustingQuoteCalculator({value,onChange}:{
     <textarea value={areas} onChange={e=>onChange({...value,scope:e.target.value})} maxLength={2000} rows={3} placeholder="Describe accessible beams, vents, rafters, ledges, fixtures, exclusions..." className="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"/>
    </label>
   </div>
-
+  {(!height.trim() || !areas.trim() || !access.length) && <p className="mt-3 text-xs text-neutral-600">To generate your live Estimate Summary, enter working height, describe the elevated surfaces, and select at least one access method.</p>}
  </section>;
 }
