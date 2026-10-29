@@ -24,6 +24,11 @@ export const services = [
     href: "/commercial",
   },
   {
+    title: "Commercial High Dusting",
+    description: "Specialty high dusting of accessible elevated commercial surfaces, including ledges, beams, vent exteriors, and overhead fixtures. Quoted after reviewing heights and safe access.",
+    href: "/commercial",
+  },
+  {
     title: "Post-Construction Cleaning",
     description:
       "Detailed removal of construction dust, fine particles, light debris, and surface residue after building or renovation work. Scope is tailored to the project phase and readiness goals.",
