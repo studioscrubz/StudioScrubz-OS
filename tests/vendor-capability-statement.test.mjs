@@ -275,3 +275,11 @@ test("combined send uses server-authoritative snapshots and one idempotent commu
   assert.match(route, /idempotencyKey: eventKey/);
   assert.match(route, /status: "Prepared"/);
 });
+
+test("Send action always uses the currently previewed document", () => {
+  const ui = read("components/vendorPackets/VendorPacketsPage.tsx");
+  assert.match(ui, /onClick=\{\(\) => openEmail\(previewKind\)\}/);
+  assert.match(ui, /onClick=\{\(\) => openEmail\("corporate-capability-statement", true\)\}/);
+  assert.doesNotMatch(ui, />Email Statement<\/button>/);
+  assert.doesNotMatch(ui, />Email Packet<\/button>/);
+});
