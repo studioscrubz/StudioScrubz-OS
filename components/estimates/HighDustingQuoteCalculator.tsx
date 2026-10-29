@@ -11,7 +11,7 @@ export function HighDustingQuoteCalculator({value,onChange}:{
  const access=value.accessMethods;
  const areas=value.scope;
  const setInputs=(update:(current:HighDustingInputs)=>HighDustingInputs)=>onChange(update(value));
- function field(key:keyof Inputs,label:string,step="1"){
+ function field(key:keyof Pick<HighDustingInputs,"cleaners"|"hoursPerCleaner"|"hourlyLaborCost"|"equipment"|"supplies"|"travelAndOverhead"|"targetMarginPercent">,label:string,step="1"){
    return <label className="text-xs font-bold text-neutral-700">{label}
     <input type="number" min={key==="targetMarginPercent"?"25":"0"} max={key==="targetMarginPercent"?"50":undefined} step={step} value={inputs[key]}
       onChange={event=>setInputs(prev=>({...prev,[key]:Number(event.target.value)}))}
