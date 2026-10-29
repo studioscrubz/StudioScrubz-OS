@@ -185,6 +185,7 @@ import type {
   InternalEventAttendee,
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
+import type { CorporateCapabilityProfile } from "@/types/corporateCapability";
 
 export interface Database {
   public: {
@@ -1717,9 +1718,9 @@ export interface Database {
         ];
       };
       business_settings: {
-        Row: BusinessSettings;
-        Insert: BusinessSettingsUpdate & { id?: string };
-        Update: Partial<BusinessSettingsUpdate>;
+        Row: BusinessSettings & { corporate_capability_profile: CorporateCapabilityProfile };
+        Insert: BusinessSettingsUpdate & { id?: string; corporate_capability_profile?: CorporateCapabilityProfile };
+        Update: Partial<BusinessSettingsUpdate & { corporate_capability_profile: CorporateCapabilityProfile }>;
         Relationships: [];
       };
       client_communications: {
@@ -2188,6 +2189,14 @@ export interface Database {
     };
 
     Functions: {
+      get_corporate_capability_profile: {
+        Args: Record<PropertyKey, never>;
+        Returns: CorporateCapabilityProfile;
+      };
+      save_corporate_capability_profile: {
+        Args: { p_profile: CorporateCapabilityProfile };
+        Returns: CorporateCapabilityProfile;
+      };
       get_my_employee_time_off_requests: { Args: Record<PropertyKey, never>; Returns: unknown[] };
       get_employee_time_off_review_queue: { Args: Record<PropertyKey, never>; Returns: unknown[] };
       get_approved_employee_absences: { Args: { p_start_date: string; p_end_date: string }; Returns: unknown[] };

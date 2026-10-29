@@ -36,6 +36,21 @@ jobs:
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_terminal_equipment_test -f supabase/migrations/20261027082047_terminal_gps_and_crew_lead_equipment_custody.sql
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_terminal_equipment_test -f supabase/tests/terminal_gps_lead_equipment_postgres.sql
 
+  corporate-capability-profile-postgres:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Build isolated Business Settings database
+        run: |
+          sudo -u postgres createdb studioscrubz_capability_profile_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_capability_profile_test -f supabase/tests/corporate_capability_profile_fixture.sql
+      - name: Apply actual corporate capability profile migration
+        run: sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_capability_profile_test -f supabase/migrations/20261029090000_corporate_capability_profile.sql
+      - name: Verify profile authorization, validation, defaults, and persistence
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_capability_profile_test -f supabase/tests/corporate_capability_profile_postgres.sql
+
   job-finished-photo-postgres:
     runs-on: ubuntu-24.04
     steps:

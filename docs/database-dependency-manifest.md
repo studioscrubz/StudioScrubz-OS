@@ -217,3 +217,11 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 - Both RPCs resolve the property from the authorized scheduled walkthrough and reuse the protected `jobsite_geofence_settings` relation.
 
 2026-10-27 equipment action relocation: `get_my_equipment_action_jobs` and `get_my_pending_job_equipment_handoffs` are authenticated, current-employee-scoped read-only RPCs defined by `20261027190000_equipment_action_job_access.sql`. They preserve access to completed financially handed-off Jobs only while the employee has a pending Final Sign Out or incoming handoff, without changing normal operational Job visibility. The My Availability page keeps using `get_my_pending_equipment_signouts` for its server-enforced sign-out guard.
+
+## 2026-10-29 Corporate capability profile dependencies
+
+- `get_corporate_capability_profile` exposes only the verified capability profile JSON to authenticated Master Admin, Administrator, and Sales users.
+- `save_corporate_capability_profile` validates and saves the singleton profile and is restricted to Master Admin.
+- `validate_corporate_capability_profile` is an internal validator with no application execute grant.
+- `business_settings.corporate_capability_profile` is intentionally excluded from the public and workflow business settings projections.
+- Source: `supabase/migrations/20261029090000_corporate_capability_profile.sql`.
