@@ -13,7 +13,7 @@ select
   'Commercial high dusting of approved elevated surfaces. Scope and price require a separate site assessment and estimate; not included in routine janitorial service.',
   'Custom',
   coalesce(template.pricing_config, '{}'::jsonb) ||
-    '{"requires_separate_quote":true,"requires_walkthrough":true,"catalog_price_is_floor":false}'::jsonb,
+    '{"requires_separate_quote":true,"requires_walkthrough":true,"catalog_price_is_floor":false,"default_worker_hourly_pay":30,"default_target_profit_margin_percent":35}'::jsonb,
   0, 0, false, true, 175,
   'Quote separately: document ceiling heights, elevated surfaces, access equipment, operating conditions and exclusions. Do not include this work in a regular cleaning estimate or price it as a flat add-on.'
 from public.services template
