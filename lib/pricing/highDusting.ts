@@ -12,13 +12,18 @@ export const approvedHighDustingAccessMethods = [
  "Approved extension tools","Appropriate ladder setup","Scissor lift","Other reviewed access method"
 ] as const;
 export function priceHighDusting(input:HighDustingInputs) {
- if(!input || !Number.isInteger(input.cleaners) || input.cleaners<1 || !Number.isFinite(input.hoursPerCleaner) || input.hoursPerCleaner<=0 ||
-  !Number.isFinite(input.hourlyLaborCost)||input.hourlyLaborCost<30 ||
-  ![input.equipment,input.supplies,input.travelAndOverhead].every(n=>Number.isFinite(n)&&n>=0) ||
-  !Number.isFinite(input.targetMarginPercent)||input.targetMarginPercent<25||input.targetMarginPercent>50) throw new Error("Enter valid High Dusting labor, costs and margin.");
- if(!input.workingHeight.trim()||!input.scope.trim()||!Array.isArray(input.accessMethods)||!input.accessMethods.length||
-  input.accessMethods.some(method=>!(approvedHighDustingAccessMethods as readonly string[]).includes(method))||
-  new Set(input.accessMethods).size!==input.accessMethods.length) throw new Error("Record working height, scope and at least one approved access method.");
+ if(!input) throw new Error("Enter the High Dusting calculator details.");
+ if(!Number.isInteger(input.cleaners)||input.cleaners<1) throw new Error("Number of cleaners must be at least 1.");
+ if(!Number.isFinite(input.hoursPerCleaner)||input.hoursPerCleaner<=0) throw new Error("Enter hours greater than 0 for each cleaner.");
+ if(!Number.isFinite(input.hourlyLaborCost)||input.hourlyLaborCost<30) throw new Error("Hourly labor cost must be at least $30.");
+ if(!Number.isFinite(input.equipment)||input.equipment<0) throw new Error("Equipment cost cannot be negative.");
+ if(!Number.isFinite(input.supplies)||input.supplies<0) throw new Error("Supplies cost cannot be negative.");
+ if(!Number.isFinite(input.travelAndOverhead)||input.travelAndOverhead<0) throw new Error("Travel and overhead cost cannot be negative.");
+ if(!Number.isFinite(input.targetMarginPercent)||input.targetMarginPercent<25||input.targetMarginPercent>50) throw new Error("Target gross margin must be between 25% and 50%.");
+ if(!input.workingHeight?.trim()) throw new Error("Enter the highest surface or working height.");
+ if(!input.scope?.trim()) throw new Error("Describe the elevated surfaces and scope.");
+ if(!Array.isArray(input.accessMethods)||!input.accessMethods.length) throw new Error("Select at least one access method.");
+ if(input.accessMethods.some(method=>!(approvedHighDustingAccessMethods as readonly string[]).includes(method))||new Set(input.accessMethods).size!==input.accessMethods.length) throw new Error("Review the selected access methods.");
  const laborCost=input.cleaners*input.hoursPerCleaner*input.hourlyLaborCost;
  const supplyCost=input.equipment+input.supplies+input.travelAndOverhead;
  const directCost=laborCost+supplyCost;
