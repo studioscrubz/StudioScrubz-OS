@@ -1,4 +1,5 @@
 import "server-only";
+import { approvedHighDustingAccessMethods, priceHighDusting } from "@/lib/pricing/highDusting";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
@@ -63,6 +64,10 @@ export type PublicRequest = {
   kitchens?: number;
   stations?: number;
   units?: number;
+  commonAreas?: number;
+  highDustingHeight?: string;
+  highDustingAccessMethods?: string[];
+  highDustingScope?: string;
   condition: Condition;
   addons: string[];
   addonQuantities?: Record<string, number>;
@@ -254,10 +259,42 @@ export function calculatePublicRequest(
   }
 
   const config = service.pricing_config;
+  const highDusting = service.service_code === "COM-HIGH-DUST";
+  // The customer describes the site; protected costs and margin stay server-side.
+  // This is a preliminary figure requiring a walkthrough, not a guaranteed lift quote.
+  const estimatedHighDustingHours = highDusting
+    ? Math.max(2, Math.ceil((input.squareFeet / 500 + (input.restrooms ?? 0) * 0.3 +
+        (input.kitchens ?? 0) * 0.4 + (input.commonAreas ?? 0) * 0.5 +
+        (input.units ?? 0) * 0.2) * (input.condition === "Extreme" ? 1.75 :
+         input.condition === "Heavy" ? 1.4 : input.condition === "Light" ? 0.85 : 1) * 2) / 2)
+    : 0;
+  const highDustingInput = highDusting ? {
+    cleaners: 2,
+    hoursPerCleaner: estimatedHighDustingHours,
+    hourlyLaborCost: Math.max(30, Number(config.default_worker_hourly_pay) || 30),
+    equipment: (input.highDustingAccessMethods ?? []).includes("Scissor lift") ? 325 : 75,
+    supplies: 35,
+    travelAndOverhead: 60,
+    targetMarginPercent: Math.max(25, Math.min(50, Number(config.default_target_profit_margin_percent) || 35)),
+    squareFeet: input.squareFeet,
+    bathrooms: input.restrooms ?? 0,
+    kitchens: input.kitchens ?? 0,
+    commonAreas: input.commonAreas ?? 0,
+    units: input.units ?? 0,
+    workingHeight: input.highDustingHeight ?? "",
+    accessMethods: input.highDustingAccessMethods ?? [],
+    scope: input.highDustingScope ?? "",
+  } : undefined;
+  if (highDustingInput) {
+    if (input.addons.length) throw new PublicEstimateRequestError("High Dusting requires a separate estimate from routine cleaning.");
+    try { priceHighDusting(highDustingInput); }
+    catch (error) { throw new PublicEstimateRequestError(error instanceof Error ? error.message : "Complete the High Dusting project details."); }
+  }
 
   const calculator: CommercialCalculatorInput = {
     division: "Commercial",
     commercialType: trimCleaning(service.service_name),
+    highDusting: highDustingInput,
     frequency: allowedFrequency(input.frequency, service),
     condition: input.condition,
     squareFeet: input.squareFeet,
@@ -286,10 +323,17 @@ export function calculatePublicRequest(
     workdayHours: 8,
   };
 
-  return withServiceDescription(
-    calculateCommercialEstimate(calculator, catalog),
-    service
-  );
+  const calculated = calculateCommercialEstimate(calculator, catalog);
+  return highDustingInput
+    ? {
+        ...calculated,
+        serviceDescription: calculated.scope[0] ?? null,
+        submission: {
+          ...(calculated.submission ?? {}),
+          // Customer-facing price is preliminary; reviewed access and equipment can change it.
+        } as EstimateResult["submission"],
+      }
+    : withServiceDescription(calculated, service);
 }
 
 export async function submitPublicRequest(
@@ -524,7 +568,7 @@ export async function submitPublicRequest(
               input.division === "Commercial"
                 ? input.units ?? null
                 : null,
-            specialtyAreas: "",
+            specialtyAreas: input.division === "Commercial" && result.serviceName === "High Dusting Cleaning" ? `High Dusting: ${input.highDustingScope ?? ""}. Common areas: ${input.commonAreas ?? 0}. Height: ${input.highDustingHeight ?? ""}. Access: ${(input.highDustingAccessMethods ?? []).join(", ")}.` : "",
             accessRestrictions: "",
             parkingLoading: "",
             waterAccess: "",
@@ -608,6 +652,8 @@ function validatePricingInput(input: PublicRequest) {
           input.stations,
           input.units,
         ];
+
+  if (input.division === "Commercial" && (!validNumber(input.commonAreas ?? 0, 0, 10000) || !Number.isInteger(input.commonAreas ?? 0))) throw new PublicEstimateRequestError("Enter a valid number of common areas.");
 
   if (
     counts.some(
