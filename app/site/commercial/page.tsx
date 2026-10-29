@@ -53,13 +53,12 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           </dl>
         <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-white px-4 py-5">
           <img src="https://upload.wikimedia.org/wikipedia/en/d/d3/Starbucks_Corporation_Logo_2011.svg" width="185" height="185" alt="Starbucks logo" loading="lazy" decoding="async" className="aspect-square w-full max-w-[185px] object-contain" />
-        </div
+        </div>
           </div>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz successfully completed high-dusting assignments at two Starbucks locations, addressing accessible elevated surfaces, ceiling vents, fixtures, and other designated areas in accordance with the approved scope of work.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our experience supporting commercial facility service providers demonstrates our ability to deliver specialized cleaning services in active business environments.</p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">This work was completed as a facility services subcontract. Reference to Starbucks identifies the serviced locations and does not imply endorsement or a direct contract with Starbucks.</p>
         </div>
->
       </div>
     </div>
   </section>
@@ -77,13 +76,12 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
         <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-4 py-5">
           <div aria-label="Women’s Audio Mission Academy project" className="flex size-40 flex-col items-center justify-center rounded-full border-[10px] border-[#e93431] bg-white px-4 text-center shadow-[inset_0_0_0_5px_#141414]"><span className="text-[10px] font-black uppercase tracking-[.12em] text-[#141414]">Women&apos;s Audio Mission</span><span className="mt-2 text-4xl font-black tracking-[-.08em] text-[#e93431]">WAM</span><span className="mt-2 text-xs font-black uppercase tracking-[.18em] text-[#141414]">Academy</span></div>
           
-        </div
+        </div>
           </div>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provided commercial cleaning services for Women&apos;s Audio Mission Academy, including detailed refrigerator cleaning as part of the service scope.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">From everyday facility upkeep to focused detail work, our commercial cleaning services are tailored to the needs of each space.</p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">StudioScrubz provided these services directly to Women&apos;s Audio Mission Academy. Project reference does not imply a public endorsement.</p>
         </div>
->
       </div>
     </div>
   </section>
