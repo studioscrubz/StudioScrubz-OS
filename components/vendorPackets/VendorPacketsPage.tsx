@@ -219,7 +219,7 @@ export function VendorPacketsPage() {
     </dialog>}
 
     {!loading && createPortal(<div id="vendor-document-print">{documentModel && <VendorDocumentPreview model={documentModel} />}</div>, document.body)}
-    <style>{`
+    {createPortal(<style>{`
       #vendor-document-print { display: none; }
       .vendor-document { max-width: 8.5in; margin: auto; padding: .55in; background: white; color: #202820; font: 10.5pt/1.48 Arial, sans-serif; overflow-wrap: anywhere; }
       .vendor-document h1 { font-size: 25pt; line-height: 1.12; color: #143d1a; font-weight: 800; margin: 20px 0; }
@@ -270,7 +270,8 @@ export function VendorPacketsPage() {
       @media print {
         @page { size: letter; margin: .55in; }
         body > *:not(#vendor-document-print) { display: none !important; }
-        body > #vendor-document-print { display: block !important; }
+        #vendor-document-print, #vendor-document-print * { visibility: visible !important; }
+        body > #vendor-document-print { display: block !important; position: static !important; height: auto !important; overflow: visible !important; }
         html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
         .vendor-document { max-width: none; padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         .vendor-document h2, .vendor-document h3 { break-after: avoid; }
@@ -282,7 +283,7 @@ export function VendorPacketsPage() {
         .capability-sidebar { border-left: 1px solid #dce4db; padding-left: 16px; }
         .capability-competency-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       }
-    `}</style>
+    `}</style>, document.head)}
   </>;
 }
 
