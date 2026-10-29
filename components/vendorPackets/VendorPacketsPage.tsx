@@ -19,12 +19,7 @@ import type { CorporateCapabilityProfile } from "@/types/corporateCapability";
 import type { Property } from "@/types/property";
 
 const fieldClass = "mt-2 w-full rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-800";
-const documentChoices: Array<{ kind: VendorDocumentKind; title: string; description: string }> = [
-  { kind: "corporate-capability-statement", title: "Corporate Capability Statement", description: "A concise corporate profile with verified company facts and selected core competencies." },
-  { kind: "service-packet", title: "Service Capability Packet", description: "The detailed service overview for a prospect, client, property, or project." },
-];
-
-type EmailDraft = { recipientEmail: string; subject: string; messageBody: string; requestId: string; sendBoth: boolean };
+type EmailDraft = { recipientEmail: string; subject: string; messageBody: string; requestId: string; sendBoth: boolean; kind: VendorDocumentKind };
 
 export function VendorPacketsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -33,11 +28,10 @@ export function VendorPacketsPage() {
   const [corporateProfile, setCorporateProfile] = useState<CorporateCapabilityProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [documentKind, setDocumentKind] = useState<VendorDocumentKind>("corporate-capability-statement");
+  const [previewKind, setPreviewKind] = useState<VendorDocumentKind>("corporate-capability-statement");
   const [clientId, setClientId] = useState("");
   const [propertyId, setPropertyId] = useState("");
-  const [serviceModuleIds, setServiceModuleIds] = useState<string[]>([]);
-  const [statementModuleIds, setStatementModuleIds] = useState<string[]>([]);
+  const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
   const [sending, setSending] = useState(false);
@@ -66,11 +60,10 @@ export function VendorPacketsPage() {
   const client = clients.find((item) => item.id === clientId);
   const availableProperties = properties.filter((item) => item.client_id === clientId);
   const property = availableProperties.find((item) => item.id === propertyId);
-  const selectedModuleIds = documentKind === "corporate-capability-statement" ? statementModuleIds : serviceModuleIds;
   const documentModel = (() => {
     if (!client || !business || selectedModuleIds.length === 0) return null;
     return buildVendorCapabilityDocumentModel({
-      documentKind,
+      documentKind: previewKind,
       clientName: clientName(client),
       propertyLabel: property ? propertyLabel(property) : null,
       business: {
@@ -82,42 +75,32 @@ export function VendorPacketsPage() {
         address: businessAddress(business),
       },
       corporateProfile,
-      moduleIds: selectedModuleIds,
+      moduleIds: previewKind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds,
     });
   })();
 
-  const documentLabel = documentKind === "corporate-capability-statement" ? "Capability Statement" : "Service Packet";
+  const documentLabel = previewKind === "corporate-capability-statement" ? "Capability Statement" : "Service Packet";
   const profileHasCorporateFacts = Boolean(corporateProfile && (
     corporateProfile.uei || corporateProfile.cageCode || corporateProfile.naicsCodes.length || corporateProfile.certifications.length ||
     corporateProfile.pastPerformance.length || corporateProfile.differentiators.length || corporateProfile.serviceAreas
   ));
 
-  function changeDocumentKind(kind: VendorDocumentKind) {
-    setDocumentKind(kind);
-    setSelectionNotice(null);
-    setEmailNotice(null);
-  }
-
   function toggleModule(moduleId: string, checked: boolean) {
-    const current = selectedModuleIds;
-    if (checked && documentKind === "corporate-capability-statement" && current.length >= CORPORATE_CAPABILITY_MODULE_LIMIT) {
-      setSelectionNotice(`A Corporate Capability Statement can include up to ${CORPORATE_CAPABILITY_MODULE_LIMIT} core competencies. Remove one before adding another.`);
-      return;
-    }
-    const next = checked ? [...current, moduleId] : current.filter((value) => value !== moduleId);
-    if (documentKind === "corporate-capability-statement") setStatementModuleIds(next);
-    else setServiceModuleIds(next);
+    setSelectedModuleIds(current => checked
+      ? current.includes(moduleId) ? current : [...current, moduleId]
+      : current.filter(id => id !== moduleId));
     setSelectionNotice(null);
     setEmailNotice(null);
   }
 
-  function openEmail(sendBoth = false) {
+  function openEmail(kind: VendorDocumentKind, sendBoth = false) {
     if (!client || !documentModel) return;
     setEmailError(null);
     setEmailNotice(null);
     const target = property?.property_name || clientName(client);
-    const statement = sendBoth || documentKind === "corporate-capability-statement";
+    const statement = sendBoth || kind === "corporate-capability-statement";
     setEmailDraft({
+      kind,
       sendBoth,
       recipientEmail: client.email ?? "",
       requestId: crypto.randomUUID(),
@@ -143,12 +126,12 @@ export function VendorPacketsPage() {
       const response = await fetch("/api/vendor-packets/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : documentKind, clientId, propertyId: propertyId || null, moduleIds: selectedModuleIds }),
+        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : emailDraft.kind, clientId, propertyId: propertyId || null, moduleIds: !emailDraft.sendBoth && emailDraft.kind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds }),
       });
       const result = await response.json() as { error?: string; providerMessageId?: string; warning?: string };
       if (!response.ok || !result.providerMessageId) throw new Error(result.error || "The email could not be sent.");
       setEmailDraft(null);
-      setEmailNotice(result.warning || `${emailDraft.sendBoth ? "Both documents" : documentLabel} emailed and recorded in client history.`);
+      setEmailNotice(result.warning || `${emailDraft.sendBoth ? "Both documents" : emailDraft.kind === "corporate-capability-statement" ? "Capability Statement" : "Service Packet"} emailed and recorded in client history.`);
     } catch (cause) {
       setEmailError(cause instanceof Error ? cause.message : "The email could not be confirmed as sent. Please try again.");
     } finally {
@@ -160,21 +143,11 @@ export function VendorPacketsPage() {
     <header className="mb-7 border-b border-[#143d1a]/10 pb-7">
       <p className="text-xs font-bold uppercase tracking-widest text-[#9a7a17]">Business development</p>
       <h1 className="mt-3 text-3xl font-extrabold text-[#143d1a]">Vendor Documents</h1>
-      <p className="mt-3 max-w-3xl text-sm text-neutral-600">Generate a client-ready Corporate Capability Statement or detailed Service Capability Packet from approved StudioScrubz information.</p>
+      <p className="mt-3 max-w-3xl text-sm text-neutral-600">Select your client and services once, then preview or send either document—or both together.</p>
     </header>
 
     {loading ? <p role="status">Loading clients and corporate business information...</p> : error ? <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error}</p> : <>
       <section aria-label="Document options" className="mb-8 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6">
-        <fieldset>
-          <legend className="font-bold text-[#143d1a]">Document type</legend>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {documentChoices.map((choice) => <label key={choice.kind} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${documentKind === choice.kind ? "border-[#143d1a] bg-[#143d1a]/5 ring-1 ring-[#143d1a]" : "border-neutral-200 hover:border-neutral-300"}`}>
-              <input type="radio" name="vendor-document-kind" value={choice.kind} checked={documentKind === choice.kind} onChange={() => changeDocumentKind(choice.kind)} className="mt-1 accent-[#143d1a]" />
-              <span><strong className="block text-sm text-[#143d1a]">{choice.title}</strong><span className="mt-1 block text-sm text-neutral-600">{choice.description}</span></span>
-            </label>)}
-          </div>
-        </fieldset>
-
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-bold">Prospect / Client
             <select className={fieldClass} value={clientId} onChange={(event) => { setClientId(event.target.value); setPropertyId(""); setEmailNotice(null); }}>
@@ -192,31 +165,39 @@ export function VendorPacketsPage() {
         {!clients.length && <p className="mt-3 text-sm text-neutral-600">No unarchived clients are available. Add a prospect through Clients first.</p>}
 
         <fieldset className="mt-6" aria-describedby="module-guidance">
-          <legend className="font-bold text-[#143d1a]">{documentKind === "corporate-capability-statement" ? "Core competencies" : "Capability modules"}</legend>
-          <p id="module-guidance" className="mt-1 text-sm text-neutral-600">{documentKind === "corporate-capability-statement" ? `Choose up to ${CORPORATE_CAPABILITY_MODULE_LIMIT} services to keep the statement concise.` : "Choose the service sections relevant to this client or property."}</p>
+          <legend className="font-bold text-[#143d1a]">Services to highlight</legend>
+          <p id="module-guidance" className="mt-1 text-sm text-neutral-600">Select relevant services once. The statement highlights up to four; the detailed packet includes all selections.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {modules.map((item) => {
-              const checked = selectedModuleIds.includes(item.id);
-              const limitReached = documentKind === "corporate-capability-statement" && !checked && selectedModuleIds.length >= CORPORATE_CAPABILITY_MODULE_LIMIT;
-              return <label key={item.id} className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${limitReached ? "cursor-not-allowed bg-neutral-50 text-neutral-400" : "cursor-pointer"}`}>
-                <input type="checkbox" className="mt-1 accent-[#143d1a]" checked={checked} disabled={limitReached} onChange={(event) => toggleModule(item.id, event.target.checked)} />
-                {item.title}
-              </label>;
-            })}
+            {modules.map(item => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm">
+              <input type="checkbox" className="mt-1 accent-[#143d1a]" checked={selectedModuleIds.includes(item.id)} onChange={event => toggleModule(item.id, event.target.checked)} />
+              {item.title}
+            </label>)}
           </div>
         </fieldset>
 
         {selectionNotice && <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{selectionNotice}</p>}
-        {documentKind === "corporate-capability-statement" && <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-600">
+        {previewKind === "corporate-capability-statement" && <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-600">
           {profileHasCorporateFacts ? "Only configured corporate facts are included. Blank identifiers or claims are omitted." : "Corporate identifiers, certifications, service areas, differentiators, and past performance are omitted until a Master Admin verifies them in Business Settings."}
         </p>}
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={!documentModel} onClick={() => document.getElementById("vendor-document-preview")?.scrollIntoView({ behavior: "smooth" })} className="rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40">Preview</button>
-          <button type="button" disabled={!documentModel} onClick={() => window.print()} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Print / Save PDF</button>
-          <button type="button" disabled={!documentModel} onClick={() => openEmail()} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Email {documentLabel}</button>
-          <button type="button" disabled={!documentModel} onClick={() => openEmail(true)} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Send Both Documents</button>
-          <p className="basis-full text-sm text-neutral-500 sm:basis-auto">Select a client and services. Send Both puts the statement in the email and attaches a PDF packet for all selected services (the statement highlights the first four). For browser printing, turn off headers and footers.</p>
+        <div className="mt-6 space-y-4">
+          <div>
+            <p className="mb-2 text-sm font-bold text-[#143d1a]">Preview & print</p>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" disabled={!client || !selectedModuleIds.length} onClick={() => { setPreviewKind("corporate-capability-statement"); setEmailNotice(null); }} aria-pressed={previewKind === "corporate-capability-statement"} className={`rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40 ${previewKind === "corporate-capability-statement" ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>Preview Statement</button>
+              <button type="button" disabled={!client || !selectedModuleIds.length} onClick={() => { setPreviewKind("service-packet"); setEmailNotice(null); }} aria-pressed={previewKind === "service-packet"} className={`rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40 ${previewKind === "service-packet" ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>Preview Packet</button>
+              <button type="button" disabled={!documentModel} onClick={() => window.print()} className="rounded-lg border border-[#143d1a] px-5 py-3 text-sm font-bold text-[#143d1a] disabled:opacity-40">Print / Save Preview as PDF</button>
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-bold text-[#143d1a]">Email documents</p>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" disabled={!documentModel} onClick={() => openEmail("corporate-capability-statement")} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Email Statement</button>
+              <button type="button" disabled={!documentModel} onClick={() => openEmail("service-packet")} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Email Packet</button>
+              <button type="button" disabled={!documentModel} onClick={() => openEmail("corporate-capability-statement", true)} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Send Both Documents</button>
+            </div>
+          </div>
+          <p className="text-sm text-neutral-500">The preview below reflects your selected document. Send Both places the statement in the email and attaches the complete packet as a PDF. For browser printing, disable headers and footers.</p>
         </div>
         {emailNotice && <p role="status" className="mt-4 text-sm font-medium text-[#143d1a]">{emailNotice}</p>}
       </section>
@@ -226,7 +207,7 @@ export function VendorPacketsPage() {
 
     {emailDraft && <dialog ref={(element) => { if (element && !element.open) element.showModal(); }} onCancel={(event) => { event.preventDefault(); if (!sending) setEmailDraft(null); }} aria-labelledby="vendor-email-title" className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-2xl p-5 backdrop:bg-black/40 sm:p-6">
       <form onSubmit={sendEmail}>
-        <h2 id="vendor-email-title" className="text-xl font-bold text-[#143d1a]">{emailDraft.sendBoth ? "Send Both Documents" : `Email ${documentLabel}`}</h2>
+        <h2 id="vendor-email-title" className="text-xl font-bold text-[#143d1a]">{emailDraft.sendBoth ? "Send Both Documents" : emailDraft.kind === "corporate-capability-statement" ? "Email Capability Statement" : "Email Service Packet"}</h2>
         <p className="mt-2 text-sm text-neutral-600">{emailDraft.sendBoth ? "The Corporate Capability Statement appears in the branded email, with a generated Service Capability Packet PDF attached. One delivery is recorded in client history." : "The generated document will appear in the branded email body and the exact content snapshot will be recorded in client history."}</p>
         <fieldset disabled={sending} className="mt-4 space-y-4">
           <label className="block text-sm font-bold">Recipient<input autoFocus required type="email" maxLength={320} className={fieldClass} value={emailDraft.recipientEmail} onChange={(event) => setEmailDraft({ ...emailDraft, recipientEmail: event.target.value })} /></label>
@@ -234,7 +215,7 @@ export function VendorPacketsPage() {
           <label className="block text-sm font-bold">Message<textarea required maxLength={10000} rows={9} className={fieldClass} value={emailDraft.messageBody} onChange={(event) => setEmailDraft({ ...emailDraft, messageBody: event.target.value })} /></label>
         </fieldset>
         {emailError && <p role="alert" className="mt-3 text-sm text-red-700">{emailError}</p>}
-        <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={sending} onClick={() => setEmailDraft(null)} className="rounded-lg border px-4 py-2">Cancel</button><button disabled={sending || !documentModel || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft.recipientEmail.trim()) || !emailDraft.subject.trim() || !emailDraft.messageBody.trim()} className="rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-40">{sending ? "Sending..." : emailDraft.sendBoth ? "Send Both Documents" : `Send ${documentLabel}`}</button></div>
+        <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={sending} onClick={() => setEmailDraft(null)} className="rounded-lg border px-4 py-2">Cancel</button><button disabled={sending || !documentModel || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft.recipientEmail.trim()) || !emailDraft.subject.trim() || !emailDraft.messageBody.trim()} className="rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-40">{sending ? "Sending..." : emailDraft.sendBoth ? "Send Both Documents" : emailDraft.kind === "corporate-capability-statement" ? "Send Statement" : "Send Packet"}</button></div>
       </form>
     </dialog>}
 

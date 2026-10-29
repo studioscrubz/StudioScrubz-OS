@@ -265,7 +265,7 @@ test("combined send generates a genuine US Letter PDF attachment with branded pa
 test("combined send uses server-authoritative snapshots and one idempotent communication", () => {
   const ui = read("components/vendorPackets/VendorPacketsPage.tsx");
   assert.match(ui, /Send Both Documents/);
-  assert.match(ui, /emailDraft\.sendBoth \? "both" : documentKind/);
+  assert.match(ui, /emailDraft\.sendBoth \? "both" : emailDraft\.kind/);
   assert.match(route, /documentKind === "both" \? "service-packet" : documentKind/);
   assert.match(route, /attachment_content_snapshot: packetModel\.contentSnapshot/);
   assert.match(route, /packetFromCommunication\(communication, identity\)/);
