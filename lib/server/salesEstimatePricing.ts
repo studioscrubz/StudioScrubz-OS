@@ -49,7 +49,7 @@ export function calculateSalesEstimate(rawInput: unknown, catalog: ServiceCatalo
   const result = isPostConstruction(input)
     ? calculated
     : withAuthoritativeEstimatePrice(calculated, requestedPrice);
-  return { ...result, serviceDescription: typeof description === "string" && description.trim() ? description.trim() : result.serviceDescription };
+  return { ...result, serviceDescription: result.serviceName === "High Dusting Cleaning" ? result.scope[0] ?? null : typeof description === "string" && description.trim() ? description.trim() : result.serviceDescription };
 }
 
 export function publicEstimateResult(result: EstimateResult): Record<string, unknown> {
