@@ -26,7 +26,7 @@ export function HighDustingQuoteCalculator({value,onChange}:{
     <input type="number" min="1" step="1" required value={value.squareFeet || ""} onChange={event=>onChange({...value,squareFeet:Number(event.target.value)})} placeholder="Enter total area" className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
    </label>
    {([["bathrooms","Bathrooms"],["kitchens","Kitchens"],["commonAreas","Common areas"],["units","Units"]] as const).map(([key,label])=><label key={key} className="text-xs font-bold text-neutral-700">{label}
-    <input type="number" min="0" step="1" value={value[key]} onChange={event=>onChange({...value,[key]:Number(event.target.value)})} className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
+    <input type="number" min="0" step="1" value={value[key]??0} onChange={event=>onChange({...value,[key]:Number(event.target.value)})} className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
    </label>)}
   </div>
   <div className="mt-4 grid gap-3 sm:grid-cols-2">
