@@ -52,9 +52,6 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           </dl>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz successfully completed high-dusting assignments at two Starbucks locations, addressing accessible elevated surfaces, ceiling vents, fixtures, and other designated areas in accordance with the approved scope of work.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our experience supporting commercial facility service providers demonstrates our ability to deliver specialized cleaning services in active business environments.</p>
-          <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Need a dependable commercial cleaning partner?</h3>
-          <p className="mt-3 text-base leading-7 text-neutral-700">Contact StudioScrubz for recurring cleaning, specialty cleaning, and high-dusting services.</p>
-          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-base font-extrabold text-[#143d1a]"><a href="tel:+17473656265" className="underline decoration-[#d4af37] underline-offset-4">(747) 365-6265</a><a href="https://www.studioscrubz.com/" className="underline decoration-[#d4af37] underline-offset-4">www.StudioScrubz.com</a></p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">This work was completed as a facility services subcontract. Reference to Starbucks identifies the serviced locations and does not imply endorsement or a direct contract with Starbucks.</p>
         </div>
         <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-white px-6 py-9">
@@ -75,9 +72,6 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           </dl>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provided commercial cleaning services for Women&apos;s Audio Mission Academy, including detailed refrigerator cleaning as part of the service scope.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">From everyday facility upkeep to focused detail work, our commercial cleaning services are tailored to the needs of each space.</p>
-          <h3 className="mt-7 text-lg font-extrabold text-[#143d1a]">Looking for dependable commercial cleaning?</h3>
-          <p className="mt-3 text-base leading-7 text-neutral-700">Contact StudioScrubz to discuss a customized cleaning plan for your facility.</p>
-          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-base font-extrabold text-[#143d1a]"><a href="tel:+17473656265" className="underline decoration-[#d4af37] underline-offset-4">(747) 365-6265</a><a href="https://www.studioscrubz.com/" className="underline decoration-[#d4af37] underline-offset-4">www.StudioScrubz.com</a></p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">StudioScrubz provided these services directly to Women&apos;s Audio Mission Academy. Project reference does not imply a public endorsement.</p>
         </div>
         <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-6 py-8">
