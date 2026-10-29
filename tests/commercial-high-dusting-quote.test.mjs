@@ -14,7 +14,7 @@ test("high dusting has a unique independently quoted catalog service and no inve
  assert.doesNotMatch(migration, /insert into public\.service_addons|insert into public\.service_addon_links/i);
 });
 test("high dusting uses normal estimate summary with calculated price", () => {
- assert.match(calculator, /selected\.service_code === "COM-HIGH-DUST"/);
+ assert.match(calculator, /service\.service_code === "COM-HIGH-DUST"/);
  assert.match(calculator, /input\.frequency !== "One-Time"/);
  assert.match(builder, /<HighDustingQuoteCalculator value=\{value\.highDusting/);
  assert.doesNotMatch(builder, /Separate High Dusting Quote Required/);
