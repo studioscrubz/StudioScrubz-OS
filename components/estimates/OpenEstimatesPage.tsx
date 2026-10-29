@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { EstimateBuilder } from "./EstimateBuilder";
+import { loadHighDustingPairs } from "@/lib/services/estimatePairs";
 import { EstimateApprovalControls } from "./EstimateApprovalControls";
 import type { UserProfile } from "@/types/auth";
 import { archiveEstimate, declineEstimate, getEstimates, markEstimateSent } from "@/lib/services/estimates";
@@ -31,6 +32,7 @@ export function OpenEstimatesPage() {
   const { profile } = useAuth();
   const [approvalFilter,setApprovalFilter] = useState("All");
   const [estimates, setEstimates] = useState<EstimateWithRelations[]>([]);
+  const [highDustingPairs,setHighDustingPairs]=useState<{estimate_a_id:string;estimate_b_id:string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function OpenEstimatesPage() {
   const [sending, setSending] = useState<EstimateWithRelations | null>(null);
   const [declining, setDeclining] = useState<EstimateWithRelations | null>(null);
 
-  useEffect(() => { let active = true; void Promise.all([getEstimates(), getWalkthroughsForEstimates()]).then(([estimateRows, walkthroughRows]) => { if (active) { setEstimates(estimateRows); setWalkthroughs(walkthroughRows); const requestedId = new URLSearchParams(window.location.search).get("estimateId"); if (requestedId) setViewing(estimateRows.find((estimate) => estimate.id === requestedId) ?? null); } }).catch((caught: unknown) => { console.error("Failed to load estimates or walkthrough links from Supabase", caught); if (active) setError(message(caught, "Estimates could not be loaded.")); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void Promise.all([getEstimates(), getWalkthroughsForEstimates(), loadHighDustingPairs()]).then(([estimateRows, walkthroughRows, linkedPairs]) => { if (active) { setEstimates(estimateRows); setWalkthroughs(walkthroughRows); setHighDustingPairs(linkedPairs); const requestedId = new URLSearchParams(window.location.search).get("estimateId"); if (requestedId) setViewing(estimateRows.find((estimate) => estimate.id === requestedId) ?? null); } }).catch((caught: unknown) => { console.error("Failed to load estimates or walkthrough links from Supabase", caught); if (active) setError(message(caught, "Estimates could not be loaded.")); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
   const scheduledEstimateIds=useMemo(()=>new Set(walkthroughs.filter((item)=>Boolean(item.walkthrough_date&&item.walkthrough_time)).map((item)=>item.estimate_id).filter((id):id is string=>Boolean(id))),[walkthroughs]);
   const isOpenWork=(item:EstimateWithRelations)=>!item.archived_at&&item.status==="Open"&&!scheduledEstimateIds.has(item.id);
   const summary = useMemo(() => ({ total: estimates.filter(isOpenWork).length, residential: estimates.filter((item) => isOpenWork(item) && item.division === "Residential").length, commercial: estimates.filter((item) => isOpenWork(item) && item.division === "Commercial").length, archived: estimates.filter((item) => Boolean(item.archived_at)).length }), [estimates,scheduledEstimateIds]);
@@ -64,7 +66,7 @@ export function OpenEstimatesPage() {
     return records.sort((a, b) => compare(a, b, sort));
   }, [approvalFilter, archive, division, estimates, scheduledEstimateIds, search, sort, status]);
 
-  async function refresh(text?: string) { const [estimateRows, walkthroughRows] = await Promise.all([getEstimates(), getWalkthroughsForEstimates()]); setEstimates(estimateRows); setWalkthroughs(walkthroughRows); if (text) setNotice(text); }
+  async function refresh(text?: string) { const [estimateRows, walkthroughRows, linkedPairs] = await Promise.all([getEstimates(), getWalkthroughsForEstimates(), loadHighDustingPairs()]); setEstimates(estimateRows); setWalkthroughs(walkthroughRows);setHighDustingPairs(linkedPairs); if (text) setNotice(text); }
   useOperationalRealtime(["estimates", "walkthroughs"], refresh);
   function copyPreviewLink(estimate: EstimateWithRelations) {
     void copyEstimatePreviewLink(estimate.id).then(() => setNotice(`Private preview link copied for ${estimate.estimate_number}. Login is required to open it; the estimate has not been sent.`)).catch((cause: unknown) => setError(message(cause, "Could not copy the preview link.")));
@@ -78,6 +80,20 @@ export function OpenEstimatesPage() {
       <div className="border-b border-neutral-100 bg-[#f8faf7] p-4 sm:p-5"><h2 className="text-sm font-extrabold text-[#143d1a]">Find estimates</h2><p className="mt-1 text-xs text-neutral-500">Search and filter by division, status, archive, or sort order.</p><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_150px_140px_180px_180px]"><label><span className="sr-only">Search estimates</span><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search estimates" className={filterClass} /></label><Filter label="Division" value={division} set={(v) => setDivision(v as DivisionFilter)} options={["All", "Residential", "Commercial"]} /><Filter label="Status" value={status} set={(v) => setStatus(v as StatusFilter)} options={["All", "Open", "Converted", "Superseded", "Declined", "Archived"]} /><Filter label="Approval" value={approvalFilter} set={setApprovalFilter} options={["All","Draft","Pending Approval","Approved","Changes Requested"]}/><Filter label="Archive" value={archive} set={(v) => setArchive(v as ArchiveFilter)} options={["Active Records", "Archived Records", "All Records"]} /><Filter label="Sort" value={sort} set={(v) => setSort(v as SortOption)} options={["Newest", "Oldest", "Customer Name", "Estimate Number", "Price High to Low", "Price Low to High"]} /></div></div>
       {loading ? <Loading /> : filtered.length === 0 ? <Empty hasRecords={estimates.length > 0} /> : <EstimateTable estimates={filtered} walkthroughs={walkthroughs} archivingId={archivingId} view={setViewing} edit={setEditing} send={(estimate)=>Promise.resolve(setSending(estimate))} decline={setDeclining} archive={archiveRecord} copyPreviewLink={copyPreviewLink} profile={profile} onApprovalChanged={refresh} createWalkthrough={setWalkthroughEstimate} viewWalkthrough={setViewingWalkthrough} />}
     </section>
+    {highDustingPairs.length>0&&<section aria-label="Related High Dusting estimates" className="mt-5 rounded-2xl border border-[#143d1a]/10 bg-white p-5">
+      <h2 className="font-extrabold text-[#143d1a]">Linked High Dusting & Cleaning Estimates</h2>
+      <p className="mt-1 text-xs text-neutral-600">Each estimate retains its own scope, price, and approval. Open either estimate to review the related project.</p>
+      <div className="mt-3 space-y-2">{highDustingPairs.map(pair=>{
+        const first=estimates.find(row=>row.id===pair.estimate_a_id);
+        const second=estimates.find(row=>row.id===pair.estimate_b_id);
+        if(!first||!second)return null;
+        return <div key={pair.estimate_a_id+pair.estimate_b_id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm">
+          <button type="button" className="font-bold text-[#143d1a] underline" onClick={()=>setViewing(first)}>{first.estimate_number}: {first.service_name}</button>
+          <span className="text-neutral-500">linked with</span>
+          <button type="button" className="font-bold text-[#143d1a] underline" onClick={()=>setViewing(second)}>{second.estimate_number}: {second.service_name}</button>
+        </div>;
+      })}</div>
+    </section>}
     <ProposalLinkSummary source="estimate" visibleEstimates={filtered} />
     {viewing && <SharedEstimatePreview estimate={viewing} walkthrough={walkthroughs.find(item=>item.estimate_id===viewing.id)??null} close={() => setViewing(null)} schedule={()=>{setViewing(null);setWalkthroughEstimate(viewing)}} viewWalkthrough={(item)=>{setViewing(null);setViewingWalkthrough(item)}} copyPreviewLink={copyPreviewLink} />}
     {editing && <EditModal estimate={editing} close={() => setEditing(null)} saved={() => { setEditing(null); void refresh("Estimate updated successfully."); }} />}
