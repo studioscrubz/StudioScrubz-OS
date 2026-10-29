@@ -1,5 +1,3 @@
-begin;
-
 -- Dedicated separately quoted commercial service.
 -- Reuse existing approved commercial calculator defaults rather than inventing
 -- a high-dusting rate, floor, or working-at-height charge.
@@ -22,4 +20,3 @@ on conflict (service_code) do nothing;
 
 -- Never link this service into service_addons or service_addon_links.
 -- It must be its own estimate with its own authorization and pricing.
-commit;
