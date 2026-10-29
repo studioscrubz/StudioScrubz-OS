@@ -57,11 +57,8 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-base font-extrabold text-[#143d1a]"><a href="tel:+17473656265" className="underline decoration-[#d4af37] underline-offset-4">(747) 365-6265</a><a href="https://www.studioscrubz.com/" className="underline decoration-[#d4af37] underline-offset-4">www.StudioScrubz.com</a></p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">This work was completed as a facility services subcontract. Reference to Starbucks identifies the serviced locations and does not imply endorsement or a direct contract with Starbucks.</p>
         </div>
-        <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-[#006241] px-6 py-9 text-center text-white">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-white/75">Commercial high dusting</p>
-          <p className="mt-3 text-6xl font-extrabold tracking-tight">2</p>
-          <p className="mt-2 text-lg font-bold">Starbucks locations</p>
-          <p className="mt-5 max-w-xs text-sm leading-6 text-white/80">Specialty elevated-surface cleaning completed through a facility services subcontract</p>
+        <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.6rem] bg-white px-6 py-9">
+          <img src="https://upload.wikimedia.org/wikipedia/en/d/d3/Starbucks_Corporation_Logo_2011.svg" width="260" height="260" alt="Starbucks logo" loading="lazy" decoding="async" className="aspect-square w-full max-w-[260px] object-contain" />
         </div>
       </div>
     </div>
