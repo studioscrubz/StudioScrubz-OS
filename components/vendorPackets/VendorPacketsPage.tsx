@@ -24,7 +24,7 @@ const documentChoices: Array<{ kind: VendorDocumentKind; title: string; descript
   { kind: "service-packet", title: "Service Capability Packet", description: "The detailed service overview for a prospect, client, property, or project." },
 ];
 
-type EmailDraft = { recipientEmail: string; subject: string; messageBody: string; requestId: string };
+type EmailDraft = { recipientEmail: string; subject: string; messageBody: string; requestId: string; sendBoth: boolean };
 
 export function VendorPacketsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -111,19 +111,24 @@ export function VendorPacketsPage() {
     setEmailNotice(null);
   }
 
-  function openEmail() {
+  function openEmail(sendBoth = false) {
     if (!client || !documentModel) return;
     setEmailError(null);
     setEmailNotice(null);
     const target = property?.property_name || clientName(client);
-    const statement = documentKind === "corporate-capability-statement";
+    const statement = sendBoth || documentKind === "corporate-capability-statement";
     setEmailDraft({
+      sendBoth,
       recipientEmail: client.email ?? "",
       requestId: crypto.randomUUID(),
-      subject: statement
+      subject: sendBoth
+        ? `StudioScrubz Corporate Capability Statement & Service Packet — ${target}`.slice(0, 200)
+        : statement
         ? `StudioScrubz Corporate Capability Statement — ${target}`.slice(0, 200)
         : `StudioScrubz Cleaning & Property Service Capabilities — ${target}`.slice(0, 200),
-      messageBody: statement
+      messageBody: sendBoth
+        ? `Hello ${clientName(client)},\n\nThank you for the opportunity to introduce StudioScrubz. Our corporate capability statement appears below, and a detailed Service Capability Packet is attached as a PDF.\n\nPlease reach out if you would like to discuss your property, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
+        : statement
         ? `Hello ${clientName(client)},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a corporate capability statement summarizing our company, selected core competencies, and verified business information.\n\nPlease review the statement below, and contact us if you would like to discuss your facility, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
         : `Hello ${clientName(client)},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a service capability packet highlighting the StudioScrubz services that may be relevant to your property or project.\n\nPlease review the information below, and feel free to contact us if you would like to schedule an assessment or discuss a customized service plan.\n\nNo mess. No stress.\n\nStudioScrubz`,
     });
@@ -138,12 +143,12 @@ export function VendorPacketsPage() {
       const response = await fetch("/api/vendor-packets/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...emailDraft, documentKind, clientId, propertyId: propertyId || null, moduleIds: selectedModuleIds }),
+        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : documentKind, clientId, propertyId: propertyId || null, moduleIds: selectedModuleIds }),
       });
       const result = await response.json() as { error?: string; providerMessageId?: string; warning?: string };
       if (!response.ok || !result.providerMessageId) throw new Error(result.error || "The email could not be sent.");
       setEmailDraft(null);
-      setEmailNotice(result.warning || `${documentLabel} emailed and recorded in client history.`);
+      setEmailNotice(result.warning || `${emailDraft.sendBoth ? "Both documents" : documentLabel} emailed and recorded in client history.`);
     } catch (cause) {
       setEmailError(cause instanceof Error ? cause.message : "The email could not be confirmed as sent. Please try again.");
     } finally {
@@ -209,8 +214,9 @@ export function VendorPacketsPage() {
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button type="button" disabled={!documentModel} onClick={() => document.getElementById("vendor-document-preview")?.scrollIntoView({ behavior: "smooth" })} className="rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40">Preview</button>
           <button type="button" disabled={!documentModel} onClick={() => window.print()} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Print / Save PDF</button>
-          <button type="button" disabled={!documentModel} onClick={openEmail} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Email {documentLabel}</button>
-          <p className="basis-full text-sm text-neutral-500 sm:basis-auto">Select a client and at least one capability. For a clean PDF, turn off browser headers and footers.</p>
+          <button type="button" disabled={!documentModel} onClick={() => openEmail()} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Email {documentLabel}</button>
+          <button type="button" disabled={!documentModel} onClick={() => openEmail(true)} className="rounded-lg bg-[#143d1a] px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Send Both Documents</button>
+          <p className="basis-full text-sm text-neutral-500 sm:basis-auto">Select a client and services. Send Both puts the statement in the email and attaches a PDF packet for all selected services (the statement highlights the first four). For browser printing, turn off headers and footers.</p>
         </div>
         {emailNotice && <p role="status" className="mt-4 text-sm font-medium text-[#143d1a]">{emailNotice}</p>}
       </section>
@@ -220,15 +226,15 @@ export function VendorPacketsPage() {
 
     {emailDraft && <dialog ref={(element) => { if (element && !element.open) element.showModal(); }} onCancel={(event) => { event.preventDefault(); if (!sending) setEmailDraft(null); }} aria-labelledby="vendor-email-title" className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-2xl p-5 backdrop:bg-black/40 sm:p-6">
       <form onSubmit={sendEmail}>
-        <h2 id="vendor-email-title" className="text-xl font-bold text-[#143d1a]">Email {documentLabel}</h2>
-        <p className="mt-2 text-sm text-neutral-600">The generated document will appear in the branded email body and the exact content snapshot will be recorded in client history.</p>
+        <h2 id="vendor-email-title" className="text-xl font-bold text-[#143d1a]">{emailDraft.sendBoth ? "Send Both Documents" : `Email ${documentLabel}`}</h2>
+        <p className="mt-2 text-sm text-neutral-600">{emailDraft.sendBoth ? "The Corporate Capability Statement appears in the branded email, with a generated Service Capability Packet PDF attached. One delivery is recorded in client history." : "The generated document will appear in the branded email body and the exact content snapshot will be recorded in client history."}</p>
         <fieldset disabled={sending} className="mt-4 space-y-4">
           <label className="block text-sm font-bold">Recipient<input autoFocus required type="email" maxLength={320} className={fieldClass} value={emailDraft.recipientEmail} onChange={(event) => setEmailDraft({ ...emailDraft, recipientEmail: event.target.value })} /></label>
           <label className="block text-sm font-bold">Subject<input required maxLength={200} className={fieldClass} value={emailDraft.subject} onChange={(event) => setEmailDraft({ ...emailDraft, subject: event.target.value })} /></label>
           <label className="block text-sm font-bold">Message<textarea required maxLength={10000} rows={9} className={fieldClass} value={emailDraft.messageBody} onChange={(event) => setEmailDraft({ ...emailDraft, messageBody: event.target.value })} /></label>
         </fieldset>
         {emailError && <p role="alert" className="mt-3 text-sm text-red-700">{emailError}</p>}
-        <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={sending} onClick={() => setEmailDraft(null)} className="rounded-lg border px-4 py-2">Cancel</button><button disabled={sending || !documentModel || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft.recipientEmail.trim()) || !emailDraft.subject.trim() || !emailDraft.messageBody.trim()} className="rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-40">{sending ? "Sending..." : `Send ${documentLabel}`}</button></div>
+        <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={sending} onClick={() => setEmailDraft(null)} className="rounded-lg border px-4 py-2">Cancel</button><button disabled={sending || !documentModel || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft.recipientEmail.trim()) || !emailDraft.subject.trim() || !emailDraft.messageBody.trim()} className="rounded-lg bg-[#143d1a] px-4 py-2 font-bold text-white disabled:opacity-40">{sending ? "Sending..." : emailDraft.sendBoth ? "Send Both Documents" : `Send ${documentLabel}`}</button></div>
       </form>
     </dialog>}
 
