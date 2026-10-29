@@ -262,7 +262,7 @@ function deliveryMetadata(model: CapabilityStatementModel, identity: RequestIden
     document_kind: identity.documentKind,
     ...(packetModel ? { attachment_filename: "StudioScrubz_Service_Capability_Packet.pdf", attachment_content_type: "application/pdf", attachment_content_snapshot: packetModel.contentSnapshot } : {}),
     document_version: model.documentVersion,
-    selected_module_ids: [...model.selectedModuleIds],
+    selected_module_ids: [...identity.moduleIds],
     selected_capability_modules: model.coreCompetencies.map(module => module.title),
     content_snapshot: model.contentSnapshot,
     request_fingerprint: identity.fingerprint,
