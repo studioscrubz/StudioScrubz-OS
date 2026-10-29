@@ -22,6 +22,14 @@ export function HighDustingQuoteCalculator({value,onChange}:{
   <h3 className="text-lg font-bold text-[#143d1a]">High Dusting Cost Calculator</h3>
   <p className="mt-1 text-xs text-neutral-600">Enter the scope and costs below. Your calculated quote appears automatically in Estimate Summary.</p>
   <div className="mt-4 grid gap-3 sm:grid-cols-2">
+   <label className="text-xs font-bold text-neutral-700">Square Feet (required)
+    <input type="number" min="1" step="1" required value={value.squareFeet || ""} onChange={event=>onChange({...value,squareFeet:Number(event.target.value)})} placeholder="Enter total area" className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
+   </label>
+   {([["bathrooms","Bathrooms"],["kitchens","Kitchens"],["commonAreas","Common areas"],["units","Units"]] as const).map(([key,label])=><label key={key} className="text-xs font-bold text-neutral-700">{label}
+    <input type="number" min="0" step="1" value={value[key]} onChange={event=>onChange({...value,[key]:Number(event.target.value)})} className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
+   </label>)}
+  </div>
+  <div className="mt-4 grid gap-3 sm:grid-cols-2">
    {field("cleaners","Number of cleaners")}
    {field("hoursPerCleaner","Hours per cleaner","0.5")}
    {field("hourlyLaborCost","Fully burdened labor cost per hour ($)","0.01")}
@@ -45,6 +53,6 @@ export function HighDustingQuoteCalculator({value,onChange}:{
     <textarea value={areas} onChange={e=>onChange({...value,scope:e.target.value})} maxLength={2000} rows={3} placeholder="Describe accessible beams, vents, rafters, ledges, fixtures, exclusions..." className="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"/>
    </label>
   </div>
-  {(!height.trim() || !areas.trim() || !access.length) && <p className="mt-3 text-xs text-neutral-600">To generate your live Estimate Summary, enter working height, describe the elevated surfaces, and select at least one access method.</p>}
+  {(value.squareFeet<=0 || !height.trim() || !areas.trim() || !access.length) && <p className="mt-3 text-xs text-neutral-600">To generate your live Estimate Summary, enter square footage, working height, describe the elevated surfaces, and select at least one access method.</p>}
  </section>;
 }
