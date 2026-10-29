@@ -326,7 +326,7 @@ function CommercialFields({ value, set, postConstruction, setPostConstruction, c
       set({...value,commercialType:next});
     }else{
       const config=selected?.pricing_config;
-      set({ ...value, commercialType:next,recurringPricingRuleId:null,additionalServices:[],addonSelections:[],...(config?.requires_complete_pricing_config?{targetCompletionHours:Number(config.default_target_completion_hours),workerHourlyPay:Math.max(MINIMUM_WORKER_HOURLY_PAY,Number(config.default_worker_hourly_pay)),targetProfitMarginPercent:Number(config.default_target_profit_margin_percent),targetProjectDays:value.targetProjectDays??3,workdayHours:value.workdayHours??8}:{}) });
+      set({ ...value, commercialType:next,recurringPricingRuleId:null,additionalServices:[],addonSelections:[],...(selected?.service_code==="COM-HIGH-DUST"?{frequency:"One-Time" as const,customIntervalDays:null,serviceDaysOfWeek:[],weeklyMixedVisits:undefined}:{}),...(config?.requires_complete_pricing_config?{targetCompletionHours:Number(config.default_target_completion_hours),workerHourlyPay:Math.max(MINIMUM_WORKER_HOURLY_PAY,Number(config.default_worker_hourly_pay)),targetProfitMarginPercent:Number(config.default_target_profit_margin_percent),targetProjectDays:value.targetProjectDays??3,workdayHours:value.workdayHours??8}:{}) });
     }
     serviceChanged(next);
   }
