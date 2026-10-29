@@ -23,7 +23,7 @@ export function priceHighDusting(input:HighDustingInputs) {
  if(!Number.isFinite(input.travelAndOverhead)||input.travelAndOverhead<0) throw new Error("Travel and overhead cost cannot be negative.");
  if(!Number.isFinite(input.targetMarginPercent)||input.targetMarginPercent<25||input.targetMarginPercent>50) throw new Error("Target gross margin must be between 25% and 50%.");
  if(!Number.isFinite(input.squareFeet)||input.squareFeet<=0) throw new Error("Enter required High Dusting square footage greater than zero.");
- for(const [label,count] of [["Bathrooms",input.bathrooms],["Kitchens",input.kitchens],["Common areas",input.commonAreas],["Units",input.units]] as const) {
+ for(const [label,count] of [["Bathrooms",input.bathrooms??0],["Kitchens",input.kitchens??0],["Common areas",input.commonAreas??0],["Units",input.units??0]] as const) {
   if(!Number.isInteger(count)||count<0) throw new Error(`${label} must be a whole number of zero or more.`);
  }
  if(!input.workingHeight?.trim()) throw new Error("Enter the highest surface or working height.");
@@ -35,5 +35,5 @@ export function priceHighDusting(input:HighDustingInputs) {
  const directCost=laborCost+supplyCost;
  const finalPrice=Math.round((directCost/(1-input.targetMarginPercent/100)+Number.EPSILON)*100)/100;
  return {laborCost,supplyCost,directCost,finalPrice,grossProfit:finalPrice-directCost,
-  description:`High Dusting: ${input.squareFeet} sq ft; ${input.bathrooms} bathrooms; ${input.kitchens} kitchens; ${input.commonAreas} common areas; ${input.units} units. ${input.scope.trim()}. Height: ${input.workingHeight.trim()}. Access methods: ${input.accessMethods.join(", ")}. Equipment and site safety to be confirmed during walkthrough.`};
+  description:`High Dusting: ${input.squareFeet} sq ft; ${input.bathrooms??0} bathrooms; ${input.kitchens??0} kitchens; ${input.commonAreas??0} common areas; ${input.units??0} units. ${input.scope.trim()}. Height: ${input.workingHeight.trim()}. Access methods: ${input.accessMethods.join(", ")}. Equipment and site safety to be confirmed during walkthrough.`};
 }
