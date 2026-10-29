@@ -14,6 +14,7 @@ import {
   residentialCatalogPrice,
 } from "@/lib/pricing/pricingEngine";
 import { getAvailableServiceAddons } from "@/lib/services/serviceCatalog";
+import { priceHighDusting } from "@/lib/pricing/highDusting";
 import { withMixedVisitEstimate } from "@/lib/pricing/weeklyMixedVisits";
 import {
   estimatedMonthlyTotal,
@@ -533,6 +534,24 @@ export function calculateCommercialEstimate(
   resolvedService?: ServiceCatalogBundle["services"][number],
   addonDivision: "Residential" | "Commercial" = "Commercial",
 ): EstimateResult {
+  if (input.commercialType === "High Dusting" || input.commercialType === "High Dusting Cleaning") {
+    if (input.frequency !== "One-Time" || input.additionalServices.length) {
+      throw new Error("High Dusting must be an independent, one-time estimate without bundled add-ons.");
+    }
+    const service = resolvedService ?? catalog.services.find(item => item.service_code === "COM-HIGH-DUST");
+    if (!service || service.service_code !== "COM-HIGH-DUST") throw new Error("High Dusting is not configured in the Service Catalog.");
+    const priced = priceHighDusting(input.highDusting!);
+    return result({
+      input, serviceName: service.service_name, catalogAddons: [],
+      basePrice: priced.finalPrice, adjustments: [], oneTimePrice: priced.finalPrice,
+      recurringPricingRuleId: null, recurringPricingRuleName: null,
+      recurringDiscount: 0, recurringDiscountPercent: 0, manualDiscount: 0,
+      totalDiscount: 0, taxes: 0, finalPrice: priced.finalPrice,
+      laborHours: input.highDusting!.cleaners * input.highDusting!.hoursPerCleaner,
+      crewSize: input.highDusting!.cleaners, laborCost: priced.laborCost,
+      supplyCost: priced.supplyCost, scope: [priced.description],
+    });
+  }
   const workerHourlyPay = requireMinimumWorkerHourlyPay(
     input.workerHourlyPay,
   );
