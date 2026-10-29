@@ -202,7 +202,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const incompleteProject = v2Mode && isPostConstructionV2Estimate(postConstruction) ? projectCostingIncompleteMessage(postConstruction.projectCosting) : null;
   const calculation = (() => {if(isSales)return{result:salesResult,error:salesCalculationError};if(!catalog || incompleteProject)return{result:null,error:null};try{return{result:postConstructionMode?calculatePostConstructionCatalogEstimate({...postConstruction,division},catalog,selectedService):division === "Residential" ? calculateResidentialEstimate(residential,catalog,defaults?.upkeep_adjustment_percent ?? 30) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?(v2Mode ? projectCostingErrorMessage(x.message) : x.message):"Pricing could not be calculated."}}})();
 
-  const result=calculation.result ? isSales ? calculation.result : v2Mode ? {...calculation.result,serviceDescription:serviceDescription.trim()||null} : withAuthoritativeEstimatePrice({...calculation.result,serviceDescription:serviceDescription.trim()||null},manualPrice) : null;
+  const result=calculation.result ? isSales ? calculation.result : v2Mode ? {...calculation.result,serviceDescription:serviceDescription.trim()||null} : withAuthoritativeEstimatePrice({...calculation.result,serviceDescription:calculation.result.serviceName==="High Dusting Cleaning" ? calculation.result.scope[0] ?? null : serviceDescription.trim()||null},manualPrice) : null;
 
   useEffect(()=>{
     if(!isSales||!catalog||catalogLoading)return;
