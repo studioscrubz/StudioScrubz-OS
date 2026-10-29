@@ -29,6 +29,7 @@ import { PostConstructionBidSummary } from "@/components/estimates/PostConstruct
 import { MINIMUM_WORKER_HOURLY_PAY } from "@/lib/pricing/workerHourlyPay";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { HighDustingQuoteCalculator } from "./HighDustingQuoteCalculator";
+import { defaultHighDustingInputs } from "@/lib/pricing/highDusting";
 import { getEstimateById } from "@/lib/services/estimates";
 import { pairHighDustingEstimates } from "@/lib/services/estimatePairs";
 
@@ -345,7 +346,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       <div className="space-y-6">
         <Section title="Estimate Calculator" subtitle="Choose a division and configure the service.">
           <DivisionToggle value={division} set={changeDivision} />
-          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:catalog&&<div className="mt-6">{calculation.error&&<div className="mb-4"><Alert kind="error" text={calculation.error}/></div>}{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} salesSafe={isSales} manualPrice={manualPrice} setManualPrice={setManualPrice} onHighDustingQuote={(amount,scope)=>{setManualPrice(amount);setServiceDescription(scope);}} />}</div>}
+          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:catalog&&<div className="mt-6">{calculation.error&&<div className="mb-4"><Alert kind="error" text={calculation.error}/></div>}{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} salesSafe={isSales} manualPrice={manualPrice} setManualPrice={setManualPrice} />}</div>}
         </Section>
         <Section title="Service Description" subtitle="Copied from the selected Service Catalog entry and saved with this Estimate."><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{serviceDescription||"No service description available."}</div></Section>
         {division==="Commercial"&&!postConstructionMode&&<Section title="Related specialty service" subtitle="Create linked estimates for cleaning and high dusting, each with its own price, scope and approval.">
@@ -382,7 +383,7 @@ function ResidentialFields({ value, set,postConstruction,setPostConstruction,cat
   <div className="sm:col-span-2 xl:col-span-3"><CatalogAddonPicker addons={addons} selected={value.addOns} setSelected={(addOns) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addOns }))} snapshots={value.addonSelections} setSnapshots={(addonSelections) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addonSelections }))} /></div></div>}
 </div>; }
 
-function CommercialFields({ value, set, postConstruction, setPostConstruction, catalog, serviceChanged, salesSafe = false, manualPrice, setManualPrice, onHighDustingQuote }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void; postConstruction: PostConstructionCalculatorInput; setPostConstruction: (value: PostConstructionCalculatorInput) => void; catalog: ServiceCatalogBundle; serviceChanged: (selection: string) => void; salesSafe?: boolean; manualPrice: number | null; setManualPrice: (value: number | null) => void; onHighDustingQuote:(amount:number,scope:string)=>void }) {
+function CommercialFields({ value, set, postConstruction, setPostConstruction, catalog, serviceChanged, salesSafe = false, manualPrice, setManualPrice }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void; postConstruction: PostConstructionCalculatorInput; setPostConstruction: (value: PostConstructionCalculatorInput) => void; catalog: ServiceCatalogBundle; serviceChanged: (selection: string) => void; salesSafe?: boolean; manualPrice: number | null; setManualPrice: (value: number | null) => void; }) {
   const services=catalog.services.filter(x=>x.division!=="Residential").map(x=>x.service_name.replace(/ Cleaning$/,""));
   const service=selectedCatalogService(catalog,"Commercial",value.commercialType);
   const addons=service?getAvailableServiceAddons(catalog,service.id,"Commercial"):[];
