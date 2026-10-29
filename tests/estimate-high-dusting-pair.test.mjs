@@ -32,6 +32,6 @@ test("high dusting calculator is separate from combined janitorial price",()=>{
  assert.match(calculator,/supplies/);
  assert.match(calculator,/travelAndOverhead/);
  assert.match(calculator,/targetMarginPercent/);
- assert.match(calculator,/Apply Separate Quote/);
- assert.match(estimate,/onHighDustingQuote/);
+ assert.doesNotMatch(calculator,/Apply Separate Quote/);
+ assert.match(estimate,/highDusting=>set/);
 });

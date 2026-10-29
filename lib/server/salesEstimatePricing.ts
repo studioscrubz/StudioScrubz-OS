@@ -31,11 +31,6 @@ export function calculateSalesEstimate(rawInput: unknown, catalog: ServiceCatalo
       (service.service_name === input.commercialType ||
         service.service_name.replace(/ Cleaning$/, "") === input.commercialType));
     if (selected) {
-      const separatelyQuotedAmount = Number(manualPrice);
-      if (manualPrice === null || manualPrice === undefined ||
-        !Number.isFinite(separatelyQuotedAmount) || separatelyQuotedAmount <= 0) {
-        throw new Error("High Dusting requires a separate assessed quote amount before an estimate can be prepared.");
-      }
       if (input.frequency !== "One-Time" || input.additionalServices.length) {
         throw new Error("Prepare High Dusting as its own one-time estimate without bundled add-ons.");
       }
@@ -51,7 +46,7 @@ export function calculateSalesEstimate(rawInput: unknown, catalog: ServiceCatalo
   const result = isPostConstruction(input)
     ? calculated
     : withAuthoritativeEstimatePrice(calculated, requestedPrice);
-  return { ...result, serviceDescription: typeof description === "string" && description.trim() ? description.trim() : result.serviceDescription };
+  return { ...result, serviceDescription: result.serviceName === "High Dusting Cleaning" ? result.scope[0] ?? null : typeof description === "string" && description.trim() ? description.trim() : result.serviceDescription };
 }
 
 export function publicEstimateResult(result: EstimateResult): Record<string, unknown> {
