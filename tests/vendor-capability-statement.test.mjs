@@ -18,6 +18,7 @@ function evaluateTypeScript(path, dependencies = {}) {
   vm.runInNewContext(code, {
     module,
     exports: module.exports,
+    Buffer,
     require: id => {
       if (Object.hasOwn(dependencies, id)) return dependencies[id];
       throw new Error(`Unexpected import ${id} from ${path}`);
@@ -29,6 +30,7 @@ function evaluateTypeScript(path, dependencies = {}) {
 const content = evaluateTypeScript("lib/vendorPackets/content.ts");
 const capability = evaluateTypeScript("lib/vendorPackets/capability.ts", { "./content": content });
 const email = evaluateTypeScript("lib/vendorPackets/email.ts", { "./capability": capability });
+const pdf = evaluateTypeScript("lib/vendorPackets/pdf.ts");
 const migration = read("supabase/migrations/20261029090000_corporate_capability_profile.sql");
 const route = read("app/api/vendor-packets/send/route.ts");
 
@@ -205,7 +207,7 @@ test("send route authorizes active document senders and rebuilds content from au
   assert.match(route, /admin\.from\("properties"\)[\s\S]*?\.eq\("id", identity\.propertyId\)[\s\S]*?\.eq\("client_id", identity\.clientId\)[\s\S]*?\.is\("archived_at", null\)/);
   assert.match(route, /admin\.from\("business_settings"\)[\s\S]*?corporate_capability_profile/);
   assert.match(route, /validateCorporateCapabilityProfile\(business\.corporate_capability_profile\)/);
-  assert.match(route, /buildVendorCapabilityDocumentModel\(\{[\s\S]*?clientName:[\s\S]*?propertyLabel,[\s\S]*?business:[\s\S]*?corporateProfile,[\s\S]*?moduleIds: identity\.moduleIds/);
+  assert.match(route, /buildVendorCapabilityDocumentModel\(\{[\s\S]*?clientName:[\s\S]*?propertyLabel,[\s\S]*?business:[\s\S]*?corporateProfile,[\s\S]*?moduleIds: identity\.documentKind === "both"/);
   assert.doesNotMatch(route, /body\.(?:corporateProfile|business|clientName|propertyLabel)/);
 });
 
@@ -233,13 +235,43 @@ test("send route recovers provider receipts without resending and snapshots exac
   assert.match(route, /Retry this same send request to recover it without sending a duplicate/);
   assert.match(route, /createError\?\.code === "23505"/);
   assert.match(route, /content_snapshot: model\.contentSnapshot/);
-  assert.match(route, /document_kind: model\.documentKind/);
+  assert.match(route, /document_kind: identity\.documentKind/);
   assert.match(route, /document_version: model\.documentVersion/);
-  assert.match(route, /selected_module_ids: \[\.\.\.model\.selectedModuleIds\]/);
+  assert.match(route, /selected_module_ids: \[\.\.\.model\.selectedModuleIds\]|selected_module_ids: \[\.\.\.identity\.moduleIds\]/);
   assert.match(route, /Corporate Capability Statement Sent/);
   assert.match(route, /Vendor Packet Sent/);
   assert.match(route, /capabilityModelFromSnapshot\(metadata\.content_snapshot\)/);
-  assert.match(route, /model\.documentKind !== identity\.documentKind/);
-  assert.match(route, /!sameStringArray\(model\.selectedModuleIds, identity\.moduleIds\)/);
+  assert.match(route, /model\.documentKind !== \(identity\.documentKind === "both"/);
+  assert.match(route, /!sameStringArray\(model\.selectedModuleIds, identity\.documentKind === "both"/);
   assert.match(route, /resolveEmailSenderProfile\("vendor"\)/);
+});
+
+test("combined send generates a genuine US Letter PDF attachment with branded pagination", () => {
+  const model = capability.buildVendorCapabilityDocumentModel({
+    ...baseInput(emptyProfile()),
+    documentKind: "service-packet",
+    moduleIds: content.modules.map(item => item.id),
+  });
+  const bytes = pdf.generateServiceCapabilityPacketPdf(model);
+  assert.ok(Buffer.isBuffer(bytes));
+  assert.equal(bytes.subarray(0, 8).toString(), "%PDF-1.4");
+  assert.match(bytes.toString("latin1"), /\/MediaBox \[0 0 612 792\]/);
+  assert.match(bytes.toString("latin1"), /SERVICE CAPABILITY PACKET/);
+  assert.match(bytes.toString("latin1"), /Core capabilities/i);
+  assert.match(bytes.toString("latin1"), /\/Count [1-9][0-9]* >>/);
+  assert.throws(() => pdf.generateServiceCapabilityPacketPdf(capability.buildVendorCapabilityDocumentModel(baseInput(emptyProfile()))), /service packet/i);
+});
+
+test("combined send uses server-authoritative snapshots and one idempotent communication", () => {
+  const ui = read("components/vendorPackets/VendorPacketsPage.tsx");
+  assert.match(ui, /Send Both Documents/);
+  assert.match(ui, /emailDraft\.sendBoth \? "both" : documentKind/);
+  assert.match(route, /documentKind === "both" \? "service-packet" : documentKind/);
+  assert.match(route, /attachment_content_snapshot: packetModel\.contentSnapshot/);
+  assert.match(route, /packetFromCommunication\(communication, identity\)/);
+  assert.match(route, /generateServiceCapabilityPacketPdf\(/);
+  assert.match(route, /contentType: "application\/pdf"/);
+  assert.match(route, /attachments,/);
+  assert.match(route, /idempotencyKey: eventKey/);
+  assert.match(route, /status: "Prepared"/);
 });

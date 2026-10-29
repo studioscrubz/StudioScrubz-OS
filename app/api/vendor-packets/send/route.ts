@@ -15,6 +15,7 @@ import {
   type VendorDocumentKind,
 } from "@/lib/vendorPackets/capability";
 import { renderCapabilityDocumentEmail } from "@/lib/vendorPackets/email";
+import { generateServiceCapabilityPacketPdf } from "@/lib/vendorPackets/pdf";
 import { validateCorporateCapabilityProfile, type CorporateCapabilityProfile } from "@/types/corporateCapability";
 import type { UserProfile } from "@/types/auth";
 
@@ -45,7 +46,7 @@ type RequestIdentity = {
   recipientEmail: string;
   subject: string;
   messageBody: string;
-  documentKind: VendorDocumentKind;
+  documentKind: VendorDocumentKind | "both";
   moduleIds: string[];
   fingerprint: string;
 };
@@ -89,11 +90,11 @@ export async function POST(request: Request) {
     const subject = text(body.subject, "Subject", 200);
     if (/[\r\n]/.test(subject)) throw new InputError("Subject must be a single line.");
     const messageBody = text(body.messageBody, "Message", 10_000);
-    let documentKind: VendorDocumentKind;
+    let documentKind: VendorDocumentKind | "both";
     let moduleIds: string[];
     try {
-      documentKind = normalizeDocumentKind(body.documentKind);
-      moduleIds = validateSelectedModuleIds(documentKind, body.moduleIds);
+      documentKind = body.documentKind === "both" ? "both" : normalizeDocumentKind(body.documentKind);
+      moduleIds = validateSelectedModuleIds(documentKind === "both" ? "service-packet" : documentKind, body.moduleIds);
     } catch (cause) {
       if (cause instanceof CapabilityModelError) throw new InputError(cause.message);
       throw cause;
@@ -107,13 +108,16 @@ export async function POST(request: Request) {
     if (findError) throw findError;
     let communication = found as CommunicationRow | null;
     let model: CapabilityStatementModel;
+    let packetModel: CapabilityStatementModel | null = null;
     if (communication) {
       assertSameRequest(communication, identity, eventKey);
       communicationId = communication.id;
       model = modelFromCommunication(communication, identity);
+      if (identity.documentKind === "both") packetModel = packetFromCommunication(communication, identity);
     } else {
       model = await buildAuthoritativeModel(admin, identity);
-      const metadata = deliveryMetadata(model, identity);
+      if (identity.documentKind === "both") packetModel = await buildAuthoritativeModel(admin, { ...identity, documentKind: "service-packet" });
+      const metadata = deliveryMetadata(model, identity, packetModel);
       const insert = {
         communication_number: `COMM-${randomUUID()}`,
         client_id: clientId,
@@ -138,6 +142,7 @@ export async function POST(request: Request) {
         communication = raced as CommunicationRow;
         assertSameRequest(communication, identity, eventKey);
         model = modelFromCommunication(communication, identity);
+        if (identity.documentKind === "both") packetModel = packetFromCommunication(communication, identity);
       } else if (createError || !created) {
         throw createError ?? new Error("Vendor document preparation failed.");
       } else {
@@ -166,10 +171,16 @@ export async function POST(request: Request) {
     }
 
     const content = renderCapabilityDocumentEmail({ model, message: messageBody });
+    const attachments = identity.documentKind === "both" ? [{
+      filename: "StudioScrubz_Service_Capability_Packet.pdf",
+      content: generateServiceCapabilityPacketPdf(packetModel ?? packetFromCommunication(communication, identity)).toString("base64"),
+      contentType: "application/pdf",
+    }] : undefined;
     const sent = await sendResendEmail({
       recipientEmail,
       subject,
       ...content,
+      attachments,
       ...resolveEmailSenderProfile("vendor"),
       idempotencyKey: eventKey,
     });
@@ -218,13 +229,13 @@ async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity):
   if (businessError || !rawBusiness) throw new InputError("Business Settings are unavailable.", 503);
   const business = rawBusiness as Record<string, unknown>;
   let corporateProfile: CorporateCapabilityProfile | null = null;
-  if (identity.documentKind === "corporate-capability-statement") {
+  if (identity.documentKind === "corporate-capability-statement" || identity.documentKind === "both") {
     try { corporateProfile = validateCorporateCapabilityProfile(business.corporate_capability_profile); }
     catch { throw new InputError("The Corporate Capability profile is invalid. Review Business Settings before sending.", 503); }
   }
   try {
     return buildVendorCapabilityDocumentModel({
-      documentKind: identity.documentKind,
+      documentKind: identity.documentKind === "both" ? "corporate-capability-statement" : identity.documentKind,
       clientName: clean(client.company_name) || joinText([client.first_name, client.last_name]) || "Unnamed client",
       propertyLabel,
       business: {
@@ -236,7 +247,7 @@ async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity):
         address: joinText([business.address, business.city, business.state, business.zip]),
       },
       corporateProfile,
-      moduleIds: identity.moduleIds,
+      moduleIds: identity.documentKind === "both" ? identity.moduleIds.slice(0, 4) : identity.moduleIds,
     });
   } catch (cause) {
     if (cause instanceof CapabilityModelError) throw new InputError(cause.message, 503);
@@ -244,13 +255,14 @@ async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity):
   }
 }
 
-function deliveryMetadata(model: CapabilityStatementModel, identity: RequestIdentity) {
+function deliveryMetadata(model: CapabilityStatementModel, identity: RequestIdentity, packetModel: CapabilityStatementModel | null = null) {
   return {
-    event: model.documentKind === "corporate-capability-statement" ? "Corporate Capability Statement Sent" : "Vendor Packet Sent",
+    event: identity.documentKind === "both" ? "Capability Statement & Service Packet Sent" : model.documentKind === "corporate-capability-statement" ? "Corporate Capability Statement Sent" : "Vendor Packet Sent",
     delivery: "vendor-document-resend-v2",
-    document_kind: model.documentKind,
+    document_kind: identity.documentKind,
+    ...(packetModel ? { attachment_filename: "StudioScrubz_Service_Capability_Packet.pdf", attachment_content_type: "application/pdf", attachment_content_snapshot: packetModel.contentSnapshot } : {}),
     document_version: model.documentVersion,
-    selected_module_ids: [...model.selectedModuleIds],
+    selected_module_ids: [...identity.moduleIds],
     selected_capability_modules: model.coreCompetencies.map(module => module.title),
     content_snapshot: model.contentSnapshot,
     request_fingerprint: identity.fingerprint,
@@ -264,12 +276,26 @@ function modelFromCommunication(row: CommunicationRow, identity: RequestIdentity
   let model: CapabilityStatementModel;
   try { model = capabilityModelFromSnapshot(metadata.content_snapshot); }
   catch { throw new UnconfirmedProviderStateError("The prepared vendor document has an invalid immutable content snapshot. It was not sent."); }
-  if (model.documentKind !== identity.documentKind || model.documentVersion !== metadata.document_version
-    || !sameStringArray(model.selectedModuleIds, identity.moduleIds)
-    || !sameStringArray(model.selectedModuleIds, metadata.selected_module_ids)) {
+  if (model.documentKind !== (identity.documentKind === "both" ? "corporate-capability-statement" : identity.documentKind) || model.documentVersion !== metadata.document_version
+    || !sameStringArray(model.selectedModuleIds, identity.documentKind === "both" ? identity.moduleIds.slice(0, 4) : identity.moduleIds)
+    || !sameStringArray(metadata.selected_module_ids, identity.moduleIds)) {
     throw new UnconfirmedProviderStateError("The prepared vendor document does not match this send request. It was not sent.");
   }
   return model;
+}
+
+function packetFromCommunication(row: CommunicationRow, identity: RequestIdentity): CapabilityStatementModel {
+  const metadata = record(row.metadata);
+  let packet: CapabilityStatementModel;
+  try { packet = capabilityModelFromSnapshot(metadata.attachment_content_snapshot); }
+  catch { throw new UnconfirmedProviderStateError("The prepared service packet PDF has an invalid immutable snapshot. It was not sent."); }
+  if (identity.documentKind !== "both" || packet.documentKind !== "service-packet"
+    || !sameStringArray(packet.selectedModuleIds, identity.moduleIds)
+    || metadata.attachment_content_type !== "application/pdf"
+    || metadata.attachment_filename !== "StudioScrubz_Service_Capability_Packet.pdf") {
+    throw new UnconfirmedProviderStateError("The service packet does not match this send request. It was not sent.");
+  }
+  return packet;
 }
 
 function assertSameRequest(row: CommunicationRow, expected: RequestIdentity, eventKey: string) {
