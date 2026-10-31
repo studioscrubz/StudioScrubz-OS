@@ -23,7 +23,10 @@ const labels: Array<[keyof ProfitabilityAdjustments, string]> = [
 ];
 
 /** This panel is internal-only; these assumptions are never copied to a plan pricing snapshot. */
-export function PorterProfitabilityPanel({ pricing }: { pricing: PorterServicePricingSnapshot }) {
+export function PorterProfitabilityPanel({ pricing, onPriceChange }: {
+  pricing: PorterServicePricingSnapshot;
+  onPriceChange: (next: number | null) => void;
+}) {
   const { profile } = useAuth();
   const authorized = canAccessFinances(profile);
   const [settings, setSettings] = useState<ProfitabilitySettings | null>(null);
@@ -77,6 +80,36 @@ export function PorterProfitabilityPanel({ pricing }: { pricing: PorterServicePr
           if (!Number.isFinite(value) || value < 0) return;
           setExtras(previous => ({ ...previous, [key]: value }));
         }} className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 font-normal"/></label>)}
+      </div>
+      <div className="mt-4 rounded-xl border border-[#143d1a]/20 bg-white p-4">
+        <h4 className="text-sm font-extrabold text-[#143d1a]">Property Service Estimate Price</h4>
+        <p className="mt-1 text-xs text-neutral-600">Full monthly contract price. Adjust after reviewing the monthly expenses above. Your price updates profitability immediately; it is not saved to the plan until you select Use Pricing.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div><p className="text-xs font-semibold text-neutral-600">Original calculated monthly bid</p><p className="font-bold text-[#143d1a]">{money(pricing.recommendedMonthlyPrice)}</p></div>
+          <div><p className="text-xs font-semibold text-neutral-600">Profitability minimum (monthly)</p><p className="font-bold text-[#143d1a]">{result.recommendedMinimumPrice == null ? "Unverified" : money(result.recommendedMinimumPrice)}</p></div>
+        </div>
+        <label className="mt-3 block text-sm font-bold text-[#143d1a]">Manual / Custom Estimate Amount (monthly)
+          <input type="number" aria-label="Manual monthly property service estimate amount" min="0.01" step="0.01"
+            value={pricing.inputs.manualMonthlyPriceOverride ?? ""} placeholder={String(pricing.recommendedMonthlyPrice)}
+            onChange={event => {
+              if (event.target.value === "") { onPriceChange(null); return; }
+              const value = Number(event.target.value);
+              if (Number.isFinite(value) && value > 0) onPriceChange(value);
+            }}
+            className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 font-normal"/>
+        </label>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button type="button" disabled={result.recommendedMinimumPrice == null || result.recommendedMinimumPrice <= 0}
+            onClick={() => { if (result.recommendedMinimumPrice != null && result.recommendedMinimumPrice > 0) onPriceChange(result.recommendedMinimumPrice); }}
+            className="rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">
+            Use Profitability Minimum
+          </button>
+          <button type="button" disabled={pricing.inputs.manualMonthlyPriceOverride == null} onClick={() => onPriceChange(null)}
+            className="rounded-lg border border-[#143d1a]/30 px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-40">
+            Use Original Calculated Bid
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-neutral-600">Current monthly customer estimate: <strong>{money(result.price)}</strong>. Internal cost inputs are private and reset when the editor closes; the approved price is saved only through Use Pricing.</p>
       </div>
       <p className="mt-3 text-xs text-amber-900">Expenses entered here are for this private calculation only and reset when the editor is closed. The existing monthly Travel and Supervision/Admin entries are counted once; do not duplicate them. Recurring travel is the monthly amount you entered, not a Geoapify-verified route.</p>
     </>}

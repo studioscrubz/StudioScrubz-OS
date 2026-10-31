@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { canAccessFinances } from "@/lib/auth/permissions";
 import { calculatePorterService } from "@/lib/pricing/porterService";
 import { PorterProfitabilityPanel } from "@/components/properties/PorterProfitabilityPanel";
 import type { PorterServicePricingInput, PorterServicePricingSnapshot } from "@/types/propertyServicePlan";
@@ -37,6 +39,8 @@ export function PorterServiceCalculator({
   onUse: (snapshot: PorterServicePricingSnapshot) => void;
 }) {
   const luxury = serviceMode === "Luxury Property Care";
+  const { profile } = useAuth();
+  const financeAccess = canAccessFinances(profile);
 
   const [values, setValues] = useState(
     () =>
@@ -153,7 +157,7 @@ export function PorterServiceCalculator({
           </span>
         </label>
 
-        {fields.map(([key, label]) => (
+        {fields.filter(([key]) => !financeAccess || key !== "manualMonthlyPriceOverride").map(([key, label]) => (
           <label key={key} className="text-sm font-bold">
             {luxury && key === "porterHourlyPay"
               ? "Property-care hourly pay"
@@ -192,7 +196,9 @@ export function PorterServiceCalculator({
         </dl>
       )}
 
-      {result && <PorterProfitabilityPanel pricing={result} />}
+      {result && <PorterProfitabilityPanel pricing={result} onPriceChange={next =>
+        setValues(current => ({...current, manualMonthlyPriceOverride: next == null ? "" : String(next)}))
+      } />}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
