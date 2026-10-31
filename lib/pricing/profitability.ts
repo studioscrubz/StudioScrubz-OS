@@ -24,6 +24,8 @@ export type ProfitabilityInput = {
   salesCommissions?: number | null;
   allocatedOverhead?: number | null;
   visitsPerPeriod?: number | null;
+  projectDays?: number | null;
+  roundTripsPerPeriod?: number | null;
   legacyTravelLogisticsCost?: number | null;
   legacyProjectCosts?: number | null;
   legacyTravelIncludesDriving?: boolean;
@@ -59,6 +61,8 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const burdenRate = validRate(settings.employerBurdenRate) ?? 0;
   const targetMarginRate = validRate(settings.targetGrossMarginRate);
   const visitsPerPeriod = positiveInteger(input.visitsPerPeriod, 1);
+  const projectDays = input.projectDays == null ? undefined : positiveInteger(input.projectDays, 1);
+  const roundTripsPerPeriod = positiveInteger(input.roundTripsPerPeriod, visitsPerPeriod);
   const estimatedLaborHours = money(cleanerCount * hoursPerCleaner * visitsPerPeriod);
   const loadedHourlyLaborCost = money(hourlyWage * (1 + burdenRate));
   const loadedCleaningLabor = money(estimatedLaborHours * loadedHourlyLaborCost);
@@ -66,12 +70,12 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const rate = settings.vehicleOperatingRatePerMile == null ? null : nonNegative(settings.vehicleOperatingRatePerMile);
   const legacyTravelLogistics = money(nonNegative(input.legacyTravelLogisticsCost));
   const legacyTravelIncludesDriving = input.legacyTravelIncludesDriving === true && legacyTravelLogistics > 0;
-  const vehicleOperating = legacyTravelIncludesDriving ? 0 : travel.roundTripMiles == null || rate == null ? null : money(travel.roundTripMiles * rate * travel.vehicleCount * visitsPerPeriod);
+  const vehicleOperating = legacyTravelIncludesDriving ? 0 : travel.roundTripMiles == null || rate == null ? null : money(travel.roundTripMiles * rate * travel.vehicleCount * roundTripsPerPeriod);
   const compensableTravelLabor = legacyTravelIncludesDriving || !travel.companyRequiredTravelIsCompensable
     ? 0
     : travel.roundTripMinutes == null
       ? null
-      : money((travel.roundTripMinutes / 60) * travel.travelingEmployeeCount * loadedHourlyLaborCost * visitsPerPeriod);
+      : money((travel.roundTripMinutes / 60) * travel.travelingEmployeeCount * loadedHourlyLaborCost * roundTripsPerPeriod);
   const directCosts: ProfitabilityDirectCosts = {
     loadedCleaningLabor,
     vehicleOperating,
@@ -111,6 +115,8 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     version: 1,
     periodLabel: input.periodLabel?.trim() || "Per service visit",
     visitsPerPeriod,
+    ...(projectDays == null ? {} : { projectDays }),
+    roundTripsPerPeriod,
     legacyTravelIncludesDriving,
     price,
     cleanerCount,
