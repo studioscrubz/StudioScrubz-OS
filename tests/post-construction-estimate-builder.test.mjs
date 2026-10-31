@@ -113,7 +113,10 @@ test("Post-Construction manual price and minimum action appear only in finance-r
   const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
   const engine = readFileSync(resolve("lib/pricing/authoritativePrice.ts"), "utf8");
   assert.match(builder, /const estimateProfitability = canViewProfitability/);
-  assert.match(builder, /projectPrice=\{postConstructionMode && !v2Mode && result \? \{ manualPrice, calculatedPrice: result\.calculatedFinalPrice \?\? result\.finalPrice, onChange: setManualPrice \} : undefined\}/);
+  assert.match(builder, /projectPrice=\{postConstructionMode && result \?/);
+  assert.match(builder, /manualPrice: v2Mode && isPostConstructionV2Estimate\(postConstruction\)/);
+  assert.match(builder, /onChange: v2Mode/);
+  assert.match(builder, /: setManualPrice/);
   assert.match(panel, /projectPrice && editable/);
   assert.match(panel, /Manual \/ Custom Estimate Amount/);
   assert.match(panel, /Use Profitability Minimum/);
@@ -137,4 +140,23 @@ test("Post-Construction summary profit and job cost include project expenses alr
   assert.match(summary, /expenses\?\.supervisionAdminCost/);
   assert.match(summary, /const jobCost=result\.laborCost\+result\.supplyCost\+additionalProjectCosts/);
   assert.match(summary, /const projectedProfit=finalAmount-jobCost/);
+});
+
+test("existing V2 Post-Construction estimates expose the same profitability override and persist using projectCosting", () => {
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
+  const engine = readFileSync(resolve("lib/pricing/estimates.ts"), "utf8");
+  assert.match(builder, /projectPrice=\{postConstructionMode && result \?/);
+  assert.match(builder, /postConstruction\.projectCosting\.manualProjectPriceOverride \?\? null/);
+  assert.match(builder, /if \(!isPostConstructionV2Estimate\(previous\)\) return previous/);
+  assert.match(builder, /if \(amount == null\) delete projectCosting\.manualProjectPriceOverride/);
+  assert.match(builder, /else projectCosting\.manualProjectPriceOverride = amount/);
+  assert.match(builder, /return \{ \.\.\.previous, projectCosting \}/);
+  assert.match(builder, /calculatedPrice: result\.calculatedFinalPrice \?\? result\.finalPrice/);
+  assert.match(panel, /Use Profitability Minimum/);
+  assert.match(panel, /Use Original Calculated Bid/);
+  assert.doesNotMatch(fields, /<Label text="Manual project price override \(optional\)"\/>/);
+  assert.match(fields, /Adjust or restore the final project price under Internal Profitability/);
+  assert.match(engine, /manualPrice: project\.calculatorInput\.manualProjectPriceOverride \?\? null/);
+  assert.match(engine, /finalPrice: project\.approvedProjectPrice/);
 });
