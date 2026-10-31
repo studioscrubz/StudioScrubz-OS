@@ -1,6 +1,7 @@
 "use client";
 
 import type { HighDustingInputs } from "@/lib/pricing/highDusting";
+import { ElevatedSurfaceMultiSelect } from "@/components/estimates/ElevatedSurfaceMultiSelect";
 import { approvedHighDustingAccessMethods, priceHighDusting } from "@/lib/pricing/highDusting";
 
 export function HighDustingQuoteCalculator({value,onChange}:{
@@ -54,9 +55,7 @@ export function HighDustingQuoteCalculator({value,onChange}:{
      </label>)}
     </div>
    </fieldset>
-   <label className="text-xs font-bold text-neutral-700 sm:col-span-2">Elevated surfaces and scope
-    <textarea value={areas} onChange={e=>onChange({...value,scope:e.target.value})} maxLength={2000} rows={3} placeholder="Describe accessible beams, vents, rafters, ledges, fixtures, exclusions..." className="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"/>
-   </label>
+   <ElevatedSurfaceMultiSelect value={areas} onChange={scope=>onChange({...value,scope})}/>
   </div>
   {missingAssessment && <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Assessment pending: record working height, elevated surface scope, and a verified safe access method before finalizing the client quote. Prices may change after the walkthrough.</p>}
  </section>;
