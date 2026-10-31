@@ -34,8 +34,10 @@ test("High Dusting calculator previews cost-based estimates and displays incompl
  const form = read("components/estimates/HighDustingQuoteCalculator.tsx");
  const engine = read("lib/pricing/highDusting.ts");
  const publicRequest = read("lib/services/publicEstimateRequests.ts");
- assert.match(form, /preview = priceHighDusting\(value\)/);
- assert.match(form, /Preliminary High Dusting estimate/);
+ assert.match(form, /try \{ priceHighDusting\(value\); \}/);
+ assert.doesNotMatch(form, /Preliminary High Dusting estimate/);
+ assert.doesNotMatch(form, /High Dusting calculated estimate/);
+ assert.doesNotMatch(form, /preview\.finalPrice\.toLocaleString/);
  assert.match(form, /pricingError && <p role="alert"/);
  assert.match(form, /Assessment pending:/);
  assert.doesNotMatch(form, /To generate your live Estimate Summary, enter square footage, working height/);
