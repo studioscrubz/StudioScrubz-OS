@@ -39,6 +39,13 @@ const positiveInteger = (value: unknown, fallback: number) => {
   const number = Math.trunc(Number(value));
   return Number.isFinite(number) && number > 0 ? number : fallback;
 };
+const commissionInclusiveMinimum = (directCost: number | null, targetMarginRate: number | null, operatingCosts: { paymentProcessingFees: number; salesCommissions: number; allocatedOverhead: number }): number | null => {
+  if (directCost == null || targetMarginRate == null || targetMarginRate >= 1) return null;
+  // Cover commission and other quoted-period costs before preserving the configured target margin.
+  // Keep commission separate from direct job costs and do not alter customer-facing pricing.
+  const allInCost = directCost + operatingCosts.paymentProcessingFees + operatingCosts.salesCommissions + operatingCosts.allocatedOverhead;
+  return Math.ceil((allInCost / (1 - targetMarginRate)) * 100 - 1e-9) / 100;
+};
 const validRate = (value: unknown) => {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 && number < 1 ? number : null;
@@ -98,9 +105,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const contributionMarginPercent = contributionProfit == null || price <= 0 ? null : money((contributionProfit / price) * 100);
   const operatingProfit = contributionProfit == null ? null : money(contributionProfit - operatingCosts.allocatedOverhead);
   const operatingMarginPercent = operatingProfit == null || price <= 0 ? null : money((operatingProfit / price) * 100);
-  const recommendedMinimumPrice = totalEstimatedDirectCost == null || targetMarginRate == null || targetMarginRate >= 1
-    ? null
-    : money(totalEstimatedDirectCost / (1 - targetMarginRate));
+  const recommendedMinimumPrice = commissionInclusiveMinimum(totalEstimatedDirectCost, targetMarginRate, operatingCosts);
   const differenceToRecommendedMinimum = recommendedMinimumPrice == null ? null : money(Math.max(0, recommendedMinimumPrice - price));
   return {
     version: 1,
@@ -147,7 +152,7 @@ export function repriceProfitability(projection: ProfitabilityProjection | null 
   const overhead = projection.operatingCosts?.allocatedOverhead ?? 0;
   const contributionProfit = grossProfit == null ? null : money(grossProfit - processing - commissions);
   const operatingProfit = contributionProfit == null ? null : money(contributionProfit - overhead);
-  const recommendedMinimumPrice = total == null || targetRate >= 1 ? null : money(total / (1 - targetRate));
+  const recommendedMinimumPrice = commissionInclusiveMinimum(total, targetRate, { paymentProcessingFees: processing, salesCommissions: commissions, allocatedOverhead: overhead });
   return {
     ...projection,
     periodLabel: periodLabel?.trim() || projection.periodLabel,
