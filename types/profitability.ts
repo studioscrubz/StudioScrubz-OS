@@ -37,11 +37,41 @@ export type ProfitabilityDirectCosts = {
   equipment: number;
   subcontractors: number;
   other: number;
+  setupLabor: number;
+  ownerLabor: number;
+  parkingTolls: number;
+  disposal: number;
 };
+
+export type ProfitabilityOperatingCosts = {
+  paymentProcessingFees: number;
+  salesCommissions: number;
+  allocatedOverhead: number;
+};
+
+export type ProfitabilityAdjustments = {
+  equipment: number;
+  subcontractors: number;
+  setupLabor: number;
+  ownerLabor: number;
+  parkingTolls: number;
+  disposal: number;
+  paymentProcessingFees: number;
+  salesCommissions: number;
+  allocatedOverhead: number;
+  otherDirectExpenses: number;
+};
+
+export const emptyProfitabilityAdjustments = (): ProfitabilityAdjustments => ({
+  equipment: 0, subcontractors: 0, setupLabor: 0, ownerLabor: 0,
+  parkingTolls: 0, disposal: 0, paymentProcessingFees: 0,
+  salesCommissions: 0, allocatedOverhead: 0, otherDirectExpenses: 0,
+});
 
 export type ProfitabilityProjection = {
   version: 1;
   periodLabel: string;
+  visitsPerPeriod: number;
   price: number;
   cleanerCount: number;
   hoursPerCleaner: number;
@@ -51,6 +81,11 @@ export type ProfitabilityProjection = {
   loadedHourlyLaborCost: number;
   travel: TravelProjection;
   directCosts: ProfitabilityDirectCosts;
+  operatingCosts: ProfitabilityOperatingCosts;
+  contributionProfit: number | null;
+  contributionMarginPercent: number | null;
+  operatingProfit: number | null;
+  operatingMarginPercent: number | null;
   travelCostsVerified: boolean;
   costComplete: boolean;
   totalEstimatedDirectCost: number | null;
