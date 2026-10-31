@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as AcceptanceRequest;
     const signature = body.signature ?? "";
-    await validateDrawnPngSignature(signature);
+    await validateDrawnPngSignature(signature, "Proposal");
     const { data, error } = await createSupabaseAdminClient().rpc("accept_proposal_by_token", {
       p_token: body.token ?? "",
       p_accepted_by_name: body.acceptedName ?? "",
