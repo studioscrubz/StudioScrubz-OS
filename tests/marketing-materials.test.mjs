@@ -166,8 +166,8 @@ test("all PL/pgSQL bodies use terminated tagged dollar quotes", () => {
   assert.doesNotMatch(migration, /as\$\$|do\$\$|end\$\$/i);
   const functionCount = (migration.match(/create function public\./g) ?? []).length;
   const openingCount = (migration.match(/as \$function\$/g) ?? []).length;
-  const closingCount = (migration.match(/\n\$function\$;/g) ?? []).length;
-  const terminatedBodies = (migration.match(/\nend;\n\$function\$;/g) ?? []).length;
+  const closingCount = (migration.match(/\r?\n\$function\$;/g) ?? []).length;
+  const terminatedBodies = (migration.match(/\r?\nend;\r?\n\$function\$;/g) ?? []).length;
   assert.equal(functionCount, 6);
   assert.equal(openingCount, functionCount);
   assert.equal(closingCount, functionCount);

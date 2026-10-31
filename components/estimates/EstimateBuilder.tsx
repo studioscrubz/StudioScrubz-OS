@@ -32,6 +32,11 @@ import { HighDustingQuoteCalculator } from "./HighDustingQuoteCalculator";
 import { defaultHighDustingInputs } from "@/lib/pricing/highDusting";
 import { getEstimateById } from "@/lib/services/estimates";
 import { pairHighDustingEstimates } from "@/lib/services/estimatePairs";
+import { canAccessFinances } from "@/lib/auth/permissions";
+import { calculateProfitability } from "@/lib/pricing/profitability";
+import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
+import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
+import type { ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
 const frequencies: Frequency[] = ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Multiple Days Per Week"];
 const frequencyLabelsForService = (catalog: ServiceCatalogBundle, serviceId?: string) => new Map(frequencies.map((frequency) => [frequency, serviceFrequencyDiscountLabel(frequency, catalog.recurringRules, serviceId)]));
@@ -62,6 +67,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const router = useRouter();
   const { profile } = useAuth();
   const isSales = profile?.role === "Sales";
+  const canViewProfitability = canAccessFinances(profile);
   const initialCustomer = estimate ? customerFromEstimate(estimate) : blankCustomer;
   const initialInput = estimate?.result.calculatorInput;
   const [customer, setCustomer] = useState(initialCustomer);
@@ -83,6 +89,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [terms, setTerms] = useState(estimate?.terms ?? "");
   const [manualPrice, setManualPrice] = useState<number | null>(estimate?.result.manualPrice ?? null);
   const [defaults,setDefaults]=useState<BusinessSettings|null>(null);
+  const [profitabilitySettings, setProfitabilitySettings] = useState<ProfitabilitySettings | null>(null);
+  const [travelOverride, setTravelOverride] = useState<TravelProjection | null>(null);
+  const [otherDirectExpenses, setOtherDirectExpenses] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -198,12 +207,55 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       console.warn("Estimate draft could not be saved", caught);
     }
   }, [commercial, customer, division, draftDefaults, draftReady, estimate, manualPrice, notes, postConstruction, residential, serviceDescription, terms, leadRepresentativeId]);
+  useEffect(() => {
+    if (!canViewProfitability) return;
+    let active = true;
+    void getProfitabilitySettings().then(value => { if (active) setProfitabilitySettings(value); })
+      .catch(error => { if (active) setError(error instanceof Error ? error.message : "Profitability settings could not be loaded."); });
+    return () => { active = false; };
+  }, [canViewProfitability]);
+  useEffect(() => {
+    if (!canViewProfitability || !estimate?.id) return;
+    let active = true;
+    void getProfitabilityProjection({ estimateId: estimate.id }).then(value => {
+      if (!active) return;
+      setTravelOverride(value?.travel ?? null);
+      setOtherDirectExpenses(value?.directCosts.other ?? 0);
+    }).catch(error => { if (active) setError(error instanceof Error ? error.message : "Saved profitability could not be loaded."); });
+    return () => { active = false; };
+  }, [canViewProfitability, estimate?.id]);
+  const profitabilityDestination = [customer.address, customer.addressLine2, customer.city, customer.state, customer.zip].filter(Boolean).join(", ");
+  const profitabilityTravel: TravelProjection | null = profitabilitySettings ? (
+    travelOverride && travelOverride.destination.trim().toLowerCase() === profitabilityDestination.trim().toLowerCase()
+      ? travelOverride
+      : {
+          origin: profitabilitySettings.travelOrigin, destination: profitabilityDestination, verification: "Unverified",
+          provider: null, roundTripMiles: null, roundTripMinutes: null,
+          vehicleCount: profitabilitySettings.defaultVehiclesPerJob, travelingEmployeeCount: 1,
+          companyRequiredTravelIsCompensable: profitabilitySettings.companyRequiredTravelIsCompensable,
+          warning: "Confirm travel distance and duration before relying on margins.", calculatedAt: null,
+        }
+  ) : null;
   const v2Mode = postConstructionMode && isPostConstructionV2Estimate(postConstruction);
   const incompleteProject = v2Mode && isPostConstructionV2Estimate(postConstruction) ? projectCostingIncompleteMessage(postConstruction.projectCosting) : null;
   const calculation = (() => {if(isSales)return{result:salesResult,error:salesCalculationError};if(!catalog || incompleteProject)return{result:null,error:null};try{return{result:postConstructionMode?calculatePostConstructionCatalogEstimate({...postConstruction,division},catalog,selectedService):division === "Residential" ? calculateResidentialEstimate(residential,catalog,defaults?.upkeep_adjustment_percent ?? 30) : calculateCommercialEstimate(commercial,catalog),error:null}}catch(x){return{result:null,error:x instanceof Error?(v2Mode ? projectCostingErrorMessage(x.message) : x.message):"Pricing could not be calculated."}}})();
 
   const result=calculation.result ? isSales ? calculation.result : v2Mode ? {...calculation.result,serviceDescription:serviceDescription.trim()||null} : withAuthoritativeEstimatePrice({...calculation.result,serviceDescription:calculation.result.serviceName==="High Dusting Cleaning" ? calculation.result.scope[0] ?? null : serviceDescription.trim()||null},manualPrice) : null;
 
+  const estimateProfitability = canViewProfitability && profitabilitySettings && profitabilityTravel && result ? calculateProfitability({
+    price: result.weeklyContractTotal ?? result.finalPrice,
+    cleanerCount: Math.max(1, result.crewSize),
+    hoursPerCleaner: result.laborHours / Math.max(1, result.crewSize),
+    hourlyWage: "workerHourlyPay" in calculatorInput && typeof calculatorInput.workerHourlyPay === "number" ? calculatorInput.workerHourlyPay : undefined,
+    settings: profitabilitySettings,
+    travel: { ...profitabilityTravel, travelingEmployeeCount: Math.max(1, result.crewSize) },
+    supplies: result.supplyCost,
+    otherDirectExpenses,
+    // Post-construction V2 logistics are separate from route costs; do not count them twice.
+    legacyTravelLogisticsCost: isPostConstructionV2Estimate(postConstruction) && postConstructionMode ? postConstruction.projectCosting.travelLogisticsCost : 0,
+    periodLabel: result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
+  }) : null;
+  // The saved snapshot belongs only in the restricted profitability relation, never Estimate.result.
   useEffect(()=>{
     if(!isSales||!catalog||catalogLoading)return;
     const timer=window.setTimeout(()=>{if(v2Mode){setSalesResult(null);setSalesCalculationError("Post-Construction project costing requires management review because it contains protected internal costs.");return}void calculateSalesEstimatePreview({calculatorInput,manualPrice,serviceDescription}).then(value=>{setSalesResult(value as unknown as EstimateResult);setSalesCalculationError(null)}).catch(cause=>{setSalesResult(null);setSalesCalculationError(cause instanceof Error?cause.message:"Pricing could not be calculated.")})},250);
@@ -253,6 +305,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         await updateEstimateRelationships(estimate, customer, division);
         if (!estimate.client_id || !estimate.property_id) throw new Error("This historical Estimate is no longer linked to a Client and Property.");
         await updateEstimate(estimate.id, { ...estimatePayload(estimate.client_id, estimate.property_id, customer, division, result, notes, terms, estimate.status), lead_representative_id: leadRepresentativeId });
+        if (estimateProfitability) await saveProfitabilityProjection({ estimateId: estimate.id, projection: estimateProfitability });
         await getEstimates();
         setSuccess("Estimate updated successfully.");
         if (pairedServiceRequested) {router.push(`/estimates?pairWith=${encodeURIComponent(estimate.id)}`);return;}
@@ -269,6 +322,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         if (selectedProperty && selectedProperty.property_type!==division) throw new Error(`The selected property must be a ${division} property.`);
         const property = selectedProperty ?? await findOrCreateEstimateProperty(client.id, customer, division);
         const created = await createEstimate({ ...estimatePayload(client.id, property.id, customer, division, result, notes, terms, "Open"), lead_representative_id: leadRepresentativeId });
+        if (estimateProfitability) await saveProfitabilityProjection({ estimateId: created.id, projection: estimateProfitability });
         if (pairWithEstimateId) {
           setSavedPairEstimateId(created.id);
           await pairHighDustingEstimates(pairWithEstimateId,created.id);
@@ -354,14 +408,24 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           <label className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4">
             <input type="checkbox" checked={pairedServiceRequested} onChange={event=>setPairedServiceRequested(event.target.checked)} className="mt-1 accent-[#143d1a]"/>
             <span className="text-sm"><strong className="block text-[#143d1a]">{selectedService?.service_code==="COM-HIGH-DUST"?"Also quote commercial cleaning":"Also quote high dusting"}</strong>
-              <span className="mt-1 block text-neutral-600">After saving, automatically open the {selectedService?.service_code==="COM-HIGH-DUST"?"commercial cleaning":"high dusting"} calculator for a second, linked estimate. Nothing is added to this estimate's price.</span>
+              <span className="mt-1 block text-neutral-600">After saving, automatically open the {selectedService?.service_code==="COM-HIGH-DUST"?"commercial cleaning":"high dusting"} calculator for a second, linked estimate. Nothing is added to this estimate&apos;s price.</span>
             </span>
           </label>
         </Section>}
         <Section title="Estimate Notes"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className={inputClass} placeholder="Internal estimate notes" /></Section>
         <Section title="Estimate Terms & Conditions"><textarea value={terms} onChange={(event) => setTerms(event.target.value)} rows={6} className={inputClass} placeholder="Terms shown on the client Estimate" /></Section>
       </div>
+      <div className="space-y-4">
+      {canViewProfitability && estimateProfitability && <ProfitabilityPanel
+        projection={estimateProfitability}
+        settings={profitabilitySettings ?? undefined}
+        destination={profitabilityDestination}
+        editable
+        onTravelChange={setTravelOverride}
+        onOtherDirectExpensesChange={setOtherDirectExpenses}
+      />}
       {result?(v2Mode?<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Post-Construction V2 Project</h2><p className="mt-3 text-3xl font-bold text-[#d4af37]">{currency(result.finalPrice)}</p><p className="mt-2 text-sm">One-time project price. Use the project calculator to change or clear the override.</p><button type="button" disabled={saving} onClick={()=>void save()} className="mt-5 rounded-lg bg-[#d4af37] px-5 py-3 font-bold text-[#143d1a]">{saving ? "Saving..." : estimate ? "Update Estimate" : "Save Estimate"}</button></aside>:postConstructionMode?<PostConstructionBidSummary result={result} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)}/>:<EstimateSummary result={result} frequency={calculatorInput.frequency} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)} />):<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">{selectedService?.service_code === "COM-HIGH-DUST" ? "High Dusting estimate" : incompleteProject ? "Project pricing" : "Pricing unavailable"}</h2><p className="mt-2 text-sm text-white/70">{selectedService?.service_code === "COM-HIGH-DUST" ? "Enter the project details, working height, access methods and elevated surfaces above. The estimate price will calculate automatically here when the required information is complete." : incompleteProject ?? "A valid catalog price is required before this estimate can be saved."}</p></aside>}
+      </div>
     </div>
   </div>;
 }

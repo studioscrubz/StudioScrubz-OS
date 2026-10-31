@@ -41,6 +41,7 @@ import type { WalkthroughWithRelations } from "@/types/walkthrough";
 import type {
   ProposalAdjustment,
   ProposalInsert,
+  ProposalResult,
   ProposalScopeItem,
   ProposalTerms,
   ProposalWithRelations,
@@ -52,6 +53,11 @@ import { canManageProposalPricingPhotos } from "@/lib/auth/permissions";
 import { ProposalPricingPhotos } from "@/components/proposals/ProposalPricingPhotos";
 import { serviceFrequencyLabel } from "@/lib/scheduling/frequency";
 import { proposalAddonSnapshots, replaceProposalCatalogAddons, selectProposalCatalogAddons } from "@/lib/pricing/proposalAddons";
+import { calculateProfitability } from "@/lib/pricing/profitability";
+import { canAccessFinances } from "@/lib/auth/permissions";
+import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
+import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
+import type { ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
 const termsDefault: ProposalTerms = {
   paymentTerms: "Payment due upon completion of service.",
@@ -83,6 +89,7 @@ export function ProposalBuilder({
   onSaved?: () => void;
 }) {
   const { profile } = useAuth();
+  const canViewProfitability = canAccessFinances(profile);
   const canManagePricingPhotos = canManageProposalPricingPhotos(profile);
   // The legacy builder renders this slot deep inside a compact JSX expression.
   // Keep its public props while swapping the implementation for saved Proposals.
@@ -102,6 +109,8 @@ export function ProposalBuilder({
     [canManagePricingPhotos, proposal],
   );
   const [catalog, setCatalog] = useState<ServiceCatalogBundle | null>(null);
+  const [profitabilitySettings, setProfitabilitySettings] = useState<ProfitabilitySettings | null>(null);
+  const [sourceProfitability, setSourceProfitability] = useState<ProfitabilityProjection | null>(null);
   const router = useRouter();
   const [mode, setMode] = useState<"estimate" | "walkthrough">(
     proposal?.walkthrough_id ? "walkthrough" : "estimate",
@@ -344,6 +353,21 @@ export function ProposalBuilder({
           serviceDaysOfWeek,
         )
       : authoritativeEstimate;
+  useEffect(() => {
+    if (!canViewProfitability) return;
+    let active = true;
+    void getProfitabilitySettings().then((settings) => { if (active) setProfitabilitySettings(settings); }).catch(() => { if (active) setProfitabilitySettings(null); });
+    return () => { active = false; };
+  }, [canViewProfitability]);
+  useEffect(() => {
+    if (!canViewProfitability) return;
+    const proposalId = proposal?.id ?? null;
+    const estimateId = proposalId ? null : estimate?.id ?? null;
+    if (!proposalId && !estimateId) { void Promise.resolve().then(() => setSourceProfitability(null)); return; }
+    let active = true;
+    void getProfitabilityProjection({ proposalId, estimateId }).then((value) => { if (active) setSourceProfitability(value); }).catch(() => { if (active) setSourceProfitability(null); });
+    return () => { active = false; };
+  }, [canViewProfitability, estimate?.id, proposal?.id]);
   const calculatedResult = calculateProposal({
     estimate: pricingEstimate,
     catalogBasePrice: catalogService?.base_price,
@@ -386,6 +410,9 @@ export function ProposalBuilder({
     ...(mixedWeeklyMode ? withProposalWeeklyVisitPrices(pricedResult, weeklyMixedVisits, serviceDaysOfWeek) : pricedResult),
     finalPriceAdjustmentLabel: adjustmentLabel.trim() || null,
   };
+  const proposalProfitability = canViewProfitability && profitabilitySettings && sourceProfitability
+    ? calculateProposalProfitability({ result, source: sourceProfitability, settings: profitabilitySettings, propertyAddress: property?.address ?? "" })
+    : null;
   useEffect(() => {
     if (proposal || !sourceId) return;
     const selectedWalkthrough =
@@ -571,8 +598,10 @@ export function ProposalBuilder({
         const { photos: omittedPhotos, ...updatePayload } = payload;
         void omittedPhotos;
         await updateProposal(proposal.id, updatePayload);
+        if (proposalProfitability) await saveProfitabilityProjection({ proposalId: proposal.id, projection: proposalProfitability });
       } else {
         const created = await createProposal(payload);
+        if (proposalProfitability) await saveProfitabilityProjection({ proposalId: created.id, projection: proposalProfitability });
         await getProposalPricingPhotos(created.id);
         if (walkthrough?.id) {
           await updateWalkthroughStatus(walkthrough.id, "Proposal Ready");
@@ -977,6 +1006,7 @@ export function ProposalBuilder({
           save={save}
           editing={Boolean(proposal)}
         />
+        {canViewProfitability && proposalProfitability && <ProfitabilityPanel projection={proposalProfitability} />}
       </div>
     </div>
   );
@@ -1503,6 +1533,28 @@ function msg(x: unknown, f: string) {
       ? x.message : "";
   return detail && !/jwt|auth(?:orization)? header|access[_ -]?token|service[_ -]?role|secret|api[_ -]?key/i.test(detail)
     ? detail : f;
+}
+function calculateProposalProfitability({ result, source, settings, propertyAddress }: { result: ProposalResult; source: ProfitabilityProjection; settings: ProfitabilitySettings; propertyAddress: string }) {
+  const destination = propertyAddress.trim();
+  const travel: TravelProjection = source.travel.destination.trim().toLowerCase() === destination.toLowerCase()
+    ? source.travel
+    : { origin: settings.travelOrigin, destination, verification: "Unverified", provider: null, roundTripMiles: null, roundTripMinutes: null, vehicleCount: settings.defaultVehiclesPerJob, travelingEmployeeCount: Math.max(1, result.crewRecommendation), companyRequiredTravelIsCompensable: settings.companyRequiredTravelIsCompensable, warning: "The service property changed; recalculate travel before relying on margin.", calculatedAt: null };
+  const crewSize = Math.max(1, result.crewRecommendation);
+  return calculateProfitability({
+    price: result.weeklyContractTotal ?? result.perVisitTotal,
+    cleanerCount: crewSize,
+    hoursPerCleaner: result.laborHours / crewSize,
+    hourlyWage: source.hourlyWage,
+    settings,
+    travel: { ...travel, travelingEmployeeCount: crewSize },
+    supplies: source.directCosts.supplies + result.additionalMaterials,
+    equipment: source.directCosts.equipment,
+    subcontractors: source.directCosts.subcontractors,
+    otherDirectExpenses: source.directCosts.other,
+    legacyTravelLogisticsCost: source.directCosts.legacyTravelLogistics,
+    legacyTravelIncludesDriving: source.directCosts.legacyTravelLogistics > 0,
+    periodLabel: result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
+  });
 }
 const input =
   "w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";

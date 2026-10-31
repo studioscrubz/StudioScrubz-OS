@@ -186,6 +186,7 @@ import type {
   InternalScheduleEvent,
 } from "@/types/internalScheduleEvent";
 import type { CorporateCapabilityProfile } from "@/types/corporateCapability";
+import type { ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
 export interface Database {
   public: {
@@ -1726,6 +1727,24 @@ export interface Database {
           },
         ];
       };
+      profitability_settings: {
+        Row: { singleton: boolean; settings: ProfitabilitySettings; created_at: string; updated_at: string };
+        Insert: { singleton?: boolean; settings?: ProfitabilitySettings; created_at?: string; updated_at?: string };
+        Update: { singleton?: boolean; settings?: ProfitabilitySettings; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      profitability_route_cache: {
+        Row: { cache_key: string; origin: string; destination: string; provider: string; route: TravelProjection; expires_at: string; created_at: string; updated_at: string };
+        Insert: { cache_key: string; origin: string; destination: string; provider: string; route: TravelProjection; expires_at: string; created_at?: string; updated_at?: string };
+        Update: Partial<{ cache_key: string; origin: string; destination: string; provider: string; route: TravelProjection; expires_at: string; created_at: string; updated_at: string }>;
+        Relationships: [];
+      };
+      profitability_projections: {
+        Row: { id: string; estimate_id: string | null; proposal_id: string | null; projection: ProfitabilityProjection; created_by: string | null; created_at: string };
+        Insert: { id?: string; estimate_id?: string | null; proposal_id?: string | null; projection: ProfitabilityProjection; created_by?: string | null; created_at?: string };
+        Update: Partial<{ estimate_id: string | null; proposal_id: string | null; projection: ProfitabilityProjection; created_by: string | null }>;
+        Relationships: [];
+      };
       business_settings: {
         Row: BusinessSettings & { corporate_capability_profile: CorporateCapabilityProfile };
         Insert: BusinessSettingsUpdate & { id?: string; corporate_capability_profile?: CorporateCapabilityProfile };
@@ -2473,6 +2492,10 @@ export interface Database {
         Args: { p_name: string };
         Returns: ServiceLabel;
       };
+      get_profitability_settings: { Args: Record<string, never>; Returns: ProfitabilitySettings };
+      save_profitability_settings: { Args: { p_settings: ProfitabilitySettings }; Returns: ProfitabilitySettings };
+      get_profitability_projection: { Args: { p_estimate_id?: string | null; p_proposal_id?: string | null }; Returns: ProfitabilityProjection | null };
+      save_profitability_projection: { Args: { p_estimate_id?: string | null; p_proposal_id?: string | null; p_projection: ProfitabilityProjection }; Returns: ProfitabilityProjection };
       get_business_settings_public: {
         Args: Record<string, never>;
         Returns: BusinessIdentitySettings[];
