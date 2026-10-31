@@ -15,7 +15,7 @@ test("proposal acceptance collects a drawn signature and blocks unsigned request
 });
 
 test("server checks actual PNG ink before restricted acceptance RPC", () => {
-  assert.match(route, /validateDrawnPngSignature\(signature\)/);
+  assert.match(route, /validateDrawnPngSignature\(signature, "Proposal"\)/);
   assert.match(route, /createSupabaseAdminClient\(\)\.rpc\("accept_proposal_by_token"/);
   assert.match(route, /p_signature: signature/);
   assert.doesNotMatch(route, /createSupabaseServerClient/);
