@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { residentialPostConstructionScopeError } from "@/lib/walkthroughWorkflow";
 import { useRouter } from "next/navigation";
-import { isPostConstructionV2Estimate, type PostConstructionEstimateInput, calculatePostConstructionCatalogEstimate, calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
+import { isPostConstructionV2Estimate, calculatePostConstructionCatalogEstimate, calculateCommercialEstimate, calculateResidentialEstimate } from "@/lib/pricing/estimates";
 import { withAuthoritativeEstimatePrice } from "@/lib/pricing/authoritativePrice";
 import { matchingRecurringRules, serviceFrequencyDiscountLabel } from "@/lib/pricing/pricingEngine";
 import { calculateSalesEstimatePreview, createEstimate, findOrCreateEstimateClient, findOrCreateEstimateProperty, getEstimates, updateEstimate, updateEstimateRelationships } from "@/lib/services/estimates";
@@ -45,7 +45,6 @@ const blankCustomer: CustomerInformation = { firstName: "", lastName: "", compan
 const defaultResidential: ResidentialCalculatorInput = { division: "Residential", serviceType: "Standard", frequency: "One-Time", condition: "Average", squareFeet: 1000, bedrooms: 2, bathrooms: 1, occupied: true, pets: false, additionalDiscountPercent: 0, taxRatePercent: 0, addOns: [] };
 const defaultCommercial: CommercialCalculatorInput = { division: "Commercial", commercialType: "Office", frequency: "One-Time", squareFeet: 2500, floors: 1, restrooms: 2, kitchens: 1, stations: 0, units: 0, condition: "Average", targetCompletionHours: 4, workerHourlyPay: MINIMUM_WORKER_HOURLY_PAY, targetProfitMarginPercent: 35, additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [] };
 const defaultPostConstruction: PostConstructionCalculatorInput = { calculatorType: "Post-Construction", division: "Residential", serviceType: "Post-Construction Cleaning", frequency: "One-Time", squareFeet: 2500, floors: 1, rooms: 0, bathrooms: 0, kitchens: 0, condition: "Average", dustSeverity: "Average", debrisSeverity: "Average", detailLevel: "Detailed", windowsOrGlassCount: 0, cabinetOrDrawerCount: 0, applianceInteriorCount: 0, stairFlights: 0, targetProjectDays: 1, workdayHours: 8, workerHourlyPay: MINIMUM_WORKER_HOURLY_PAY, targetProfitMarginPercent: 35, additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [] };
-const defaultPostConstructionV2: PostConstructionEstimateInput = { ...defaultPostConstruction, version: 2, projectCosting: { version: 2, calculatorType: "Post-Construction", totalSquareFeet: 2500, scope: [], estimatedPersonHours: 0, crewSize: 1, workerHourlyPay: MINIMUM_WORKER_HOURLY_PAY, plannedProjectDays: 1, workdayHours: 8, suppliesCost: 0, equipmentRentalCost: 0, travelLogisticsCost: 0, disposalDebrisCost: 0, supervisionAdminCost: 0, contingencyCost: 0, desiredMarginPercent: 35 } };
 const estimateDraftKey = "studioscrubz:estimate-draft";
 
 type EstimateDraft = {
