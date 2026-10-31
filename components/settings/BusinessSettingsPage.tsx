@@ -6,6 +6,7 @@ import type { BusinessSettings, BusinessSettingsUpdate } from "@/types/businessS
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
 import { GoogleCalendarSettings } from "@/components/settings/GoogleCalendarSettings";
 import { CorporateCapabilitySettings } from "@/components/settings/CorporateCapabilitySettings";
+import { ProfitabilitySettingsEditor } from "@/components/settings/ProfitabilitySettings";
 
 const textFields: Array<[keyof BusinessSettings, string]> = [
   ["business_name","Business Name"],["tagline","Tagline"],["business_email","Business Email"],
@@ -28,6 +29,7 @@ export function BusinessSettingsPage(){
   return <><header className="border-b pb-7"><h1 className="text-3xl font-extrabold text-[#143d1a]">Business Settings</h1><p className="mt-3 text-neutral-600">Manage StudioScrubz business information and default document settings.</p></header>{error&&<Alert text={error}/>} {notice&&<Alert text={notice} good/>}
     <Section title="Company Information"><Grid>{textFields.map(([key,label])=><Field key={key} label={label} value={String(value[key]??"")} set={next=>setValue(current=>current?{...current,[key]:next||null}:current)}/>)}<label className="text-sm font-bold">State<UsStateSelect className={input} value={value.state??""} onChange={next=>set("state",next||null)}/></label><label className="text-sm font-bold">Timezone<select className={input} value={value.timezone??""} onChange={event=>set("timezone",event.target.value||null)}><option value="">Use server default (UTC)</option>{timeZones.map(([zone,label])=><option key={zone} value={zone}>{label}</option>)}</select></label></Grid></Section>
     <CorporateCapabilitySettings/>
+    <ProfitabilitySettingsEditor/>
     <Section title="Estimate Defaults"><Grid><NumberField label="Default estimate expiration days" value={value.default_estimate_expiration_days} set={x=>set("default_estimate_expiration_days",x)}/><Area label="Default estimate notes" value={value.default_estimate_notes??""} set={x=>set("default_estimate_notes",x||null)}/><Area label="Default Estimate Terms & Conditions" value={value.default_estimate_terms??""} set={x=>set("default_estimate_terms",x||null)}/></Grid></Section>
     <CompanyMileageRate/>
     <Section title="Upkeep Plan Pricing"><Grid><NumberField label="Upkeep Adjustment %" value={value.upkeep_adjustment_percent} min="0" max="40" set={x=>set("upkeep_adjustment_percent",x)}/></Grid></Section>

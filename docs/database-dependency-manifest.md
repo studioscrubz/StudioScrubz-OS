@@ -227,3 +227,11 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 - Source: `supabase/migrations/20261029090000_corporate_capability_profile.sql`.
 
 2026-10-29 Linked commercial quote addition: `estimate_service_pairs` is created by `20261029193000_estimate_high_dusting_pairs.sql`. Its authenticated read/insert policies use private `estimate_links_private.valid_high_dusting_estimate_pair` to require active same-client/property Commercial estimates with exactly one High Dusting estimate; each retains its own price and approval.
+
+## 2026-10-30 Integrated profitability and travel costing
+
+- Migration: `supabase/migrations/20261030090000_integrated_profitability_travel_costing.sql`. Apply only after validating current production migration history and testing the security contracts.
+- Restricted tables: `profitability_settings`, `profitability_route_cache`, and `profitability_projections`; never place cost projections in publicly readable Estimate/Proposal `result` JSON.
+- RPCs: `get_profitability_settings`, `save_profitability_settings`, `get_profitability_projection`, and `save_profitability_projection`. Database permissions enforce Master Admin access to protected financial snapshots.
+- Related application dependencies: `lib/services/profitability.ts`, `app/api/profitability/travel/route.ts`, `components/estimates/ProfitabilityPanel.tsx`, `components/settings/ProfitabilitySettings.tsx`, and pricing calculators.
+- Retain Corporate Capability, High Dusting, and linked-estimate migrations and features.

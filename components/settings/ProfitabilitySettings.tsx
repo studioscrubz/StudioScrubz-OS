@@ -1,0 +1,23 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { canAccessFinances } from "@/lib/auth/permissions";
+import { getProfitabilitySettings, saveProfitabilitySettings } from "@/lib/services/profitability";
+import type { ProfitabilitySettings } from "@/types/profitability";
+
+export function ProfitabilitySettingsEditor() {
+  const { profile } = useAuth();
+  const canViewProfitability = canAccessFinances(profile);
+  const [settings, setSettings] = useState<ProfitabilitySettings | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => { if (!canViewProfitability) return; let active = true; void getProfitabilitySettings().then((value) => { if (active) setSettings(value); }).catch((error) => { if (active) setMessage(error instanceof Error ? error.message : "Profitability settings could not be loaded."); }); return () => { active = false; }; }, [canViewProfitability]);
+  if (!canViewProfitability) return null;
+  if (!settings) return <section className="mt-6 rounded-xl border bg-white p-5"><h2 className="font-extrabold text-[#143d1a]">Profitability & Travel Costing</h2><p className="mt-2 text-sm text-neutral-600">{message ?? "Loading internal profitability settings..."}</p></section>;
+  const set = <K extends keyof ProfitabilitySettings>(key: K, value: ProfitabilitySettings[K]) => setSettings((current) => current ? { ...current, [key]: value } : current);
+  const save = async () => { setSaving(true); setMessage(null); try { setSettings(await saveProfitabilitySettings(settings)); setMessage("Profitability settings saved."); } catch (error) { setMessage(error instanceof Error ? error.message : "Profitability settings could not be saved."); } finally { setSaving(false); } };
+  return <section className="mt-6 rounded-xl border bg-white p-5" aria-labelledby="profitability-settings-title"><h2 id="profitability-settings-title" className="font-extrabold text-[#143d1a]">Profitability & Travel Costing</h2><p className="mt-1 text-sm text-neutral-600">These internal W-2 projection assumptions never change employee payroll, compensation agreements, or customer documents.</p><div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"><Field label="Cleaner hourly wage" value={settings.cleanerHourlyWage} set={(value) => set("cleanerHourlyWage", value)} step="0.01" /><Field label="Employer labor burden" value={settings.employerBurdenRate * 100} set={(value) => set("employerBurdenRate", value / 100)} step="0.1" suffix="%" /><Field label="Target gross margin" value={settings.targetGrossMarginRate * 100} set={(value) => set("targetGrossMarginRate", value / 100)} step="0.1" suffix="%" /><label className="text-sm font-bold sm:col-span-2"><span>Supplies & equipment travel origin</span><input className="mt-1 h-11 w-full rounded-lg border px-3 font-normal" value={settings.travelOrigin} onChange={(event) => set("travelOrigin", event.target.value)} /></label><Field label="Default vehicles per job" value={settings.defaultVehiclesPerJob} set={(value) => set("defaultVehiclesPerJob", Math.max(1, Math.trunc(value)))} step="1" /><label className="text-sm font-bold"><span>Vehicle operating cost per mile</span><input className="mt-1 h-11 w-full rounded-lg border px-3 font-normal" type="number" min="0" step="0.0001" value={settings.vehicleOperatingRatePerMile ?? ""} placeholder="Set actual operating cost" onChange={(event) => set("vehicleOperatingRatePerMile", event.target.value === "" ? null : Math.max(0, Number(event.target.value)))} /></label><label className="flex min-h-11 items-center gap-3 text-sm font-bold"><input type="checkbox" checked={settings.companyRequiredTravelIsCompensable} onChange={(event) => set("companyRequiredTravelIsCompensable", event.target.checked)} />Include company-required travel labor</label></div><button type="button" disabled={saving} onClick={() => void save()} className="mt-5 rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving..." : "Save Profitability Settings"}</button>{message && <p role="status" className="mt-3 text-sm">{message}</p>}</section>;
+}
+
+function Field({ label, value, set, step, suffix }: { label: string; value: number; set: (value: number) => void; step: string; suffix?: string }) { return <label className="text-sm font-bold"><span>{label}{suffix ? ` (${suffix})` : ""}</span><input className="mt-1 h-11 w-full rounded-lg border px-3 font-normal" type="number" min="0" step={step} value={value} onChange={(event) => set(Math.max(0, Number(event.target.value) || 0))} /></label>; }

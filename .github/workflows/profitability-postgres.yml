@@ -1,0 +1,35 @@
+name: Profitability native PostgreSQL release gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - release/integrated-profitability-20261030
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profitability-native-postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Create disposable fixture database
+        run: |
+          sudo -u postgres createdb studioscrubz_profitability_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_profitability_test -f supabase/tests/profitability_travel_fixture.sql
+      - name: Confirm migration rolls back cleanly
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_profitability_test -f supabase/tests/profitability_travel_rollback.sql
+      - name: Apply actual profitability migration to disposable database
+        run: sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_profitability_test -f supabase/migrations/20261030090000_integrated_profitability_travel_costing.sql
+      - name: Check Master Admin access, other roles, JSON segregation and triggers
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_profitability_test -f supabase/tests/profitability_travel_postgres.sql
