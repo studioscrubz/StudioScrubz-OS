@@ -19,9 +19,61 @@ const details:PostConstructionDetailLevel[]=["Standard","Detailed","High Detail"
 export function PostConstructionCalculatorFields({value,onChange,service,catalog,salesSafe=false}:{value:PostConstructionEstimateInput;onChange:(value:PostConstructionEstimateInput)=>void;service:CatalogService|undefined;catalog:ServiceCatalogBundle;salesSafe?:boolean}){
   const { profile } = useAuth();
   salesSafe = salesSafe || profile?.role === "Sales";
-  if (isPostConstructionV2Estimate(value)) return salesSafe?<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Post-Construction project costing contains protected internal costs and must be completed by management.</div>:<div className="space-y-4">{value.division === "Residential" && <Group title="Residential Property Scope"><NumberField label="Bedrooms" value={value.rooms} set={rooms => onChange({ ...value, rooms })}/><NumberField label="Bathrooms" value={value.bathrooms} step="0.5" set={bathrooms => onChange({ ...value, bathrooms })}/><NumberField label="Floors" value={value.floors} set={floors => onChange({ ...value, floors })}/><NumberField label="Kitchens" value={value.kitchens} set={kitchens => onChange({ ...value, kitchens })}/><p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-4">Scope for walkthrough preparation and labor planning. Total square feet is entered below; these counts do not add pricing charges.</p></Group>}<ProjectCostFields value={value.projectCosting} onChange={projectCosting => onChange({ ...value, squareFeet: projectCosting.totalSquareFeet, projectCosting })}/></div>;
+  const detailedMode = isPostConstructionV2Estimate(value);
+  const changeMode = (next: "Automatic" | "Detailed") => {
+    if ((next === "Detailed") === detailedMode || salesSafe) return;
+    if (next === "Detailed") {
+      onChange({
+        ...value,
+        version: 2,
+        projectCosting: {
+          version: 2,
+          calculatorType: "Post-Construction",
+          totalSquareFeet: value.squareFeet,
+          scope: [],
+          estimatedPersonHours: 0,
+          crewSize: 1,
+          workerHourlyPay: value.workerHourlyPay,
+          plannedProjectDays: Math.max(1, value.targetProjectDays || 1),
+          workdayHours: value.workdayHours === 10 ? 10 : 8,
+          suppliesCost: 0, equipmentRentalCost: 0, travelLogisticsCost: 0,
+          disposalDebrisCost: 0, supervisionAdminCost: 0, contingencyCost: 0,
+          desiredMarginPercent: value.targetProfitMarginPercent,
+        },
+      });
+    } else {
+      const legacy = { ...value } as PostConstructionEstimateInput;
+      const oldProject = legacy.projectCosting;
+      delete legacy.version;
+      delete legacy.projectCosting;
+      if (oldProject) {
+        legacy.squareFeet = oldProject.totalSquareFeet;
+        legacy.workerHourlyPay = oldProject.workerHourlyPay;
+        legacy.targetProjectDays = oldProject.plannedProjectDays;
+        legacy.workdayHours = oldProject.workdayHours;
+        legacy.targetProfitMarginPercent = oldProject.desiredMarginPercent;
+      }
+      onChange(legacy);
+    }
+  };
+  const modeSelector = !salesSafe && <fieldset className="rounded-xl border border-[#143d1a]/20 bg-white p-4">
+    <legend className="px-2 text-sm font-bold text-[#143d1a]">Post-Construction pricing method</legend>
+    <div className="flex flex-wrap gap-3">
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <input type="radio" name="post-construction-pricing-method" checked={!detailedMode} onChange={() => changeMode("Automatic")} />
+        Automatic estimate — square footage, condition and scope
+      </label>
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <input type="radio" name="post-construction-pricing-method" checked={detailedMode} onChange={() => changeMode("Detailed")} />
+        Detailed project costing (V2) — total person-hours and expenses
+      </label>
+    </div>
+    <p className="mt-2 text-xs text-neutral-600">Automatic pricing generates a quote as you enter property details. Detailed V2 is optional and requires total person-hours, crew size and project expenses. Changing methods recalculates the quote; review the new price before saving.</p>
+  </fieldset>;
+  if (detailedMode) return salesSafe?<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Post-Construction project costing contains protected internal costs and must be completed by management.</div>:<div className="space-y-4">{modeSelector}{value.division === "Residential" && <Group title="Residential Property Scope"><NumberField label="Bedrooms" value={value.rooms} set={rooms => onChange({ ...value, rooms })}/><NumberField label="Bathrooms" value={value.bathrooms} step="0.5" set={bathrooms => onChange({ ...value, bathrooms })}/><NumberField label="Floors" value={value.floors} set={floors => onChange({ ...value, floors })}/><NumberField label="Kitchens" value={value.kitchens} set={kitchens => onChange({ ...value, kitchens })}/><p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-4">Scope for walkthrough preparation and labor planning. Total square feet is entered below; these counts do not add pricing charges.</p></Group>}<ProjectCostFields value={value.projectCosting} onChange={projectCosting => onChange({ ...value, squareFeet: projectCosting.totalSquareFeet, projectCosting })}/></div>;
   const set=<K extends keyof PostConstructionCalculatorInput>(key:K,next:PostConstructionCalculatorInput[K])=>onChange({...value,[key]:next});
   return <div className="space-y-5">
+    {modeSelector}
     <Group title="Project Scope"><NumberField label="Square Feet" value={value.squareFeet} set={next=>set("squareFeet",next)}/><NumberField label="Floors" value={value.floors} set={next=>set("floors",next)}/><NumberField label="Rooms / Bedrooms" value={value.rooms} set={next=>set("rooms",next)}/><NumberField label="Bathrooms / Restrooms" value={value.bathrooms} set={next=>set("bathrooms",next)}/><NumberField label="Kitchens / Breakrooms" value={value.kitchens} set={next=>set("kitchens",next)}/></Group>
     <Group title="Site Condition"><SelectField label="Overall Condition" value={value.condition} options={conditions} set={next=>set("condition",next as Condition)}/><SelectField label="Construction Dust" value={value.dustSeverity} options={severities} set={next=>set("dustSeverity",next as PostConstructionSeverity)}/><SelectField label="Construction Debris" value={value.debrisSeverity} options={severities} set={next=>set("debrisSeverity",next as PostConstructionSeverity)}/><SelectField label="Detail Level" value={value.detailLevel} options={details} set={next=>set("detailLevel",next as PostConstructionDetailLevel)}/></Group>
     <Group title="Specialty / Detail Work"><NumberField label="Windows / Glass" value={value.windowsOrGlassCount} set={next=>set("windowsOrGlassCount",next)}/><NumberField label="Cabinets / Drawers" value={value.cabinetOrDrawerCount} set={next=>set("cabinetOrDrawerCount",next)}/><NumberField label="Appliance Interiors" value={value.applianceInteriorCount} set={next=>set("applianceInteriorCount",next)}/><NumberField label="Stair Flights" value={value.stairFlights} set={next=>set("stairFlights",next)}/></Group>
@@ -38,7 +90,7 @@ function SelectField({label,value,options,set,labels}:{label:string;value:string
 const inputClass="w-full rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/15";
 
 export function projectCostingIncompleteMessage(value: PostConstructionV2Input | undefined): string | null {
-  if (!value) return null;
+  if (!value) return "Detailed project costing is missing required inputs. Select Automatic estimate or complete the V2 project information.";
   if (value.estimatedPersonHours === 0) return "Enter estimated total person-hours to calculate project pricing.";
   if (value.crewSize === 0 || value.plannedProjectDays === 0 || Number(value.workdayHours) === 0) return "Enter crew size, planned project days, and workday hours to calculate project pricing.";
   return null;
