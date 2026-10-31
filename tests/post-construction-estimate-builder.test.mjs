@@ -113,7 +113,7 @@ test("Post-Construction manual price and minimum action appear only in finance-r
   const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
   const engine = readFileSync(resolve("lib/pricing/authoritativePrice.ts"), "utf8");
   assert.match(builder, /const estimateProfitability = canViewProfitability/);
-  assert.match(builder, /projectPrice=\{postConstructionMode && !v2Mode \? \{ manualPrice, calculatedPrice: result\.calculatedFinalPrice \?\? result\.finalPrice, onChange: setManualPrice \} : undefined\}/);
+  assert.match(builder, /projectPrice=\{postConstructionMode && !v2Mode && result \? \{ manualPrice, calculatedPrice: result\.calculatedFinalPrice \?\? result\.finalPrice, onChange: setManualPrice \} : undefined\}/);
   assert.match(panel, /projectPrice && editable/);
   assert.match(panel, /Manual \/ Custom Estimate Amount/);
   assert.match(panel, /Use Profitability Minimum/);
