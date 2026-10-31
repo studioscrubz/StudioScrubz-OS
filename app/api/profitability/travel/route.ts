@@ -49,8 +49,9 @@ export async function POST(request: Request) {
     const target = await geocode(normalizedDestination, apiKey);
     if (!confidentlyVerified([target])) return Response.json({ travel: unavailable(base, "The destination address could not be confidently verified. Enter a manual mileage and duration override.") });
     const url = new URL("https://api.geoapify.com/v1/routing");
-    url.searchParams.set("waypoints", `${origin.longitude},${origin.latitude}|${target.longitude},${target.latitude}`);
+    url.searchParams.set("waypoints", `${origin.latitude},${origin.longitude}|${target.latitude},${target.longitude}`);
     url.searchParams.set("mode", "drive");
+    url.searchParams.set("format", "json");
     url.searchParams.set("apiKey", apiKey);
     const response = await provider(url);
     const route = parseRoutingResponse(response);
@@ -76,6 +77,7 @@ async function geocode(address: string, apiKey: string) {
   const url = new URL("https://api.geoapify.com/v1/geocode/search");
   url.searchParams.set("text", address);
   url.searchParams.set("filter", "countrycode:us");
+  url.searchParams.set("format", "json");
   url.searchParams.set("limit", "2");
   url.searchParams.set("apiKey", apiKey);
   const candidates = parseGeocodingResponse(await provider(url));

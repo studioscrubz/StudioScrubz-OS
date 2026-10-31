@@ -106,6 +106,15 @@ test("route endpoint and migration keep provider use server-side, cached, and fi
   assert.match(migration, /set search_path = ''/);
 });
 
+test("profitability Geoapify requests match the supported JSON schema and coordinate order", () => {
+  const route = readFileSync(new URL("../app/api/profitability/travel/route.ts", import.meta.url), "utf8");
+  const porter = readFileSync(new URL("../app/api/porter-routes/optimize/route.ts", import.meta.url), "utf8");
+  assert.match(porter, /url\.searchParams\.set\("format","json"\)/);
+  assert.equal((route.match(/url\.searchParams\.set\("format", "json"\)/g) || []).length, 2);
+  assert.match(route, /\x60\$\{origin\.latitude\},\$\{origin\.longitude\}\|\$\{target\.latitude\},\$\{target\.longitude\}\x60/);
+  assert.doesNotMatch(route, /\x60\$\{origin\.longitude\},\$\{origin\.latitude\}/);
+});
+
 test("native PostgreSQL harness includes an external transaction rollback assertion", () => {
   const rollback = readFileSync(new URL("../supabase/tests/profitability_travel_rollback.sql", import.meta.url), "utf8");
   const fixture = readFileSync(new URL("../supabase/tests/profitability_travel_fixture.sql", import.meta.url), "utf8");
