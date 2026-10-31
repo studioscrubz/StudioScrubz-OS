@@ -24,5 +24,20 @@ test("high dusting uses normal estimate summary with calculated price", () => {
 
 test("incomplete high dusting form never reports a missing fixed catalog price", () => {
  assert.match(builder, /selectedService\?\.service_code === "COM-HIGH-DUST" \? "High Dusting estimate"/);
- assert.match(builder, /The estimate price will calculate automatically here/);
+ assert.match(builder, /A preliminary estimate will calculate even if walkthrough height, access and scope details are pending/);
+ assert.match(builder, /\{calculation.error && <div className="mb-4"><Alert kind="error" text=\{calculation.error\}/);
+});
+
+test("High Dusting calculator previews cost-based estimates and displays incomplete scope warnings", () => {
+ const form = read("components/estimates/HighDustingQuoteCalculator.tsx");
+ const engine = read("lib/pricing/highDusting.ts");
+ const publicRequest = read("lib/services/publicEstimateRequests.ts");
+ assert.match(form, /preview = priceHighDusting\(value\)/);
+ assert.match(form, /Preliminary High Dusting estimate/);
+ assert.match(form, /pricingError && <p role="alert"/);
+ assert.match(form, /Assessment pending:/);
+ assert.doesNotMatch(form, /To generate your live Estimate Summary, enter square footage, working height/);
+ assert.match(engine, /scopeConfirmed=Boolean/);
+ assert.match(engine, /PRELIMINARY ESTIMATE/);
+ assert.match(publicRequest, /Complete working height, access method and elevated surface scope before submitting a High Dusting request/);
 });
