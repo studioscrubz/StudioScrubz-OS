@@ -66,6 +66,7 @@ function publicCalculatorInput(value: unknown): unknown {
   delete input.workerHourlyPay;
   delete input.targetProfitMarginPercent;
   delete input.projectCosting;
+  delete input.projectExpenses;
   return input;
 }
 
