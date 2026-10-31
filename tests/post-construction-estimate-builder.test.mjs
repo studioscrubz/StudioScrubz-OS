@@ -21,7 +21,7 @@ test("Post-Construction UI exposes the approved grouped fields and live breakdow
 
 test("drafts preserve separate generic Commercial and Post-Construction state", () => {
   assert.match(builder, /postConstruction\?: PostConstructionCalculatorInput/);
-  assert.match(builder, /setPostConstruction\(parsed\.postConstruction \?\? defaultPostConstructionV2\)/);
+  assert.match(builder, /setPostConstruction\(parsed\.postConstruction \?\? defaultPostConstruction\)/);
   assert.match(builder, /const draft: EstimateDraft = \{ version: 1, customer, division, residential, commercial, postConstruction/);
 });
 
@@ -37,4 +37,27 @@ test("Post-Construction uses dedicated specialty quantities instead of catalog A
 test("existing Residential and generic Commercial calculators remain routed unchanged", () => {
   assert.match(builder, /calculateResidentialEstimate\(residential,catalog,defaults\?\.upkeep_adjustment_percent \?\? 30\)/);
   assert.match(builder, /calculateCommercialEstimate\(commercial,catalog\)/);
+});
+
+test("new Post-Construction estimates use the original automatic quote instead of an incomplete V2 form", () => {
+  assert.match(builder, /isPostConstructionInput\(initialInput\) \? initialInput : defaultPostConstruction/);
+  assert.match(builder, /postConstruction:\{\.\.\.defaultPostConstruction,taxRatePercent:0,additionalServices:\[\]\}/);
+  assert.doesNotMatch(builder, /isPostConstructionInput\(initialInput\) \? initialInput : defaultPostConstructionV2/);
+  assert.match(builder, /const incompleteProject = v2Mode/);
+  assert.match(builder, /postConstructionMode\?calculatePostConstructionCatalogEstimate/);
+});
+
+test("Post-Construction retains both automatic scope pricing and explicitly selected detailed V2 costing", () => {
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  assert.match(fields, /Post-Construction pricing method/);
+  assert.match(fields, /Automatic estimate — square footage, condition and scope/);
+  assert.match(fields, /Detailed project costing \(V2\)/);
+  assert.match(fields, /if \(detailedMode\) return salesSafe/);
+  assert.match(fields, /delete legacy\.version/);
+  assert.match(fields, /delete legacy\.projectCosting/);
+  assert.match(fields, /const oldProject = legacy\.projectCosting/);
+  assert.match(fields, /<Group title="Project Scope">/);
+  assert.match(fields, /<Group title="Site Condition">/);
+  assert.match(fields, /<Group title="Specialty \/ Detail Work">/);
+  assert.match(fields, /<ProjectCostFields value=\{value\.projectCosting\}/);
 });
