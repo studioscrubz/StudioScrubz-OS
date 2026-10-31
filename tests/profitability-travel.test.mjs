@@ -187,3 +187,32 @@ test("the original customer pricing and proposal workflows remain separate from 
   assert.match(panel, /Estimated operating profit/);
   assert.match(panel, /vehicle operating rate per mile/); 
 });
+
+test("monthly upkeep package counts all three included visits without changing the customer package price", () => {
+  const projection = calculateProfitability({
+    price: 300, cleanerCount: 1, hoursPerCleaner: 2, visitsPerPeriod: 3,
+    supplies: 10, settings, travel: verifiedTravel(1),
+    periodLabel: "Monthly upkeep package",
+  });
+  assert.equal(projection.price, 300);
+  assert.equal(projection.visitsPerPeriod, 3);
+  assert.equal(projection.directCosts.loadedCleaningLabor, 216);
+  assert.equal(projection.directCosts.supplies, 30);
+  assert.equal(projection.totalEstimatedDirectCost, 246);
+});
+
+test("original post-construction equipment, disposal, supervision and contingency remain in protected direct costs", () => {
+  const projection = calculateProfitability({
+    price: 2000, cleanerCount: 2, hoursPerCleaner: 4,
+    supplies: 100, legacyTravelLogisticsCost: 150, legacyProjectCosts: 700,
+    settings, travel: verifiedTravel(2),
+  });
+  assert.equal(projection.directCosts.legacyProjectCosts, 700);
+  assert.equal(projection.totalEstimatedDirectCost, 1238);
+  const estimate = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
+  assert.match(estimate, /projectCosting\.equipmentRentalCost/);
+  assert.match(estimate, /projectCosting\.disposalDebrisCost/);
+  assert.match(estimate, /projectCosting\.supervisionAdminCost/);
+  assert.match(estimate, /projectCosting\.contingencyCost/);
+  assert.match(estimate, /result\.upkeepPlan\?\.visitsIncluded/);
+});
