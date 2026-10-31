@@ -216,3 +216,45 @@ test("original post-construction equipment, disposal, supervision and contingenc
   assert.match(estimate, /projectCosting\.contingencyCost/);
   assert.match(estimate, /result\.upkeepPlan\?\.visitsIncluded/);
 });
+
+test("recommended customer price includes commission, transaction fees and overhead before target margin", () => {
+  const baseline = calculateProfitability({ price: 160, cleanerCount: 1, hoursPerCleaner: 2, settings, travel: verifiedTravel(1) });
+  assert.equal(baseline.totalEstimatedDirectCost, 72);
+  assert.equal(baseline.recommendedMinimumPrice, 110.77);
+  const commission = calculateProfitability({
+    price: 160, cleanerCount: 1, hoursPerCleaner: 2, settings, travel: verifiedTravel(1),
+    salesCommissions: 20, paymentProcessingFees: 5, allocatedOverhead: 10,
+  });
+  assert.equal(commission.grossProfit, 88);
+  assert.equal(commission.contributionProfit, 63);
+  assert.equal(commission.operatingProfit, 53);
+  assert.equal(commission.recommendedMinimumPrice, 164.62);
+  assert.equal(commission.differenceToRecommendedMinimum, 4.62);
+  assert.equal(commission.belowTargetMargin, true);
+  assert.ok(commission.recommendedMinimumPrice > baseline.recommendedMinimumPrice);
+});
+
+test("commission-inclusive suggested minimum recalculates on proposal repricing and never invents missing travel cost", () => {
+  const base = calculateProfitability({
+    price: 100, cleanerCount: 1, hoursPerCleaner: 2, settings, travel: verifiedTravel(1), salesCommissions: 20,
+  });
+  const next = repriceProfitability(base, 300);
+  assert.equal(next.recommendedMinimumPrice, base.recommendedMinimumPrice);
+  assert.equal(next.belowTargetMargin, false);
+  const missing = calculateProfitability({
+    price: 100, cleanerCount: 1, hoursPerCleaner: 2, settings,
+    travel: { ...verifiedTravel(1), verification: "Unverified", roundTripMiles: null, roundTripMinutes: null },
+    salesCommissions: 20,
+  });
+  assert.equal(missing.recommendedMinimumPrice, null);
+});
+
+test("internal panel shows commission deduction without modifying the customer-facing pricing summary", () => {
+  const panel = readFileSync(new URL("../components/estimates/ProfitabilityPanel.tsx", import.meta.url), "utf8");
+  assert.match(panel, /Sales commissions \(deducted\)/);
+  assert.match(panel, /Customer price after commission/);
+  assert.match(panel, /Recommended minimum \(includes commission, fees and overhead\)/);
+  const estimateBuilder = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
+  assert.match(estimateBuilder, /withAuthoritativeEstimatePrice/);
+  assert.match(estimateBuilder, /saveProfitabilityProjection/);
+});
