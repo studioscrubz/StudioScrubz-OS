@@ -1,5 +1,3 @@
-begin;
-
 -- Securely record a validated drawn signature with proposal acceptance.
 -- Do not expose a direct caller path that bypasses server-side PNG/ink verification.
 create or replace function public.accept_proposal_by_token(
@@ -197,4 +195,3 @@ revoke all on function private.protect_sent_proposal_offer()
 from public, anon, authenticated, service_role;
 
 notify pgrst, 'reload schema';
-commit;
