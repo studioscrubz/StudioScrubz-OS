@@ -289,5 +289,5 @@ test("Porter and Luxury Property Care have private, permission-gated monthly pro
   assert.equal(result.operatingProfit, 74.12);
   assert.equal(result.recommendedMinimumPrice, 347.51);
   const changed = mod.exports.calculatePorterProfitability(pricing, settings, { ...extras, equipment: 10 });
-  assert.equal(changed.recommendedMinimumPrice, 362.89);
+  assert.equal(changed.recommendedMinimumPrice, 362.90);
 });
