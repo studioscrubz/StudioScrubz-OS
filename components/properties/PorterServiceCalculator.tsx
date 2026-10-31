@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { calculatePorterService } from "@/lib/pricing/porterService";
+import { PorterProfitabilityPanel } from "@/components/properties/PorterProfitabilityPanel";
 import type { PorterServicePricingInput, PorterServicePricingSnapshot } from "@/types/propertyServicePlan";
 
 const fields = [
@@ -190,6 +191,8 @@ export function PorterServiceCalculator({
           ))}
         </dl>
       )}
+
+      {result && <PorterProfitabilityPanel pricing={result} />}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
