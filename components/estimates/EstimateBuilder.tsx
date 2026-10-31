@@ -453,6 +453,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         settings={profitabilitySettings ?? undefined}
         destination={profitabilityDestination}
         editable
+        integratedProjectCosts={postConstructionMode && !v2Mode}
         onTravelChange={setTravelOverride}
         onAdjustmentsChange={setProfitabilityAdjustments}
       />}
