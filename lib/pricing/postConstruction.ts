@@ -91,6 +91,66 @@ export const POST_CONSTRUCTION_SUPPLY_COSTS = {
   perApplianceInterior: 2.5,
 } as const;
 
+/** Apply optional, job-wide actual cost assumptions to the automatic baseline.
+ * Costs are not multiplied by planned days; travel repetition belongs to
+ * the separate private profitability route calculation.
+ */
+export function applyPostConstructionCostDetails(
+  baseline: EstimateResult,
+  input: PostConstructionCalculatorInput,
+): EstimateResult {
+  const details = input.projectExpenses;
+  if (!details) return baseline;
+  const amount = (value: number | null | undefined, label: string): number => {
+    if (value == null) return 0;
+    if (!Number.isFinite(value) || value < 0) throw new Error(label + " must be a nonnegative amount.");
+    return value;
+  };
+  const laborOverride = details.estimatedPersonHours;
+  if (laborOverride != null && (!Number.isFinite(laborOverride) || laborOverride <= 0)) {
+    throw new Error("Total person-hours must be greater than zero, or leave blank to estimate automatically.");
+  }
+  const crewOverride = details.crewSize;
+  if (crewOverride != null && (!Number.isInteger(crewOverride) || crewOverride <= 0)) {
+    throw new Error("Crew size must be a positive whole number, or leave blank for automatic sizing.");
+  }
+  const hours = laborOverride ?? baseline.laborHours;
+  const crewSize = crewOverride ?? baseline.crewSize;
+  const wages = requireMinimumWorkerHourlyPay(input.workerHourlyPay);
+  const labor = laborOverride == null ? baseline.laborCost : Math.round(hours * wages * 100) / 100;
+  const supplies = details.suppliesCost == null ? baseline.supplyCost : amount(details.suppliesCost, "Supplies cost");
+  const additional = amount(details.equipmentRentalCost, "Equipment / rental") +
+    amount(details.travelLogisticsCost, "Travel / logistics") +
+    amount(details.supervisionAdminCost, "Supervision / admin") +
+    amount(details.contingencyCost, "Contingency");
+  const costs = labor + supplies + additional;
+  const margin = Math.max(0, Math.min(POST_CONSTRUCTION_MAX_MARGIN_PERCENT, input.targetProfitMarginPercent));
+  const basePrice = Math.round((costs / (1 - margin / 100)) * 100) / 100;
+  if (!Number.isFinite(basePrice)) throw new Error("Project costs exceed supported price limits.");
+  const days = Math.max(1, input.targetProjectDays);
+  const workdayHours = input.workdayHours === 10 ? 10 : 8;
+  return {
+    ...baseline,
+    basePrice,
+    oneTimePrice: basePrice,
+    finalPrice: basePrice,
+    calculatedFinalPrice: basePrice,
+    laborHours: hours,
+    crewSize,
+    estimatedDuration: Math.round((hours / crewSize) * 10) / 10,
+    laborCost: labor,
+    supplyCost: supplies,
+    estimatedProfit: Math.round((basePrice - costs) * 100) / 100,
+    postConstructionBreakdown: baseline.postConstructionBreakdown ? {
+      ...baseline.postConstructionBreakdown,
+      totalLaborHours: hours,
+      recommendedCrewSize: crewSize,
+      availableCrewHoursPerWorker: days * workdayHours,
+      estimatedProjectDays: Math.round((hours / crewSize / workdayHours) * 10) / 10,
+    } : undefined,
+  };
+}
+
 export function calculatePostConstructionEstimate(input: PostConstructionCalculatorInput): EstimateResult {
   const workerHourlyPay = requireMinimumWorkerHourlyPay(input.workerHourlyPay);
   const squareFeet = nonnegative(input.squareFeet);
