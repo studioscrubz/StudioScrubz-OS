@@ -104,3 +104,62 @@ test("blank V2 hours derive automatically from the original scope calculator wit
     ...scope, version: 2, projectCosting: { ...draft, totalSquareFeet: 0 },
   }), /Enter total square feet/);
 });
+
+test("unified automatic quote includes project-wide detailed costs but keeps source estimate unchanged", () => {
+  const { applyPostConstructionCostDetails } = target.exports;
+  const scope = {
+    calculatorType:"Post-Construction",division:"Residential",serviceType:"Post-Construction Cleaning",
+    frequency:"One-Time",squareFeet:4000,floors:1,rooms:3,bathrooms:2,kitchens:1,
+    condition:"Average",dustSeverity:"Average",debrisSeverity:"Average",detailLevel:"Detailed",
+    windowsOrGlassCount:10,cabinetOrDrawerCount:20,applianceInteriorCount:2,stairFlights:1,
+    targetProjectDays:3,workdayHours:8,workerHourlyPay:30,targetProfitMarginPercent:35,
+    additionalDiscountPercent:0,taxRatePercent:0,additionalServices:[]
+  };
+  const baseline=legacy(scope);
+  const details={
+    equipmentRentalCost:200,travelLogisticsCost:50,supervisionAdminCost:100,contingencyCost:50
+  };
+  const costed=applyPostConstructionCostDetails(baseline,{...scope,projectExpenses:details});
+  assert.equal(costed.laborHours,baseline.laborHours);
+  assert.equal(costed.laborCost,baseline.laborCost);
+  assert.equal(costed.supplyCost,baseline.supplyCost);
+  assert.equal(costed.crewSize,baseline.crewSize);
+  assert.equal(costed.basePrice,Math.round(((baseline.laborCost + baseline.supplyCost + 400)/.65)*100)/100);
+  assert.equal(baseline.basePrice,legacy(scope).basePrice);
+  assert.equal(costed.estimatedProfit,Math.round((costed.basePrice-baseline.laborCost-baseline.supplyCost-400)*100)/100);
+  const adjusted=applyPostConstructionCostDetails(baseline,{
+    ...scope,projectExpenses:{...details,estimatedPersonHours:100,crewSize:5,suppliesCost:300}
+  });
+  assert.equal(adjusted.laborHours,100);
+  assert.equal(adjusted.crewSize,5);
+  assert.equal(adjusted.supplyCost,300);
+  assert.equal(adjusted.laborCost,3000);
+  assert.equal(adjusted.basePrice,Math.round(((3000+300+400)/.65)*100)/100);
+  assert.equal(adjusted.postConstructionBreakdown.totalLaborHours,100);
+});
+
+test("unified project costs reject invalid amounts and do not fabricate missing values",()=>{
+  const { applyPostConstructionCostDetails } = target.exports;
+  const scope={
+    calculatorType:"Post-Construction",division:"Commercial",serviceType:"Post-Construction Cleaning",
+    frequency:"One-Time",squareFeet:2500,floors:1,rooms:1,bathrooms:1,kitchens:1,
+    condition:"Average",dustSeverity:"Average",debrisSeverity:"Average",detailLevel:"Detailed",
+    windowsOrGlassCount:0,cabinetOrDrawerCount:0,applianceInteriorCount:0,stairFlights:0,
+    targetProjectDays:2,workdayHours:8,workerHourlyPay:30,targetProfitMarginPercent:35,
+    additionalDiscountPercent:0,taxRatePercent:0,additionalServices:[]
+  };
+  const baseline=legacy(scope);
+  assert.equal(applyPostConstructionCostDetails(baseline,scope),baseline);
+  for(const bad of [-1,NaN,Infinity]){
+    assert.throws(()=>applyPostConstructionCostDetails(baseline,{...scope,projectExpenses:{
+      equipmentRentalCost:bad,travelLogisticsCost:0,supervisionAdminCost:0,contingencyCost:0
+    }}));
+    assert.throws(()=>applyPostConstructionCostDetails(baseline,{...scope,projectExpenses:{
+      equipmentRentalCost:0,travelLogisticsCost:0,supervisionAdminCost:0,contingencyCost:0,
+      estimatedPersonHours:bad
+    }}));
+  }
+  assert.throws(()=>applyPostConstructionCostDetails(baseline,{...scope,projectExpenses:{
+    equipmentRentalCost:0,travelLogisticsCost:0,supervisionAdminCost:0,contingencyCost:0,crewSize:1.5
+  }}));
+});

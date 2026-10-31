@@ -275,10 +275,14 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       ? Math.max(1, result.weeklyMixedVisits?.length || calculatorInput.serviceDaysOfWeek?.length || 1)
       : 1),
     // Post-construction V2 logistics are separate from route costs; do not count them twice.
-    legacyTravelLogisticsCost: isPostConstructionV2Estimate(postConstruction) && postConstructionMode ? postConstruction.projectCosting.travelLogisticsCost : 0,
-    legacyProjectCosts: isPostConstructionV2Estimate(postConstruction) && postConstructionMode
-      ? postConstruction.projectCosting.equipmentRentalCost + postConstruction.projectCosting.disposalDebrisCost
-        + postConstruction.projectCosting.supervisionAdminCost + postConstruction.projectCosting.contingencyCost
+    legacyTravelLogisticsCost: postConstructionMode ? (v2Mode && isPostConstructionV2Estimate(postConstruction) ? postConstruction.projectCosting.travelLogisticsCost : postConstruction.projectExpenses?.travelLogisticsCost ?? 0) : 0,
+    legacyProjectCosts: postConstructionMode
+      ? v2Mode && isPostConstructionV2Estimate(postConstruction)
+        ? postConstruction.projectCosting.equipmentRentalCost + postConstruction.projectCosting.disposalDebrisCost
+          + postConstruction.projectCosting.supervisionAdminCost + postConstruction.projectCosting.contingencyCost
+        : (postConstruction.projectExpenses?.equipmentRentalCost ?? 0)
+          + (postConstruction.projectExpenses?.supervisionAdminCost ?? 0)
+          + (postConstruction.projectExpenses?.contingencyCost ?? 0)
       : 0,
     legacyTravelIncludesDriving: false,
     periodLabel: postConstructionMode ? "Full post-construction project" : result.upkeepPlan ? "Monthly upkeep package" : result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
@@ -449,6 +453,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         settings={profitabilitySettings ?? undefined}
         destination={profitabilityDestination}
         editable
+        integratedProjectCosts={postConstructionMode && !v2Mode}
         onTravelChange={setTravelOverride}
         onAdjustmentsChange={setProfitabilityAdjustments}
       />}

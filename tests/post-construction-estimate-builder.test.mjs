@@ -47,19 +47,25 @@ test("new Post-Construction estimates use the original automatic quote instead o
   assert.match(builder, /postConstructionMode\?calculatePostConstructionCatalogEstimate/);
 });
 
-test("Post-Construction retains both automatic scope pricing and explicitly selected detailed V2 costing", () => {
+test("one new Post-Construction calculator combines automatic scope pricing and detailed project-wide costs", () => {
   const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
-  assert.match(fields, /Post-Construction pricing method/);
-  assert.match(fields, /Automatic estimate — square footage, condition and scope/);
-  assert.match(fields, /Detailed project costing \(V2\)/);
-  assert.match(fields, /if \(detailedMode\) return salesSafe/);
-  assert.match(fields, /delete legacy\.version/);
-  assert.match(fields, /delete legacy\.projectCosting/);
-  assert.match(fields, /const oldProject = legacy\.projectCosting/);
+  assert.doesNotMatch(fields, /Post-Construction pricing method/);
   assert.match(fields, /<Group title="Project Scope">/);
   assert.match(fields, /<Group title="Site Condition">/);
   assert.match(fields, /<Group title="Specialty \/ Detail Work">/);
-  assert.match(fields, /<ProjectCostFields value=\{value\.projectCosting\}/);
+  assert.match(fields, /<Group title="Production Plan">/);
+  assert.match(fields, /Project Cost Details \(Full Project\)/);
+  for (const label of [
+    "Total person-hours (optional override)", "Crew size (optional override)",
+    "Supplies (optional override)", "Equipment / rental (full project)",
+    "Travel / logistics (additional project expense)",
+    "Supervision / admin (full project)", "Contingency (full project)"
+  ]) assert.ok(fields.includes(label), label);
+  assert.match(fields, /Historical Detailed V2 estimate/);
+  assert.match(fields, /<ProjectCostFields parent=\{value\}/);
+  assert.match(estimates, /applyPostConstructionCostDetails\(calculatePostConstructionEstimate/);
+  assert.match(builder, /postConstruction\.projectExpenses\?\.travelLogisticsCost/);
+  assert.match(builder, /postConstruction\.projectExpenses\?\.equipmentRentalCost/);
 });
 
 test("only the private profitability panel offers a disposal and debris input", () => {
@@ -81,4 +87,23 @@ test("restored V2 drafts with blank person-hours generate pricing and expose a s
   assert.match(fields, /Enter a nonzero total person-hours value above to override/);
   assert.doesNotMatch(fields, /if \(value\.estimatedPersonHours === 0\) return "Enter estimated total person-hours/);
   assert.match(fields, /if \(value\.estimatedPersonHours === 0 && \(!Number\.isFinite\(value\.totalSquareFeet\)/);
+});
+
+test("automatic job expense values are persisted with the estimate and priced without double counting", () => {
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  assert.match(fields, /projectExpenses: \{ \.\.\.details, \[key\]: amount \}/);
+  assert.match(builder, /const draft: EstimateDraft = \{ version: 1, customer, division, residential, commercial, postConstruction/);
+  assert.match(estimates, /\.\.\.input,\s*serviceCode: resolved.service_code/);
+  assert.match(estimates, /pricing.finalPrice - core.laborCost - core.supplyCost/);
+  assert.match(estimates, /input.projectExpenses\?\.contingencyCost/);
+});
+
+test("sales-safe estimate payload strips new private project cost inputs", () => {
+  const service = readFileSync(resolve("lib/services/estimates.ts"), "utf8");
+  assert.match(service, /delete input\.projectExpenses/);
+  assert.match(service, /delete input\.projectCosting/);
+  assert.match(service, /delete input\.workerHourlyPay/);
+  assert.match(service, /delete input\.targetProfitMarginPercent/);
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  assert.match(fields, /\{!salesSafe && <UnifiedProjectCosts/);
 });

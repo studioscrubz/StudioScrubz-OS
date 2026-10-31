@@ -23,6 +23,7 @@ import {
 import { calculateUpkeepPlan } from "@/lib/pricing/upkeepPlan";
 import {
   calculatePostConstructionEstimate,
+  applyPostConstructionCostDetails,
   calculatePostConstructionV2,
   resolvePostConstructionV2Hours,
 } from "@/lib/pricing/postConstruction";
@@ -155,14 +156,14 @@ export function calculatePostConstructionCatalogEstimate(
     return result;
   }
 
-  const core = calculatePostConstructionEstimate({
+  const core = applyPostConstructionCostDetails(calculatePostConstructionEstimate({
     ...input,
     additionalDiscountPercent: 0,
     taxRatePercent: 0,
     recurringPricingRuleId: null,
     frequency: "One-Time",
     customIntervalDays: null,
-  });
+  }), input);
 
   const oneTimePrice = core.basePrice;
 
@@ -218,7 +219,11 @@ export function calculatePostConstructionCatalogEstimate(
       input.serviceDaysOfWeek,
     ),
     estimatedProfit: money(
-      pricing.finalPrice - core.laborCost - core.supplyCost,
+      pricing.finalPrice - core.laborCost - core.supplyCost
+        - (input.projectExpenses?.equipmentRentalCost ?? 0)
+        - (input.projectExpenses?.travelLogisticsCost ?? 0)
+        - (input.projectExpenses?.supervisionAdminCost ?? 0)
+        - (input.projectExpenses?.contingencyCost ?? 0),
     ),
     calculatorInput,
   };
