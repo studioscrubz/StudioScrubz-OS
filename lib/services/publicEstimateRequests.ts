@@ -287,6 +287,7 @@ export function calculatePublicRequest(
   } : undefined;
   if (highDustingInput) {
     if (input.addons.length) throw new PublicEstimateRequestError("High Dusting requires a separate estimate from routine cleaning.");
+    if (!highDustingInput.workingHeight.trim() || !highDustingInput.scope.trim() || !highDustingInput.accessMethods.length) throw new PublicEstimateRequestError("Complete working height, access method and elevated surface scope before submitting a High Dusting request.");
     try { priceHighDusting(highDustingInput); }
     catch (error) { throw new PublicEstimateRequestError(error instanceof Error ? error.message : "Complete the High Dusting project details."); }
   }

@@ -26,14 +26,15 @@ export function priceHighDusting(input:HighDustingInputs) {
  for(const [label,count] of [["Bathrooms",input.bathrooms??0],["Kitchens",input.kitchens??0],["Common areas",input.commonAreas??0],["Units",input.units??0]] as const) {
   if(!Number.isInteger(count)||count<0) throw new Error(`${label} must be a whole number of zero or more.`);
  }
- if(!input.workingHeight?.trim()) throw new Error("Enter the highest surface or working height.");
- if(!input.scope?.trim()) throw new Error("Describe the elevated surfaces and scope.");
- if(!Array.isArray(input.accessMethods)||!input.accessMethods.length) throw new Error("Select at least one access method.");
- if(input.accessMethods.some(method=>!(approvedHighDustingAccessMethods as readonly string[]).includes(method))||new Set(input.accessMethods).size!==input.accessMethods.length) throw new Error("Review the selected access methods.");
+ const accessMethods=Array.isArray(input.accessMethods)?input.accessMethods:[];
+ if(accessMethods.some(method=>!(approvedHighDustingAccessMethods as readonly string[]).includes(method))||new Set(accessMethods).size!==accessMethods.length) throw new Error("Review the selected access methods.");
+ // Height, access and descriptive scope do not change this numeric formula.
+ // Missing details are flagged prominently for the required site assessment.
+ const scopeConfirmed=Boolean(input.workingHeight?.trim() && input.scope?.trim() && accessMethods.length);
  const laborCost=input.cleaners*input.hoursPerCleaner*input.hourlyLaborCost;
  const supplyCost=input.equipment+input.supplies+input.travelAndOverhead;
  const directCost=laborCost+supplyCost;
  const finalPrice=Math.round((directCost/(1-input.targetMarginPercent/100)+Number.EPSILON)*100)/100;
  return {laborCost,supplyCost,directCost,finalPrice,grossProfit:finalPrice-directCost,
-  description:`High Dusting: ${input.squareFeet} sq ft; ${input.bathrooms??0} bathrooms; ${input.kitchens??0} kitchens; ${input.commonAreas??0} common areas; ${input.units??0} units. ${input.scope.trim()}. Height: ${input.workingHeight.trim()}. Access methods: ${input.accessMethods.join(", ")}. Equipment and site safety to be confirmed during walkthrough.`};
+  description:`High Dusting: ${input.squareFeet} sq ft; ${input.bathrooms??0} bathrooms; ${input.kitchens??0} kitchens; ${input.commonAreas??0} common areas; ${input.units??0} units. ${input.scope?.trim() || "Elevated surfaces and scope not yet assessed"}. Height: ${input.workingHeight?.trim() || "Not yet assessed"}. Access methods: ${accessMethods.length ? accessMethods.join(", ") : "Not yet assessed"}. ${scopeConfirmed ? "Equipment and site safety to be confirmed during walkthrough." : "PRELIMINARY ESTIMATE based on entered labor and job costs; confirm access, height and scope before final approval."}`};
 }
