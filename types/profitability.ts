@@ -73,6 +73,8 @@ export type ProfitabilityProjection = {
   version: 1;
   periodLabel: string;
   visitsPerPeriod: number;
+  projectDays?: number;
+  roundTripsPerPeriod?: number;
   legacyTravelIncludesDriving: boolean;
   price: number;
   cleanerCount: number;
