@@ -10,9 +10,8 @@ export function HighDustingQuoteCalculator({value,onChange}:{
  const height=value.workingHeight;
  const access=value.accessMethods;
  const areas=value.scope;
- let preview: ReturnType<typeof priceHighDusting> | null = null;
  let pricingError: string | null = null;
- try { preview = priceHighDusting(value); }
+ try { priceHighDusting(value); }
  catch (cause) { pricingError = cause instanceof Error ? cause.message : "Review the High Dusting cost inputs."; }
  const missingAssessment = !height.trim() || !areas.trim() || !access.length;
  const setInputs=(update:(current:HighDustingInputs)=>HighDustingInputs)=>onChange(update(value));
