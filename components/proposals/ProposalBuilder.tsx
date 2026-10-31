@@ -1548,6 +1548,8 @@ function calculateProposalProfitability({ result, source, settings, propertyAddr
     settings,
     travel: { ...travel, travelingEmployeeCount: crewSize },
     supplies: (source.directCosts.supplies / Math.max(1, source.visitsPerPeriod ?? 1)) + result.additionalMaterials,
+    projectDays: source.projectDays,
+    roundTripsPerPeriod: source.roundTripsPerPeriod ?? source.projectDays,
     visitsPerPeriod: result.upkeepPlan?.visitsIncluded ?? (result.weeklyContractTotal != null
       ? Math.max(1, result.weeklyMixedVisits?.length || result.serviceDaysOfWeek?.length || source.visitsPerPeriod || 1)
       : 1),
@@ -1564,7 +1566,7 @@ function calculateProposalProfitability({ result, source, settings, propertyAddr
     legacyTravelLogisticsCost: source.directCosts.legacyTravelLogistics,
     legacyProjectCosts: source.directCosts.legacyProjectCosts ?? 0,
     legacyTravelIncludesDriving: source.legacyTravelIncludesDriving ?? false,
-    periodLabel: result.upkeepPlan ? "Monthly upkeep package" : result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
+    periodLabel: source.projectDays != null ? "Full post-construction project" : result.upkeepPlan ? "Monthly upkeep package" : result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
   });
 }
 const input =

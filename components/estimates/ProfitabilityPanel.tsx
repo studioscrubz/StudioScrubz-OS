@@ -66,7 +66,9 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
     <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">{[
       ["Estimated cleaners", String(projection.cleanerCount)], ["Hours per cleaner", hours(projection.hoursPerCleaner)],
       ["Estimated labor hours", hours(projection.estimatedLaborHours)],
-      ["Visits in quoted period", String(projection.visitsPerPeriod ?? 1)], ["Base wage", money(projection.hourlyWage)],
+      ...(projection.projectDays != null
+        ? [["Planned project days", String(projection.projectDays)], ["Round-trip travel days", String(projection.roundTripsPerPeriod ?? projection.projectDays)]]
+        : [["Visits in quoted period", String(projection.visitsPerPeriod ?? 1)]]), ["Base wage", money(projection.hourlyWage)],
       ["Projected W-2 burden", percent(projection.employerBurdenRate)], ["Loaded labor rate", money(projection.loadedHourlyLaborCost)],
       ["Loaded cleaning labor", money(projection.directCosts.loadedCleaningLabor)], ["Supplies", money(projection.directCosts.supplies)],
       ["Equipment", money(projection.directCosts.equipment)], ["Subcontractors", money(projection.directCosts.subcontractors)],
