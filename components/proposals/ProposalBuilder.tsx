@@ -56,8 +56,9 @@ import { proposalAddonSnapshots, replaceProposalCatalogAddons, selectProposalCat
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { canAccessFinances } from "@/lib/auth/permissions";
 import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
+import { ElevatedSurfaceMultiSelect } from "@/components/estimates/ElevatedSurfaceMultiSelect";
 import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
-import type { ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
+import type { ProfitabilityAdjustments, ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
 const termsDefault: ProposalTerms = {
   paymentTerms: "Payment due upon completion of service.",
@@ -111,6 +112,8 @@ export function ProposalBuilder({
   const [catalog, setCatalog] = useState<ServiceCatalogBundle | null>(null);
   const [profitabilitySettings, setProfitabilitySettings] = useState<ProfitabilitySettings | null>(null);
   const [sourceProfitability, setSourceProfitability] = useState<ProfitabilityProjection | null>(null);
+  const [proposalExpenseOverrides, setProposalExpenseOverrides] = useState<ProfitabilityAdjustments | null>(null);
+  const [proposalTravelOverride, setProposalTravelOverride] = useState<TravelProjection | null>(null);
   const router = useRouter();
   const [mode, setMode] = useState<"estimate" | "walkthrough">(
     proposal?.walkthrough_id ? "walkthrough" : "estimate",
@@ -311,6 +314,7 @@ export function ProposalBuilder({
       ? `${walkthrough.division} Cleaning Proposal`
       : "Service Proposal");
   const postConstruction = /post[- ]construction/i.test(resolvedServiceName);
+  const highDustingProposal = /high[ -]dusting/i.test(resolvedServiceName);
   const catalogService =
     services.find((item) => item.id === selectedServiceId) ??
     (proposalDivision
@@ -363,9 +367,9 @@ export function ProposalBuilder({
     if (!canViewProfitability) return;
     const proposalId = proposal?.id ?? null;
     const estimateId = proposalId ? null : estimate?.id ?? null;
-    if (!proposalId && !estimateId) { void Promise.resolve().then(() => setSourceProfitability(null)); return; }
+    if (!proposalId && !estimateId) { void Promise.resolve().then(() => { setSourceProfitability(null); setProposalExpenseOverrides(null); setProposalTravelOverride(null); }); return; }
     let active = true;
-    void getProfitabilityProjection({ proposalId, estimateId }).then((value) => { if (active) setSourceProfitability(value); }).catch(() => { if (active) setSourceProfitability(null); });
+    void getProfitabilityProjection({ proposalId, estimateId }).then((value) => { if (active) { setSourceProfitability(value); setProposalExpenseOverrides(null); setProposalTravelOverride(null); } }).catch(() => { if (active) { setSourceProfitability(null); setProposalExpenseOverrides(null); setProposalTravelOverride(null); } });
     return () => { active = false; };
   }, [canViewProfitability, estimate?.id, proposal?.id]);
   const calculatedResult = calculateProposal({
@@ -411,7 +415,7 @@ export function ProposalBuilder({
     finalPriceAdjustmentLabel: adjustmentLabel.trim() || null,
   };
   const proposalProfitability = canViewProfitability && profitabilitySettings && sourceProfitability
-    ? calculateProposalProfitability({ result, source: sourceProfitability, settings: profitabilitySettings, propertyAddress: property?.address ?? "" })
+    ? calculateProposalProfitability({ result, source: sourceProfitability, settings: profitabilitySettings, propertyAddress: property?.address ?? "", expenses: proposalExpenseOverrides, travelOverride: proposalTravelOverride })
     : null;
   useEffect(() => {
     if (proposal || !sourceId) return;
@@ -431,6 +435,8 @@ export function ProposalBuilder({
       ...(selectedWalkthrough?.recommendations.map((x) => x.text) ?? []),
     ];
     const unique = [...new Set(inherited.map((x) => x.trim()).filter(Boolean))];
+    const sourceCalculator = approved?.estimateResult.calculatorInput ?? selectedEstimate?.result.calculatorInput;
+    const inheritedElevatedScope = sourceCalculator && "highDusting" in sourceCalculator ? sourceCalculator.highDusting?.scope?.trim() ?? "" : "";
     const inheritedServiceName =
       approved?.serviceName ||
       selectedWalkthrough?.measurements.serviceType ||
@@ -473,7 +479,10 @@ export function ProposalBuilder({
       .filter(Boolean)
       .join("\n");
     const timer = window.setTimeout(() => {
-      setScope(unique.map((text, index) => ({ id: `source-${index}`, text })));
+      setScope([
+        ...unique.filter(text => !inheritedElevatedScope || text !== inheritedElevatedScope).map((text, index) => ({ id: `source-${index}`, text })),
+        ...(inheritedElevatedScope ? [{ id: "high-dusting-surfaces", text: `Elevated surfaces and scope: ${inheritedElevatedScope}` }] : []),
+      ]);
       setServiceName(inheritedServiceName);
       setSelectedServiceId(
         approved?.serviceId ?? inheritedCatalogService?.id ?? "",
@@ -819,7 +828,7 @@ export function ProposalBuilder({
                 set={setAdditionalMaterials}
               />}
               <Num l="Manual Discount %" v={discount} set={setDiscount} />
-              {!mixedWeeklyMode && (!canViewProfitability || !proposalProfitability || profile?.role === "Sales") ? <label>
+              {!mixedWeeklyMode && (!canViewProfitability || !proposalProfitability || profile?.role === "Sales") && <label>
                 <Label t="Manual / Custom Final Price" />
                 <span className="relative block">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-bold text-neutral-500">
@@ -854,7 +863,8 @@ export function ProposalBuilder({
                 >
                   Use Calculated Price
                 </button>
-              </label> : <p className="col-span-full rounded-lg bg-[#f6faf4] px-3 py-2 text-xs text-[#143d1a]">Separate weekday visit prices are authoritative. Weekly total: {new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(result.weeklyContractTotal ?? 0)}. No uniform per-visit price is applied.</p>}
+              </label>}
+              {mixedWeeklyMode && <p className="col-span-full rounded-lg bg-[#f6faf4] px-3 py-2 text-xs text-[#143d1a]">Separate weekday visit prices are authoritative. Weekly total: {new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(result.weeklyContractTotal ?? 0)}. No uniform per-visit price is applied.</p>}
               {!mixedWeeklyMode && (manualPrice !== null || Boolean(proposal?.result.finalPriceAdjustmentLabel)) && <label className="col-span-full">
                 <Label t="Final Price Adjustment Label (customer-facing)" />
                 <input type="text" maxLength={90} value={adjustmentLabel} onChange={event => setAdjustmentLabel(event.target.value)} placeholder="Final Price Adjustment" className={input} />
@@ -943,6 +953,16 @@ export function ProposalBuilder({
               }
             />
           </Panel>
+          {highDustingProposal && <Panel title="High Dusting Scope">
+            <ElevatedSurfaceMultiSelect
+              value={scope.find(item => item.id === "high-dusting-surfaces")?.text.replace(/^Elevated surfaces and scope:\s*/, "") ?? ""}
+              onChange={next => setScope(current => [
+                ...current.filter(item => item.id !== "high-dusting-surfaces"),
+                ...(next.trim() ? [{ id: "high-dusting-surfaces", text: `Elevated surfaces and scope: ${next}` }] : []),
+              ])}
+            />
+            <p className="mt-2 text-xs text-neutral-600">This scope is saved on the proposal. Review labor, access, and price separately before approval.</p>
+          </Panel>}
           <ScopeEditor items={scope} set={setScope} />
           <Panel title="Terms / Conditions">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1008,7 +1028,12 @@ export function ProposalBuilder({
         />
         {canViewProfitability && proposalProfitability && <ProfitabilityPanel
           projection={proposalProfitability}
+          settings={profitabilitySettings ?? undefined}
+          destination={property?.address ?? ""}
+          editable
           priceEditable
+          onAdjustmentsChange={setProposalExpenseOverrides}
+          onTravelChange={setProposalTravelOverride}
           projectPrice={!mixedWeeklyMode ? {
             manualPrice,
             calculatedPrice: result.calculatedPerVisitTotal ?? result.perVisitTotal,
@@ -1550,10 +1575,11 @@ function msg(x: unknown, f: string) {
   return detail && !/jwt|auth(?:orization)? header|access[_ -]?token|service[_ -]?role|secret|api[_ -]?key/i.test(detail)
     ? detail : f;
 }
-function calculateProposalProfitability({ result, source, settings, propertyAddress }: { result: ProposalResult; source: ProfitabilityProjection; settings: ProfitabilitySettings; propertyAddress: string }) {
+function calculateProposalProfitability({ result, source, settings, propertyAddress, expenses, travelOverride }: { result: ProposalResult; source: ProfitabilityProjection; settings: ProfitabilitySettings; propertyAddress: string; expenses: ProfitabilityAdjustments | null; travelOverride: TravelProjection | null }) {
   const destination = propertyAddress.trim();
-  const travel: TravelProjection = source.travel.destination.trim().toLowerCase() === destination.toLowerCase()
-    ? source.travel
+  const originalTravel = travelOverride ?? source.travel;
+  const travel: TravelProjection = originalTravel.destination.trim().toLowerCase() === destination.toLowerCase()
+    ? originalTravel
     : { origin: settings.travelOrigin, destination, verification: "Unverified", provider: null, roundTripMiles: null, roundTripMinutes: null, vehicleCount: settings.defaultVehiclesPerJob, travelingEmployeeCount: Math.max(1, result.crewRecommendation), companyRequiredTravelIsCompensable: settings.companyRequiredTravelIsCompensable, warning: "The service property changed; recalculate travel before relying on margin.", calculatedAt: null };
   const crewSize = Math.max(1, result.crewRecommendation);
   return calculateProfitability({
@@ -1569,16 +1595,16 @@ function calculateProposalProfitability({ result, source, settings, propertyAddr
     visitsPerPeriod: result.upkeepPlan?.visitsIncluded ?? (result.weeklyContractTotal != null
       ? Math.max(1, result.weeklyMixedVisits?.length || result.serviceDaysOfWeek?.length || source.visitsPerPeriod || 1)
       : 1),
-    equipment: source.directCosts.equipment,
-    subcontractors: source.directCosts.subcontractors,
-    otherDirectExpenses: source.directCosts.other,
-    setupLabor: source.directCosts.setupLabor ?? 0,
-    ownerLabor: source.directCosts.ownerLabor ?? 0,
-    parkingTolls: source.directCosts.parkingTolls ?? 0,
-    disposal: source.directCosts.disposal ?? 0,
-    paymentProcessingFees: source.operatingCosts?.paymentProcessingFees ?? 0,
-    salesCommissions: source.operatingCosts?.salesCommissions ?? 0,
-    allocatedOverhead: source.operatingCosts?.allocatedOverhead ?? 0,
+    equipment: expenses?.equipment ?? source.directCosts.equipment,
+    subcontractors: expenses?.subcontractors ?? source.directCosts.subcontractors,
+    otherDirectExpenses: expenses?.otherDirectExpenses ?? source.directCosts.other,
+    setupLabor: expenses?.setupLabor ?? source.directCosts.setupLabor ?? 0,
+    ownerLabor: expenses?.ownerLabor ?? source.directCosts.ownerLabor ?? 0,
+    parkingTolls: expenses?.parkingTolls ?? source.directCosts.parkingTolls ?? 0,
+    disposal: expenses?.disposal ?? source.directCosts.disposal ?? 0,
+    paymentProcessingFees: expenses?.paymentProcessingFees ?? source.operatingCosts?.paymentProcessingFees ?? 0,
+    salesCommissions: expenses?.salesCommissions ?? source.operatingCosts?.salesCommissions ?? 0,
+    allocatedOverhead: expenses?.allocatedOverhead ?? source.operatingCosts?.allocatedOverhead ?? 0,
     legacyTravelLogisticsCost: source.directCosts.legacyTravelLogistics,
     legacyProjectCosts: source.directCosts.legacyProjectCosts ?? 0,
     legacyTravelIncludesDriving: source.legacyTravelIncludesDriving ?? false,

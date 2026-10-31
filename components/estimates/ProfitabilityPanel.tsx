@@ -129,13 +129,13 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
     </div>}
     {projectPrice && (editable || priceEditable) && <div className="mt-4 rounded-xl border border-[#143d1a]/20 bg-white p-4">
       <h3 className="text-sm font-extrabold text-[#143d1a]">{projectPrice.title ?? "Post-Construction Estimate Price"}</h3>
-      <p className="mt-1 text-xs text-neutral-600">Edit the customer estimate here after reviewing the costs for the quoted period. Your chosen price updates profitability immediately and is saved when you select Save Estimate or Update Estimate.</p>
+      <p className="mt-1 text-xs text-neutral-600">Edit the customer {projectPrice.artifactLabel ?? "estimate"} here after reviewing the costs for the quoted period. Your chosen price updates profitability immediately and is saved when you save or update the {projectPrice.artifactLabel ?? "estimate"}.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div><p className="text-xs font-semibold text-neutral-600">Original calculated bid</p><p className="font-bold text-[#143d1a]">{money(projectPrice.calculatedPrice)}</p></div>
         <div><p className="text-xs font-semibold text-neutral-600">Profitability minimum</p><p className="font-bold text-[#143d1a]">{maybeMoney(projection.recommendedMinimumPrice)}</p></div>
       </div>
-      <label className="mt-3 block text-sm font-bold text-[#143d1a]">Manual / Custom Estimate Amount{projectPrice.unitLabel ? ` (${projectPrice.unitLabel})` : ""}
-        <input aria-label="Manual or custom Post-Construction estimate amount" type="number" min="0.01" step="0.01"
+      <label className="mt-3 block text-sm font-bold text-[#143d1a]">{projectPrice.artifactLabel === "proposal" ? "Manual / Custom Proposal Amount" : "Manual / Custom Estimate Amount"}{projectPrice.unitLabel ? ` (${projectPrice.unitLabel})` : ""}
+        <input aria-label={projectPrice.artifactLabel === "proposal" ? "Manual or custom proposal amount" : "Manual or custom Post-Construction estimate amount"} type="number" min="0.01" step="0.01"
           value={projectPrice.manualPrice ?? ""} placeholder={String(projectPrice.calculatedPrice)}
           onChange={event => {
             const raw = event.target.value;
