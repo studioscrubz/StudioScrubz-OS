@@ -27,11 +27,6 @@ export function HighDustingQuoteCalculator({value,onChange}:{
   <h3 className="text-lg font-bold text-[#143d1a]">High Dusting Cost Calculator</h3>
   <p className="mt-1 text-xs text-neutral-600">Enter square footage and your labor and job costs for a live preliminary quote. Working height, scope, and access details can be confirmed during a walkthrough.</p>
   {pricingError && <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{pricingError}</p>}
-  {preview && <div role="status" className="mt-3 rounded-lg border border-[#143d1a]/20 bg-[#f4f8f3] p-3 text-sm">
-    <p className="text-xs font-bold uppercase tracking-wide text-[#143d1a]">{missingAssessment ? "Preliminary High Dusting estimate" : "High Dusting calculated estimate"}</p>
-    <p className="mt-1 text-2xl font-extrabold text-[#143d1a]">{preview.finalPrice.toLocaleString("en-US", { style: "currency", currency: "USD" })}</p>
-    <p className="mt-1 text-xs text-neutral-600">Based on entered labor, equipment, supplies, travel and overhead. Internal Profitability evaluates further costs.</p>
-  </div>}
   <div className="mt-4 grid gap-3 sm:grid-cols-2">
    <label className="text-xs font-bold text-neutral-700">Square Feet (required)
     <input type="number" min="1" step="1" required value={value.squareFeet || ""} onChange={event=>onChange({...value,squareFeet:Number(event.target.value)})} placeholder="Enter total area" className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"/>
