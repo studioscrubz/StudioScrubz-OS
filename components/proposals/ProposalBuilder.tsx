@@ -56,6 +56,7 @@ import { proposalAddonSnapshots, replaceProposalCatalogAddons, selectProposalCat
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { canAccessFinances } from "@/lib/auth/permissions";
 import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
+import { ElevatedSurfaceMultiSelect } from "@/components/estimates/ElevatedSurfaceMultiSelect";
 import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
 import type { ProfitabilityAdjustments, ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
@@ -313,6 +314,7 @@ export function ProposalBuilder({
       ? `${walkthrough.division} Cleaning Proposal`
       : "Service Proposal");
   const postConstruction = /post[- ]construction/i.test(resolvedServiceName);
+  const highDustingProposal = /high[ -]dusting/i.test(resolvedServiceName);
   const catalogService =
     services.find((item) => item.id === selectedServiceId) ??
     (proposalDivision
@@ -433,6 +435,8 @@ export function ProposalBuilder({
       ...(selectedWalkthrough?.recommendations.map((x) => x.text) ?? []),
     ];
     const unique = [...new Set(inherited.map((x) => x.trim()).filter(Boolean))];
+    const sourceCalculator = approved?.estimateResult.calculatorInput ?? selectedEstimate?.result.calculatorInput;
+    const inheritedElevatedScope = sourceCalculator && "highDusting" in sourceCalculator ? sourceCalculator.highDusting?.scope?.trim() ?? "" : "";
     const inheritedServiceName =
       approved?.serviceName ||
       selectedWalkthrough?.measurements.serviceType ||
@@ -475,7 +479,10 @@ export function ProposalBuilder({
       .filter(Boolean)
       .join("\n");
     const timer = window.setTimeout(() => {
-      setScope(unique.map((text, index) => ({ id: `source-${index}`, text })));
+      setScope([
+        ...unique.filter(text => !inheritedElevatedScope || text !== inheritedElevatedScope).map((text, index) => ({ id: `source-${index}`, text })),
+        ...(inheritedElevatedScope ? [{ id: "high-dusting-surfaces", text: `Elevated surfaces and scope: ${inheritedElevatedScope}` }] : []),
+      ]);
       setServiceName(inheritedServiceName);
       setSelectedServiceId(
         approved?.serviceId ?? inheritedCatalogService?.id ?? "",
@@ -945,6 +952,16 @@ export function ProposalBuilder({
               }
             />
           </Panel>
+          {highDustingProposal && <Panel title="High Dusting Scope">
+            <ElevatedSurfaceMultiSelect
+              value={scope.find(item => item.id === "high-dusting-surfaces")?.text.replace(/^Elevated surfaces and scope:\\s*/, "") ?? ""}
+              onChange={next => setScope(current => [
+                ...current.filter(item => item.id !== "high-dusting-surfaces"),
+                ...(next.trim() ? [{ id: "high-dusting-surfaces", text: `Elevated surfaces and scope: ${next}` }] : []),
+              ])}
+            />
+            <p className="mt-2 text-xs text-neutral-600">This scope is saved on the proposal. Review labor, access, and price separately before approval.</p>
+          </Panel>}
           <ScopeEditor items={scope} set={setScope} />
           <Panel title="Terms / Conditions">
             <div className="grid gap-4 sm:grid-cols-2">
