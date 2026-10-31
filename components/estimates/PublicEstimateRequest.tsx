@@ -1,4 +1,5 @@
 "use client";
+import { ElevatedSurfaceMultiSelect } from "@/components/estimates/ElevatedSurfaceMultiSelect";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { StudioScrubzLogo } from "@/components/branding/StudioScrubzLogo";
@@ -59,9 +60,7 @@ export function PublicEstimateRequest(){
        </label>)}
        </div>
       </fieldset>
-      <label className="text-sm font-bold text-[#143d1a] sm:col-span-2">Elevated surfaces and scope *
-        <textarea required rows={3} maxLength={2000} value={highDustingScope} onChange={e=>setHighDustingScope(e.target.value)} placeholder="Example: ceiling vents, beams, overhead pipes, ledges, light fixtures" className={`${input} mt-1.5`}/>
-      </label>
+      <ElevatedSurfaceMultiSelect required value={highDustingScope} onChange={setHighDustingScope}/>
     </div>
    </div>}{selected?.description&&<p className="mt-4 text-sm text-neutral-600">{selected.description}</p>}{selected?.addons.length&&!isHighDusting?(division==="Residential"?<AddonMultiSelect options={selected.addons} selected={addons} set={setAddons} quantities={addonQuantities} setQuantities={setAddonQuantities}/>:<div className="mt-6"><p className="mb-3 font-extrabold text-[#143d1a]">Available add-ons</p><div className="grid gap-3 sm:grid-cols-2">{selected.addons.map(a=><div key={a.name}><Check label={a.name} detail={a.description} checked={addons.includes(a.name)} set={on=>{setAddons(on?[...addons,a.name]:addons.filter(x=>x!==a.name));setAddonQuantities(current=>{const next={...current};if(on)next[a.name]=1;else delete next[a.name];return next})}}/>{a.pricingType==="Per Unit"&&addons.includes(a.name)&&<QuantityField name={a.name} unitName={a.unitName} quantities={addonQuantities} setQuantities={setAddonQuantities}/>}</div>)}</div></div>):null}</Card>
   <Card title="Anything else?"><div className="grid gap-4"><Field label="Preferred Service Date" type="date" value={preferredDate} set={setPreferredDate}/><label className="text-sm font-bold text-[#143d1a]">Special Requests / Notes<textarea value={notes} maxLength={2000} onChange={e=>setNotes(e.target.value)} rows={4} className={`${input} mt-1.5 resize-y`}/></label><label className="absolute left-[-10000px]" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={website} onChange={e=>setWebsite(e.target.value)}/></label></div></Card>
