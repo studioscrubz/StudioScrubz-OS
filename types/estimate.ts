@@ -79,6 +79,20 @@ export type CommercialCalculatorInput = {
   workdayHours?: 8 | 10;
 };
 
+/** Optional project-wide inputs supplement the automatic square-footage baseline.
+ * null/undefined labor hours, crew and supplies mean derive from scope.
+ * All other cost amounts are totals for the entire project (not per day).
+ */
+export type PostConstructionCostDetails = {
+  estimatedPersonHours?: number | null;
+  crewSize?: number | null;
+  suppliesCost?: number | null;
+  equipmentRentalCost: number;
+  travelLogisticsCost: number;
+  supervisionAdminCost: number;
+  contingencyCost: number;
+};
+
 export type PostConstructionCalculatorInput = {
   calculatorType: "Post-Construction";
   division: EstimateDivision;
@@ -109,6 +123,7 @@ export type PostConstructionCalculatorInput = {
   taxRatePercent: number;
   additionalServices: string[];
   addonSelections?: CatalogAddonSnapshot[];
+  projectExpenses?: PostConstructionCostDetails;
 };
 
 // Separate from legacy CalculatorInput until the V2 workflow integration is implemented.
