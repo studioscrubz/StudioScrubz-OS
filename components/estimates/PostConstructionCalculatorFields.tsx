@@ -4,7 +4,7 @@ import { matchingRecurringRules, serviceFrequencyDiscountLabel } from "@/lib/pri
 
 import { WeeklyServiceDaysField } from "@/components/forms/WeeklyServiceDaysField";
 import { isPostConstructionV2Estimate, type PostConstructionEstimateInput } from "@/lib/pricing/estimates";
-import { calculatePostConstructionV2 } from "@/lib/pricing/postConstruction";
+import { calculatePostConstructionV2, resolvePostConstructionV2Hours } from "@/lib/pricing/postConstruction";
 import type { PostConstructionV2Input } from "@/types/estimate";
 import type { Condition, Frequency, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
 import type { CatalogService, ServiceCatalogBundle } from "@/types/serviceCatalog";
@@ -70,7 +70,7 @@ export function PostConstructionCalculatorFields({value,onChange,service,catalog
     </div>
     <p className="mt-2 text-xs text-neutral-600">Automatic pricing generates a quote as you enter property details. Detailed V2 is optional and requires total person-hours, crew size and project expenses. Changing methods recalculates the quote; review the new price before saving.</p>
   </fieldset>;
-  if (detailedMode) return salesSafe?<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Post-Construction project costing contains protected internal costs and must be completed by management.</div>:<div className="space-y-4">{modeSelector}{value.division === "Residential" && <Group title="Residential Property Scope"><NumberField label="Bedrooms" value={value.rooms} set={rooms => onChange({ ...value, rooms })}/><NumberField label="Bathrooms" value={value.bathrooms} step="0.5" set={bathrooms => onChange({ ...value, bathrooms })}/><NumberField label="Floors" value={value.floors} set={floors => onChange({ ...value, floors })}/><NumberField label="Kitchens" value={value.kitchens} set={kitchens => onChange({ ...value, kitchens })}/><p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-4">Scope for walkthrough preparation and labor planning. Total square feet is entered below; these counts do not add pricing charges.</p></Group>}<ProjectCostFields value={value.projectCosting} onChange={projectCosting => onChange({ ...value, squareFeet: projectCosting.totalSquareFeet, projectCosting })}/></div>;
+  if (detailedMode) return salesSafe?<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Post-Construction project costing contains protected internal costs and must be completed by management.</div>:<div className="space-y-4">{modeSelector}{value.division === "Residential" && <Group title="Residential Property Scope"><NumberField label="Bedrooms" value={value.rooms} set={rooms => onChange({ ...value, rooms })}/><NumberField label="Bathrooms" value={value.bathrooms} step="0.5" set={bathrooms => onChange({ ...value, bathrooms })}/><NumberField label="Floors" value={value.floors} set={floors => onChange({ ...value, floors })}/><NumberField label="Kitchens" value={value.kitchens} set={kitchens => onChange({ ...value, kitchens })}/><p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-4">Scope for walkthrough preparation and labor planning. Total square feet is entered below; these counts do not add pricing charges.</p></Group>}<ProjectCostFields parent={value} value={value.projectCosting} onChange={projectCosting => onChange({ ...value, squareFeet: projectCosting.totalSquareFeet, projectCosting })}/></div>;
   const set=<K extends keyof PostConstructionCalculatorInput>(key:K,next:PostConstructionCalculatorInput[K])=>onChange({...value,[key]:next});
   return <div className="space-y-5">
     {modeSelector}
@@ -91,7 +91,7 @@ const inputClass="w-full rounded-lg border border-neutral-200 bg-white px-3.5 py
 
 export function projectCostingIncompleteMessage(value: PostConstructionV2Input | undefined): string | null {
   if (!value) return "Detailed project costing is missing required inputs. Select Automatic estimate or complete the V2 project information.";
-  if (value.estimatedPersonHours === 0) return "Enter estimated total person-hours to calculate project pricing.";
+  if (value.estimatedPersonHours === 0 && (!Number.isFinite(value.totalSquareFeet) || value.totalSquareFeet <= 0)) return "Enter total square feet to calculate project person-hours automatically, or enter the person-hours manually.";
   if (value.crewSize === 0 || value.plannedProjectDays === 0 || Number(value.workdayHours) === 0) return "Enter crew size, planned project days, and workday hours to calculate project pricing.";
   return null;
 }
@@ -106,7 +106,7 @@ export function projectCostingErrorMessage(message: string): string {
   return message.replace(/^[a-zA-Z]+/, key => labels[key] ?? key);
 }
 
-function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input; onChange: (value: PostConstructionV2Input) => void }) {
+function ProjectCostFields({ parent, value, onChange }: { parent: PostConstructionEstimateInput; value: PostConstructionV2Input; onChange: (value: PostConstructionV2Input) => void }) {
   if (!value) return <p role="alert">Version 2 project inputs are missing.</p>;
   const fields = [
     ["totalSquareFeet", "Total square feet"], ["estimatedPersonHours", "Estimated total person-hours"],
@@ -118,7 +118,7 @@ function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input
   let result;
   let error = "";
   const incomplete = projectCostingIncompleteMessage(value);
-  if (!incomplete) { try { result = calculatePostConstructionV2(value); } catch (cause) { error = projectCostingErrorMessage(cause instanceof Error ? cause.message : "Check project inputs."); } }
+  if (!incomplete) { try { result = calculatePostConstructionV2(resolvePostConstructionV2Hours(parent)); } catch (cause) { error = projectCostingErrorMessage(cause instanceof Error ? cause.message : "Check project inputs."); } }
   const money = (amount: number) => amount.toLocaleString("en-US", { style: "currency", currency: "USD" });
   const rows = result ? [
     ["Labor cost", money(result.laborCost)], ["Non-labor costs", money(result.nonLaborProjectCosts)],
@@ -127,12 +127,13 @@ function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input
     ["Projected gross margin", `${result.projectedGrossMarginPercent.toFixed(2)}%`],
     ["Estimated completion days", result.estimatedCompletionDays.toFixed(2)], ["Crew utilization", `${result.crewUtilizationPercent.toFixed(2)}%`],
   ] : [];
-  return <div className="space-y-4"><p className="text-sm text-neutral-600">Post-Construction V2: one-time project costing. Enter total person-hours across all workers, not hours per worker.</p>
+  return <div className="space-y-4"><p className="text-sm text-neutral-600">Post-Construction V2: one-time project costing. Enter total person-hours across all workers, not hours per worker. Leave the value at 0 to estimate hours automatically from square footage, condition and scope.</p>
     <Group title="Project Costing">{fields.map(([key,label]) => <NumberField key={key} label={label} value={value[key]} min={key === "workerHourlyPay" ? MINIMUM_WORKER_HOURLY_PAY : 0} error={key === "workerHourlyPay" ? workerPayError(value.workerHourlyPay) : null} step={key === "crewSize" ? "1" : "any"} set={next => onChange({ ...value, [key]: next })}/>)}
       <SelectField label="Workday hours" value={String(value.workdayHours)} options={["8","10"]} set={next => onChange({ ...value, workdayHours: Number(next) as 8 | 10 })}/>
       <label><Label text="Manual project price override (optional)"/><input className={inputClass} type="number" min="0.01" step="0.01" value={value.manualProjectPriceOverride ?? ""} onChange={event => { const next = { ...value }; if (event.target.value === "") delete next.manualProjectPriceOverride; else next.manualProjectPriceOverride = Number(event.target.value); onChange(next); }}/></label>
     </Group>
     <label className="block"><Label text="Scope / areas (one per line)"/><textarea className={inputClass} rows={3} value={(value.scope ?? []).join("\n")} onChange={event => onChange({ ...value, scope: event.target.value.split("\n") })}/></label>
+    {value.estimatedPersonHours === 0 && result && <p className="rounded-lg border border-[#143d1a]/15 bg-white p-3 text-sm text-[#143d1a]" role="status">Automatically estimated {result.totalLaborHours.toFixed(1)} total person-hours from square footage, condition and scope. Enter a nonzero total person-hours value above to override this estimate.</p>}
     {incomplete && <p className="text-sm text-neutral-600">{incomplete}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {result && <dl className="grid gap-3 rounded-xl bg-[#f7f9f6] p-4 sm:grid-cols-2 xl:grid-cols-3">{rows.map(([label,display]) => <div key={label}><dt className="text-xs text-neutral-600">{label}</dt><dd className="mt-1 font-bold text-[#143d1a]">{display}</dd></div>)}</dl>}

@@ -76,3 +76,31 @@ test("legacy 9351 sq ft calibration retains existing outputs and workday fallbac
   assert.equal(legacy({...old,targetProfitMarginPercent:90}).finalPrice,legacy({...old,targetProfitMarginPercent:70}).finalPrice);
   assert.equal(r.calculatorInput.version,undefined);
 });
+
+test("blank V2 hours derive automatically from the original scope calculator without changing explicit hours", () => {
+  const { resolvePostConstructionV2Hours } = target.exports;
+  const scope = {
+    calculatorType: "Post-Construction", division: "Residential",
+    serviceType: "Post-Construction Cleaning", frequency: "One-Time",
+    squareFeet: 4000, floors: 2, rooms: 4, bathrooms: 3, kitchens: 1,
+    condition: "Average", dustSeverity: "Average", debrisSeverity: "Average",
+    detailLevel: "Detailed", windowsOrGlassCount: 10, cabinetOrDrawerCount: 20,
+    applianceInteriorCount: 3, stairFlights: 2, targetProjectDays: 3, workdayHours: 8,
+    workerHourlyPay: 30, targetProfitMarginPercent: 35,
+    additionalDiscountPercent: 0, taxRatePercent: 0, additionalServices: [],
+  };
+  const draft = { ...input, estimatedPersonHours: 0, totalSquareFeet: 4000, crewSize: 4 };
+  const derived = resolvePostConstructionV2Hours({ ...scope, version: 2, projectCosting: draft });
+  const auto = legacy(scope);
+  assert.equal(derived.estimatedPersonHours, auto.laborHours);
+  assert.ok(derived.estimatedPersonHours > 0);
+  assert.equal(derived.crewSize, 4);
+  assert.equal(derived.plannedProjectDays, 3);
+  assert.equal(draft.estimatedPersonHours, 0);
+  assert.equal(calculate(derived).totalLaborHours, auto.laborHours);
+  const explicit = { ...draft, estimatedPersonHours: 123 };
+  assert.equal(resolvePostConstructionV2Hours({ ...scope, version: 2, projectCosting: explicit }), explicit);
+  assert.throws(() => resolvePostConstructionV2Hours({
+    ...scope, version: 2, projectCosting: { ...draft, totalSquareFeet: 0 },
+  }), /Enter total square feet/);
+});

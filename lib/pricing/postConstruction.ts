@@ -6,6 +6,35 @@ import { estimatedMonthlyTotal as scheduleMonthlyTotal, estimatedVisitsPerMonth 
 export const POST_CONSTRUCTION_BASE_HOURS_PER_1K_SQUARE_FEET = 19;
 export const POST_CONSTRUCTION_MAX_MARGIN_PERCENT = 70;
 
+/**
+ * Optional V2 hours are calculated from the same proven square-footage, condition,
+ * detail and specialty-work estimate used in the automatic calculator.
+ * Explicit positive person-hours always take precedence. Never multiply full
+ * project labor by the number of planned days.
+ */
+export function resolvePostConstructionV2Hours(
+  input: PostConstructionCalculatorInput & { projectCosting?: PostConstructionV2Input },
+): PostConstructionV2Input {
+  const project = input.projectCosting;
+  if (!project) throw new Error("Detailed project costing inputs are missing.");
+  if (project.estimatedPersonHours !== 0) return project;
+  if (!Number.isFinite(project.totalSquareFeet) || project.totalSquareFeet <= 0) {
+    throw new Error("Enter total square feet to calculate project labor hours automatically.");
+  }
+  const auto = calculatePostConstructionEstimate({
+    ...input,
+    squareFeet: project.totalSquareFeet,
+    workerHourlyPay: project.workerHourlyPay,
+    targetProjectDays: project.plannedProjectDays,
+    workdayHours: project.workdayHours,
+    targetProfitMarginPercent: project.desiredMarginPercent,
+  });
+  if (!Number.isFinite(auto.laborHours) || auto.laborHours <= 0) {
+    throw new Error("Enter a positive total square footage or enter estimated person-hours manually.");
+  }
+  return { ...project, estimatedPersonHours: auto.laborHours };
+}
+
 export function calculatePostConstructionV2(input: PostConstructionV2Input): PostConstructionV2Result {
   if (input.version !== 2 || input.calculatorType !== "Post-Construction") throw new Error("Explicit Post-Construction version 2 input is required.");
   for (const key of ["estimatedPersonHours", "crewSize", "plannedProjectDays", "workdayHours"] as const) {
