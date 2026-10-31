@@ -3,26 +3,43 @@
 import { useEffect, useRef, useState } from "react";
 import { validateManualTravelOverride } from "@/lib/pricing/profitability";
 import { calculateTravelProjection } from "@/lib/services/profitability";
-import type { ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
+import type { ProfitabilityAdjustments, ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
-export function ProfitabilityPanel({ projection, settings, destination, editable, onTravelChange, onOtherDirectExpensesChange }: {
+export function ProfitabilityPanel({ projection, settings, destination, editable, onTravelChange, onAdjustmentsChange }: {
   projection: ProfitabilityProjection;
   settings?: ProfitabilitySettings;
   destination?: string;
   editable?: boolean;
   onTravelChange?: (value: TravelProjection) => void;
-  onOtherDirectExpensesChange?: (value: number) => void;
+  onAdjustmentsChange?: (value: ProfitabilityAdjustments) => void;
 }) {
   const [routing, setRouting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const lastDestination = useRef("");
   const travel = projection.travel;
+  const adjustments: ProfitabilityAdjustments = {
+    equipment: projection.directCosts.equipment,
+    subcontractors: projection.directCosts.subcontractors,
+    setupLabor: projection.directCosts.setupLabor ?? 0,
+    ownerLabor: projection.directCosts.ownerLabor ?? 0,
+    parkingTolls: projection.directCosts.parkingTolls ?? 0,
+    disposal: projection.directCosts.disposal ?? 0,
+    paymentProcessingFees: projection.operatingCosts?.paymentProcessingFees ?? 0,
+    salesCommissions: projection.operatingCosts?.salesCommissions ?? 0,
+    allocatedOverhead: projection.operatingCosts?.allocatedOverhead ?? 0,
+    otherDirectExpenses: projection.directCosts.other,
+  };
   const route = async () => {
     if (!destination?.trim() || !onTravelChange || routing) return;
     setRouting(true); setRouteError(null);
     try { onTravelChange({ ...(await calculateTravelProjection(destination)), travelingEmployeeCount: projection.cleanerCount }); }
     catch (error) { setRouteError(error instanceof Error ? error.message : "Travel could not be calculated. Enter a manual override."); }
     finally { setRouting(false); }
+  };
+  const updateExpense = (key: keyof ProfitabilityAdjustments, raw: string) => {
+    const next = raw === "" ? 0 : Number(raw);
+    if (!Number.isFinite(next) || next < 0) return;
+    onAdjustmentsChange?.({ ...adjustments, [key]: next });
   };
   const updateManualTravel = (field: "roundTripMiles" | "roundTripMinutes", raw: string) => {
     if (!onTravelChange) return;
@@ -48,18 +65,44 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-extrabold text-[#143d1a]">Internal Profitability</h2><p className="mt-1 text-sm text-neutral-600">{projection.periodLabel}. Internal costs are never included in customer documents.</p></div>{projection.belowTargetMargin && <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-extrabold text-red-800">Below Target Margin</span>}</div>
     <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">{[
       ["Estimated cleaners", String(projection.cleanerCount)], ["Hours per cleaner", hours(projection.hoursPerCleaner)],
-      ["Estimated labor hours", hours(projection.estimatedLaborHours)], ["Base wage", money(projection.hourlyWage)],
+      ["Estimated labor hours", hours(projection.estimatedLaborHours)],
+      ["Visits in quoted period", String(projection.visitsPerPeriod ?? 1)], ["Base wage", money(projection.hourlyWage)],
       ["Projected W-2 burden", percent(projection.employerBurdenRate)], ["Loaded labor rate", money(projection.loadedHourlyLaborCost)],
       ["Loaded cleaning labor", money(projection.directCosts.loadedCleaningLabor)], ["Supplies", money(projection.directCosts.supplies)],
       ["Equipment", money(projection.directCosts.equipment)], ["Subcontractors", money(projection.directCosts.subcontractors)],
-      ["Other direct expenses", money(projection.directCosts.other)], ["Vehicle expense", maybeMoney(projection.directCosts.vehicleOperating)],
-      ["Paid travel labor", maybeMoney(projection.directCosts.compensableTravelLabor)], ["Legacy travel logistics", money(projection.directCosts.legacyTravelLogistics)], ["Total estimated job cost", maybeMoney(projection.totalEstimatedDirectCost)],
+      ["Other direct expenses", money(projection.directCosts.other)],
+      ["Setup and loading labor", money(projection.directCosts.setupLabor ?? 0)],
+      ["Owner labor", money(projection.directCosts.ownerLabor ?? 0)],
+      ["Parking and tolls", money(projection.directCosts.parkingTolls ?? 0)],
+      ["Disposal and debris", money(projection.directCosts.disposal ?? 0)], ["Vehicle expense", maybeMoney(projection.directCosts.vehicleOperating)],
+      ["Paid travel labor", maybeMoney(projection.directCosts.compensableTravelLabor)], ["Legacy travel logistics", money(projection.directCosts.legacyTravelLogistics)],
+      ["Existing post-construction project costs", money(projection.directCosts.legacyProjectCosts ?? 0)], ["Total estimated job cost", maybeMoney(projection.totalEstimatedDirectCost)],
       ["Proposed customer price", money(projection.price)], ["Projected gross profit", maybeMoney(projection.grossProfit)],
-      ["Projected gross margin", maybePercent(projection.grossMarginPercent)], ["Target gross margin", percent(projection.targetGrossMarginPercent)],
+      ["Projected gross margin", maybePercent(projection.grossMarginPercent)],
+      ["Payment processing fees", money(projection.operatingCosts?.paymentProcessingFees ?? 0)],
+      ["Sales commissions", money(projection.operatingCosts?.salesCommissions ?? 0)],
+      ["Contribution profit", maybeMoney(projection.contributionProfit ?? null)],
+      ["Contribution margin", maybePercent(projection.contributionMarginPercent ?? null)],
+      ["Allocated overhead", money(projection.operatingCosts?.allocatedOverhead ?? 0)],
+      ["Estimated operating profit", maybeMoney(projection.operatingProfit ?? null)],
+      ["Estimated operating margin", maybePercent(projection.operatingMarginPercent ?? null)], ["Target gross margin", percent(projection.targetGrossMarginPercent)],
       ["Recommended minimum", maybeMoney(projection.recommendedMinimumPrice)], ["Difference to target", maybeMoney(projection.differenceToRecommendedMinimum)],
     ].map(([label, value]) => <div key={label} className="flex justify-between gap-3 border-b border-[#143d1a]/10 py-1.5"><dt className="text-neutral-600">{label}</dt><dd className="text-right font-bold text-[#143d1a]">{value}</dd></div>)}</dl>
     <div className={`mt-4 rounded-lg border p-3 text-sm ${projection.travelCostsVerified ? "border-[#143d1a]/15 bg-white" : "border-amber-300 bg-amber-50 text-amber-900"}`}><p className="font-bold">Travel: {travel.verification}</p><p className="mt-1">{travel.roundTripMiles == null ? "Mileage and duration require a verified route or manual override." : `${travel.roundTripMiles.toFixed(2)} round-trip miles · ${travel.roundTripMinutes?.toFixed(1) ?? "—"} minutes · ${travel.vehicleCount} vehicle${travel.vehicleCount === 1 ? "" : "s"}`}</p>{travel.warning && <p className="mt-1">{travel.warning}</p>}</div>
-    {editable && settings && <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold">Manual round-trip miles<input type="number" min="0" step="0.01" value={travel.roundTripMiles ?? ""} onChange={(event) => updateManualTravel("roundTripMiles", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Manual round-trip minutes<input type="number" min="0" step="0.1" value={travel.roundTripMinutes ?? ""} onChange={(event) => updateManualTravel("roundTripMinutes", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Vehicles for this job<input type="number" min="1" step="1" value={travel.vehicleCount} onChange={(event) => onTravelChange?.({ ...travel, vehicleCount: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Other direct expenses<input type="number" min="0" step="0.01" value={projection.directCosts.other} onChange={(event) => onOtherDirectExpensesChange?.(Math.max(0, Number(event.target.value) || 0))} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><div className="sm:col-span-2"><button type="button" disabled={routing || !destination?.trim()} onClick={() => void route()} className="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50">{routing ? "Calculating travel..." : "Recalculate driving route"}</button>{routeError && <p role="alert" className="mt-2 text-sm text-red-700">{routeError}</p>}</div></div>}
+    {editable && settings && <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold">Manual round-trip miles<input type="number" min="0" step="0.01" value={travel.roundTripMiles ?? ""} onChange={(event) => updateManualTravel("roundTripMiles", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Manual round-trip minutes<input type="number" min="0" step="0.1" value={travel.roundTripMinutes ?? ""} onChange={(event) => updateManualTravel("roundTripMinutes", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Vehicles for this job<input type="number" min="1" step="1" value={travel.vehicleCount} onChange={(event) => onTravelChange?.({ ...travel, vehicleCount: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><div className="sm:col-span-2 mt-2 font-bold text-[#143d1a]">Internal expense assumptions (amounts for the quoted period)</div>{([
+      ["equipment", "Equipment and rentals"],
+      ["subcontractors", "Subcontractor costs"],
+      ["setupLabor", "Setup / loading / cleanup labor"],
+      ["ownerLabor", "Owner labor (not already in cleaner count)"],
+      ["parkingTolls", "Parking and tolls"],
+      ["disposal", "Disposal and debris"],
+      ["paymentProcessingFees", "Payment processing fees"],
+      ["salesCommissions", "Sales and lead commissions"],
+      ["allocatedOverhead", "Allocated operating overhead"],
+      ["otherDirectExpenses", "Other direct expenses"],
+    ] as const).map(([key, label]) => <label key={key} className="text-sm font-bold">{label}<input type="number" min="0" step="0.01" value={adjustments[key]} onChange={(event) => updateExpense(key, event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label>) }<div className="sm:col-span-2"><button type="button" disabled={routing || !destination?.trim()} onClick={() => void route()} className="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50">{routing ? "Calculating travel..." : "Recalculate driving route"}</button>{routeError && <p role="alert" className="mt-2 text-sm text-red-700">{routeError}</p>}</div></div>}
+    {settings?.vehicleOperatingRatePerMile == null && <p className="mt-3 text-sm font-semibold text-amber-900">Driving distance is verified, but vehicle cost and margin remain unverified until you set a vehicle operating rate per mile in Business Settings.</p>}
+    <p className="mt-3 text-xs text-neutral-600">Gross profit excludes financing and overhead. Contribution profit deducts payment fees and commissions; estimated operating profit also deducts allocated overhead. Blank expense assumptions are treated as $0, not as confirmed expenses.</p>
     {!projection.costComplete && <p role="status" className="mt-3 text-sm font-semibold text-amber-900">Travel costs are incomplete and are excluded from the margin result until a route or manual override and vehicle operating rate are configured.</p>}
   </section>;
 }

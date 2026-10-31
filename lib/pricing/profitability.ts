@@ -16,7 +16,16 @@ export type ProfitabilityInput = {
   equipment?: number | null;
   subcontractors?: number | null;
   otherDirectExpenses?: number | null;
+  setupLabor?: number | null;
+  ownerLabor?: number | null;
+  parkingTolls?: number | null;
+  disposal?: number | null;
+  paymentProcessingFees?: number | null;
+  salesCommissions?: number | null;
+  allocatedOverhead?: number | null;
+  visitsPerPeriod?: number | null;
   legacyTravelLogisticsCost?: number | null;
+  legacyProjectCosts?: number | null;
   legacyTravelIncludesDriving?: boolean;
   periodLabel?: string;
 };
@@ -42,38 +51,53 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const hourlyWage = nonNegative(input.hourlyWage ?? settings.cleanerHourlyWage);
   const burdenRate = validRate(settings.employerBurdenRate) ?? 0;
   const targetMarginRate = validRate(settings.targetGrossMarginRate);
-  const estimatedLaborHours = money(cleanerCount * hoursPerCleaner);
+  const visitsPerPeriod = positiveInteger(input.visitsPerPeriod, 1);
+  const estimatedLaborHours = money(cleanerCount * hoursPerCleaner * visitsPerPeriod);
   const loadedHourlyLaborCost = money(hourlyWage * (1 + burdenRate));
   const loadedCleaningLabor = money(estimatedLaborHours * loadedHourlyLaborCost);
   const travel = normalizeTravel(input.travel, cleanerCount, settings);
   const rate = settings.vehicleOperatingRatePerMile == null ? null : nonNegative(settings.vehicleOperatingRatePerMile);
   const legacyTravelLogistics = money(nonNegative(input.legacyTravelLogisticsCost));
   const legacyTravelIncludesDriving = input.legacyTravelIncludesDriving === true && legacyTravelLogistics > 0;
-  const vehicleOperating = legacyTravelIncludesDriving ? 0 : travel.roundTripMiles == null || rate == null ? null : money(travel.roundTripMiles * rate * travel.vehicleCount);
+  const vehicleOperating = legacyTravelIncludesDriving ? 0 : travel.roundTripMiles == null || rate == null ? null : money(travel.roundTripMiles * rate * travel.vehicleCount * visitsPerPeriod);
   const compensableTravelLabor = legacyTravelIncludesDriving || !travel.companyRequiredTravelIsCompensable
     ? 0
     : travel.roundTripMinutes == null
       ? null
-      : money((travel.roundTripMinutes / 60) * travel.travelingEmployeeCount * loadedHourlyLaborCost);
+      : money((travel.roundTripMinutes / 60) * travel.travelingEmployeeCount * loadedHourlyLaborCost * visitsPerPeriod);
   const directCosts: ProfitabilityDirectCosts = {
     loadedCleaningLabor,
     vehicleOperating,
     compensableTravelLabor,
     legacyTravelLogistics,
-    supplies: money(nonNegative(input.supplies)),
+    legacyProjectCosts: money(nonNegative(input.legacyProjectCosts)),
+    supplies: money(nonNegative(input.supplies) * visitsPerPeriod),
     equipment: money(nonNegative(input.equipment)),
     subcontractors: money(nonNegative(input.subcontractors)),
     other: money(nonNegative(input.otherDirectExpenses)),
+    setupLabor: money(nonNegative(input.setupLabor)),
+    ownerLabor: money(nonNegative(input.ownerLabor)),
+    parkingTolls: money(nonNegative(input.parkingTolls)),
+    disposal: money(nonNegative(input.disposal)),
+  };
+  const operatingCosts = {
+    paymentProcessingFees: money(nonNegative(input.paymentProcessingFees)),
+    salesCommissions: money(nonNegative(input.salesCommissions)),
+    allocatedOverhead: money(nonNegative(input.allocatedOverhead)),
   };
   const travelCostsVerified = travel.verification === "Verified" || travel.verification === "Manual";
   const costComplete = vehicleOperating != null && compensableTravelLabor != null;
-  const directValues = [directCosts.loadedCleaningLabor, directCosts.vehicleOperating, directCosts.compensableTravelLabor, directCosts.legacyTravelLogistics, directCosts.supplies, directCosts.equipment, directCosts.subcontractors, directCosts.other];
+  const directValues = [directCosts.loadedCleaningLabor, directCosts.vehicleOperating, directCosts.compensableTravelLabor, directCosts.legacyTravelLogistics, directCosts.legacyProjectCosts, directCosts.supplies, directCosts.equipment, directCosts.subcontractors, directCosts.other, directCosts.setupLabor, directCosts.ownerLabor, directCosts.parkingTolls, directCosts.disposal];
   const totalEstimatedDirectCost = costComplete
     ? money(directValues.reduce<number>((sum, value) => sum + (value ?? 0), 0))
     : null;
   const price = money(nonNegative(input.price));
   const grossProfit = totalEstimatedDirectCost == null ? null : money(price - totalEstimatedDirectCost);
   const grossMarginPercent = totalEstimatedDirectCost == null || price <= 0 ? null : money((grossProfit! / price) * 100);
+  const contributionProfit = grossProfit == null ? null : money(grossProfit - operatingCosts.paymentProcessingFees - operatingCosts.salesCommissions);
+  const contributionMarginPercent = contributionProfit == null || price <= 0 ? null : money((contributionProfit / price) * 100);
+  const operatingProfit = contributionProfit == null ? null : money(contributionProfit - operatingCosts.allocatedOverhead);
+  const operatingMarginPercent = operatingProfit == null || price <= 0 ? null : money((operatingProfit / price) * 100);
   const recommendedMinimumPrice = totalEstimatedDirectCost == null || targetMarginRate == null || targetMarginRate >= 1
     ? null
     : money(totalEstimatedDirectCost / (1 - targetMarginRate));
@@ -81,6 +105,8 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   return {
     version: 1,
     periodLabel: input.periodLabel?.trim() || "Per service visit",
+    visitsPerPeriod,
+    legacyTravelIncludesDriving,
     price,
     cleanerCount,
     hoursPerCleaner: money(hoursPerCleaner),
@@ -90,6 +116,11 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     loadedHourlyLaborCost,
     travel,
     directCosts,
+    operatingCosts,
+    contributionProfit,
+    contributionMarginPercent,
+    operatingProfit,
+    operatingMarginPercent,
     travelCostsVerified,
     costComplete,
     totalEstimatedDirectCost,
@@ -111,6 +142,11 @@ export function repriceProfitability(projection: ProfitabilityProjection | null 
   const customerPrice = money(nonNegative(price));
   const grossProfit = total == null ? null : money(customerPrice - total);
   const grossMarginPercent = total == null || customerPrice <= 0 ? null : money((grossProfit! / customerPrice) * 100);
+  const processing = projection.operatingCosts?.paymentProcessingFees ?? 0;
+  const commissions = projection.operatingCosts?.salesCommissions ?? 0;
+  const overhead = projection.operatingCosts?.allocatedOverhead ?? 0;
+  const contributionProfit = grossProfit == null ? null : money(grossProfit - processing - commissions);
+  const operatingProfit = contributionProfit == null ? null : money(contributionProfit - overhead);
   const recommendedMinimumPrice = total == null || targetRate >= 1 ? null : money(total / (1 - targetRate));
   return {
     ...projection,
@@ -119,6 +155,10 @@ export function repriceProfitability(projection: ProfitabilityProjection | null 
     directCosts: { ...direct },
     grossProfit,
     grossMarginPercent,
+    contributionProfit,
+    contributionMarginPercent: contributionProfit == null || customerPrice <= 0 ? null : money((contributionProfit / customerPrice) * 100),
+    operatingProfit,
+    operatingMarginPercent: operatingProfit == null || customerPrice <= 0 ? null : money((operatingProfit / customerPrice) * 100),
     recommendedMinimumPrice,
     differenceToRecommendedMinimum: recommendedMinimumPrice == null ? null : money(Math.max(0, recommendedMinimumPrice - customerPrice)),
     belowTargetMargin: recommendedMinimumPrice != null && customerPrice < recommendedMinimumPrice,
