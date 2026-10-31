@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import vm from "node:vm";
+import ts from "typescript";
 const read = p => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const migration = read("supabase/migrations/20261029180000_commercial_high_dusting_separate_quote.sql");
 const calculator = read("lib/server/salesEstimatePricing.ts");
@@ -40,4 +42,28 @@ test("High Dusting calculator previews cost-based estimates and displays incompl
  assert.match(engine, /scopeConfirmed=Boolean/);
  assert.match(engine, /PRELIMINARY ESTIMATE/);
  assert.match(publicRequest, /Complete working height, access method and elevated surface scope before submitting a High Dusting request/);
+});
+
+test("High Dusting preliminary pricing produces a numeric quote without unused assessment fields", () => {
+ const compiled = ts.transpileModule(read("lib/pricing/highDusting.ts"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+ }).outputText;
+ const target = { exports: {} };
+ vm.runInNewContext(compiled, { module: target, exports: target.exports });
+ const { priceHighDusting, defaultHighDustingInputs } = target.exports;
+ const draft = { ...defaultHighDustingInputs, squareFeet: 1000 };
+ const quote = priceHighDusting(draft);
+ assert.equal(quote.finalPrice, 723.08);
+ assert.equal(quote.laborCost, 300);
+ assert.match(quote.description, /PRELIMINARY ESTIMATE/);
+ assert.match(quote.description, /Not yet assessed/);
+ const assessed = priceHighDusting({
+  ...draft, workingHeight: "18 ft", scope: "Rafters and vents",
+  accessMethods: ["Scissor lift"]
+ });
+ assert.equal(assessed.finalPrice, quote.finalPrice);
+ assert.doesNotMatch(assessed.description, /PRELIMINARY ESTIMATE/);
+ assert.throws(() => priceHighDusting({ ...draft, squareFeet: 0 }), /square footage/);
+ assert.throws(() => priceHighDusting({ ...draft, targetMarginPercent: 60 }), /margin/);
+ assert.throws(() => priceHighDusting({ ...draft, accessMethods: ["Unsafe equipment"] }), /access methods/);
 });
