@@ -112,7 +112,7 @@ function ProjectCostFields({ value, onChange }: { value: PostConstructionV2Input
     ["totalSquareFeet", "Total square feet"], ["estimatedPersonHours", "Estimated total person-hours"],
     ["crewSize", "Crew size"], ["workerHourlyPay", "Worker hourly pay"], ["plannedProjectDays", "Planned project days"],
     ["suppliesCost", "Supplies"], ["equipmentRentalCost", "Equipment / rental"], ["travelLogisticsCost", "Travel / logistics"],
-    ["disposalDebrisCost", "Disposal / debris"], ["supervisionAdminCost", "Supervision / admin"], ["contingencyCost", "Contingency"],
+    ["supervisionAdminCost", "Supervision / admin"], ["contingencyCost", "Contingency"],
     ["desiredMarginPercent", "Desired margin % (0–70)"],
   ] as const;
   let result;

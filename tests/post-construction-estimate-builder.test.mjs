@@ -61,3 +61,13 @@ test("Post-Construction retains both automatic scope pricing and explicitly sele
   assert.match(fields, /<Group title="Specialty \/ Detail Work">/);
   assert.match(fields, /<ProjectCostFields value=\{value\.projectCosting\}/);
 });
+
+test("only the private profitability panel offers a disposal and debris input", () => {
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  const profitability = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
+  const builder = readFileSync(resolve("components/estimates/EstimateBuilder.tsx"), "utf8");
+  assert.doesNotMatch(fields, /\["disposalDebrisCost",\s*"Disposal \/ debris"\]/);
+  assert.match(profitability, /\["disposal", "Disposal and debris"\]/);
+  // Preserve the historical V2 cost field and existing customer pricing, without changing old estimates.
+  assert.match(builder, /postConstruction\.projectCosting\.disposalDebrisCost/);
+});
