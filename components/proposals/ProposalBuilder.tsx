@@ -828,7 +828,7 @@ export function ProposalBuilder({
                 set={setAdditionalMaterials}
               />}
               <Num l="Manual Discount %" v={discount} set={setDiscount} />
-              {!mixedWeeklyMode && (!canViewProfitability || !proposalProfitability || profile?.role === "Sales") ? <label>
+              {!mixedWeeklyMode && (!canViewProfitability || !proposalProfitability || profile?.role === "Sales") && <label>
                 <Label t="Manual / Custom Final Price" />
                 <span className="relative block">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-bold text-neutral-500">
@@ -863,7 +863,8 @@ export function ProposalBuilder({
                 >
                   Use Calculated Price
                 </button>
-              </label> : <p className="col-span-full rounded-lg bg-[#f6faf4] px-3 py-2 text-xs text-[#143d1a]">Separate weekday visit prices are authoritative. Weekly total: {new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(result.weeklyContractTotal ?? 0)}. No uniform per-visit price is applied.</p>}
+              </label>}
+              {mixedWeeklyMode && <p className="col-span-full rounded-lg bg-[#f6faf4] px-3 py-2 text-xs text-[#143d1a]">Separate weekday visit prices are authoritative. Weekly total: {new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(result.weeklyContractTotal ?? 0)}. No uniform per-visit price is applied.</p>}
               {!mixedWeeklyMode && (manualPrice !== null || Boolean(proposal?.result.finalPriceAdjustmentLabel)) && <label className="col-span-full">
                 <Label t="Final Price Adjustment Label (customer-facing)" />
                 <input type="text" maxLength={90} value={adjustmentLabel} onChange={event => setAdjustmentLabel(event.target.value)} placeholder="Final Price Adjustment" className={input} />
