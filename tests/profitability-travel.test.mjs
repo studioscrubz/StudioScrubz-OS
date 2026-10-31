@@ -291,3 +291,53 @@ test("Porter and Luxury Property Care have private, permission-gated monthly pro
   const changed = mod.exports.calculatePorterProfitability(pricing, settings, { ...extras, equipment: 10 });
   assert.equal(changed.recommendedMinimumPrice, 362.90);
 });
+
+test("three planned post-construction project days display three trips but do not triple total labor or supplies", () => {
+  const result = calculateProfitability({
+    price: 2000, cleanerCount: 2, hoursPerCleaner: 12, visitsPerPeriod: 1,
+    projectDays: 3, roundTripsPerPeriod: 3, supplies: 80,
+    settings: { ...settings, vehicleOperatingRatePerMile: .5 },
+    travel: { ...verifiedTravel(2), roundTripMiles: 20, roundTripMinutes: 60 },
+    periodLabel: "Full post-construction project",
+  });
+  assert.equal(result.projectDays, 3);
+  assert.equal(result.roundTripsPerPeriod, 3);
+  assert.equal(result.visitsPerPeriod, 1);
+  assert.equal(result.estimatedLaborHours, 24);
+  assert.equal(result.directCosts.loadedCleaningLabor, 864);
+  assert.equal(result.directCosts.supplies, 80);
+  assert.equal(result.directCosts.vehicleOperating, 30);
+  assert.equal(result.directCosts.compensableTravelLabor, 216);
+  assert.equal(result.totalEstimatedDirectCost, 1190);
+  const repriced = repriceProfitability(result, 2200);
+  assert.equal(repriced.projectDays, 3);
+  assert.equal(repriced.roundTripsPerPeriod, 3);
+  assert.equal(repriced.estimatedLaborHours, 24);
+});
+
+test("weekly recurring visit costs remain independent of multi-day project travel trips", () => {
+  const weekly = calculateProfitability({
+    price: 1000, cleanerCount: 1, hoursPerCleaner: 2,
+    visitsPerPeriod: 3, supplies: 10,
+    settings: { ...settings, vehicleOperatingRatePerMile: .5 },
+    travel: { ...verifiedTravel(1), roundTripMiles: 20, roundTripMinutes: 60 },
+  });
+  assert.equal(weekly.estimatedLaborHours, 6);
+  assert.equal(weekly.directCosts.supplies, 30);
+  assert.equal(weekly.directCosts.vehicleOperating, 30);
+  assert.equal(weekly.directCosts.compensableTravelLabor, 108);
+  assert.equal(weekly.projectDays, undefined);
+});
+
+test("the Post-Construction panel displays planned days instead of visits and proposal carries project days", () => {
+  const estimate = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../components/estimates/ProfitabilityPanel.tsx", import.meta.url), "utf8");
+  const proposal = readFileSync(new URL("../components/proposals/ProposalBuilder.tsx", import.meta.url), "utf8");
+  assert.match(estimate, /postConstruction\.projectCosting\.plannedProjectDays/);
+  assert.match(estimate, /postConstruction\.targetProjectDays/);
+  assert.match(panel, /"Planned project days"/);
+  assert.match(panel, /"Round-trip travel days"/);
+  assert.match(panel, /"Visits in quoted period"/);
+  assert.match(proposal, /projectDays: source\.projectDays/);
+  assert.match(proposal, /roundTripsPerPeriod: source\.roundTripsPerPeriod/);
+});
