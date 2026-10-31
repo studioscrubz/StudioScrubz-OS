@@ -113,18 +113,18 @@ test("Post-Construction manual price and minimum action appear only in finance-r
   const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
   const engine = readFileSync(resolve("lib/pricing/authoritativePrice.ts"), "utf8");
   assert.match(builder, /const estimateProfitability = canViewProfitability/);
-  assert.match(builder, /projectPrice=\{postConstructionMode && result \?/);
+  assert.match(builder, /projectPrice=\{result && !result\.weeklyMixedVisits\?\.length \?/);
   assert.match(builder, /manualPrice: v2Mode && isPostConstructionV2Estimate\(postConstruction\)/);
   assert.match(builder, /onChange: v2Mode/);
   assert.match(builder, /: setManualPrice/);
-  assert.match(panel, /projectPrice && editable/);
+  assert.match(panel, /projectPrice && \(editable \|\| priceEditable\)/);
   assert.match(panel, /Manual \/ Custom Estimate Amount/);
   assert.match(panel, /Use Profitability Minimum/);
   assert.match(panel, /Use Original Calculated Bid/);
   assert.match(panel, /projectPrice\.onChange\(minimum\)/);
   assert.match(panel, /projectPrice\.onChange\(null\)/);
   assert.match(panel, /projection\.recommendedMinimumPrice == null \|\| !Number\.isFinite\(projection\.recommendedMinimumPrice\)/);
-  assert.match(panel, /Current customer estimate amount/);
+  assert.match(panel, /Current customer \{projectPrice\.artifactLabel \?\? "estimate"\} amount/);
   assert.doesNotMatch(summary, /Use Profitability Minimum/);
   assert.doesNotMatch(summary, /Use Recommended Bid/);
   assert.match(summary, /Final Estimate Amount/);
@@ -146,7 +146,7 @@ test("existing V2 Post-Construction estimates expose the same profitability over
   const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
   const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
   const engine = readFileSync(resolve("lib/pricing/estimates.ts"), "utf8");
-  assert.match(builder, /projectPrice=\{postConstructionMode && result \?/);
+  assert.match(builder, /projectPrice=\{result && !result\.weeklyMixedVisits\?\.length \?/);
   assert.match(builder, /postConstruction\.projectCosting\.manualProjectPriceOverride \?\? null/);
   assert.match(builder, /if \(!isPostConstructionV2Estimate\(previous\)\) return previous/);
   assert.match(builder, /if \(amount == null\) delete projectCosting\.manualProjectPriceOverride/);
@@ -171,10 +171,28 @@ test("Post-Construction price editor follows Internal expense assumptions, prese
   assert.ok(route > summary);
   assert.ok(editor > route, "Price controls should be directly below the expense fields and route action");
   assert.ok(notes > editor, "Price controls should remain inside the finance section");
-  assert.match(panel, /projectPrice && editable/);
+  assert.match(panel, /projectPrice && \(editable \|\| priceEditable\)/);
   assert.match(panel, /Manual \/ Custom Estimate Amount/);
   assert.match(panel, /Use Profitability Minimum/);
   assert.match(panel, /Use Original Calculated Bid/);
   assert.match(panel, /projectPrice\.onChange\(minimum\)/);
   assert.match(panel, /projectPrice\.onChange\(null\)/);
+});
+
+test("Residential, Commercial and High Dusting estimates share the finance-only price editor below expenses", () => {
+  const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
+  assert.match(builder, /projectPrice=\{result && !result\.weeklyMixedVisits\?\.length \?/);
+  assert.match(builder, /title: postConstructionMode \? "Post-Construction Estimate Price" : "Estimate Price"/);
+  assert.match(builder, /canApplyMinimum: !result\.upkeepPlan && result\.weeklyContractTotal == null/);
+  assert.match(builder, /profitabilityPriceEditorVisible=\{Boolean\(canViewProfitability && estimateProfitability\)\}/);
+  assert.match(builder, /!mixed && !profitabilityPriceEditorVisible/);
+  assert.match(panel, /Internal expense assumptions \(amounts for the quoted period\)/);
+  const expenseOffset = panel.indexOf("Internal expense assumptions (amounts for the quoted period)");
+  const priceOffset = panel.indexOf('projectPrice.title ?? "Post-Construction Estimate Price"');
+  assert.ok(priceOffset > expenseOffset);
+  assert.match(panel, /projectPrice\.onChange\(minimum\)/);
+  assert.match(panel, /Use Original Calculated Bid/);
+  assert.match(panel, /canApplyMinimum === false/);
+  // Mixed-scope visits retain their individual prices, never a uniform override.
+  assert.match(builder, /!result\.weeklyMixedVisits\?\.length/);
 });
