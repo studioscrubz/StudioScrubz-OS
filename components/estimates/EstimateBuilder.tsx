@@ -262,12 +262,17 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     travel: { ...profitabilityTravel, travelingEmployeeCount: Math.max(1, result.crewSize) },
     supplies: result.supplyCost,
     ...profitabilityAdjustments,
-    visitsPerPeriod: result.weeklyContractTotal != null
+    visitsPerPeriod: result.upkeepPlan?.visitsIncluded ?? (result.weeklyContractTotal != null
       ? Math.max(1, result.weeklyMixedVisits?.length || calculatorInput.serviceDaysOfWeek?.length || 1)
-      : 1,
+      : 1),
     // Post-construction V2 logistics are separate from route costs; do not count them twice.
     legacyTravelLogisticsCost: isPostConstructionV2Estimate(postConstruction) && postConstructionMode ? postConstruction.projectCosting.travelLogisticsCost : 0,
-    periodLabel: result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
+    legacyProjectCosts: isPostConstructionV2Estimate(postConstruction) && postConstructionMode
+      ? postConstruction.projectCosting.equipmentRentalCost + postConstruction.projectCosting.disposalDebrisCost
+        + postConstruction.projectCosting.supervisionAdminCost + postConstruction.projectCosting.contingencyCost
+      : 0,
+    legacyTravelIncludesDriving: false,
+    periodLabel: result.upkeepPlan ? "Monthly upkeep package" : result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
   }) : null;
   // The saved snapshot belongs only in the restricted profitability relation, never Estimate.result.
   useEffect(()=>{
