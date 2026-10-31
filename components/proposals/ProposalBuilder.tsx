@@ -819,7 +819,7 @@ export function ProposalBuilder({
                 set={setAdditionalMaterials}
               />}
               <Num l="Manual Discount %" v={discount} set={setDiscount} />
-              {!mixedWeeklyMode ? <label>
+              {!mixedWeeklyMode && (!canViewProfitability || !proposalProfitability || profile?.role === "Sales") ? <label>
                 <Label t="Manual / Custom Final Price" />
                 <span className="relative block">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-bold text-neutral-500">
@@ -1006,7 +1006,23 @@ export function ProposalBuilder({
           save={save}
           editing={Boolean(proposal)}
         />
-        {canViewProfitability && proposalProfitability && <ProfitabilityPanel projection={proposalProfitability} />}
+        {canViewProfitability && proposalProfitability && <ProfitabilityPanel
+          projection={proposalProfitability}
+          priceEditable
+          projectPrice={!mixedWeeklyMode ? {
+            manualPrice,
+            calculatedPrice: result.calculatedPerVisitTotal ?? result.perVisitTotal,
+            title: "Proposal Price",
+            artifactLabel: "proposal",
+            unitLabel: frequency === "One-Time" ? "full project" : "per visit",
+            canApplyMinimum: frequency === "One-Time" && result.weeklyContractTotal == null && !result.upkeepPlan,
+            minimumUnavailableReason: "The recommended minimum covers a multi-visit contract. It cannot safely replace a single per-visit price; review each visit's amount instead.",
+            onChange: (amount: number | null) => {
+              setPreserveStoredPriceBaseline(false);
+              setManualPrice(amount);
+            },
+          } : undefined}
+        />}
       </div>
     </div>
   );
