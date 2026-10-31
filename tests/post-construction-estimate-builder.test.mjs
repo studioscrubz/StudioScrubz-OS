@@ -97,3 +97,13 @@ test("automatic job expense values are persisted with the estimate and priced wi
   assert.match(estimates, /pricing.finalPrice - core.laborCost - core.supplyCost/);
   assert.match(estimates, /input.projectExpenses\?\.contingencyCost/);
 });
+
+test("sales-safe estimate payload strips new private project cost inputs", () => {
+  const service = readFileSync(resolve("lib/services/estimates.ts"), "utf8");
+  assert.match(service, /delete input\.projectExpenses/);
+  assert.match(service, /delete input\.projectCosting/);
+  assert.match(service, /delete input\.workerHourlyPay/);
+  assert.match(service, /delete input\.targetProfitMarginPercent/);
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  assert.match(fields, /\{!salesSafe && <UnifiedProjectCosts/);
+});
