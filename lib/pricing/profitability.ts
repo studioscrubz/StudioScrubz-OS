@@ -25,6 +25,7 @@ export type ProfitabilityInput = {
   allocatedOverhead?: number | null;
   visitsPerPeriod?: number | null;
   legacyTravelLogisticsCost?: number | null;
+  legacyProjectCosts?: number | null;
   legacyTravelIncludesDriving?: boolean;
   periodLabel?: string;
 };
@@ -69,6 +70,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     vehicleOperating,
     compensableTravelLabor,
     legacyTravelLogistics,
+    legacyProjectCosts: money(nonNegative(input.legacyProjectCosts)),
     supplies: money(nonNegative(input.supplies) * visitsPerPeriod),
     equipment: money(nonNegative(input.equipment)),
     subcontractors: money(nonNegative(input.subcontractors)),
@@ -85,7 +87,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   };
   const travelCostsVerified = travel.verification === "Verified" || travel.verification === "Manual";
   const costComplete = vehicleOperating != null && compensableTravelLabor != null;
-  const directValues = [directCosts.loadedCleaningLabor, directCosts.vehicleOperating, directCosts.compensableTravelLabor, directCosts.legacyTravelLogistics, directCosts.supplies, directCosts.equipment, directCosts.subcontractors, directCosts.other, directCosts.setupLabor, directCosts.ownerLabor, directCosts.parkingTolls, directCosts.disposal];
+  const directValues = [directCosts.loadedCleaningLabor, directCosts.vehicleOperating, directCosts.compensableTravelLabor, directCosts.legacyTravelLogistics, directCosts.legacyProjectCosts, directCosts.supplies, directCosts.equipment, directCosts.subcontractors, directCosts.other, directCosts.setupLabor, directCosts.ownerLabor, directCosts.parkingTolls, directCosts.disposal];
   const totalEstimatedDirectCost = costComplete
     ? money(directValues.reduce<number>((sum, value) => sum + (value ?? 0), 0))
     : null;
@@ -104,6 +106,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     version: 1,
     periodLabel: input.periodLabel?.trim() || "Per service visit",
     visitsPerPeriod,
+    legacyTravelIncludesDriving,
     price,
     cleanerCount,
     hoursPerCleaner: money(hoursPerCleaner),
