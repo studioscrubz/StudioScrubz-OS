@@ -954,7 +954,7 @@ export function ProposalBuilder({
           </Panel>
           {highDustingProposal && <Panel title="High Dusting Scope">
             <ElevatedSurfaceMultiSelect
-              value={scope.find(item => item.id === "high-dusting-surfaces")?.text.replace(/^Elevated surfaces and scope:\\s*/, "") ?? ""}
+              value={scope.find(item => item.id === "high-dusting-surfaces")?.text.replace(/^Elevated surfaces and scope:\s*/, "") ?? ""}
               onChange={next => setScope(current => [
                 ...current.filter(item => item.id !== "high-dusting-surfaces"),
                 ...(next.trim() ? [{ id: "high-dusting-surfaces", text: `Elevated surfaces and scope: ${next}` }] : []),
