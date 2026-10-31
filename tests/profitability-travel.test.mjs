@@ -136,3 +136,54 @@ test("customer document mappers use explicit public fields and omit profitabilit
   assert.doesNotMatch(estimateDocument, /profitability/);
   assert.doesNotMatch(proposalDocument, /profitability/);
 });
+
+test("weekly price includes every scheduled visit's cleaning labor, supplies, driving and paid travel", () => {
+  const result = calculateProfitability({
+    price: 1000, cleanerCount: 1, hoursPerCleaner: 2, visitsPerPeriod: 2,
+    settings: { ...settings, vehicleOperatingRatePerMile: .5 },
+    travel: { ...verifiedTravel(1), roundTripMiles: 10, roundTripMinutes: 60 },
+    supplies: 5, equipment: 7, subcontractors: 9, setupLabor: 10,
+    ownerLabor: 20, parkingTolls: 3, disposal: 4, otherDirectExpenses: 8,
+    paymentProcessingFees: 5, salesCommissions: 6, allocatedOverhead: 7,
+    periodLabel: "Weekly contract period",
+  });
+  assert.equal(result.visitsPerPeriod, 2);
+  assert.equal(result.estimatedLaborHours, 4);
+  assert.equal(result.directCosts.loadedCleaningLabor, 144);
+  assert.equal(result.directCosts.supplies, 10);
+  assert.equal(result.directCosts.vehicleOperating, 10);
+  assert.equal(result.directCosts.compensableTravelLabor, 72);
+  assert.equal(result.totalEstimatedDirectCost, 297);
+  assert.equal(result.grossProfit, 703);
+  assert.equal(result.contributionProfit, 692);
+  assert.equal(result.operatingProfit, 685);
+});
+
+test("repricing retains operating expense assumptions while recalculating the contribution and operating margins", () => {
+  const original = calculateProfitability({
+    price: 1000, cleanerCount: 1, hoursPerCleaner: 2,
+    settings, travel: verifiedTravel(1), salesCommissions: 35,
+    paymentProcessingFees: 15, allocatedOverhead: 30,
+  });
+  const next = repriceProfitability(original, 900);
+  assert.equal(next.totalEstimatedDirectCost, original.totalEstimatedDirectCost);
+  assert.equal(next.operatingCosts.salesCommissions, 35);
+  assert.equal(next.contributionProfit, next.grossProfit - 50);
+  assert.equal(next.operatingProfit, next.contributionProfit - 30);
+});
+
+test("the original customer pricing and proposal workflows remain separate from internal cost inputs", () => {
+  const estimate = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
+  const proposal = readFileSync(new URL("../components/proposals/ProposalBuilder.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../components/estimates/ProfitabilityPanel.tsx", import.meta.url), "utf8");
+  assert.match(estimate, /calculateResidentialEstimate\(/);
+  assert.match(estimate, /calculateCommercialEstimate\(/);
+  assert.match(estimate, /calculatePostConstructionCatalogEstimate\(/);
+  assert.match(estimate, /HighDustingQuoteCalculator/);
+  assert.match(estimate, /pairHighDustingEstimates/);
+  assert.match(estimate, /result\.weeklyMixedVisits\?\.length/);
+  assert.match(estimate, /onAdjustmentsChange=\{setProfitabilityAdjustments\}/);
+  assert.match(proposal, /source\.operatingCosts\?\.salesCommissions/);
+  assert.match(panel, /Estimated operating profit/);
+  assert.match(panel, /vehicle operating rate per mile/); 
+});
