@@ -108,18 +108,25 @@ test("sales-safe estimate payload strips new private project cost inputs", () =>
   assert.match(fields, /\{!salesSafe && <UnifiedProjectCosts/);
 });
 
-test("Post-Construction can apply the verified profitability minimum to the editable customer estimate", () => {
+test("Post-Construction manual price and minimum action appear only in finance-restricted Internal Profitability", () => {
   const summary = readFileSync(resolve("components/estimates/PostConstructionBidSummary.tsx"), "utf8");
+  const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
   const engine = readFileSync(resolve("lib/pricing/authoritativePrice.ts"), "utf8");
-  assert.match(builder, /profitabilityMinimum=\{estimateProfitability\?\.recommendedMinimumPrice \?\? null\}/);
-  assert.match(summary, /Use Profitability Minimum as Estimate Amount/);
-  assert.match(summary, /setManualPrice\(profitabilityMinimum\)/);
-  assert.match(summary, /profitabilityMinimum == null \|\| !Number\.isFinite\(profitabilityMinimum\)/);
-  assert.match(summary, /Use Recommended Bid/);
-  assert.match(summary, /setManualPrice\(null\)/);
+  assert.match(builder, /const estimateProfitability = canViewProfitability/);
+  assert.match(builder, /projectPrice=\{postConstructionMode && !v2Mode \? \{ manualPrice, calculatedPrice: result\.calculatedFinalPrice \?\? result\.finalPrice, onChange: setManualPrice \} : undefined\}/);
+  assert.match(panel, /projectPrice && editable/);
+  assert.match(panel, /Manual \/ Custom Estimate Amount/);
+  assert.match(panel, /Use Profitability Minimum/);
+  assert.match(panel, /Use Original Calculated Bid/);
+  assert.match(panel, /projectPrice\.onChange\(minimum\)/);
+  assert.match(panel, /projectPrice\.onChange\(null\)/);
+  assert.match(panel, /projection\.recommendedMinimumPrice == null \|\| !Number\.isFinite\(projection\.recommendedMinimumPrice\)/);
+  assert.match(panel, /Current customer estimate amount/);
+  assert.doesNotMatch(summary, /Use Profitability Minimum/);
+  assert.doesNotMatch(summary, /Use Recommended Bid/);
+  assert.match(summary, /Final Estimate Amount/);
   assert.match(summary, /if\(profile\?\.role==="Sales"\)return/);
   assert.match(engine, /const finalPrice = manualPrice === null \? calculatedFinalPrice : money\(manualPrice\)/);
-  assert.match(builder, /const estimateProfitability = canViewProfitability/);
   assert.match(builder, /if \(estimateProfitability\) await saveProfitabilityProjection/);
 });
 
