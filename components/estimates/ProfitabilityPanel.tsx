@@ -5,12 +5,17 @@ import { validateManualTravelOverride } from "@/lib/pricing/profitability";
 import { calculateTravelProjection } from "@/lib/services/profitability";
 import type { ProfitabilityAdjustments, ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
 
-export function ProfitabilityPanel({ projection, settings, destination, editable, integratedProjectCosts, onTravelChange, onAdjustmentsChange }: {
+export function ProfitabilityPanel({ projection, settings, destination, editable, integratedProjectCosts, projectPrice, onTravelChange, onAdjustmentsChange }: {
   projection: ProfitabilityProjection;
   settings?: ProfitabilitySettings;
   destination?: string;
   editable?: boolean;
   integratedProjectCosts?: boolean;
+  projectPrice?: {
+    manualPrice: number | null;
+    calculatedPrice: number;
+    onChange: (amount: number | null) => void;
+  };
   onTravelChange?: (value: TravelProjection) => void;
   onAdjustmentsChange?: (value: ProfitabilityAdjustments) => void;
 }) {
@@ -92,6 +97,42 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
       ["Estimated operating margin", maybePercent(projection.operatingMarginPercent ?? null)], ["Target gross margin", percent(projection.targetGrossMarginPercent)],
       ["Recommended minimum (includes commission, fees and overhead)", maybeMoney(projection.recommendedMinimumPrice)], ["Difference to target", maybeMoney(projection.differenceToRecommendedMinimum)],
     ].map(([label, value]) => <div key={label} className="flex justify-between gap-3 border-b border-[#143d1a]/10 py-1.5"><dt className="text-neutral-600">{label}</dt><dd className="text-right font-bold text-[#143d1a]">{value}</dd></div>)}</dl>
+    {projectPrice && editable && <div className="mt-4 rounded-xl border border-[#143d1a]/20 bg-white p-4">
+      <h3 className="text-sm font-extrabold text-[#143d1a]">Post-Construction Estimate Price</h3>
+      <p className="mt-1 text-xs text-neutral-600">Edit the customer estimate here after reviewing the full project's costs. Your chosen price updates profitability immediately and is saved when you select Save Estimate.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div><p className="text-xs font-semibold text-neutral-600">Original calculated bid</p><p className="font-bold text-[#143d1a]">{money(projectPrice.calculatedPrice)}</p></div>
+        <div><p className="text-xs font-semibold text-neutral-600">Profitability minimum</p><p className="font-bold text-[#143d1a]">{maybeMoney(projection.recommendedMinimumPrice)}</p></div>
+      </div>
+      <label className="mt-3 block text-sm font-bold text-[#143d1a]">Manual / Custom Estimate Amount
+        <input aria-label="Manual or custom Post-Construction estimate amount" type="number" min="0.01" step="0.01"
+          value={projectPrice.manualPrice ?? ""} placeholder={String(projectPrice.calculatedPrice)}
+          onChange={event => {
+            const raw = event.target.value;
+            if (!raw) { projectPrice.onChange(null); return; }
+            const next = Number(raw);
+            if (Number.isFinite(next) && next > 0) projectPrice.onChange(next);
+          }}
+          className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 font-normal"/>
+      </label>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <button type="button"
+          disabled={projection.recommendedMinimumPrice == null || !Number.isFinite(projection.recommendedMinimumPrice) || projection.recommendedMinimumPrice <= 0}
+          onClick={() => {
+            const minimum = projection.recommendedMinimumPrice;
+            if (minimum != null && Number.isFinite(minimum) && minimum > 0) projectPrice.onChange(minimum);
+          }}
+          className="rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+          Use Profitability Minimum
+        </button>
+        <button type="button" disabled={projectPrice.manualPrice === null} onClick={() => projectPrice.onChange(null)}
+          className="rounded-lg border border-[#143d1a]/30 px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-40">
+          Use Original Calculated Bid
+        </button>
+      </div>
+      <p className="mt-3 text-sm text-neutral-600">Current customer estimate amount: <strong className="text-[#143d1a]">{money(projection.price)}</strong>. This change is not saved until you save or update the estimate.</p>
+      {projection.recommendedMinimumPrice == null && <p className="mt-2 text-xs font-semibold text-amber-900">Verify travel and job costs before applying the profitability minimum. Manual pricing remains available.</p>}
+    </div>
     <div className={`mt-4 rounded-lg border p-3 text-sm ${projection.travelCostsVerified ? "border-[#143d1a]/15 bg-white" : "border-amber-300 bg-amber-50 text-amber-900"}`}><p className="font-bold">Travel: {travel.verification}</p><p className="mt-1">{travel.roundTripMiles == null ? "Mileage and duration require a verified route or manual override." : `${travel.roundTripMiles.toFixed(2)} round-trip miles · ${travel.roundTripMinutes?.toFixed(1) ?? "—"} minutes · ${travel.vehicleCount} vehicle${travel.vehicleCount === 1 ? "" : "s"}`}</p>{travel.warning && <p className="mt-1">{travel.warning}</p>}</div>
     {editable && settings && <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold">Manual round-trip miles<input type="number" min="0" step="0.01" value={travel.roundTripMiles ?? ""} onChange={(event) => updateManualTravel("roundTripMiles", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Manual round-trip minutes<input type="number" min="0" step="0.1" value={travel.roundTripMinutes ?? ""} onChange={(event) => updateManualTravel("roundTripMinutes", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><label className="text-sm font-bold">Vehicles for this job<input type="number" min="1" step="1" value={travel.vehicleCount} onChange={(event) => onTravelChange?.({ ...travel, vehicleCount: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label><div className="sm:col-span-2 mt-2 font-bold text-[#143d1a]">Internal expense assumptions (amounts for the quoted period)</div>{([
       ["equipment", integratedProjectCosts ? "Additional equipment outside quoted project expenses (if any)" : "Equipment and rentals"],
