@@ -83,7 +83,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [division, setDivision] = useState<EstimateDivision>(estimate?.division ?? "Residential");
   const [residential, setResidential] = useState<ResidentialCalculatorInput>(initialInput?.division === "Residential" && !isPostConstructionInput(initialInput) ? initialInput : isPostConstructionInput(initialInput)&&estimate?.division==="Residential"?{...defaultResidential,serviceType:"Post-Construction"}:defaultResidential);
   const [commercial, setCommercial] = useState<CommercialCalculatorInput>(initialInput?.division === "Commercial" && !isPostConstructionInput(initialInput) ? initialInput : isPostConstructionInput(initialInput)&&estimate?.division==="Commercial"?{...defaultCommercial,commercialType:"Post-Construction"}:defaultCommercial);
-  const [postConstruction, setPostConstruction] = useState<PostConstructionCalculatorInput>(isPostConstructionInput(initialInput) ? initialInput : defaultPostConstructionV2);
+  const [postConstruction, setPostConstruction] = useState<PostConstructionCalculatorInput>(isPostConstructionInput(initialInput) ? initialInput : defaultPostConstruction);
   const [serviceDescription, setServiceDescription] = useState(estimate?.result.serviceDescription ?? "");
   const [notes, setNotes] = useState(estimate?.notes ?? "");
   const [terms, setTerms] = useState(estimate?.terms ?? "");
@@ -116,7 +116,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const historicalPostConstructionFallback=isPostConstructionInput(initialInput);
   const postConstructionMode=isPostConstructionCatalogService(selectedService)||historicalPostConstructionFallback;
   const calculatorInput=useMemo<CalculatorInput>(()=>postConstructionMode ? {...postConstruction,division,serviceCode:selectedService?.service_code??postConstruction.serviceCode??null} : division === "Residential" ? residential : commercial,[commercial,division,postConstruction,postConstructionMode,residential,selectedService?.service_code]);
-  const draftDefaults=useMemo<EstimateDraftDefaults>(()=>({residential:{...defaultResidential,taxRatePercent:0,addOns:[]},commercial:{...defaultCommercial,taxRatePercent:0,additionalServices:[]},postConstruction:{...defaultPostConstructionV2,taxRatePercent:0,additionalServices:[]},serviceDescription:catalog?selectedCatalogService(catalog,"Residential",defaultResidential.serviceType)?.description?.trim()??"":"",notes:defaults?.default_estimate_notes??"",terms:defaults?.default_estimate_terms??""}),[catalog,defaults]);
+  const draftDefaults=useMemo<EstimateDraftDefaults>(()=>({residential:{...defaultResidential,taxRatePercent:0,addOns:[]},commercial:{...defaultCommercial,taxRatePercent:0,additionalServices:[]},postConstruction:{...defaultPostConstruction,taxRatePercent:0,additionalServices:[]},serviceDescription:catalog?selectedCatalogService(catalog,"Residential",defaultResidential.serviceType)?.description?.trim()??"":"",notes:defaults?.default_estimate_notes??"",terms:defaults?.default_estimate_terms??""}),[catalog,defaults]);
   useOperationalRealtime(["services", "service_addons", "service_addon_links", "service_price_tiers", "recurring_pricing_rules"], async () => {
     setCatalog(await getServiceCatalog());
   });
@@ -139,7 +139,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
           setDivision(parsed.division);
           setResidential(parsed.residential);
           setCommercial(parsed.commercial);
-          setPostConstruction(parsed.postConstruction ?? defaultPostConstructionV2);
+          setPostConstruction(parsed.postConstruction ?? defaultPostConstruction);
           setServiceDescription(parsed.serviceDescription ?? "");
           setNotes(parsed.notes);
           setTerms(parsed.terms??"");
