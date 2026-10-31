@@ -24,6 +24,7 @@ import { calculateUpkeepPlan } from "@/lib/pricing/upkeepPlan";
 import {
   calculatePostConstructionEstimate,
   calculatePostConstructionV2,
+  resolvePostConstructionV2Hours,
 } from "@/lib/pricing/postConstruction";
 import type {
   PostConstructionV2Input,
@@ -103,7 +104,7 @@ export function calculatePostConstructionCatalogEstimate(
       throw new Error("Version 2 project inputs are required.");
     }
 
-    const project = calculatePostConstructionV2(input.projectCosting);
+    const project = calculatePostConstructionV2(resolvePostConstructionV2Hours(input));
 
     const calculatorInput: PostConstructionEstimateInput = {
       ...input,
