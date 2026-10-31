@@ -107,3 +107,27 @@ test("sales-safe estimate payload strips new private project cost inputs", () =>
   const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
   assert.match(fields, /\{!salesSafe && <UnifiedProjectCosts/);
 });
+
+test("Post-Construction can apply the verified profitability minimum to the editable customer estimate", () => {
+  const summary = readFileSync(resolve("components/estimates/PostConstructionBidSummary.tsx"), "utf8");
+  const engine = readFileSync(resolve("lib/pricing/authoritativePrice.ts"), "utf8");
+  assert.match(builder, /profitabilityMinimum=\{estimateProfitability\?\.recommendedMinimumPrice \?\? null\}/);
+  assert.match(summary, /Use Profitability Minimum as Estimate Amount/);
+  assert.match(summary, /setManualPrice\(profitabilityMinimum\)/);
+  assert.match(summary, /profitabilityMinimum == null \|\| !Number\.isFinite\(profitabilityMinimum\)/);
+  assert.match(summary, /Use Recommended Bid/);
+  assert.match(summary, /setManualPrice\(null\)/);
+  assert.match(summary, /if\(profile\?\.role==="Sales"\)return/);
+  assert.match(engine, /const finalPrice = manualPrice === null \? calculatedFinalPrice : money\(manualPrice\)/);
+  assert.match(builder, /const estimateProfitability = canViewProfitability/);
+  assert.match(builder, /if \(estimateProfitability\) await saveProfitabilityProjection/);
+});
+
+test("Post-Construction summary profit and job cost include project expenses already in the quote", () => {
+  const summary = readFileSync(resolve("components/estimates/PostConstructionBidSummary.tsx"), "utf8");
+  assert.match(summary, /const additionalProjectCosts=/);
+  assert.match(summary, /expenses\?\.equipmentRentalCost/);
+  assert.match(summary, /expenses\?\.supervisionAdminCost/);
+  assert.match(summary, /const jobCost=result\.laborCost\+result\.supplyCost\+additionalProjectCosts/);
+  assert.match(summary, /const projectedProfit=finalAmount-jobCost/);
+});
