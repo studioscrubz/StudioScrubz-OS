@@ -1,9 +1,9 @@
 import "server-only";
 import sharp, { type OutputInfo } from "sharp";
 
-export async function validateDrawnPngSignature(value: string): Promise<void> {
+export async function validateDrawnPngSignature(value: string, documentType: "Agreement" | "Proposal" = "Agreement"): Promise<void> {
   const match = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
-  if (!match || value.length > 700000) throw new Error("Draw your signature before completing the Agreement.");
+  if (!match || value.length > 700000) throw new Error(`Draw your signature before completing the ${documentType}.`);
   let result: { data: Buffer; info: OutputInfo };
   try {
     const bytes = Buffer.from(match[1], "base64");
@@ -20,5 +20,5 @@ export async function validateDrawnPngSignature(value: string): Promise<void> {
   for (let index = 0; index < data.length; index += info.channels) {
     if (data[index] < 220 || data[index + 1] < 220 || data[index + 2] < 220) inkPixels += 1;
   }
-  if (inkPixels < 40) throw new Error("Draw your signature before completing the Agreement.");
+  if (inkPixels < 40) throw new Error(`Draw your signature before completing the ${documentType}.`);
 }

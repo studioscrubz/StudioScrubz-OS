@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ProposalDocument } from "@/components/proposals/ProposalDocument";
+import { SignaturePad } from "@/components/agreements/SignaturePad";
 import { compareProposalRevisions } from "@/lib/proposals/revisionComparison";
 import { acceptPublicProposal, declinePublicProposal, getPublicProposal, getPublicProposalRevisionHistory, recordPublicProposalView } from "@/lib/services/publicProposals";
 import type { PublicProposal, PublicProposalRevisionHistory } from "@/types/publicProposal";
@@ -12,6 +13,7 @@ export function PublicProposalPage({ token }: { token: string }) {
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
+  const [signature, setSignature] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,7 @@ export function PublicProposalPage({ token }: { token: string }) {
 
   async function accept() {
     setSaving(true); setError(null);
-    try { setProposal(await acceptPublicProposal(token, name, consent)); }
+    try { setProposal(await acceptPublicProposal(token, name, consent, signature ?? "")); }
     catch (cause) { setError(message(cause)); }
     finally { setSaving(false); }
   }
@@ -87,12 +89,13 @@ export function PublicProposalPage({ token }: { token: string }) {
         <div className="rounded-xl border border-neutral-300 bg-neutral-50 p-5"><h3 className="font-bold text-[#143d1a]">Proposal Declined</h3><p className="mt-1 text-sm text-neutral-600">StudioScrubz has been notified. This proposal remains available for your records.</p></div>
       : actionable && (proposal.status === "Sent" || proposal.status === "Viewed") ?
         <div className="rounded-xl border bg-neutral-50 p-5">
-          <h3 className="font-bold text-[#143d1a]">Accept Proposal</h3>
+          <h3 className="font-bold text-[#143d1a]">Sign &amp; Accept Proposal</h3>
           <label className="mt-4 block font-semibold">Full Name<input className="mt-1 h-11 w-full rounded-lg border bg-white px-3" value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <div className="mt-4"><p className="font-semibold">Draw Your Signature *</p><p className="text-xs text-neutral-600">Use your finger, stylus, or mouse. Your signature and consent will be saved with this proposal revision.</p><SignaturePad onChange={setSignature} disabled={saving}/></div>
           <label className="mt-4 flex gap-3"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I have reviewed and accept this Proposal.</span></label>
           {error && <p className="mt-3 rounded bg-red-50 p-3 text-red-700">{error}</p>}
           <div className="mt-5 flex flex-wrap gap-3">
-            <button disabled={saving || !consent || name.trim().length < 2} onClick={() => void accept()} className="rounded-lg bg-[#143d1a] px-5 py-3 font-bold text-white disabled:opacity-50">{saving ? "Accepting…" : "Accept Proposal"}</button>
+            <button disabled={saving || !consent || !signature || name.trim().length < 2} onClick={() => void accept()} className="rounded-lg bg-[#143d1a] px-5 py-3 font-bold text-white disabled:opacity-50">{saving ? "Signing…" : "Sign & Accept Proposal"}</button>
             <button disabled={saving} onClick={() => setDeclining((value) => !value)} className="rounded-lg border border-neutral-300 px-5 py-3 font-bold text-neutral-700 disabled:opacity-50">Decline Proposal</button>
           </div>
           {declining && <div className="mt-4 rounded-lg border bg-white p-4"><label className="block text-sm font-semibold">Reason or feedback (optional)<textarea maxLength={1000} className="mt-2 min-h-24 w-full rounded-lg border p-3 font-normal" value={declineReason} onChange={(event) => setDeclineReason(event.target.value)} /></label><p className="mt-2 text-xs text-neutral-500">Declining is final for this proposal revision.</p><button disabled={saving} onClick={() => void decline()} className="mt-3 rounded-lg bg-red-700 px-4 py-2 font-bold text-white disabled:opacity-50">{saving ? "Declining…" : "Confirm Decline"}</button></div>}

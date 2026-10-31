@@ -3484,6 +3484,7 @@ export interface Database {
           p_token: string;
           p_accepted_by_name: string;
           p_consent: boolean;
+          p_signature: string;
         };
         Returns: PublicProposal;
       };
