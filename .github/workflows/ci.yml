@@ -99,6 +99,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:contracts
+      - run: node --test tests/profitability*.test.mjs
       - run: npm run build:production
       - run: npm run check:diff
 
