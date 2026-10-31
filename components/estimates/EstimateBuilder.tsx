@@ -36,7 +36,7 @@ import { canAccessFinances } from "@/lib/auth/permissions";
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
 import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
-import type { ProfitabilitySettings, TravelProjection } from "@/types/profitability";
+import { emptyProfitabilityAdjustments, type ProfitabilityAdjustments, type ProfitabilitySettings, type TravelProjection } from "@/types/profitability";
 
 const frequencies: Frequency[] = ["One-Time", "Daily", "Weekly", "Biweekly", "Twice Monthly", "Monthly", "Multiple Days Per Week"];
 const frequencyLabelsForService = (catalog: ServiceCatalogBundle, serviceId?: string) => new Map(frequencies.map((frequency) => [frequency, serviceFrequencyDiscountLabel(frequency, catalog.recurringRules, serviceId)]));
@@ -91,7 +91,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
   const [defaults,setDefaults]=useState<BusinessSettings|null>(null);
   const [profitabilitySettings, setProfitabilitySettings] = useState<ProfitabilitySettings | null>(null);
   const [travelOverride, setTravelOverride] = useState<TravelProjection | null>(null);
-  const [otherDirectExpenses, setOtherDirectExpenses] = useState(0);
+  const [profitabilityAdjustments, setProfitabilityAdjustments] = useState<ProfitabilityAdjustments>(emptyProfitabilityAdjustments);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -220,7 +220,18 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     void getProfitabilityProjection({ estimateId: estimate.id }).then(value => {
       if (!active) return;
       setTravelOverride(value?.travel ?? null);
-      setOtherDirectExpenses(value?.directCosts.other ?? 0);
+      setProfitabilityAdjustments({
+        equipment: value?.directCosts.equipment ?? 0,
+        subcontractors: value?.directCosts.subcontractors ?? 0,
+        setupLabor: value?.directCosts.setupLabor ?? 0,
+        ownerLabor: value?.directCosts.ownerLabor ?? 0,
+        parkingTolls: value?.directCosts.parkingTolls ?? 0,
+        disposal: value?.directCosts.disposal ?? 0,
+        paymentProcessingFees: value?.operatingCosts?.paymentProcessingFees ?? 0,
+        salesCommissions: value?.operatingCosts?.salesCommissions ?? 0,
+        allocatedOverhead: value?.operatingCosts?.allocatedOverhead ?? 0,
+        otherDirectExpenses: value?.directCosts.other ?? 0,
+      });
     }).catch(error => { if (active) setError(error instanceof Error ? error.message : "Saved profitability could not be loaded."); });
     return () => { active = false; };
   }, [canViewProfitability, estimate?.id]);
@@ -250,7 +261,10 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     settings: profitabilitySettings,
     travel: { ...profitabilityTravel, travelingEmployeeCount: Math.max(1, result.crewSize) },
     supplies: result.supplyCost,
-    otherDirectExpenses,
+    ...profitabilityAdjustments,
+    visitsPerPeriod: result.weeklyContractTotal != null
+      ? Math.max(1, result.weeklyMixedVisits?.length || calculatorInput.serviceDaysOfWeek?.length || 1)
+      : 1,
     // Post-construction V2 logistics are separate from route costs; do not count them twice.
     legacyTravelLogisticsCost: isPostConstructionV2Estimate(postConstruction) && postConstructionMode ? postConstruction.projectCosting.travelLogisticsCost : 0,
     periodLabel: result.weeklyContractTotal != null ? "Weekly contract period" : "Per service visit",
@@ -422,7 +436,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
         destination={profitabilityDestination}
         editable
         onTravelChange={setTravelOverride}
-        onOtherDirectExpensesChange={setOtherDirectExpenses}
+        onAdjustmentsChange={setProfitabilityAdjustments}
       />}
       {result?(v2Mode?<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">Post-Construction V2 Project</h2><p className="mt-3 text-3xl font-bold text-[#d4af37]">{currency(result.finalPrice)}</p><p className="mt-2 text-sm">One-time project price. Use the project calculator to change or clear the override.</p><button type="button" disabled={saving} onClick={()=>void save()} className="mt-5 rounded-lg bg-[#d4af37] px-5 py-3 font-bold text-[#143d1a]">{saving ? "Saving..." : estimate ? "Update Estimate" : "Save Estimate"}</button></aside>:postConstructionMode?<PostConstructionBidSummary result={result} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)}/>:<EstimateSummary result={result} frequency={calculatorInput.frequency} manualPrice={manualPrice} setManualPrice={setManualPrice} saving={saving} save={save} editing={Boolean(estimate)} />):<aside className="rounded-2xl bg-[#143d1a] p-6 text-white"><h2 className="font-extrabold">{selectedService?.service_code === "COM-HIGH-DUST" ? "High Dusting estimate" : incompleteProject ? "Project pricing" : "Pricing unavailable"}</h2><p className="mt-2 text-sm text-white/70">{selectedService?.service_code === "COM-HIGH-DUST" ? "Enter the project details, working height, access methods and elevated surfaces above. The estimate price will calculate automatically here when the required information is complete." : incompleteProject ?? "A valid catalog price is required before this estimate can be saved."}</p></aside>}
       </div>
