@@ -33,6 +33,7 @@ export type ProfitabilityDirectCosts = {
   vehicleOperating: number | null;
   compensableTravelLabor: number | null;
   legacyTravelLogistics: number;
+  legacyProjectCosts: number;
   supplies: number;
   equipment: number;
   subcontractors: number;
@@ -72,6 +73,7 @@ export type ProfitabilityProjection = {
   version: 1;
   periodLabel: string;
   visitsPerPeriod: number;
+  legacyTravelIncludesDriving: boolean;
   price: number;
   cleanerCount: number;
   hoursPerCleaner: number;
