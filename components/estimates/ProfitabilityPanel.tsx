@@ -15,6 +15,10 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
     manualPrice: number | null;
     calculatedPrice: number;
     onChange: (amount: number | null) => void;
+    title?: string;
+    unitLabel?: string;
+    canApplyMinimum?: boolean;
+    minimumUnavailableReason?: string;
   };
   onTravelChange?: (value: TravelProjection) => void;
   onAdjustmentsChange?: (value: ProfitabilityAdjustments) => void;
@@ -111,13 +115,13 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
       ["otherDirectExpenses", "Other direct expenses"],
     ] as const).filter(([key]) => !integratedProjectCosts || key !== "equipment" || adjustments.equipment > 0).map(([key, label]) => <label key={key} className="text-sm font-bold">{label}<input type="number" min="0" step="0.01" value={adjustments[key]} onChange={(event) => updateExpense(key, event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 font-normal" /></label>) }<div className="sm:col-span-2"><button type="button" disabled={routing || !destination?.trim()} onClick={() => void route()} className="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50">{routing ? "Calculating travel..." : "Recalculate driving route"}</button>{routeError && <p role="alert" className="mt-2 text-sm text-red-700">{routeError}</p>}</div></div>}
     {projectPrice && editable && <div className="mt-4 rounded-xl border border-[#143d1a]/20 bg-white p-4">
-      <h3 className="text-sm font-extrabold text-[#143d1a]">Post-Construction Estimate Price</h3>
-      <p className="mt-1 text-xs text-neutral-600">Edit the customer estimate here after reviewing the full project's costs. Your chosen price updates profitability immediately and is saved when you select Save Estimate.</p>
+      <h3 className="text-sm font-extrabold text-[#143d1a]">{projectPrice.title ?? "Post-Construction Estimate Price"}</h3>
+      <p className="mt-1 text-xs text-neutral-600">Edit the customer estimate here after reviewing the costs for the quoted period. Your chosen price updates profitability immediately and is saved when you select Save Estimate or Update Estimate.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div><p className="text-xs font-semibold text-neutral-600">Original calculated bid</p><p className="font-bold text-[#143d1a]">{money(projectPrice.calculatedPrice)}</p></div>
         <div><p className="text-xs font-semibold text-neutral-600">Profitability minimum</p><p className="font-bold text-[#143d1a]">{maybeMoney(projection.recommendedMinimumPrice)}</p></div>
       </div>
-      <label className="mt-3 block text-sm font-bold text-[#143d1a]">Manual / Custom Estimate Amount
+      <label className="mt-3 block text-sm font-bold text-[#143d1a]">Manual / Custom Estimate Amount{projectPrice.unitLabel ? ` (${projectPrice.unitLabel})` : ""}
         <input aria-label="Manual or custom Post-Construction estimate amount" type="number" min="0.01" step="0.01"
           value={projectPrice.manualPrice ?? ""} placeholder={String(projectPrice.calculatedPrice)}
           onChange={event => {
@@ -130,10 +134,10 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
       </label>
       <div className="mt-3 flex flex-wrap gap-3">
         <button type="button"
-          disabled={projection.recommendedMinimumPrice == null || !Number.isFinite(projection.recommendedMinimumPrice) || projection.recommendedMinimumPrice <= 0}
+          disabled={projectPrice.canApplyMinimum === false || projection.recommendedMinimumPrice == null || !Number.isFinite(projection.recommendedMinimumPrice) || projection.recommendedMinimumPrice <= 0}
           onClick={() => {
             const minimum = projection.recommendedMinimumPrice;
-            if (minimum != null && Number.isFinite(minimum) && minimum > 0) projectPrice.onChange(minimum);
+            if (projectPrice.canApplyMinimum !== false && minimum != null && Number.isFinite(minimum) && minimum > 0) projectPrice.onChange(minimum);
           }}
           className="rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
           Use Profitability Minimum
@@ -144,6 +148,7 @@ export function ProfitabilityPanel({ projection, settings, destination, editable
         </button>
       </div>
       <p className="mt-3 text-sm text-neutral-600">Current customer estimate amount: <strong className="text-[#143d1a]">{money(projection.price)}</strong>. This change is not saved until you save or update the estimate.</p>
+      {projectPrice.canApplyMinimum === false && <p className="mt-2 text-xs font-semibold text-amber-900">{projectPrice.minimumUnavailableReason ?? "This contract has individually priced visits. Adjust each visit before saving."}</p>}
       {projection.recommendedMinimumPrice == null && <p className="mt-2 text-xs font-semibold text-amber-900">Verify travel and job costs before applying the profitability minimum. Manual pricing remains available.</p>}
     </div>}
     {integratedProjectCosts && <p className="mt-3 text-xs font-semibold text-neutral-600">Equipment, supervision, contingency, and additional travel/logistics entered in Project Cost Details are already included in the customer quote and the profitability calculation. Do not enter them twice. All other inputs here are additional project expenses.</p>}
