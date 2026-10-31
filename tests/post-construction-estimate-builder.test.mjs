@@ -71,3 +71,14 @@ test("only the private profitability panel offers a disposal and debris input", 
   // Preserve the historical V2 cost field and existing customer pricing, without changing old estimates.
   assert.match(builder, /postConstruction\.projectCosting\.disposalDebrisCost/);
 });
+
+test("restored V2 drafts with blank person-hours generate pricing and expose a scope-derived override", () => {
+  const fields = readFileSync(resolve("components/estimates/PostConstructionCalculatorFields.tsx"), "utf8");
+  const engine = readFileSync(resolve("lib/pricing/estimates.ts"), "utf8");
+  assert.match(engine, /calculatePostConstructionV2\(resolvePostConstructionV2Hours\(input\)\)/);
+  assert.match(fields, /calculatePostConstructionV2\(resolvePostConstructionV2Hours\(parent\)\)/);
+  assert.match(fields, /Automatically estimated/);
+  assert.match(fields, /Enter a nonzero total person-hours value above to override/);
+  assert.doesNotMatch(fields, /if \(value\.estimatedPersonHours === 0\) return "Enter estimated total person-hours/);
+  assert.match(fields, /if \(value\.estimatedPersonHours === 0 && \(!Number\.isFinite\(value\.totalSquareFeet\)/);
+});
