@@ -6,7 +6,7 @@ create or replace function public.accept_proposal_by_token(
   p_token text, p_accepted_by_name text, p_consent boolean, p_signature text
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
-  v_name text := pg_catalog.btrim(pg_catalog.coalesce(p_accepted_by_name, ''));
+  v_name text := pg_catalog.btrim(coalesce(p_accepted_by_name, ''));
   v_consent constant text := 'I have reviewed and accept this Proposal.';
   v_id uuid;
   v_group uuid;
