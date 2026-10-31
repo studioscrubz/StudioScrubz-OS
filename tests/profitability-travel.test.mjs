@@ -258,3 +258,36 @@ test("internal panel shows commission deduction without modifying the customer-f
   assert.match(estimateBuilder, /withAuthoritativeEstimatePrice/);
   assert.match(estimateBuilder, /saveProfitabilityProjection/);
 });
+
+test("Porter and Luxury Property Care have private, permission-gated monthly profitability with commission-inclusive minimum", () => {
+  const porter = readFileSync(new URL("../components/properties/PorterServiceCalculator.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../components/properties/PorterProfitabilityPanel.tsx", import.meta.url), "utf8");
+  const plans = readFileSync(new URL("../components/properties/PropertyServicePlansPage.tsx", import.meta.url), "utf8");
+  assert.match(porter, /<PorterProfitabilityPanel pricing=\{result\}/);
+  assert.match(plans, /serviceMode=\{serviceMode\}/);
+  assert.match(panel, /canAccessFinances\(profile\)/);
+  assert.match(panel, /if \(!authorized\) return null/);
+  assert.match(panel, /Customer price after commission/);
+  assert.match(panel, /not added to client proposals or the saved plan/);
+  const source = readFileSync(new URL("../lib/pricing/porterProfitability.ts", import.meta.url), "utf8");
+  const transpiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const mod = { exports: {} };
+  vm.runInNewContext(transpiled, { module: mod, exports: mod.exports, require: () => { throw new Error("Unexpected runtime import"); } });
+  const pricing = {
+    approvedMonthlyPrice: 300, monthlyHours: 4.33,
+    inputs: { porterHourlyPay: 30, suppliesMonthly: 10, travelMonthly: 20, supervisionAdminMonthly: 15 },
+  };
+  const extras = {
+    equipment: 0, subcontractors: 0, setupLabor: 0, ownerLabor: 0, parkingTolls: 0,
+    disposal: 0, paymentProcessingFees: 5, salesCommissions: 20, allocatedOverhead: 0, otherDirectExpenses: 0,
+  };
+  const result = mod.exports.calculatePorterProfitability(pricing, settings, extras);
+  assert.equal(result.loadedLabor, 155.88);
+  assert.equal(result.direct, 185.88);
+  assert.equal(result.commissions, 20);
+  assert.equal(result.overhead, 15);
+  assert.equal(result.operatingProfit, 74.12);
+  assert.equal(result.recommendedMinimumPrice, 347.51);
+  const changed = mod.exports.calculatePorterProfitability(pricing, settings, { ...extras, equipment: 10 });
+  assert.equal(changed.recommendedMinimumPrice, 362.90);
+});
