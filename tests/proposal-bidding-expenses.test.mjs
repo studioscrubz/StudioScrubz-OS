@@ -23,3 +23,11 @@ test("shared profitability price card labels proposals properly", () => {
   assert.match(builder, /artifactLabel: "proposal"/);
   assert.match(panel, /Internal expense assumptions \(amounts for the quoted period\)/);
 });
+
+test("high dusting proposal inherits and preserves the shared multi-select scope", () => {
+  assert.match(builder, /import \{ ElevatedSurfaceMultiSelect \}/);
+  assert.match(builder, /inheritedElevatedScope/);
+  assert.match(builder, /id: "high-dusting-surfaces"/);
+  assert.match(builder, /<ElevatedSurfaceMultiSelect/);
+  assert.match(builder, /High Dusting Scope/);
+});
