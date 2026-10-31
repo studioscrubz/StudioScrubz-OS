@@ -160,3 +160,21 @@ test("existing V2 Post-Construction estimates expose the same profitability over
   assert.match(engine, /manualPrice: project\.calculatorInput\.manualProjectPriceOverride \?\? null/);
   assert.match(engine, /finalPrice: project\.approvedProjectPrice/);
 });
+
+test("Post-Construction price editor follows Internal expense assumptions, preserving buttons and edit actions", () => {
+  const panel = readFileSync(resolve("components/estimates/ProfitabilityPanel.tsx"), "utf8");
+  const summary = panel.indexOf('Internal expense assumptions (amounts for the quoted period)');
+  const route = panel.indexOf('Recalculate driving route', summary);
+  const editor = panel.indexOf('Post-Construction Estimate Price');
+  const notes = panel.indexOf('Commissions are deducted from projected earnings.', editor);
+  assert.ok(summary > 0);
+  assert.ok(route > summary);
+  assert.ok(editor > route, "Price controls should be directly below the expense fields and route action");
+  assert.ok(notes > editor, "Price controls should remain inside the finance section");
+  assert.match(panel, /projectPrice && editable/);
+  assert.match(panel, /Manual \/ Custom Estimate Amount/);
+  assert.match(panel, /Use Profitability Minimum/);
+  assert.match(panel, /Use Original Calculated Bid/);
+  assert.match(panel, /projectPrice\.onChange\(minimum\)/);
+  assert.match(panel, /projectPrice\.onChange\(null\)/);
+});
