@@ -6,7 +6,7 @@ import { WeeklyServiceDaysField } from "@/components/forms/WeeklyServiceDaysFiel
 import { isPostConstructionV2Estimate, type PostConstructionEstimateInput } from "@/lib/pricing/estimates";
 import { calculatePostConstructionV2, resolvePostConstructionV2Hours } from "@/lib/pricing/postConstruction";
 import type { PostConstructionV2Input } from "@/types/estimate";
-import type { Condition, Frequency, PostConstructionCalculatorInput, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
+import type { Condition, Frequency, PostConstructionCalculatorInput, PostConstructionCostDetails, PostConstructionDetailLevel, PostConstructionSeverity } from "@/types/estimate";
 import type { CatalogService, ServiceCatalogBundle } from "@/types/serviceCatalog";
 import { MINIMUM_WORKER_HOURLY_PAY } from "@/lib/pricing/workerHourlyPay";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -20,66 +20,49 @@ export function PostConstructionCalculatorFields({value,onChange,service,catalog
   const { profile } = useAuth();
   salesSafe = salesSafe || profile?.role === "Sales";
   const detailedMode = isPostConstructionV2Estimate(value);
-  const changeMode = (next: "Automatic" | "Detailed") => {
-    if ((next === "Detailed") === detailedMode || salesSafe) return;
-    if (next === "Detailed") {
-      onChange({
-        ...value,
-        version: 2,
-        projectCosting: {
-          version: 2,
-          calculatorType: "Post-Construction",
-          totalSquareFeet: value.squareFeet,
-          scope: [],
-          estimatedPersonHours: 0,
-          crewSize: 1,
-          workerHourlyPay: value.workerHourlyPay,
-          plannedProjectDays: Math.max(1, value.targetProjectDays || 1),
-          workdayHours: value.workdayHours === 10 ? 10 : 8,
-          suppliesCost: 0, equipmentRentalCost: 0, travelLogisticsCost: 0,
-          disposalDebrisCost: 0, supervisionAdminCost: 0, contingencyCost: 0,
-          desiredMarginPercent: value.targetProfitMarginPercent,
-        },
-      });
-    } else {
-      const legacy = { ...value } as PostConstructionEstimateInput;
-      const oldProject = legacy.projectCosting;
-      delete legacy.version;
-      delete legacy.projectCosting;
-      if (oldProject) {
-        legacy.squareFeet = oldProject.totalSquareFeet;
-        legacy.workerHourlyPay = oldProject.workerHourlyPay;
-        legacy.targetProjectDays = oldProject.plannedProjectDays;
-        legacy.workdayHours = oldProject.workdayHours;
-        legacy.targetProfitMarginPercent = oldProject.desiredMarginPercent;
-      }
-      onChange(legacy);
-    }
-  };
-  const modeSelector = !salesSafe && <fieldset className="rounded-xl border border-[#143d1a]/20 bg-white p-4">
-    <legend className="px-2 text-sm font-bold text-[#143d1a]">Post-Construction pricing method</legend>
-    <div className="flex flex-wrap gap-3">
-      <label className="flex cursor-pointer items-center gap-2 text-sm">
-        <input type="radio" name="post-construction-pricing-method" checked={!detailedMode} onChange={() => changeMode("Automatic")} />
-        Automatic estimate — square footage, condition and scope
-      </label>
-      <label className="flex cursor-pointer items-center gap-2 text-sm">
-        <input type="radio" name="post-construction-pricing-method" checked={detailedMode} onChange={() => changeMode("Detailed")} />
-        Detailed project costing (V2) — total person-hours and expenses
-      </label>
-    </div>
-    <p className="mt-2 text-xs text-neutral-600">Automatic pricing generates a quote as you enter property details. Detailed V2 is optional and requires total person-hours, crew size and project expenses. Changing methods recalculates the quote; review the new price before saving.</p>
-  </fieldset>;
-  if (detailedMode) return salesSafe?<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Post-Construction project costing contains protected internal costs and must be completed by management.</div>:<div className="space-y-4">{modeSelector}{value.division === "Residential" && <Group title="Residential Property Scope"><NumberField label="Bedrooms" value={value.rooms} set={rooms => onChange({ ...value, rooms })}/><NumberField label="Bathrooms" value={value.bathrooms} step="0.5" set={bathrooms => onChange({ ...value, bathrooms })}/><NumberField label="Floors" value={value.floors} set={floors => onChange({ ...value, floors })}/><NumberField label="Kitchens" value={value.kitchens} set={kitchens => onChange({ ...value, kitchens })}/><p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-4">Scope for walkthrough preparation and labor planning. Total square feet is entered below; these counts do not add pricing charges.</p></Group>}<ProjectCostFields parent={value} value={value.projectCosting} onChange={projectCosting => onChange({ ...value, squareFeet: projectCosting.totalSquareFeet, projectCosting })}/></div>;
+  // Historical V2 estimates retain their original saved pricing and inputs.
+  // New estimates use one scope-based calculator with integrated project costs.
+  const historicNotice = <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Historical Detailed V2 estimate. Its saved calculation and cost fields remain available for compatibility; new Post-Construction estimates use the unified automatic calculator.</p>;
+  if (detailedMode) return salesSafe?<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Post-Construction project costing contains protected internal costs and must be completed by management.</div>:<div className="space-y-4">{historicNotice}{value.division === "Residential" && <Group title="Residential Property Scope"><NumberField label="Bedrooms" value={value.rooms} set={rooms => onChange({ ...value, rooms })}/><NumberField label="Bathrooms" value={value.bathrooms} step="0.5" set={bathrooms => onChange({ ...value, bathrooms })}/><NumberField label="Floors" value={value.floors} set={floors => onChange({ ...value, floors })}/><NumberField label="Kitchens" value={value.kitchens} set={kitchens => onChange({ ...value, kitchens })}/><p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-4">Scope for walkthrough preparation and labor planning. Total square feet is entered below; these counts do not add pricing charges.</p></Group>}<ProjectCostFields parent={value} value={value.projectCosting} onChange={projectCosting => onChange({ ...value, squareFeet: projectCosting.totalSquareFeet, projectCosting })}/></div>;
   const set=<K extends keyof PostConstructionCalculatorInput>(key:K,next:PostConstructionCalculatorInput[K])=>onChange({...value,[key]:next});
   return <div className="space-y-5">
-    {modeSelector}
     <Group title="Project Scope"><NumberField label="Square Feet" value={value.squareFeet} set={next=>set("squareFeet",next)}/><NumberField label="Floors" value={value.floors} set={next=>set("floors",next)}/><NumberField label="Rooms / Bedrooms" value={value.rooms} set={next=>set("rooms",next)}/><NumberField label="Bathrooms / Restrooms" value={value.bathrooms} set={next=>set("bathrooms",next)}/><NumberField label="Kitchens / Breakrooms" value={value.kitchens} set={next=>set("kitchens",next)}/></Group>
     <Group title="Site Condition"><SelectField label="Overall Condition" value={value.condition} options={conditions} set={next=>set("condition",next as Condition)}/><SelectField label="Construction Dust" value={value.dustSeverity} options={severities} set={next=>set("dustSeverity",next as PostConstructionSeverity)}/><SelectField label="Construction Debris" value={value.debrisSeverity} options={severities} set={next=>set("debrisSeverity",next as PostConstructionSeverity)}/><SelectField label="Detail Level" value={value.detailLevel} options={details} set={next=>set("detailLevel",next as PostConstructionDetailLevel)}/></Group>
     <Group title="Specialty / Detail Work"><NumberField label="Windows / Glass" value={value.windowsOrGlassCount} set={next=>set("windowsOrGlassCount",next)}/><NumberField label="Cabinets / Drawers" value={value.cabinetOrDrawerCount} set={next=>set("cabinetOrDrawerCount",next)}/><NumberField label="Appliance Interiors" value={value.applianceInteriorCount} set={next=>set("applianceInteriorCount",next)}/><NumberField label="Stair Flights" value={value.stairFlights} set={next=>set("stairFlights",next)}/></Group>
     <Group title="Production Plan"><NumberField label="Target Completion Days" value={value.targetProjectDays} set={next=>set("targetProjectDays",next)}/><NumberField label="Workday Hours" value={value.workdayHours} set={next=>set("workdayHours",next)}/>{!salesSafe&&<><NumberField label="Worker Hourly Cost" value={value.workerHourlyPay} min={MINIMUM_WORKER_HOURLY_PAY} error={workerPayError(value.workerHourlyPay)} step="0.01" set={next=>set("workerHourlyPay",next)}/><NumberField label="Target Profit Margin %" value={value.targetProfitMarginPercent} step="0.1" set={next=>set("targetProfitMarginPercent",next)}/></>}</Group>
+    {!salesSafe && <UnifiedProjectCosts value={value} onChange={onChange} />}
     <Group title="Pricing"><SelectField label="Frequency" value={value.frequency} options={value.frequency==="Custom"?[...frequencies,"Custom"]:frequencies} labels={new Map(frequencies.map(item=>[item,serviceFrequencyDiscountLabel(item,catalog.recurringRules,service?.id)]))} set={next=>onChange({...value,frequency:next as Frequency,serviceDaysOfWeek:next==="Multiple Days Per Week"?value.serviceDaysOfWeek??[]:[],customIntervalDays:next==="Custom"?value.customIntervalDays??1:null,recurringPricingRuleId:null})}/>{value.frequency==="Multiple Days Per Week"&&<WeeklyServiceDaysField value={value.serviceDaysOfWeek} onChange={serviceDaysOfWeek=>set("serviceDaysOfWeek",serviceDaysOfWeek)}/>} {value.frequency==="Custom"&&<NumberField label="Repeat every (days)" value={value.customIntervalDays??1} set={next=>set("customIntervalDays",next)}/>}<RecurringRule service={service} catalog={catalog} value={value} onChange={onChange}/><NumberField label="Additional Discount %" value={value.additionalDiscountPercent} step="0.1" set={next=>set("additionalDiscountPercent",next)}/><NumberField label="Tax Rate %" value={value.taxRatePercent} step="0.1" set={next=>set("taxRatePercent",next)}/></Group>
   </div>;
+}
+
+const emptyProjectDetails: PostConstructionCostDetails = {
+  equipmentRentalCost: 0, travelLogisticsCost: 0,
+  supervisionAdminCost: 0, contingencyCost: 0,
+};
+type ProjectExpenseKey = "estimatedPersonHours" | "crewSize" | "suppliesCost" |
+  "equipmentRentalCost" | "travelLogisticsCost" | "supervisionAdminCost" | "contingencyCost";
+function UnifiedProjectCosts({ value, onChange }: { value: PostConstructionCalculatorInput; onChange: (value: PostConstructionCalculatorInput) => void }) {
+  const details = { ...emptyProjectDetails, ...value.projectExpenses };
+  const change = (key: ProjectExpenseKey, amount: number | null) => {
+    onChange({ ...value, projectExpenses: { ...details, [key]: amount } });
+  };
+  return <Group title="Project Cost Details (Full Project)">
+    <p className="col-span-full text-xs text-neutral-600">The automatic square-footage calculation supplies baseline labor and supplies. Optional overrides replace those baselines. All additional costs are totals for the entire project, not per day. The customer price and internal profitability will update together.</p>
+    {([
+      ["estimatedPersonHours", "Total person-hours (optional override)"],
+      ["crewSize", "Crew size (optional override)"],
+      ["suppliesCost", "Supplies (optional override)"],
+    ] as const).map(([key, label]) => <label key={key}><Label text={label}/>
+      <input type="number" className={inputClass} min={key === "crewSize" || key === "estimatedPersonHours" ? "0.01" : "0"} step={key === "crewSize" ? "1" : "any"}
+        placeholder="Automatic" value={details[key] ?? ""}
+        onChange={event => { const raw = event.target.value; change(key, raw === "" ? null : Number(raw)); }}/>
+    </label>)}
+    <NumberField label="Equipment / rental (full project)" value={details.equipmentRentalCost} step="0.01" set={next => change("equipmentRentalCost", next)}/>
+    <NumberField label="Travel / logistics (additional project expense)" value={details.travelLogisticsCost} step="0.01" set={next => change("travelLogisticsCost", next)}/>
+    <NumberField label="Supervision / admin (full project)" value={details.supervisionAdminCost} step="0.01" set={next => change("supervisionAdminCost", next)}/>
+    <NumberField label="Contingency (full project)" value={details.contingencyCost} step="0.01" set={next => change("contingencyCost", next)}/>
+    <p className="col-span-full text-xs text-neutral-600">Driving mileage and paid travel time are calculated in Internal Profitability. Enter Travel / logistics only for additional expenses not already included there. Commissions, disposal, subcontractors and other costs can be entered in Internal Profitability once.</p>
+  </Group>;
 }
 
 function RecurringRule({service,catalog,value,onChange}:{service:CatalogService|undefined;catalog:ServiceCatalogBundle;value:PostConstructionCalculatorInput;onChange:(value:PostConstructionCalculatorInput)=>void}){const matches=service?matchingRecurringRules(value.frequency,catalog.recurringRules,service.id):[];if(value.frequency==="One-Time"||!matches.length)return null;const selected=value.recurringPricingRuleId??(matches.length===1?matches[0].id:"");return <label><Label text="Pricing Rule"/><select className={inputClass} value={selected} onChange={event=>onChange({...value,recurringPricingRuleId:event.target.value||null})}><option value="">{matches.length>1?"Select pricing rule":"Standard frequency pricing"}</option>{matches.map(rule=><option key={rule.id} value={rule.id}>{rule.rule_name??`${rule.frequency} rule`}</option>)}</select></label>}
