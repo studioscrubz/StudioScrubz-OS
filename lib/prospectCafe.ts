@@ -8,13 +8,13 @@ export type CafeNoteField = "Host company" | "Facilities decision-maker" | "Outs
 
 export function readCafeNote(notes: string | null | undefined, field: CafeNoteField): string {
   const prefix = field + ":";
-  const match = (notes ?? "").split(/\r?\n/).find(line => line.trimStart().startsWith(prefix));
+  const match = (notes ?? "").split(/\r?\n|\s+\|\s+/).find(line => line.trimStart().startsWith(prefix));
   return match ? match.trimStart().slice(prefix.length).trim() : "";
 }
 
 export function updateCafeNote(notes: string | null | undefined, field: CafeNoteField, value: string): string | null {
   const prefix = field + ":";
-  const lines = (notes ?? "").split(/\r?\n/);
+  const lines = (notes ?? "").split(/\r?\n|\s+\|\s+/);
   const existingIndex = lines.findIndex(line => line.trimStart().startsWith(prefix));
   const nextValue = value.trim();
   // Keep the original line position while preventing duplicate metadata lines.
@@ -23,5 +23,5 @@ export function updateCafeNote(notes: string | null | undefined, field: CafeNote
     if (nextValue) cleaned[existingIndex] = prefix + " " + nextValue;
     else cleaned.splice(existingIndex, 1);
   } else if (nextValue) cleaned.push(prefix + " " + nextValue);
-  return cleaned.join("\n").trim() || null;
+  return cleaned.join(" | ").trim() || null;
 }
