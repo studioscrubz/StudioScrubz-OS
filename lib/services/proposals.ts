@@ -36,7 +36,14 @@ function callManualAcceptanceRpc(name:string,args?:Record<string,unknown>){const
 export async function canRecordManualProposalAcceptance(){const{data,error}=await callManualAcceptanceRpc("can_record_manual_proposal_acceptance");if(error)throw error;return data===true;}
 export async function recordManualProposalAcceptance(id:string,input:{method:ManualProposalAcceptanceMethod;acceptedAt:string;notes:string;authorizationConfirmed:boolean}){const{data,error}=await callManualAcceptanceRpc("record_manual_proposal_acceptance",{p_proposal_id:id,p_acceptance_method:input.method,p_accepted_at:input.acceptedAt,p_notes:input.notes,p_authorization_confirmed:input.authorizationConfirmed});if(error)throw error;return data;}
 export const markProposalDeclined=(id:string,reason:string)=>withImmediateAttentionPush(()=>updateProposalStatus(id,"Declined","Declined",{accepted:false,declined_at:new Date().toISOString(),decline_reason:reason}));
-export const renewProposal=(id:string,expiration:string)=>updateProposalStatus(id,"Draft","Proposal Renewed",{approval_status:"Not Submitted",expired_at:null,expiration_date:expiration});
+export async function renewProposal(id:string,expiration:string):Promise<ProposalWithRelations>{
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiration) || !Number.isFinite(Date.parse(`${expiration}T00:00:00Z`)) || new Date(`${expiration}T00:00:00Z`).toISOString().slice(0,10)!==expiration || expiration <= new Date().toISOString().slice(0,10)) {
+    throw new Error("Choose a valid future expiration date (YYYY-MM-DD).");
+  }
+  const {data,error}=await getSupabaseClient().rpc("renew_expired_proposal",{p_proposal_id:id,p_expiration_date:expiration});
+  if(error)throw new Error(error.message);
+  return getProposalById((data as Proposal).id);
+}
 export const archiveProposal=(id:string)=>updateProposalStatus(id,"Archived","Archived",{archived_at:new Date().toISOString()});
 export async function getProposalHistory(id:string):Promise<ProposalHistory[]>{const{data,error}=await getSupabaseClient().from("proposal_history").select("*").eq("proposal_id",id).order("created_at",{ascending:false});if(error)throw error;return data;}
 export async function getProposalFamilyHistory(groupId:string):Promise<ProposalActivity[]>{const versions=await getProposalRevisionHistory(groupId);if(!versions.length)return[];const labels=new Map(versions.map(version=>[version.id,{revision_number:version.revision_number,proposal_number:version.proposal_number}]));const{data,error}=await getSupabaseClient().from("proposal_history").select("*").in("proposal_id",versions.map(version=>version.id)).order("created_at",{ascending:false});if(error)throw error;return(data as ProposalHistory[]).map(row=>({...row,...labels.get(row.proposal_id)!}));}
