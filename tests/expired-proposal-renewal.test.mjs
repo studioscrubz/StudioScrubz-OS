@@ -12,6 +12,32 @@ test("renewal creates a new draft revision from an expired, current, unaccepted 
   assert.match(migration, /source\.accepted/);
   assert.match(migration, /not source\.is_current_revision/);
   assert.match(migration, /regexp_replace\(source\.proposal_number, '\(-R/);
+  assert.equal((migration.match(/create or replace function public\\.renew_expired_proposal/gi) || []).length, 1);
+  assert.equal((migration.match(/grant execute on function public\\.renew_expired_proposal/gi) || []).length, 1);
+  assert.match(migration, /regexp_replace\\(source\\.proposal_number, '[^']+\\
+  assert.match(migration, /'Draft', 'Not Submitted'/);
+  assert.match(migration, /p_expiration_date, null/);
+  assert.match(migration, /created\.id, 'Proposal Renewed'/);
+  assert.doesNotMatch(migration, /update public\.proposals/);
+});
+
+test("renewal is restricted to authorized roles and rejects invalid dates", () => {
+  assert.match(migration, /p_expiration_date <= current_date/);
+  assert.match(migration, /auth\.uid\(\) is null/);
+  assert.match(migration, /public\.has_any_role\(array\['Master Admin','Administrator','Sales'\]\)/);
+  assert.match(migration, /This Proposal already has an open draft revision/);
+  assert.match(migration, /revoke all on function public\.renew_expired_proposal\(uuid,date\)/);
+  assert.match(service, /getSupabaseClient\(\).*?\.rpc\("renew_expired_proposal"/);
+  assert.doesNotMatch(service, /renewProposal=\(id:string,expiration:string\)=>updateProposalStatus/);
+});
+
+test("Renew opens the revised draft for pricing review and fresh approval", () => {
+  assert.match(page, /renew=\{async\(p,expiration\)=>/);
+  assert.match(page, /setEdit\(revision\)/);
+  assert.match(page, /Review pricing and submit for approval/);
+  assert.match(page, /<Action t="Renew" disabled=\{busy \|\| !canCreate\}/);
+});
+, ''\\) \\|\\| '-R' \\|\\| next_revision,/);
   assert.match(migration, /'Draft', 'Not Submitted'/);
   assert.match(migration, /p_expiration_date, null/);
   assert.match(migration, /created\.id, 'Proposal Renewed'/);
