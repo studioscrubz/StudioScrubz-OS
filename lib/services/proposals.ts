@@ -40,7 +40,7 @@ export async function renewProposal(id:string,expiration:string):Promise<Proposa
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expiration) || !Number.isFinite(Date.parse(`${expiration}T00:00:00Z`)) || new Date(`${expiration}T00:00:00Z`).toISOString().slice(0,10)!==expiration || expiration <= new Date().toISOString().slice(0,10)) {
     throw new Error("Choose a valid future expiration date (YYYY-MM-DD).");
   }
-  const {data,error}=await getSupabaseClient().rpc("renew_expired_proposal",{p_proposal_id:id,p_expiration_date:expiration});
+  const {data,error}=await (getSupabaseClient() as unknown as {rpc:(name:string,args:Record<string,unknown>)=>Promise<{data:unknown,error:{message:string}|null}>}).rpc("renew_expired_proposal",{p_proposal_id:id,p_expiration_date:expiration});
   if(error)throw new Error(error.message);
   return getProposalById((data as Proposal).id);
 }
