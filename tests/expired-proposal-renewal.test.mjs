@@ -12,9 +12,10 @@ test("renewal creates a new draft revision from an expired, current, unaccepted 
   assert.match(migration, /source\.accepted/);
   assert.match(migration, /not source\.is_current_revision/);
   assert.match(migration, /regexp_replace\(source\.proposal_number, '\(-R/);
-  assert.equal((migration.match(/create or replace function public\\.renew_expired_proposal/gi) || []).length, 1);
-  assert.equal((migration.match(/grant execute on function public\\.renew_expired_proposal/gi) || []).length, 1);
-  assert.match(migration, /regexp_replace\\(source\\.proposal_number, '[^']+\\
+  assert.equal(migration.toLowerCase().split("create or replace function public.renew_expired_proposal").length-1, 1);
+  assert.equal(migration.toLowerCase().split("grant execute on function public.renew_expired_proposal").length-1, 1);
+  assert.ok(migration.includes("next_revision,"));
+  assert.ok(migration.includes("regexp_replace(source.proposal_number, "));
   assert.match(migration, /'Draft', 'Not Submitted'/);
   assert.match(migration, /p_expiration_date, null/);
   assert.match(migration, /created\.id, 'Proposal Renewed'/);
