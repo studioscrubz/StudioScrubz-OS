@@ -78,7 +78,42 @@ begin
     revision_number, revised_from_proposal_id, is_current_revision,
     superseded_at
   ) values (
-    source.proposal_number || '-R' || next_revision,
+    regexp_replace(source.proposal_number, '(-R[0-9]+)+,
+    source.client_id, source.property_id, source.estimate_id,
+    source.walkthrough_id, source.division, source.client_name,
+    source.property_name, source.customer_phone, source.customer_email,
+    source.frequency, source.requested_date, source.representative_name,
+    source.notes, source.result, '[]'::jsonb, null, 'Draft', 'Not Submitted',
+    null, null, null, null, null, null, null, null, null, null, null, null,
+    null, false, null, null, null, null, null,
+    p_expiration_date, null,
+    source.lead_representative_id, source.revision_group_id, next_revision,
+    source.id, false, null
+  )
+  returning * into created;
+
+  insert into public.proposal_history(
+    proposal_id, event_type, previous_status, new_status, description,
+    metadata, performed_by
+  ) values (
+    created.id, 'Proposal Renewed', source.status, 'Draft',
+    'Renewed from ' || source.proposal_number,
+    jsonb_build_object(
+      'source_proposal_id', source.id,
+      'revision_number', next_revision,
+      'renewed_expiration_date', p_expiration_date
+    ),
+    coalesce(actor, 'StudioScrubz User')
+  );
+
+  return created;
+end
+$function$
+;
+
+revoke all on function public.renew_expired_proposal(uuid,date) from public, anon, authenticated, service_role;
+grant execute on function public.renew_expired_proposal(uuid,date) to authenticated;
+, '') || '-R' || next_revision,
     source.client_id, source.property_id, source.estimate_id,
     source.walkthrough_id, source.division, source.client_name,
     source.property_name, source.customer_phone, source.customer_email,
