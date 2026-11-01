@@ -353,6 +353,7 @@ export function OpenProposalsPage() {
             send={setSending}
             mutate={mutate}
             revise={async(p)=>{setBusy(p.id);setError(null);try{const revision=await createProposalRevision(p.id);await refresh(`Revision V${revision.revision_number} created.`);setEdit(revision)}catch(x){setError(msg(x,"Proposal revision could not be created."))}finally{setBusy(null)}}}
+            renew={async(p,expiration)=>{setBusy(p.id);setError(null);try{const revision=await renewProposal(p.id,expiration);await refresh(`Renewed draft V${revision.revision_number} created. Review pricing and submit for approval.`);setEdit(revision)}catch(x){setError(msg(x,"Proposal renewal could not be created."))}finally{setBusy(null)}}}
             canRecordManualAcceptance={canRecordManualAcceptance}
           />
         )}
@@ -407,6 +408,7 @@ function ProposalList({
   send,
   mutate,
   revise,
+  renew,
   canRecordManualAcceptance,
 }: {
   rows: ProposalWithRelations[];
@@ -422,6 +424,7 @@ function ProposalList({
     text: string,
   ) => Promise<void>;
   revise: (p: ProposalWithRelations) => Promise<void>;
+  renew: (p: ProposalWithRelations, expiration: string) => Promise<void>;
   canRecordManualAcceptance: boolean;
 }) {
   if (rows.length === 0) return <Empty />;
@@ -464,6 +467,7 @@ function ProposalList({
                   openSend={() => send(proposal)}
                   mutate={(fn, text) => void mutate(proposal, fn, text)}
                   revise={() => void revise(proposal)}
+                  renew={(expiration) => void renew(proposal, expiration)}
                   canRecordManualAcceptance={canRecordManualAcceptance}
                 />
               ))}
@@ -484,6 +488,7 @@ function Card({
   openSend,
   mutate,
   revise,
+  renew,
   canRecordManualAcceptance,
 }: {
   p: ProposalWithRelations;
@@ -495,6 +500,7 @@ function Card({
   openSend: () => void;
   mutate: (fn: () => Promise<unknown>, text: string) => void;
   revise: () => void;
+  renew: (expiration: string) => void;
   canRecordManualAcceptance: boolean;
 }) {
   const { profile } = useAuth();
@@ -520,8 +526,7 @@ function Card({
       mutate(() => rejectProposal(p.id, value), "Proposal rejected.");
     if (kind === "decline")
       mutate(() => markProposalDeclined(p.id, value), "Proposal declined.");
-    if (kind === "renew" && value)
-      mutate(() => renewProposal(p.id, value), "Proposal renewed.");
+    if (kind === "renew" && value) renew(value);
   }
   return (
     <article className="rounded-xl border border-[#143d1a]/10 bg-white p-4 shadow-sm">
@@ -647,7 +652,7 @@ function Card({
           </>
         )}{" "}
         {actionable && p.status === "Expired" && (
-          <Action t="Renew" f={() => promptAction("renew")} />
+          <Action t="Renew" disabled={busy || !canCreate} f={() => promptAction("renew")} />
         )}
         <Action t="History" f={history} />
         {actionable && (
