@@ -11,7 +11,7 @@ test("renewal creates a new draft revision from an expired, current, unaccepted 
   assert.match(migration, /source\.status <> 'Expired'/);
   assert.match(migration, /source\.accepted/);
   assert.match(migration, /not source\.is_current_revision/);
-  assert.match(migration, /source\.proposal_number \|\| '-R' \|\| next_revision/);
+  assert.match(migration, /regexp_replace\(source\.proposal_number, '-R/);
   assert.match(migration, /'Draft', 'Not Submitted'/);
   assert.match(migration, /p_expiration_date, null/);
   assert.match(migration, /created\.id, 'Proposal Renewed'/);
