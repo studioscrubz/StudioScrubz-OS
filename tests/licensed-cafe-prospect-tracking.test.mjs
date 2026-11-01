@@ -28,6 +28,15 @@ test("reads imported café qualification metadata from Notes", () => {
   assert.equal(readCafeNote(notes, "Outside specialty-cleaning vendors"), "Not confirmed");
 });
 
+test("reads one-line Notes after CSV whitespace normalization", () => {
+  const notes = "Host company: Ralphs | Facilities decision-maker: Not identified | Outside specialty-cleaning vendors: Not confirmed | Source URL: https://www.ralphs.com/example";
+  assert.equal(readCafeNote(notes, "Host company"), "Ralphs");
+  assert.equal(readCafeNote(notes, "Outside specialty-cleaning vendors"), "Not confirmed");
+  const next = updateCafeNote(notes, "Outside specialty-cleaning vendors", "Approval required");
+  assert.equal(readCafeNote(next, "Outside specialty-cleaning vendors"), "Approval required");
+  assert.match(next, /Source URL: https:\/\/www.ralphs.com\/example/);
+});
+
 test("editing tracked fields preserves unrelated notes and source links", () => {
   const original = "Host company: Target\nOutside specialty-cleaning vendors: Not confirmed\nSource URL: https://www.target.com/example";
   const updated = updateCafeNote(original, "Outside specialty-cleaning vendors", "Approval required");
