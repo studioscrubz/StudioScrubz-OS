@@ -815,7 +815,7 @@ export function ProposalBuilder({
             <p className="mt-3 text-sm text-neutral-600">
               Labor Hours are total crew labor hours. Duration is calculated as total labor hours divided by crew size.
             </p>
-            {catalogService && pricingEstimate?.calculatorInput.division === "Commercial" && <div className="mt-4"><CommercialLaborInsights input={pricingEstimate.calculatorInput} service={catalogService} laborHours={calculatedResult.laborHours} crewSize={calculatedResult.crewRecommendation} /></div>}
+            {catalogService && pricingEstimate && "commercialType" in pricingEstimate.calculatorInput && <div className="mt-4"><CommercialLaborInsights input={pricingEstimate.calculatorInput} service={catalogService} laborHours={calculatedResult.laborHours} crewSize={calculatedResult.crewRecommendation} /></div>}
           </Panel>}
           <Panel title="Proposal Adjustments">
             <div className="grid gap-4 sm:grid-cols-3">
