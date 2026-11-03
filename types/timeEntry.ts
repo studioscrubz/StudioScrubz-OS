@@ -17,5 +17,10 @@ export type OperationalActiveTimeEntry = {
 export type TimeEntryWithRelations=TimeEntry&{employee:Employee|null;job:Job|null;crew:Crew|null};
 export type EmployeeTimeSummary={currentWeekHours:number;currentMonthHours:number;regularHours:number;overtimeHours:number;estimatedGrossPay:number;recent:TimeEntryWithRelations[]};
 export type JobLaborSummary={employeesWorked:number;regularHours:number;overtimeHours:number;totalHours:number;actualLaborCost:number};
-export type JobProfitabilitySummary=JobLaborSummary&{collectedRevenue:number;expenses:number;grossProfit:number;grossMargin:number|null};
+export type JobProfitabilitySummary=JobLaborSummary&{
+collectedRevenue:number;expenses:number;grossProfit:number;grossMargin:number|null;
+jobPrice:number;invoicedRevenue:number;outstandingBalance:number;invoiceCount:number;
+paymentsReconciled:boolean;estimatedLaborHours:number|null;laborEstimateSource:"Job"|"Proposal"|"Estimate"|"Missing";
+timeEntryCount:number;unapprovedTimeEntries:number;laborRecordsMissing:boolean;
+}
 export type CrewLaborSummary={currentWeekHours:number;currentMonthHours:number;jobsWorked:number;estimatedGrossLaborCost:number};
