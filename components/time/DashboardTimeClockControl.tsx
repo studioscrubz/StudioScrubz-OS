@@ -34,6 +34,18 @@ export function DashboardTimeClockControl({ employeeId }: { employeeId: string |
   }, [employeeId]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   useOperationalRealtime(["employee_work_sessions", "time_entries"], load);
+  useEffect(() => {
+    const onClearance = () => { void load(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
+    window.addEventListener("studioscrubz:equipment-clearance-updated", onClearance);
+    window.addEventListener("focus", onClearance);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("studioscrubz:equipment-clearance-updated", onClearance);
+      window.removeEventListener("focus", onClearance);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
   if (!employeeId) return null;
 
   async function toggle() {
