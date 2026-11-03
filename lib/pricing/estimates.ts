@@ -1,3 +1,4 @@
+import { recommendResidentialCrew } from "@/lib/pricing/residentialCrew";
 import type {
   CalculatorInput,
   CommercialCalculatorInput,
@@ -344,18 +345,11 @@ export function calculateResidentialEstimate(
         occupancyLaborHours,
     ) * conditionLaborMultiplier[input.condition];
 
-  // Crew size determines the onsite time, not total person-hours or price.
-  // The 2,683-sq-ft / 3-bed / 3-bath completed job took 2 cleaners x 4 h
-  // despite substantial pet hair; a fixed 7-hour threshold overstaffed it.
-  const targetCompletionHours =
-    Number.isFinite(input.targetCompletionHours) && (input.targetCompletionHours ?? 0) >= 1
-      ? Math.min(12, input.targetCompletionHours!)
-      : 4.5;
-  const recommendedCrew = Math.max(1, Math.ceil(laborHours / targetCompletionHours));
-  const crewSize =
-    Number.isInteger(input.crewSizeOverride) && (input.crewSizeOverride ?? 0) >= 1 && (input.crewSizeOverride ?? 0) <= 12
-      ? input.crewSizeOverride!
-      : recommendedCrew;
+  const crewSize = recommendResidentialCrew(
+    laborHours,
+    input.targetCompletionHours,
+    input.crewSizeOverride,
+  );
 
   const workerHourlyPay = Math.max(MINIMUM_WORKER_HOURLY_PAY, 22);
   const laborCost = laborHours * workerHourlyPay;
