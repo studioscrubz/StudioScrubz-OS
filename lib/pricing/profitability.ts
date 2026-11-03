@@ -10,6 +10,8 @@ export type ProfitabilityInput = {
   cleanerCount: number;
   hoursPerCleaner: number;
   hourlyWage?: number | null;
+  /** Optional service-specific target from the originating estimate. */
+  targetGrossMarginRate?: number | null;
   settings: ProfitabilitySettings;
   travel: TravelProjection;
   supplies?: number | null;
@@ -76,7 +78,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const hoursPerCleaner = nonNegative(input.hoursPerCleaner);
   const hourlyWage = nonNegative(input.hourlyWage ?? settings.cleanerHourlyWage);
   const burdenRate = validRate(settings.employerBurdenRate) ?? 0;
-  const targetMarginRate = validRate(settings.targetGrossMarginRate);
+  const targetMarginRate = validRate(input.targetGrossMarginRate ?? settings.targetGrossMarginRate);
   const visitsPerPeriod = positiveInteger(input.visitsPerPeriod, 1);
   const projectDays = input.projectDays == null ? undefined : positiveInteger(input.projectDays, 1);
   const roundTripsPerPeriod = positiveInteger(input.roundTripsPerPeriod, visitsPerPeriod);
