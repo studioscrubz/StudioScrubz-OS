@@ -71,6 +71,23 @@ test("expenses not applicable to a quote remain zero instead of automatic added 
   assert.equal(result.operatingCosts.allocatedOverhead, 0);
 });
 
+test("commercial and post-construction quotes can use an estimate-specific margin instead of global default", () => {
+  const input = { price: 250, cleanerCount: 1, hoursPerCleaner: 0, settings,
+    travel: verifiedTravel(1), otherDirectExpenses: 100 };
+  const global = calculateProfitability(input);
+  const commercial = calculateProfitability({ ...input, targetGrossMarginRate: .25 });
+  assert.equal(global.targetGrossMarginPercent, 35);
+  assert.equal(global.recommendedMinimumPrice, 153.85);
+  assert.equal(commercial.targetGrossMarginPercent, 25);
+  assert.equal(commercial.grossMarginMinimumPrice, 133.34);
+  assert.equal(commercial.recommendedMinimumPrice, 133.34);
+  assert.equal(repriceProfitability(commercial, 120).targetGrossMarginPercent, 25);
+  const estimate = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
+  const proposal = readFileSync(new URL("../components/proposals/ProposalBuilder.tsx", import.meta.url), "utf8");
+  assert.match(estimate, /targetGrossMarginRate: "targetProfitMarginPercent" in calculatorInput/);
+  assert.match(proposal, /targetGrossMarginRate: source\.targetGrossMarginPercent \/ 100/);
+});
+
 test("one vehicle is shared by multiple cleaners while paid travel labor remains per employee", () => {
   const shared = calculateProfitability({ price: 1000, cleanerCount: 3, hoursPerCleaner: 1, settings: { ...settings, vehicleOperatingRatePerMile: .5 }, travel: { ...verifiedTravel(3), roundTripMiles: 10, roundTripMinutes: 60 } });
   const solo = calculateProfitability({ price: 1000, cleanerCount: 1, hoursPerCleaner: 1, settings: { ...settings, vehicleOperatingRatePerMile: .5 }, travel: { ...verifiedTravel(1), roundTripMiles: 10, roundTripMinutes: 60 } });
