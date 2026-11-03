@@ -809,17 +809,17 @@ function productionRateForCondition(
 ): number {
   if (service.service_code === "COM-OFFICE") {
     if (condition === "Light") {
-      return catalogConfigNumber(service, "light_production_rate") || 1200;
+      return catalogConfigNumber(service, "light_production_rate") || 3000;
     }
 
     if (condition === "Heavy" || condition === "Extreme") {
-      return catalogConfigNumber(service, "heavy_production_rate") || 650;
+      return catalogConfigNumber(service, "heavy_production_rate") || 1400;
     }
 
     return (
       catalogConfigNumber(service, "average_production_rate") ||
       fallback ||
-      900
+      2200
     );
   }
 
