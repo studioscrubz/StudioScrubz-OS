@@ -257,7 +257,7 @@ test("original post-construction equipment, disposal, supervision and contingenc
   assert.match(estimate, /result\.upkeepPlan\?\.visitsIncluded/);
 });
 
-test("recommended customer price includes commission, transaction fees and overhead before target margin", () => {
+test("gross margin is applied to direct cost while commissions, fees and overhead are recovered at break-even", () => {
   const baseline = calculateProfitability({ price: 160, cleanerCount: 1, hoursPerCleaner: 2, settings, travel: verifiedTravel(1) });
   assert.equal(baseline.totalEstimatedDirectCost, 72);
   assert.equal(baseline.recommendedMinimumPrice, 110.77);
@@ -268,10 +268,12 @@ test("recommended customer price includes commission, transaction fees and overh
   assert.equal(commission.grossProfit, 88);
   assert.equal(commission.contributionProfit, 63);
   assert.equal(commission.operatingProfit, 53);
-  assert.equal(commission.recommendedMinimumPrice, 164.62);
-  assert.equal(commission.differenceToRecommendedMinimum, 4.62);
-  assert.equal(commission.belowTargetMargin, true);
-  assert.ok(commission.recommendedMinimumPrice > baseline.recommendedMinimumPrice);
+  assert.equal(commission.grossMarginMinimumPrice, 110.77);
+  assert.equal(commission.operatingBreakEvenPrice, 107);
+  assert.equal(commission.recommendedMinimumPrice, 110.77);
+  assert.equal(commission.differenceToRecommendedMinimum, 0);
+  assert.equal(commission.belowTargetMargin, false);
+  assert.equal(commission.recommendedMinimumPrice, baseline.recommendedMinimumPrice);
 });
 
 test("commission-inclusive suggested minimum recalculates on proposal repricing and never invents missing travel cost", () => {
@@ -293,7 +295,7 @@ test("internal panel shows commission deduction without modifying the customer-f
   const panel = readFileSync(new URL("../components/estimates/ProfitabilityPanel.tsx", import.meta.url), "utf8");
   assert.match(panel, /Sales commissions \(deducted\)/);
   assert.match(panel, /Customer price after commission/);
-  assert.match(panel, /Recommended minimum \(includes commission, fees and overhead\)/);
+  assert.match(panel, /Recommended minimum \(higher of those two floors\)/);
   const estimateBuilder = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
   assert.match(estimateBuilder, /withAuthoritativeEstimatePrice/);
   assert.match(estimateBuilder, /saveProfitabilityProjection/);
