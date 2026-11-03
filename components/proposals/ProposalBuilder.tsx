@@ -1589,6 +1589,7 @@ function calculateProposalProfitability({ result, source, settings, propertyAddr
     cleanerCount: crewSize,
     hoursPerCleaner: result.laborHours / crewSize,
     hourlyWage: source.hourlyWage,
+    targetGrossMarginRate: source.targetGrossMarginPercent / 100,
     settings,
     travel: { ...travel, travelingEmployeeCount: crewSize },
     supplies: (source.directCosts.supplies / Math.max(1, source.visitsPerPeriod ?? 1)) + result.additionalMaterials,
