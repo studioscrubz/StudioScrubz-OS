@@ -11,22 +11,22 @@ SET pricing_config =
         jsonb_set(pricing_config,
           '{production_rate}',
           CASE WHEN pricing_config->>'production_rate' = '900'
-               THEN to_jsonb(2200) ELSE pricing_config->'production_rate' END,
+               THEN to_jsonb(2200) ELSE COALESCE(pricing_config->'production_rate', 'null'::jsonb) END,
           true
         ),
         '{average_production_rate}',
         CASE WHEN pricing_config->>'average_production_rate' = '900'
-             THEN to_jsonb(2200) ELSE pricing_config->'average_production_rate' END,
+             THEN to_jsonb(2200) ELSE COALESCE(pricing_config->'average_production_rate', 'null'::jsonb) END,
         true
       ),
       '{light_production_rate}',
       CASE WHEN pricing_config->>'light_production_rate' = '1200'
-           THEN to_jsonb(3000) ELSE pricing_config->'light_production_rate' END,
+           THEN to_jsonb(3000) ELSE COALESCE(pricing_config->'light_production_rate', 'null'::jsonb) END,
       true
     ),
     '{heavy_production_rate}',
     CASE WHEN pricing_config->>'heavy_production_rate' = '650'
-         THEN to_jsonb(1400) ELSE pricing_config->'heavy_production_rate' END,
+         THEN to_jsonb(1400) ELSE COALESCE(pricing_config->'heavy_production_rate', 'null'::jsonb) END,
     true
   )
 WHERE service_code = 'COM-OFFICE'
