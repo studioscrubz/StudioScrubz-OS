@@ -220,6 +220,7 @@ export async function createJobFromProposal(
   return job;
 }
 export async function createDirectJob(input: DirectJobInput): Promise<JobWithRelations> {
+  if (!Number.isFinite(input.labor_hours) || input.labor_hours <= 0) throw new Error("Planned total person-hours are required for a Direct Job.");
   const customScope = input.custom_scope_description?.trim() || null;
   const args = {
     p_client_id: input.client_id,
