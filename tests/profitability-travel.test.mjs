@@ -329,9 +329,11 @@ test("Porter and Luxury Property Care have private, permission-gated monthly pro
   assert.equal(result.commissions, 20);
   assert.equal(result.overhead, 15);
   assert.equal(result.operatingProfit, 74.12);
-  assert.equal(result.recommendedMinimumPrice, 347.51);
+  assert.equal(result.grossMarginMinimumPrice, 285.97);
+  assert.equal(result.operatingBreakEvenPrice, 225.88);
+  assert.equal(result.recommendedMinimumPrice, 285.97);
   const changed = mod.exports.calculatePorterProfitability(pricing, settings, { ...extras, equipment: 10 });
-  assert.equal(changed.recommendedMinimumPrice, 362.90);
+  assert.equal(changed.recommendedMinimumPrice, 301.36);
 });
 
 test("three planned post-construction project days display three trips but do not triple total labor or supplies", () => {
