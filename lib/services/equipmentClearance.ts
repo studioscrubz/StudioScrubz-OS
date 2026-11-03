@@ -21,6 +21,7 @@ export async function submitEquipmentClearance(jobId: string, checkpoint: Equipm
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Clearance confirmation was not returned.");
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("studioscrubz:equipment-clearance-updated"));
   return data;
 }
 
