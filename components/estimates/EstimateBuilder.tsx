@@ -35,6 +35,7 @@ import { pairHighDustingEstimates } from "@/lib/services/estimatePairs";
 import { canAccessFinances } from "@/lib/auth/permissions";
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
+import { CommercialLaborInsights } from "@/components/estimates/CommercialLaborInsights";
 import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
 import { emptyProfitabilityAdjustments, type ProfitabilityAdjustments, type ProfitabilitySettings, type TravelProjection } from "@/types/profitability";
 
@@ -432,7 +433,7 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
       <div className="space-y-6">
         <Section title="Estimate Calculator" subtitle="Choose a division and configure the service.">
           <DivisionToggle value={division} set={changeDivision} />
-          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:catalog&&<div className="mt-6">{calculation.error && <div className="mb-4"><Alert kind="error" text={calculation.error}/></div>}{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields value={commercial} set={setCommercial} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} salesSafe={isSales} manualPrice={manualPrice} setManualPrice={setManualPrice} />}</div>}
+          {catalogLoading?<p className="mt-6 rounded-xl bg-neutral-50 p-5 text-sm">Loading current pricing…</p>:catalog&&<div className="mt-6">{calculation.error && <div className="mb-4"><Alert kind="error" text={calculation.error}/></div>}{division === "Residential" ? <ResidentialFields value={residential} set={setResidential} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Residential",selection)} /> : <CommercialFields result={result} value={commercial} set={setCommercial} postConstruction={postConstruction} setPostConstruction={setPostConstruction} catalog={catalog} serviceChanged={(selection)=>selectCatalogService("Commercial",selection)} salesSafe={isSales} manualPrice={manualPrice} setManualPrice={setManualPrice} />}</div>}
         </Section>
         <Section title="Service Description" subtitle="Copied from the selected Service Catalog entry and saved with this Estimate."><div className="min-h-24 whitespace-pre-line rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">{serviceDescription||"No service description available."}</div></Section>
         {division==="Commercial"&&!postConstructionMode&&<Section title="Related specialty service" subtitle="Create linked estimates for cleaning and high dusting, each with its own price, scope and approval.">
@@ -499,7 +500,7 @@ function ResidentialFields({ value, set,postConstruction,setPostConstruction,cat
   <div className="sm:col-span-2 xl:col-span-3"><CatalogAddonPicker addons={addons} selected={value.addOns} setSelected={(addOns) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addOns }))} snapshots={value.addonSelections} setSnapshots={(addonSelections) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addonSelections }))} /></div></div>}
 </div>; }
 
-function CommercialFields({ value, set, postConstruction, setPostConstruction, catalog, serviceChanged, salesSafe = false, manualPrice, setManualPrice }: { value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void; postConstruction: PostConstructionCalculatorInput; setPostConstruction: (value: PostConstructionCalculatorInput) => void; catalog: ServiceCatalogBundle; serviceChanged: (selection: string) => void; salesSafe?: boolean; manualPrice: number | null; setManualPrice: (value: number | null) => void; }) {
+function CommercialFields({ result, value, set, postConstruction, setPostConstruction, catalog, serviceChanged, salesSafe = false, manualPrice, setManualPrice }: { result: EstimateResult | null; value: CommercialCalculatorInput; set: (value: CommercialCalculatorInput) => void; postConstruction: PostConstructionCalculatorInput; setPostConstruction: (value: PostConstructionCalculatorInput) => void; catalog: ServiceCatalogBundle; serviceChanged: (selection: string) => void; salesSafe?: boolean; manualPrice: number | null; setManualPrice: (value: number | null) => void; }) {
   const services=catalog.services.filter(x=>x.division!=="Residential").map(x=>x.service_name.replace(/ Cleaning$/,""));
   const service=selectedCatalogService(catalog,"Commercial",value.commercialType);
   const addons=service?getAvailableServiceAddons(catalog,service.id,"Commercial"):[];
@@ -523,6 +524,7 @@ function CommercialFields({ value, set, postConstruction, setPostConstruction, c
       {service?.pricing_config.requires_complete_pricing_config&&<ProjectDurationFields days={value.targetProjectDays??3} workdayHours={value.workdayHours??8} setDays={(targetProjectDays)=>set({...value,targetProjectDays})} setWorkdayHours={(workdayHours)=>set({...value,workdayHours})}/>}
       {value.weeklyMixedVisits===undefined&&<div className="sm:col-span-2 xl:col-span-3"><CatalogAddonPicker addons={addons} selected={value.additionalServices} setSelected={(additionalServices) => (set as unknown as Dispatch<SetStateAction<CommercialCalculatorInput>>)(current => ({ ...current, additionalServices }))} snapshots={value.addonSelections} setSnapshots={(addonSelections) => (set as unknown as Dispatch<SetStateAction<CommercialCalculatorInput>>)(current => ({ ...current, addonSelections }))} /></div>}
     </div>}
+    {!salesSafe && result && service && !isPostConstructionCatalogService(service) && <CommercialLaborInsights input={value} service={service} laborHours={result.laborHours} crewSize={result.crewSize} />}
   </div>;
 }
 
