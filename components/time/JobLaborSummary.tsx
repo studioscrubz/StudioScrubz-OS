@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { getJobProfitabilitySummary } from "@/lib/services/timeEntries";
 import type { JobProfitabilitySummary as Summary } from "@/types/timeEntry";
 export function JobLaborSummary({
@@ -15,14 +16,17 @@ export function JobLaborSummary({
 }) {
   const [data, setData] = useState<Summary | null>(null),
     [error, setError] = useState(false);
-  useEffect(() => {
-    void getJobProfitabilitySummary(jobId)
-      .then(setData)
-      .catch((x) => {
-        console.error("Job labor load failed", x);
-        setError(true);
-      });
+  const reload = useCallback(async () => {
+    try {
+      setData(await getJobProfitabilitySummary(jobId));
+      setError(false);
+    } catch (cause) {
+      console.error("Job labor load failed", cause);
+      setError(true);
+    }
   }, [jobId]);
+  useEffect(() => { void reload(); }, [reload]);
+  useOperationalRealtime(["time_entries"], reload);
   return (
     <section className="mt-6">
       <h3 className="font-extrabold text-[#143d1a]">Labor</h3>
@@ -39,6 +43,7 @@ export function JobLaborSummary({
               ["OT Hours", data.overtimeHours.toFixed(2)],
               ["Actual Labor Hours", data.totalHours.toFixed(2)],
               ["Estimated Labor Hours", estimatedHours.toFixed(2)],
+              ["Labor Hours Variance (actual - estimate)", `${data.totalHours - estimatedHours > 0 ? "+" : ""}${(data.totalHours - estimatedHours).toFixed(2)} h`],
               ["Estimated Labor Cost", money(estimatedCost)],
               ["Actual Labor Cost", money(data.actualLaborCost)],
               ["Cost Variance", money(data.actualLaborCost - estimatedCost)],
@@ -54,7 +59,7 @@ export function JobLaborSummary({
             ))}
           </div>
           <p className="mt-3 text-xs text-neutral-500">
-            Actual labor uses completed and approved time-entry gross pay.
+            Labor variance compares recorded completed/approved job time with estimated person-hours. Positive variance indicates overtime against the estimate; negative means fewer hours. Incomplete or unsubmitted time entries will not be reflected. Actual labor uses completed and approved time-entry gross pay.
             Manual Contract Labor expenses remain separate external costs. Job
             price ({money(price)}) is operational value, not collected revenue.
           </p>
