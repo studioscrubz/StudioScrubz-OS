@@ -10,6 +10,8 @@ export type ProfitabilityInput = {
   cleanerCount: number;
   hoursPerCleaner: number;
   hourlyWage?: number | null;
+  /** Optional service-specific target from the originating estimate. */
+  targetGrossMarginRate?: number | null;
   settings: ProfitabilitySettings;
   travel: TravelProjection;
   supplies?: number | null;
@@ -41,12 +43,29 @@ const positiveInteger = (value: unknown, fallback: number) => {
   const number = Math.trunc(Number(value));
   return Number.isFinite(number) && number > 0 ? number : fallback;
 };
-const commissionInclusiveMinimum = (directCost: number | null, targetMarginRate: number | null, operatingCosts: { paymentProcessingFees: number; salesCommissions: number; allocatedOverhead: number }): number | null => {
-  if (directCost == null || targetMarginRate == null || targetMarginRate >= 1) return null;
-  // Cover commission and other quoted-period costs before preserving the configured target margin.
-  // Keep commission separate from direct job costs and do not alter customer-facing pricing.
-  const allInCost = directCost + operatingCosts.paymentProcessingFees + operatingCosts.salesCommissions + operatingCosts.allocatedOverhead;
-  return Math.ceil((allInCost / (1 - targetMarginRate)) * 100 - 1e-9) / 100;
+/**
+ * Keep gross-margin pricing separate from operating-expense recovery.
+ * A gross margin applies to direct job cost, not to overhead or commissions.
+ * The recommended customer price must also cover those operating expenses.
+ */
+const profitabilityPriceFloors = (
+  directCost: number | null,
+  targetMarginRate: number | null,
+  operatingCosts: { paymentProcessingFees: number; salesCommissions: number; allocatedOverhead: number },
+): { grossMarginMinimumPrice: number | null; operatingBreakEvenPrice: number | null; recommendedMinimumPrice: number | null } => {
+  if (directCost == null || targetMarginRate == null || targetMarginRate >= 1) {
+    return { grossMarginMinimumPrice: null, operatingBreakEvenPrice: null, recommendedMinimumPrice: null };
+  }
+  const ceilCents = (value: number) => Math.ceil(value * 100 - 1e-9) / 100;
+  const grossMarginMinimumPrice = ceilCents(directCost / (1 - targetMarginRate));
+  const operatingBreakEvenPrice = ceilCents(
+    directCost + operatingCosts.paymentProcessingFees + operatingCosts.salesCommissions + operatingCosts.allocatedOverhead,
+  );
+  return {
+    grossMarginMinimumPrice,
+    operatingBreakEvenPrice,
+    recommendedMinimumPrice: Math.max(grossMarginMinimumPrice, operatingBreakEvenPrice),
+  };
 };
 const validRate = (value: unknown) => {
   const number = Number(value);
@@ -59,7 +78,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const hoursPerCleaner = nonNegative(input.hoursPerCleaner);
   const hourlyWage = nonNegative(input.hourlyWage ?? settings.cleanerHourlyWage);
   const burdenRate = validRate(settings.employerBurdenRate) ?? 0;
-  const targetMarginRate = validRate(settings.targetGrossMarginRate);
+  const targetMarginRate = validRate(input.targetGrossMarginRate ?? settings.targetGrossMarginRate);
   const visitsPerPeriod = positiveInteger(input.visitsPerPeriod, 1);
   const projectDays = input.projectDays == null ? undefined : positiveInteger(input.projectDays, 1);
   const roundTripsPerPeriod = positiveInteger(input.roundTripsPerPeriod, visitsPerPeriod);
@@ -109,7 +128,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const contributionMarginPercent = contributionProfit == null || price <= 0 ? null : money((contributionProfit / price) * 100);
   const operatingProfit = contributionProfit == null ? null : money(contributionProfit - operatingCosts.allocatedOverhead);
   const operatingMarginPercent = operatingProfit == null || price <= 0 ? null : money((operatingProfit / price) * 100);
-  const recommendedMinimumPrice = commissionInclusiveMinimum(totalEstimatedDirectCost, targetMarginRate, operatingCosts);
+  const { grossMarginMinimumPrice, operatingBreakEvenPrice, recommendedMinimumPrice } = profitabilityPriceFloors(totalEstimatedDirectCost, targetMarginRate, operatingCosts);
   const differenceToRecommendedMinimum = recommendedMinimumPrice == null ? null : money(Math.max(0, recommendedMinimumPrice - price));
   return {
     version: 1,
@@ -138,6 +157,8 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     grossProfit,
     grossMarginPercent,
     targetGrossMarginPercent: money((targetMarginRate ?? 0) * 100),
+    grossMarginMinimumPrice,
+    operatingBreakEvenPrice,
     recommendedMinimumPrice,
     differenceToRecommendedMinimum,
     belowTargetMargin: recommendedMinimumPrice != null && price < recommendedMinimumPrice,
@@ -158,7 +179,7 @@ export function repriceProfitability(projection: ProfitabilityProjection | null 
   const overhead = projection.operatingCosts?.allocatedOverhead ?? 0;
   const contributionProfit = grossProfit == null ? null : money(grossProfit - processing - commissions);
   const operatingProfit = contributionProfit == null ? null : money(contributionProfit - overhead);
-  const recommendedMinimumPrice = commissionInclusiveMinimum(total, targetRate, { paymentProcessingFees: processing, salesCommissions: commissions, allocatedOverhead: overhead });
+  const { grossMarginMinimumPrice, operatingBreakEvenPrice, recommendedMinimumPrice } = profitabilityPriceFloors(total, targetRate, { paymentProcessingFees: processing, salesCommissions: commissions, allocatedOverhead: overhead });
   return {
     ...projection,
     periodLabel: periodLabel?.trim() || projection.periodLabel,
@@ -170,6 +191,8 @@ export function repriceProfitability(projection: ProfitabilityProjection | null 
     contributionMarginPercent: contributionProfit == null || customerPrice <= 0 ? null : money((contributionProfit / customerPrice) * 100),
     operatingProfit,
     operatingMarginPercent: operatingProfit == null || customerPrice <= 0 ? null : money((operatingProfit / customerPrice) * 100),
+    grossMarginMinimumPrice,
+    operatingBreakEvenPrice,
     recommendedMinimumPrice,
     differenceToRecommendedMinimum: recommendedMinimumPrice == null ? null : money(Math.max(0, recommendedMinimumPrice - customerPrice)),
     belowTargetMargin: recommendedMinimumPrice != null && customerPrice < recommendedMinimumPrice,

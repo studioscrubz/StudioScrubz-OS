@@ -30,14 +30,18 @@ export function calculatePorterProfitability(
   const operatingProfit = round(contributionProfit - overhead);
   const margin = (profit: number) => price > 0 ? round(profit / price * 100) : null;
   const target = settings.targetGrossMarginRate;
-  const minimum = target >= 0 && target < 1
-    ? up((direct + processing + commissions + overhead) / (1 - target))
-    : null;
+  // Direct costs determine the gross-margin floor; operating costs determine
+  // a separate break-even floor. Do not apply gross margin to overhead again.
+  const grossMarginMinimumPrice = target >= 0 && target < 1 ? up(direct / (1 - target)) : null;
+  const operatingBreakEvenPrice = target >= 0 && target < 1 ? up(direct + processing + commissions + overhead) : null;
+  const minimum = grossMarginMinimumPrice == null || operatingBreakEvenPrice == null
+    ? null
+    : Math.max(grossMarginMinimumPrice, operatingBreakEvenPrice);
   return {
     price, monthlyHours: pricing.monthlyHours, loadedLabor, supplies, travel, direct,
     processing, commissions, overhead, grossProfit, contributionProfit, operatingProfit,
     grossMarginPercent: margin(grossProfit), contributionMarginPercent: margin(contributionProfit),
-    operatingMarginPercent: margin(operatingProfit), recommendedMinimumPrice: minimum,
+    operatingMarginPercent: margin(operatingProfit), grossMarginMinimumPrice, operatingBreakEvenPrice, recommendedMinimumPrice: minimum,
     differenceToTarget: minimum == null ? null : round(Math.max(0, minimum - price)),
   };
 }

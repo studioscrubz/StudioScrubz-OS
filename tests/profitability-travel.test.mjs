@@ -31,6 +31,63 @@ test("three cleaners, four hours, $30 wage and 20% burden produces the requested
   assert.equal(result.belowTargetMargin, true);
 });
 
+test("gross-margin floor applies only to direct costs, while fees and overhead require break-even recovery", () => {
+  const result = calculateProfitability({
+    price: 180,
+    cleanerCount: 1,
+    hoursPerCleaner: 0,
+    settings: { ...settings, employerBurdenRate: 0 },
+    travel: verifiedTravel(1),
+    otherDirectExpenses: 100,
+    paymentProcessingFees: 10,
+    salesCommissions: 25,
+    allocatedOverhead: 65,
+  });
+  assert.equal(result.totalEstimatedDirectCost, 100);
+  assert.equal(result.grossMarginMinimumPrice, 153.85);
+  assert.equal(result.operatingBreakEvenPrice, 200);
+  assert.equal(result.recommendedMinimumPrice, 200);
+  assert.equal(result.grossMarginPercent, 44.44);
+  assert.equal(result.operatingProfit, -20);
+  assert.equal(result.belowTargetMargin, true);
+  const repriced = repriceProfitability(result, 215);
+  assert.equal(repriced.grossMarginMinimumPrice, 153.85);
+  assert.equal(repriced.operatingBreakEvenPrice, 200);
+  assert.equal(repriced.recommendedMinimumPrice, 200);
+  assert.equal(repriced.operatingProfit, 15);
+  assert.equal(repriced.belowTargetMargin, false);
+});
+
+test("expenses not applicable to a quote remain zero instead of automatic added fees", () => {
+  const result = calculateProfitability({
+    price: 200, cleanerCount: 1, hoursPerCleaner: 0,
+    settings: { ...settings, employerBurdenRate: 0 },
+    travel: verifiedTravel(1), otherDirectExpenses: 100,
+  });
+  assert.equal(result.grossMarginMinimumPrice, 153.85);
+  assert.equal(result.operatingBreakEvenPrice, 100);
+  assert.equal(result.recommendedMinimumPrice, 153.85);
+  assert.equal(result.operatingCosts.salesCommissions, 0);
+  assert.equal(result.operatingCosts.allocatedOverhead, 0);
+});
+
+test("commercial and post-construction quotes can use an estimate-specific margin instead of global default", () => {
+  const input = { price: 250, cleanerCount: 1, hoursPerCleaner: 0, settings,
+    travel: verifiedTravel(1), otherDirectExpenses: 100 };
+  const global = calculateProfitability(input);
+  const commercial = calculateProfitability({ ...input, targetGrossMarginRate: .25 });
+  assert.equal(global.targetGrossMarginPercent, 35);
+  assert.equal(global.recommendedMinimumPrice, 153.85);
+  assert.equal(commercial.targetGrossMarginPercent, 25);
+  assert.equal(commercial.grossMarginMinimumPrice, 133.34);
+  assert.equal(commercial.recommendedMinimumPrice, 133.34);
+  assert.equal(repriceProfitability(commercial, 120).targetGrossMarginPercent, 25);
+  const estimate = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
+  const proposal = readFileSync(new URL("../components/proposals/ProposalBuilder.tsx", import.meta.url), "utf8");
+  assert.match(estimate, /targetGrossMarginRate: "targetProfitMarginPercent" in calculatorInput/);
+  assert.match(proposal, /targetGrossMarginRate: source\.targetGrossMarginPercent \/ 100/);
+});
+
 test("one vehicle is shared by multiple cleaners while paid travel labor remains per employee", () => {
   const shared = calculateProfitability({ price: 1000, cleanerCount: 3, hoursPerCleaner: 1, settings: { ...settings, vehicleOperatingRatePerMile: .5 }, travel: { ...verifiedTravel(3), roundTripMiles: 10, roundTripMinutes: 60 } });
   const solo = calculateProfitability({ price: 1000, cleanerCount: 1, hoursPerCleaner: 1, settings: { ...settings, vehicleOperatingRatePerMile: .5 }, travel: { ...verifiedTravel(1), roundTripMiles: 10, roundTripMinutes: 60 } });
@@ -217,7 +274,7 @@ test("original post-construction equipment, disposal, supervision and contingenc
   assert.match(estimate, /result\.upkeepPlan\?\.visitsIncluded/);
 });
 
-test("recommended customer price includes commission, transaction fees and overhead before target margin", () => {
+test("gross margin is applied to direct cost while commissions, fees and overhead are recovered at break-even", () => {
   const baseline = calculateProfitability({ price: 160, cleanerCount: 1, hoursPerCleaner: 2, settings, travel: verifiedTravel(1) });
   assert.equal(baseline.totalEstimatedDirectCost, 72);
   assert.equal(baseline.recommendedMinimumPrice, 110.77);
@@ -228,10 +285,12 @@ test("recommended customer price includes commission, transaction fees and overh
   assert.equal(commission.grossProfit, 88);
   assert.equal(commission.contributionProfit, 63);
   assert.equal(commission.operatingProfit, 53);
-  assert.equal(commission.recommendedMinimumPrice, 164.62);
-  assert.equal(commission.differenceToRecommendedMinimum, 4.62);
-  assert.equal(commission.belowTargetMargin, true);
-  assert.ok(commission.recommendedMinimumPrice > baseline.recommendedMinimumPrice);
+  assert.equal(commission.grossMarginMinimumPrice, 110.77);
+  assert.equal(commission.operatingBreakEvenPrice, 107);
+  assert.equal(commission.recommendedMinimumPrice, 110.77);
+  assert.equal(commission.differenceToRecommendedMinimum, 0);
+  assert.equal(commission.belowTargetMargin, false);
+  assert.equal(commission.recommendedMinimumPrice, baseline.recommendedMinimumPrice);
 });
 
 test("commission-inclusive suggested minimum recalculates on proposal repricing and never invents missing travel cost", () => {
@@ -253,7 +312,7 @@ test("internal panel shows commission deduction without modifying the customer-f
   const panel = readFileSync(new URL("../components/estimates/ProfitabilityPanel.tsx", import.meta.url), "utf8");
   assert.match(panel, /Sales commissions \(deducted\)/);
   assert.match(panel, /Customer price after commission/);
-  assert.match(panel, /Recommended minimum \(includes commission, fees and overhead\)/);
+  assert.match(panel, /Recommended minimum \(higher of those two floors\)/);
   const estimateBuilder = readFileSync(new URL("../components/estimates/EstimateBuilder.tsx", import.meta.url), "utf8");
   assert.match(estimateBuilder, /withAuthoritativeEstimatePrice/);
   assert.match(estimateBuilder, /saveProfitabilityProjection/);
@@ -287,9 +346,11 @@ test("Porter and Luxury Property Care have private, permission-gated monthly pro
   assert.equal(result.commissions, 20);
   assert.equal(result.overhead, 15);
   assert.equal(result.operatingProfit, 74.12);
-  assert.equal(result.recommendedMinimumPrice, 347.51);
+  assert.equal(result.grossMarginMinimumPrice, 285.97);
+  assert.equal(result.operatingBreakEvenPrice, 225.88);
+  assert.equal(result.recommendedMinimumPrice, 285.97);
   const changed = mod.exports.calculatePorterProfitability(pricing, settings, { ...extras, equipment: 10 });
-  assert.equal(changed.recommendedMinimumPrice, 362.90);
+  assert.equal(changed.recommendedMinimumPrice, 301.36);
 });
 
 test("three planned post-construction project days display three trips but do not triple total labor or supplies", () => {
