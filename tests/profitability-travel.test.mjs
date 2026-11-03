@@ -31,6 +31,46 @@ test("three cleaners, four hours, $30 wage and 20% burden produces the requested
   assert.equal(result.belowTargetMargin, true);
 });
 
+test("gross-margin floor applies only to direct costs, while fees and overhead require break-even recovery", () => {
+  const result = calculateProfitability({
+    price: 180,
+    cleanerCount: 1,
+    hoursPerCleaner: 0,
+    settings: { ...settings, employerBurdenRate: 0 },
+    travel: verifiedTravel(1),
+    otherDirectExpenses: 100,
+    paymentProcessingFees: 10,
+    salesCommissions: 25,
+    allocatedOverhead: 65,
+  });
+  assert.equal(result.totalEstimatedDirectCost, 100);
+  assert.equal(result.grossMarginMinimumPrice, 153.85);
+  assert.equal(result.operatingBreakEvenPrice, 200);
+  assert.equal(result.recommendedMinimumPrice, 200);
+  assert.equal(result.grossMarginPercent, 44.44);
+  assert.equal(result.operatingProfit, -20);
+  assert.equal(result.belowTargetMargin, true);
+  const repriced = repriceProfitability(result, 215);
+  assert.equal(repriced.grossMarginMinimumPrice, 153.85);
+  assert.equal(repriced.operatingBreakEvenPrice, 200);
+  assert.equal(repriced.recommendedMinimumPrice, 200);
+  assert.equal(repriced.operatingProfit, 15);
+  assert.equal(repriced.belowTargetMargin, false);
+});
+
+test("expenses not applicable to a quote remain zero instead of automatic added fees", () => {
+  const result = calculateProfitability({
+    price: 200, cleanerCount: 1, hoursPerCleaner: 0,
+    settings: { ...settings, employerBurdenRate: 0 },
+    travel: verifiedTravel(1), otherDirectExpenses: 100,
+  });
+  assert.equal(result.grossMarginMinimumPrice, 153.85);
+  assert.equal(result.operatingBreakEvenPrice, 100);
+  assert.equal(result.recommendedMinimumPrice, 153.85);
+  assert.equal(result.operatingCosts.salesCommissions, 0);
+  assert.equal(result.operatingCosts.allocatedOverhead, 0);
+});
+
 test("one vehicle is shared by multiple cleaners while paid travel labor remains per employee", () => {
   const shared = calculateProfitability({ price: 1000, cleanerCount: 3, hoursPerCleaner: 1, settings: { ...settings, vehicleOperatingRatePerMile: .5 }, travel: { ...verifiedTravel(3), roundTripMiles: 10, roundTripMinutes: 60 } });
   const solo = calculateProfitability({ price: 1000, cleanerCount: 1, hoursPerCleaner: 1, settings: { ...settings, vehicleOperatingRatePerMile: .5 }, travel: { ...verifiedTravel(1), roundTripMiles: 10, roundTripMinutes: 60 } });
