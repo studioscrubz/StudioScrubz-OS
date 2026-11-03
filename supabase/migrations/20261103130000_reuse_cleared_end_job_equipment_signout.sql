@@ -2,7 +2,6 @@
 -- equipment verification for that job in the SAME open work session.
 -- Do not ask for an identical Final Sign Out submission later.
 -- Keep unresolved/missing equipment and historical sessions blocked.
-begin;
 
 create or replace function public.get_my_pending_equipment_signouts()
 returns table(job_id uuid, job_number text)
@@ -84,4 +83,3 @@ revoke all on function public.stop_my_work() from public,anon,authenticated;
 grant execute on function public.stop_my_work() to authenticated;
 
 notify pgrst, 'reload schema';
-commit;
