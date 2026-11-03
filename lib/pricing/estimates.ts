@@ -802,7 +802,7 @@ function commercialServiceFloor(
   );
 }
 
-function productionRateForCondition(
+export function productionRateForCondition(
   service: ServiceCatalogBundle["services"][number],
   condition: Condition,
   fallback: number,

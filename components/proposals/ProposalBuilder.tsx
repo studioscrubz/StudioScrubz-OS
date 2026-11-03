@@ -56,6 +56,7 @@ import { proposalAddonSnapshots, replaceProposalCatalogAddons, selectProposalCat
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { canAccessFinances } from "@/lib/auth/permissions";
 import { ProfitabilityPanel } from "@/components/estimates/ProfitabilityPanel";
+import { CommercialLaborInsights } from "@/components/estimates/CommercialLaborInsights";
 import { ElevatedSurfaceMultiSelect } from "@/components/estimates/ElevatedSurfaceMultiSelect";
 import { getProfitabilityProjection, getProfitabilitySettings, saveProfitabilityProjection } from "@/lib/services/profitability";
 import type { ProfitabilityAdjustments, ProfitabilityProjection, ProfitabilitySettings, TravelProjection } from "@/types/profitability";
@@ -814,6 +815,7 @@ export function ProposalBuilder({
             <p className="mt-3 text-sm text-neutral-600">
               Labor Hours are total crew labor hours. Duration is calculated as total labor hours divided by crew size.
             </p>
+            {catalogService && pricingEstimate && "commercialType" in pricingEstimate.calculatorInput && <div className="mt-4"><CommercialLaborInsights input={pricingEstimate.calculatorInput} service={catalogService} laborHours={calculatedResult.laborHours} crewSize={calculatedResult.crewRecommendation} /></div>}
           </Panel>}
           <Panel title="Proposal Adjustments">
             <div className="grid gap-4 sm:grid-cols-3">
