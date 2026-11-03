@@ -276,50 +276,90 @@ export async function getJobLaborSummary(
 export async function getJobProfitabilitySummary(
   jobId: string,
 ): Promise<JobProfitabilitySummary> {
-  const labor = await getJobLaborSummary(jobId),
-    db = getSupabaseClient();
+  const db = getSupabaseClient();
   const [
-    { data: invoices, error: invoiceError },
-    { data: expenses, error: expenseError },
+    rows,
+    jobResponse,
+    invoiceResponse,
+    expenseResponse,
   ] = await Promise.all([
-    db
-      .from("invoices")
-      .select("id")
-      .eq("job_id", jobId)
-      .not("status", "in", "(Cancelled,Archived)")
-      .is("archived_at", null),
-    db
-      .from("expenses")
-      .select("amount")
-      .eq("job_id", jobId)
-      .eq("status", "Active")
-      .is("archived_at", null),
+    getTimeEntriesForJob(jobId),
+    db.from("jobs").select("price,labor_hours,estimate_id,proposal_id,status").eq("id",jobId).single(),
+    db.from("invoices").select("id,total,amount_paid,balance_due").eq("job_id",jobId)
+      .not("status","in","(Cancelled,Archived)").is("archived_at",null),
+    db.from("expenses").select("amount").eq("job_id",jobId)
+      .eq("status","Active").is("archived_at",null),
   ]);
-  if (invoiceError) throw invoiceError;
-  if (expenseError) throw expenseError;
-  const ids = (invoices ?? []).map((x) => x.id);
-  let collectedRevenue = 0;
-  if (ids.length) {
-    const { data, error } = await db
-      .from("payments")
-      .select("amount")
-      .in("invoice_id", ids);
-    if (error) throw error;
-    collectedRevenue = (data ?? []).reduce((n, x) => n + Number(x.amount), 0);
+  if (jobResponse.error) throw jobResponse.error;
+  if (invoiceResponse.error) throw invoiceResponse.error;
+  if (expenseResponse.error) throw expenseResponse.error;
+  const job=jobResponse.data;
+  const invoices=invoiceResponse.data ?? [];
+  const expenseTotal=(expenseResponse.data ?? []).reduce((n,x)=>n+Number(x.amount),0);
+  const actual=rows.filter(paid);
+  const labor:JobLaborSummary={
+    employeesWorked:new Set(actual.map(x=>x.employee_id)).size,
+    regularHours:sum(actual,"regular_hours"),
+    overtimeHours:sum(actual,"overtime_hours"),
+    totalHours:sum(actual,"total_hours"),
+    actualLaborCost:sum(actual,"gross_pay"),
+  };
+  // Do not silently treat a missing saved labor budget as a zero-hour estimate.
+  const originalBudget=Number(job.labor_hours);
+  let estimatedLaborHours=originalBudget>0?originalBudget:null;
+  let laborEstimateSource:JobProfitabilitySummary["laborEstimateSource"]=
+    estimatedLaborHours!==null?"Job":"Missing";
+  if(estimatedLaborHours===null && job.proposal_id){
+    const {data,error}=await db.from("proposals").select("result").eq("id",job.proposal_id).maybeSingle();
+    if(error)throw error;
+    const budget=data?.result as {laborHours?:number|string}|null|undefined;
+    const amount=Number(budget?.laborHours);
+    if(Number.isFinite(amount)&&amount>0){estimatedLaborHours=amount;laborEstimateSource="Proposal";}
   }
-  const expenseTotal = (expenses ?? []).reduce(
-      (n, x) => n + Number(x.amount),
-      0,
-    ),
-    grossProfit = collectedRevenue - expenseTotal - labor.actualLaborCost;
+  if(estimatedLaborHours===null && job.estimate_id){
+    const {data,error}=await db.from("estimates").select("result").eq("id",job.estimate_id).maybeSingle();
+    if(error)throw error;
+    const budget=data?.result as {laborHours?:number|string}|null|undefined;
+    const amount=Number(budget?.laborHours);
+    if(Number.isFinite(amount)&&amount>0){estimatedLaborHours=amount;laborEstimateSource="Estimate";}
+  }
+  // Include payments attached to the job directly, even if there is no invoice.
+  // Dedupe by payment id before summing to avoid double counting.
+  const ids=invoices.map(x=>x.id);
+  const [invoicePayments,directPayments]=await Promise.all([
+    ids.length?db.from("payments").select("id,amount").in("invoice_id",ids).is("voided_at",null):
+      Promise.resolve({data:[],error:null}),
+    db.from("payments").select("id,amount").eq("job_id",jobId).is("voided_at",null),
+  ]);
+  if(invoicePayments.error)throw invoicePayments.error;
+  if(directPayments.error)throw directPayments.error;
+  const distinctPayments=new Map<string,number>();
+  for(const payment of [...(invoicePayments.data??[]),...(directPayments.data??[])]){
+    distinctPayments.set(payment.id,Number(payment.amount));
+  }
+  const collectedRevenue=Array.from(distinctPayments.values()).reduce((a,b)=>a+b,0);
+  const invoicedRevenue=invoices.reduce((n,x)=>n+Number(x.total),0);
+  const outstandingBalance=invoices.reduce((n,x)=>n+Number(x.balance_due),0);
+  const invoicePaid=invoices.reduce((n,x)=>n+Number(x.amount_paid),0);
+  const grossProfit=collectedRevenue-expenseTotal-labor.actualLaborCost;
+  const laborRecordsMissing=job.status==="Completed"&&actual.length===0;
+  const unapprovedTimeEntries=rows.filter(x=>x.status==="Completed"&&!x.archived_at).length;
   return {
     ...labor,
     collectedRevenue,
-    expenses: expenseTotal,
+    expenses:expenseTotal,
     grossProfit,
-    grossMargin: collectedRevenue
-      ? (grossProfit / collectedRevenue) * 100
-      : null,
+    grossMargin:collectedRevenue>0?grossProfit/collectedRevenue*100:null,
+    jobPrice:Number(job.price),
+    invoicedRevenue,
+    outstandingBalance,
+    invoiceCount:invoices.length,
+    paymentsReconciled:Math.abs(invoicePaid-collectedRevenue)<0.01,
+    estimatedLaborHours,
+    laborEstimateSource,
+    timeEntryCount:actual.length,
+    unapprovedTimeEntries,
+    laborRecordsMissing,
   };
 }
 export async function getCrewLaborSummary(
