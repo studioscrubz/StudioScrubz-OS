@@ -498,7 +498,16 @@ function ResidentialFields({ value, set,postConstruction,setPostConstruction,cat
   <NumberField label="Bedrooms" value={value.bedrooms} set={(v) => set({ ...value, bedrooms: v })} />
   <NumberField label="Bathrooms" step="0.5" value={value.bathrooms} set={(v) => set({ ...value, bathrooms: v })} />
   {service?.pricing_config.requires_complete_pricing_config&&<ProjectDurationFields days={value.targetProjectDays??3} workdayHours={value.workdayHours??8} setDays={(targetProjectDays)=>set({...value,targetProjectDays})} setWorkdayHours={(workdayHours)=>set({...value,workdayHours})}/>}
-  <Check label="Occupied property" checked={value.occupied} set={(v) => set({ ...value, occupied: v })} /><Check label="Pets / heavy pet hair" checked={value.pets} set={(v) => set({ ...value, pets: v })} />
+  <Check label="Occupied property" checked={value.occupied} set={(v) => set({ ...value, occupied: v })} />
+   <SelectField label="Pet-hair condition (assessment only)" value={value.petHairSeverity ?? (value.pets ? "Normal" : "None")} options={["None", "Normal", "Moderate", "Excessive"]} set={(petHairSeverity) => set({ ...value, petHairSeverity: petHairSeverity as NonNullable<ResidentialCalculatorInput["petHairSeverity"]>, pets: petHairSeverity !== "None" })} />
+   <NumberField label="Preferred hours on-site (per cleaner)" value={value.targetCompletionHours ?? 4.5} step="0.25" set={(targetCompletionHours) => set({ ...value, targetCompletionHours: Math.min(12, Math.max(1, targetCompletionHours)) })} />
+   <label className="text-sm font-bold">Crew size scheduling override
+      <select className="mt-1 h-11 w-full rounded-lg border px-3 font-normal" value={value.crewSizeOverride ?? ""} onChange={(event) => set({ ...value, crewSizeOverride: event.target.value ? Number(event.target.value) : null })}>
+        <option value="">Auto (by workload)</option>
+        {[1, 2, 3, 4, 5, 6].map(size => <option key={size} value={size}>{size} cleaner{size === 1 ? "" : "s"}</option>)}
+      </select>
+   </label>
+   <p className="text-xs text-neutral-600 sm:col-span-2 xl:col-span-3">Crew size changes time on-site, not total labor hours or the calculated customer price. Pet-hair severity is recorded for assessment only; no unverified extra charge is added.</p>
   <NumberField label="Additional Discount %" value={value.additionalDiscountPercent} set={(v) => set({ ...value, additionalDiscountPercent: v })} />
   <div className="sm:col-span-2 xl:col-span-3"><CatalogAddonPicker addons={addons} selected={value.addOns} setSelected={(addOns) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addOns }))} snapshots={value.addonSelections} setSnapshots={(addonSelections) => (set as unknown as Dispatch<SetStateAction<ResidentialCalculatorInput>>)(current => ({ ...current, addonSelections }))} /></div></div>}
 </div>; }

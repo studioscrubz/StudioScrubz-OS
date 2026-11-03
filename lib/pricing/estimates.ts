@@ -1,3 +1,4 @@
+import { recommendResidentialCrew } from "@/lib/pricing/residentialCrew";
 import type {
   CalculatorInput,
   CommercialCalculatorInput,
@@ -344,7 +345,11 @@ export function calculateResidentialEstimate(
         occupancyLaborHours,
     ) * conditionLaborMultiplier[input.condition];
 
-  const crewSize = laborHours >= 7 ? 3 : laborHours >= 3.5 ? 2 : 1;
+  const crewSize = recommendResidentialCrew(
+    laborHours,
+    input.targetCompletionHours,
+    input.crewSizeOverride,
+  );
 
   const workerHourlyPay = Math.max(MINIMUM_WORKER_HOURLY_PAY, 22);
   const laborCost = laborHours * workerHourlyPay;

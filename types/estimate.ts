@@ -44,6 +44,12 @@ export type ResidentialCalculatorInput = {
   bathrooms: number;
   occupied: boolean;
   pets: boolean;
+  /** Optional assessment-only severity; does not impose an unvalidated pet-hair fee. */
+  petHairSeverity?: "None" | "Normal" | "Moderate" | "Excessive";
+  /** Maximum desired onsite hours per cleaner for this visit; defaults to 4.5. */
+  targetCompletionHours?: number | null;
+  /** Explicit crew scheduling override; does not alter total labor or quote price. */
+  crewSizeOverride?: number | null;
   additionalDiscountPercent: number;
   taxRatePercent: number;
   addOns: string[];
