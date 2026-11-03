@@ -61,7 +61,9 @@ export function PorterProfitabilityPanel({ pricing, onPriceChange }: {
     ["Supervision/Admin plus allocated overhead", money(result.overhead)],
     ["Estimated operating profit", money(result.operatingProfit)],
     ["Operating margin", String(result.operatingMarginPercent ?? "—") + "%"],
-    ["Recommended minimum including commissions and overhead", result.recommendedMinimumPrice == null ? "Unavailable" : money(result.recommendedMinimumPrice)],
+    ["Gross-margin minimum (direct costs only)", result.grossMarginMinimumPrice == null ? "Unavailable" : money(result.grossMarginMinimumPrice)],
+    ["Operating break-even (including fees, commissions and overhead)", result.operatingBreakEvenPrice == null ? "Unavailable" : money(result.operatingBreakEvenPrice)],
+    ["Recommended minimum (higher of two floors)", result.recommendedMinimumPrice == null ? "Unavailable" : money(result.recommendedMinimumPrice)],
     ["Additional price needed to reach target", result.differenceToTarget == null ? "Unavailable" : money(result.differenceToTarget)],
   ] : [];
   return <section className="mt-4 rounded-xl border border-[#143d1a]/20 bg-white p-4 sm:p-5" aria-label="Internal monthly profitability">
@@ -111,7 +113,7 @@ export function PorterProfitabilityPanel({ pricing, onPriceChange }: {
         </div>
         <p className="mt-3 text-xs text-neutral-600">Current monthly customer estimate: <strong>{money(result.price)}</strong>. Internal cost inputs are private and reset when the editor closes; the approved price is saved only through Use Pricing.</p>
       </div>
-      <p className="mt-3 text-xs text-amber-900">Expenses entered here are for this private calculation only and reset when the editor is closed. The existing monthly Travel and Supervision/Admin entries are counted once; do not duplicate them. Recurring travel is the monthly amount you entered, not a Geoapify-verified route.</p>
+      <p className="mt-3 text-xs text-amber-900">Expenses entered here are for this private calculation only and reset when the editor is closed. Gross margin is applied only to direct costs; operating expenses are recovered through a separate break-even check. The existing monthly Travel and Supervision/Admin entries are counted once; do not duplicate them. Recurring travel is the monthly amount you entered, not a Geoapify-verified route.</p>
     </>}
   </section>;
 }
