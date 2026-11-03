@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const migration = readFileSync("supabase/migrations/20261103130000_reuse_cleared_end_job_equipment_signout.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20261103132824_reuse_cleared_end_job_equipment_signout.sql", "utf8");
 const dashboard = readFileSync("components/time/DashboardTimeClockControl.tsx", "utf8");
 const service = readFileSync("lib/services/equipmentClearance.ts", "utf8");
 const action = readFileSync("components/jobs/JobEquipmentActions.tsx", "utf8");
