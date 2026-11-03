@@ -238,3 +238,6 @@ Porter Hub V2 Phase 1 adds the existing authenticated `get_business_settings_pub
 - RPCs: `get_profitability_settings`, `save_profitability_settings`, `get_profitability_projection`, and `save_profitability_projection`. Database permissions enforce Master Admin access to protected financial snapshots.
 - Related application dependencies: `lib/services/profitability.ts`, `app/api/profitability/travel/route.ts`, `components/estimates/ProfitabilityPanel.tsx`, `components/settings/ProfitabilitySettings.tsx`, and pricing calculators.
 - Retain Corporate Capability, High Dusting, and linked-estimate migrations and features.
+
+
+2026-11-03 New-job labor planning: `20261103163000_capture_job_planned_labor_from_linked_proposal.sql` adds the private insert trigger `private.capture_new_job_labor_from_proposal` to preserve accepted proposal person-hours and crew recommendation for newly created proposal/recurring jobs before the existing immutable start-time labor snapshot. The trigger never backfills jobs, changes accepted prices, or invents a budget for a legacy agreement with no proposal. Direct Job form and service require a positive total person-hour input; incomplete legacy agreement jobs remain flagged as missing in Job Performance.
