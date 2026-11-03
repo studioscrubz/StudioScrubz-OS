@@ -259,6 +259,9 @@ export function EstimateBuilder({ estimate, onSaved }: { estimate?: EstimateWith
     hoursPerCleaner: result.laborHours / Math.max(1, result.crewSize),
     hourlyWage: "workerHourlyPay" in calculatorInput && typeof calculatorInput.workerHourlyPay === "number" ? calculatorInput.workerHourlyPay : undefined,
     settings: profitabilitySettings,
+    targetGrossMarginRate: "targetProfitMarginPercent" in calculatorInput && typeof calculatorInput.targetProfitMarginPercent === "number"
+      ? calculatorInput.targetProfitMarginPercent / 100
+      : undefined,
     travel: { ...profitabilityTravel, travelingEmployeeCount: Math.max(1, result.crewSize) },
     supplies: result.supplyCost,
     ...profitabilityAdjustments,
