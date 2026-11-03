@@ -4,7 +4,7 @@ import test from "node:test";
 
 const estimates = readFileSync("lib/pricing/estimates.ts", "utf8");
 const migration = readFileSync(
-  "supabase/migrations/20261103120000_correct_office_janitorial_production_rates.sql",
+  "supabase/migrations/20261103113833_correct_office_janitorial_production_rates.sql",
   "utf8",
 );
 
