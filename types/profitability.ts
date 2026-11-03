@@ -96,6 +96,10 @@ export type ProfitabilityProjection = {
   grossProfit: number | null;
   grossMarginPercent: number | null;
   targetGrossMarginPercent: number;
+  /** Minimum customer price meeting the target gross margin on direct job costs only. */
+  grossMarginMinimumPrice?: number | null;
+  /** Minimum customer price covering direct costs, fees, commissions and overhead. */
+  operatingBreakEvenPrice?: number | null;
   recommendedMinimumPrice: number | null;
   differenceToRecommendedMinimum: number | null;
   belowTargetMargin: boolean;
