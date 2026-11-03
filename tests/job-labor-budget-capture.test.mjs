@@ -23,7 +23,7 @@ test("direct job requires positive person-hours in both form and service before 
 });
 test("does not fabricate hours for legacy recurring agreements without a linked proposal",()=>{
  assert.match(migration,/if new\.proposal_id is null/);
- assert.match(migration,/leave historical data untouched|Never backfill existing/i);
+ assert.match(migration,/Historical jobs and legacy agreements without a linked proposal are untouched/i);
  assert.match(migration,/security definer\s+set search_path = ''/i);
  assert.match(migration,/revoke all on function private\.capture_new_job_labor_from_proposal/);
 });
