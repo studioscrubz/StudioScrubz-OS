@@ -319,6 +319,10 @@ export function DirectJobModal({
       );
     }
 
+    if (!Number.isFinite(laborHours) || laborHours <= 0) {
+      return setError("Enter planned total person-hours greater than zero before creating this Job.");
+    }
+
     setSaving(true);
     setError(null);
 
@@ -724,10 +728,10 @@ export function DirectJobModal({
                   </div>
                 )}
 
-                <Field label="Planned Labor Hours">
+                <Field label="Planned Total Person-Hours" required>
                   <input
                     type="number"
-                    min="0"
+                    min="0.25"
                     step="0.25"
                     className={`${input} mt-2 max-w-xs`}
                     value={laborHours || ""}
@@ -738,7 +742,7 @@ export function DirectJobModal({
                 </Field>
 
                 <p className="mt-2 text-xs text-neutral-500">
-                  Labor hours are operational planning data. The
+                  Total person-hours are required operational planning data (e.g., two cleaners × four hours = eight person-hours). The
                   selected Service and Add-Ons automatically determine
                   the Job Amount unless a Master Admin override is
                   used.
