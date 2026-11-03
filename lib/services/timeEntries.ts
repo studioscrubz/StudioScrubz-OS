@@ -312,13 +312,15 @@ export async function getJobProfitabilitySummary(
   if(estimatedLaborHours===null && job.proposal_id){
     const {data,error}=await db.from("proposals").select("result").eq("id",job.proposal_id).maybeSingle();
     if(error)throw error;
-    const amount=Number(data?.result?.laborHours);
+    const budget=data?.result as {laborHours?:number|string}|null|undefined;
+    const amount=Number(budget?.laborHours);
     if(Number.isFinite(amount)&&amount>0){estimatedLaborHours=amount;laborEstimateSource="Proposal";}
   }
   if(estimatedLaborHours===null && job.estimate_id){
     const {data,error}=await db.from("estimates").select("result").eq("id",job.estimate_id).maybeSingle();
     if(error)throw error;
-    const amount=Number(data?.result?.laborHours);
+    const budget=data?.result as {laborHours?:number|string}|null|undefined;
+    const amount=Number(budget?.laborHours);
     if(Number.isFinite(amount)&&amount>0){estimatedLaborHours=amount;laborEstimateSource="Estimate";}
   }
   // Include payments attached to the job directly, even if there is no invoice.
