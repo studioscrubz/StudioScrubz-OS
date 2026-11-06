@@ -354,6 +354,30 @@ const navItems: Array<NavLink | NavGroup> = [
 
       },
 
+      {
+
+        label: "Marketing Materials",
+
+        href: "/marketing-materials",
+
+        marker: "M",
+
+        permission: "marketingMaterials.send",
+
+      },
+
+      {
+
+        label: "Vendor Packets",
+
+        href: "/vendor-packets",
+
+        marker: "V",
+
+        permission: "estimates.create",
+
+      },
+
     ],
 
   },
@@ -423,42 +447,6 @@ const navItems: Array<NavLink | NavGroup> = [
         marker: "P",
 
         permission: "properties.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Marketing Materials",
-
-    marker: "M",
-
-    children: [
-
-      {
-
-        label: "Marketing Materials",
-
-        href: "/marketing-materials",
-
-        marker: "",
-
-        permission: "marketingMaterials.send",
-
-      },
-
-      {
-
-        label: "Vendor Packets",
-
-        href: "/vendor-packets",
-
-        marker: "V",
-
-        permission: "estimates.create",
 
       },
 
