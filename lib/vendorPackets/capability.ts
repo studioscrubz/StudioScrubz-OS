@@ -143,8 +143,6 @@ export function buildVendorCapabilityDocumentModel(input: BuildCapabilityStateme
     ...verifiedCorporateData,
     { label: "Commercial General Liability", value: "Spinnaker Insurance Company; policy CSG-00596658-00; $1,000,000 each occurrence / $2,000,000 general aggregate." },
     { label: "City of Los Angeles Business Tax Registration Certificate (BTRC)", value: "Registration number not provided; verify before vendor submission." },
-    { label: "CSLB Contractor's License (janitorial scope only)", value: "N/A — Professional janitorial and property cleaning services; CSLB contractor's license not required for the cleaning scope offered." },
-    { label: "Scope qualification", value: "Construction cleanup, alterations, repairs, or other contractor-regulated activities may require separate CSLB licensing review." },
   ];
   const overview = statement
     ? (profile && clean(profile.overview) ? [clean(profile.overview)] : [...intro])
