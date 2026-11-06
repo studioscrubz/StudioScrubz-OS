@@ -288,19 +288,20 @@ test("vendor packet and capability statement show insurance, BTRC, and scope-lim
   for (const documentKind of ["corporate-capability-statement","service-packet"]) {
     const model = capability.buildVendorCapabilityDocumentModel({ ...baseInput(emptyProfile()), documentKind });
     const facts = Object.fromEntries(model.corporateData.map(entry => [entry.label,entry.value]));
-    assert.match(facts["Insurance / COI"], /Certificate of Insurance available upon request/);
+    assert.match(facts["Commercial General Liability"], /Spinnaker Insurance Company/);
+    assert.match(facts["Commercial General Liability"], /11\/06\/2026/);
     assert.match(facts["City of Los Angeles Business Tax Registration Certificate (BTRC)"], /Registration number not provided/);
     assert.equal(facts["CSLB Contractor's License (janitorial scope only)"], "N/A — Professional janitorial and property cleaning services; CSLB contractor's license not required for the cleaning scope offered.");
     assert.match(facts["Scope qualification"], /Construction cleanup/);
     const rendered = email.renderCapabilityDocumentEmail({ model, message: "Vendor information" });
     assert.match(rendered.text,/Business Tax Registration Certificate \(BTRC\)/);
-    assert.match(rendered.text,/Certificate of Insurance/);
-    assert.doesNotMatch(rendered.text,/Policy #|Coverage: \$[0-9]/);
+    assert.match(rendered.text,/Spinnaker Insurance Company/);
+    assert.doesNotMatch(rendered.text,/workers.compensation is active/i);
     if(documentKind === "service-packet") {
       const pdfText = pdf.generateServiceCapabilityPacketPdf(model).toString("ascii");
       assert.match(pdfText,/Vendor registration and insurance/i);
       assert.match(pdfText,/Business Tax Registration Certificate/);
-      assert.match(pdfText,/Certificate of Insurance/);
+      assert.match(pdfText,/Spinnaker Insurance Company/);
     }
   }
 });
