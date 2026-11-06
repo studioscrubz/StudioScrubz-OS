@@ -289,7 +289,7 @@ test("vendor packet and capability statement show insurance, BTRC, and scope-lim
     const model = capability.buildVendorCapabilityDocumentModel({ ...baseInput(emptyProfile()), documentKind });
     const facts = Object.fromEntries(model.corporateData.map(entry => [entry.label,entry.value]));
     assert.match(facts["Commercial General Liability"], /Spinnaker Insurance Company/);
-    assert.match(facts["Commercial General Liability"], /11\/06\/2026/);
+    assert.doesNotMatch(facts["Commercial General Liability"], /Policy dates|Coverage subject to|certificate available on request/);
     assert.match(facts["City of Los Angeles Business Tax Registration Certificate (BTRC)"], /Registration number not provided/);
     assert.equal(facts["CSLB Contractor's License (janitorial scope only)"], "N/A — Professional janitorial and property cleaning services; CSLB contractor's license not required for the cleaning scope offered.");
     assert.match(facts["Scope qualification"], /Construction cleanup/);
