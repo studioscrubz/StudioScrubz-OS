@@ -141,7 +141,7 @@ export function buildVendorCapabilityDocumentModel(input: BuildCapabilityStateme
   // actually supplied. Never invent a BTRC number, insurer, or policy limits.
   const corporateData: CapabilityDataEntry[] = [
     ...verifiedCorporateData,
-    { label: "Insurance / COI", value: "Insured; Certificate of Insurance available upon request. Coverage details subject to the current certificate." },
+    { label: "Commercial General Liability", value: "Spinnaker Insurance Company; policy CSG-00596658-00; $1,000,000 each occurrence / $2,000,000 general aggregate. Policy dates 11/06/2026–11/06/2027, per COI dated 11/06/2026. Coverage subject to the policy terms, exclusions and limits; certificate available on request." },
     { label: "City of Los Angeles Business Tax Registration Certificate (BTRC)", value: "Registration number not provided; verify before vendor submission." },
     { label: "CSLB Contractor's License (janitorial scope only)", value: "N/A — Professional janitorial and property cleaning services; CSLB contractor's license not required for the cleaning scope offered." },
     { label: "Scope qualification", value: "Construction cleanup, alterations, repairs, or other contractor-regulated activities may require separate CSLB licensing review." },
