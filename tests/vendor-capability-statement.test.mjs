@@ -68,7 +68,7 @@ test("corporate statement omits empty and unverified identifiers and claims", ()
   const empty = capability.buildVendorCapabilityDocumentModel(baseInput(emptyProfile()));
   assert.equal(empty.documentKind, "corporate-capability-statement");
   assert.equal(empty.documentVersion, "corporate-capability-statement-v1");
-  assert.equal(empty.corporateData.length, 0);
+  assert.equal(empty.corporateData.length, 4);
   assert.equal(empty.pastPerformance.length, 0);
   assert.equal(empty.serviceAreas.length, 0);
   assert.equal(empty.business.contactName, null);
@@ -81,7 +81,7 @@ test("corporate statement omits empty and unverified identifiers and claims", ()
     cageCode: "BAD99",
     certifications: ["Unverified claim"],
   }));
-  assert.equal(invalidVersion.corporateData.length, 0);
+  assert.equal(invalidVersion.corporateData.length, 4);
   const rendered = email.renderCapabilityDocumentEmail({ model: empty, message: "Please review." });
   assert.doesNotMatch(rendered.html, /Unique Entity ID|CAGE Code|NAICS Codes|Certifications|Past Performance/);
 });
@@ -282,4 +282,25 @@ test("Send action always uses the currently previewed document", () => {
   assert.match(ui, /onClick=\{\(\) => openEmail\("corporate-capability-statement", true\)\}/);
   assert.doesNotMatch(ui, />Email Statement<\/button>/);
   assert.doesNotMatch(ui, />Email Packet<\/button>/);
+});
+
+test("vendor packet and capability statement show insurance, BTRC, and scope-limited CSLB wording without inventing identifiers", () => {
+  for (const documentKind of ["corporate-capability-statement","service-packet"]) {
+    const model = capability.buildVendorCapabilityDocumentModel({ ...baseInput(emptyProfile()), documentKind });
+    const facts = Object.fromEntries(model.corporateData.map(entry => [entry.label,entry.value]));
+    assert.match(facts["Insurance / COI"], /Certificate of Insurance available upon request/);
+    assert.match(facts["City of Los Angeles Business Tax Registration Certificate (BTRC)"], /Registration number not provided/);
+    assert.equal(facts["CSLB Contractor's License (janitorial scope only)"], "N/A — Professional janitorial and property cleaning services; CSLB contractor's license not required for the cleaning scope offered.");
+    assert.match(facts["Scope qualification"], /Construction cleanup/);
+    const rendered = email.renderCapabilityDocumentEmail({ model, message: "Vendor information" });
+    assert.match(rendered.text,/Business Tax Registration Certificate \(BTRC\)/);
+    assert.match(rendered.text,/Certificate of Insurance/);
+    assert.doesNotMatch(rendered.text,/Policy #|Coverage: \$[0-9]/);
+    if(documentKind === "service-packet") {
+      const pdfText = pdf.generateServiceCapabilityPacketPdf(model).toString("ascii");
+      assert.match(pdfText,/Vendor registration and insurance/i);
+      assert.match(pdfText,/Business Tax Registration Certificate/);
+      assert.match(pdfText,/Certificate of Insurance/);
+    }
+  }
 });
