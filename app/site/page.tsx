@@ -148,9 +148,15 @@ export default function MarketingHome() {
               </a>
             </div>
 
-            <p className="mt-8 text-sm font-extrabold uppercase tracking-[.2em] text-[#143d1a]/55">
-              No Mess. No Stress.
-            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#143d1a]/15 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[.12em] text-[#143d1a] shadow-sm">
+                <span aria-hidden="true" className="text-[#9a7a17]">✓</span>
+                Registered &amp; Insured
+              </span>
+              <span className="text-sm font-extrabold uppercase tracking-[.2em] text-[#143d1a]/55">
+                No Mess. No Stress.
+              </span>
+            </div>
           </div>
 
           <div className="relative mx-auto w-full max-w-xl">
