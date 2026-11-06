@@ -75,6 +75,10 @@ export function generateServiceCapabilityPacketPdf(model: CapabilityStatementMod
     for (const bullet of item.bullets) lines(`- ${bullet}`, 9.5, false, DARK, 10, 2);
     if (item.note) lines(item.note, 9.5, false, DARK, 10, 2);
   }
+  if (model.corporateData.length) {
+    heading("Vendor registration and insurance");
+    for (const item of model.corporateData) lines(`${item.label}: ${item.value}`, 9.5, false, DARK, 0, 3);
+  }
   if (model.process.length) {
     heading("How we work");
     for (const p of model.process) lines(`${p.title}: ${p.copy}`);
