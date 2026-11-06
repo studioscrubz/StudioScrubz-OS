@@ -86,6 +86,7 @@ function ServiceCapabilityPacket({ model }: { model: CapabilityStatementModel })
     <DocumentSection title="Selected Service Capabilities" className="vendor-capabilities">
       {model.coreCompetencies.map((item) => <div className="vendor-module" key={item.id}><h3>{item.title}</h3><ul>{item.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>{item.note && <p>{item.note}</p>}</div>)}
     </DocumentSection>
+    {model.corporateData.length > 0 && <DocumentSection title="Vendor Registration & Insurance"><dl className="grid gap-3">{model.corporateData.map(entry => <div key={entry.label}><dt className="font-bold">{entry.label}</dt><dd>{entry.value}</dd></div>)}</dl></DocumentSection>}
     {model.process.length > 0 && <DocumentSection title="How We Work" className="vendor-process"><ol>{model.process.map((step) => <li key={step.title}><h3>{step.title}</h3><p>{step.copy}</p></li>)}</ol></DocumentSection>}
     {model.differentiators.length > 0 && <DocumentSection title={`Why ${model.business.name}`} className="vendor-strengths">{model.differentiators.map((item) => {
       const [title, ...copy] = item.split(": ");
