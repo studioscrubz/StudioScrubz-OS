@@ -131,12 +131,21 @@ export function buildVendorCapabilityDocumentModel(input: BuildCapabilityStateme
     contactTitle: profile ? cleanOrNull(profile.contactTitle) : null,
   };
   const statement = documentKind === "corporate-capability-statement";
-  const corporateData = statement && profile ? compactEntries([
+  const verifiedCorporateData = statement && profile ? compactEntries([
     { label: "Unique Entity ID (UEI)", value: profile.uei },
     { label: "CAGE Code", value: profile.cageCode },
     { label: "NAICS Codes", value: cleanList(profile.naicsCodes).join(", ") },
     { label: "Certifications", value: cleanList(profile.certifications).join(", ") },
   ]) : [];
+  // These vendor-facing qualifications are intentionally limited to the facts
+  // actually supplied. Never invent a BTRC number, insurer, or policy limits.
+  const corporateData: CapabilityDataEntry[] = [
+    ...verifiedCorporateData,
+    { label: "Insurance / COI", value: "Insured; Certificate of Insurance available upon request. Coverage details subject to the current certificate." },
+    { label: "City of Los Angeles Business Tax Registration Certificate (BTRC)", value: "Registration number not provided; verify before vendor submission." },
+    { label: "CSLB Contractor's License (janitorial scope only)", value: "N/A — Professional janitorial and property cleaning services; CSLB contractor's license not required for the cleaning scope offered." },
+    { label: "Scope qualification", value: "Construction cleanup, alterations, repairs, or other contractor-regulated activities may require separate CSLB licensing review." },
+  ];
   const overview = statement
     ? (profile && clean(profile.overview) ? [clean(profile.overview)] : [...intro])
     : [...intro, ...about];
