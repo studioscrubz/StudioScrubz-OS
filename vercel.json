@@ -7,7 +7,8 @@
       "fix/contractor-job-options": false,
       "fix/contractor-request-review": false,
       "fix/contractor-withdraw-request": false,
-      "fix/active-contractor-directory": false
+      "fix/active-contractor-directory": false,
+      "fix/contractor-portal-access": false
     }
   },
   "crons": [
