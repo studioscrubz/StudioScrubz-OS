@@ -14,10 +14,12 @@ export async function GET(request:Request){
  try{
   const ctx=await contractorContext();
   const id=uuid(new URL(request.url).searchParams.get("id"));
-  const {data:document,error}=await ctx.admin.from("contractor_documents").select("id,company_id,storage_path")
+  const {data:document,error}=await ctx.admin.from("contractor_documents").select("id,company_id,storage_path,category")
    .eq("id",id).maybeSingle();
   if(error||!document||ctx.type==="partner"&&document.company_id!==ctx.companyId)
    throw new ContractorAccessError("File unavailable.",404);
+  if(ctx.type==="partner"&&ctx.role!=="Company Admin"&&document.category==="Tax")
+   throw new ContractorAccessError("Company administrator access is required for tax documents.",403);
   const {data:signed,error:se}=await ctx.admin.storage.from(BUCKET).createSignedUrl(document.storage_path,60);
   if(se||!signed)throw new ContractorAccessError("Secure file link unavailable.",503);
   return noCache({url:signed.signedUrl,expiresInSeconds:60});
@@ -44,7 +46,8 @@ export async function POST(request:Request){
     .eq("company_id",companyId).maybeSingle();
    if(!op)throw new ContractorAccessError("Opportunity is not within this company.",403);
   }
-  if(ctx.type==="partner"&&category==="Tax")throw new ContractorAccessError("Upload tax documents through approved onboarding only.",403);
+  if(ctx.type==="partner"&&category==="Tax"&&ctx.role!=="Company Admin")
+   throw new ContractorAccessError("Company administrator access required to upload tax documents.",403);
   const fileName=uploaded.name.replace(/[\r\n]/g," ").slice(0,180).trim()||"attachment";
   const path=`${companyId}/${opportunityId??"company"}/${randomUUID()}.${mimes[uploaded.type]}`;
   const result=await ctx.admin.storage.from(BUCKET).upload(path,bytes,{contentType:uploaded.type,upsert:false});
