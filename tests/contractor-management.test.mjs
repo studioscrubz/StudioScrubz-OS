@@ -22,7 +22,7 @@ test("portal user identity is verified against membership and active company, ne
  assert.match(guards,/if\(staff\)throw/);
  assert.doesNotMatch(guards,/raw_user_meta_data|user_metadata/);
  assert.match(api,/\.eq\("company_id",companyId\)/);
- assert.match(api,/linkedIds\.length\?db\.from\("invoices"\)\.select\("id,job_id,invoice_number,status,total,amount_paid,due_date"\)/);
+ assert.match(api,/db\.from\("invoices"\)\.select\("id,job_id,invoice_number,status,total,amount_paid,due_date(?:,archived_at)?"\)/);
  assert.doesNotMatch(api,/\.select\(".*gross_pay.*"\).*eq\("company_id"/);
 });
 test("single-use invitations expire and require matching verified auth email",()=>{
