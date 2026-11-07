@@ -2217,6 +2217,9 @@ export interface Database {
     };
 
     Functions: {
+      get_my_contractor_request_reviews: { Args: Record<PropertyKey, never>; Returns: {
+        id: string; opportunity_number: string; property_name: string | null; service_type: string; request_revision: number; status: string; updated_at: string;
+      }[] };
       get_corporate_capability_profile: {
         Args: Record<PropertyKey, never>;
         Returns: CorporateCapabilityProfile;

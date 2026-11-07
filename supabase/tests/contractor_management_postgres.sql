@@ -281,3 +281,90 @@ begin
  end if;
 end
 $$;
+
+\ir ../migrations/20261107200058_contractor_request_review.sql
+
+update public.contractor_companies set assigned_manager_id='00000000-0000-4000-8000-000000000002'
+ where id='10000000-0000-4000-8000-000000000001';
+
+-- New portal submissions save the property atomically and are queued for the manager.
+insert into public.contractor_opportunities(id,company_id,submitted_by,service_type,property_type,property_name,
+ property_address,scope_of_work,requested_date,estimated_person_hours,proposed_amount,request_options)
+values('30000000-0000-4000-8000-000000000009','10000000-0000-4000-8000-000000000001',
+ '00000000-0000-4000-8000-000000000011','Deep Cleaning','Residential','Sample Residence',
+ '321 Original Example Street','Clean the entire test property',current_date,4,500,'{}');
+
+do $$begin
+ if not exists(select 1 from public.contractor_opportunities o join public.properties p on p.id=o.request_property_id
+  join public.contractor_companies c on c.id=o.company_id and c.client_id=p.client_id
+  where o.id='30000000-0000-4000-8000-000000000009' and p.property_name='Sample Residence' and p.address=o.property_address) then
+  raise exception 'New contractor property was not saved for its company';
+ end if;
+ begin
+  insert into public.contractor_opportunities(company_id,service_type,property_type,property_address,scope_of_work,
+   requested_date,estimated_person_hours,proposed_amount,request_options)
+  values('10000000-0000-4000-8000-000000000001','Deep Cleaning','Residential','422 No Name Example Street',
+   'Clean the entire test property',current_date,4,500,'{}');
+  raise exception 'The missing residential name was accepted';
+ exception when raise_exception then
+  if sqlerrm<>'A name is required for residential requests.' then raise; end if;
+ end;
+end$$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
+do $$begin
+ if not exists(select 1 from public.get_my_contractor_request_reviews() where id='30000000-0000-4000-8000-000000000009') then
+  raise exception 'Assigned Operations Manager did not receive the review item';
+ end if;
+end$$;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000001',false);
+do $$begin
+ if exists(select 1 from public.get_my_contractor_request_reviews() where id='30000000-0000-4000-8000-000000000009') then
+  raise exception 'Unassigned admin received an assigned manager review item';
+ end if;
+end$$;
+reset role;
+
+-- A pre-approval edit can change the requested address and invalidates old pricing.
+insert into public.contractor_profitability(opportunity_id,assessed_by,assessed_amount,assessed_scope,minimum_price,cost_complete,projection)
+values('30000000-0000-4000-8000-000000000009','00000000-0000-4000-8000-000000000002',500,'Clean the entire test property',100,true,'{}');
+update public.contractor_opportunities
+ set property_address='345 Corrected Example Street',request_revision=1
+ where id='30000000-0000-4000-8000-000000000009';
+do $$begin
+ if exists(select 1 from public.contractor_profitability where opportunity_id='30000000-0000-4000-8000-000000000009') then
+  raise exception 'Stale contractor profitability survived a request edit';
+ end if;
+ if not exists(select 1 from public.contractor_opportunities o join public.properties p on p.id=o.request_property_id
+  where o.id='30000000-0000-4000-8000-000000000009' and p.address='345 Corrected Example Street') then
+  raise exception 'Edited contractor address was not saved';
+ end if;
+end$$;
+
+update public.contractor_opportunities
+ set status='Awaiting Approval',partner_confirmed_at=now(),final_scope=scope_of_work,agreed_amount=proposed_amount
+ where id='30000000-0000-4000-8000-000000000009';
+insert into public.contractor_profitability(opportunity_id,request_revision,assessed_by,assessed_amount,assessed_scope,minimum_price,cost_complete,projection)
+values('30000000-0000-4000-8000-000000000009',1,'00000000-0000-4000-8000-000000000002',500,'Clean the entire test property',100,true,'{}');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
+select public.convert_contractor_opportunity_to_job('30000000-0000-4000-8000-000000000009');
+reset role;
+do $$begin
+ if not exists(select 1 from public.contractor_opportunities o join public.jobs j on j.id=o.linked_job_id
+  where o.id='30000000-0000-4000-8000-000000000009' and o.request_property_id=j.property_id and j.property_name='Sample Residence') then
+  raise exception 'Approval failed to reuse the saved property and name';
+ end if;
+ if (select count(*) from public.properties where address='345 Corrected Example Street')<>1 then
+  raise exception 'Approval duplicated the saved property';
+ end if;
+ begin
+  update public.contractor_opportunities set request_revision=2
+   where id='30000000-0000-4000-8000-000000000009';
+  raise exception 'Approved contractor request was editable';
+ exception when raise_exception then
+  if sqlerrm<>'This contractor request is locked.' then raise; end if;
+ end;
+end$$;

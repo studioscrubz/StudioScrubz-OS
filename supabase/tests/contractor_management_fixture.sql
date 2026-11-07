@@ -16,7 +16,7 @@ create table public.clients(
 );
 create table public.properties(
  id uuid primary key default gen_random_uuid(),client_id uuid references public.clients(id),
- property_type text,address text,square_feet numeric,bedrooms numeric,bathrooms numeric,
+ property_type text,property_name text,archived_at timestamptz,address text,square_feet numeric,bedrooms numeric,bathrooms numeric,
  access_instructions text,notes text
 );
 create table public.jobs(

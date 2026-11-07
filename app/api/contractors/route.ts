@@ -1,5 +1,5 @@
 import "server-only";
-import { contractorPropertyConditions, contractorScopeOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
+import { contractorPropertyConditions, contractorScopeOptions, editableContractorRequestStatuses, type ContractorRequestOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
 import { loadAuthoritativeCatalog, publicCatalog } from "@/lib/services/publicEstimateRequests";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { calculateProfitability } from "@/lib/pricing/profitability";
@@ -121,7 +121,7 @@ async function list(ctx:ContractorContext){
  const [company,opportunities,offers,documents]=await Promise.all([
   db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id")
    .eq("id",companyId).single(),
-  db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_address,property_type,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
+  db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_name,property_address,property_type,request_options,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at,updated_at,internal_confirmed_at,submitted_by").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_offers").select("id,opportunity_id,company_id,offered_by_side,amount,pricing_basis,scope_text,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_documents").select("id,opportunity_id,file_name,mime_type,file_size,category,created_at").eq("company_id",companyId).limit(500),
  ]);
@@ -143,7 +143,7 @@ async function list(ctx:ContractorContext){
   approvedJobIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",approvedJobIds).is("archived_at",null).neq("status","Cancelled"):Promise.resolve({data:[],error:null}),
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
- return {role:ctx.role,company:publicCompany,operationsManager:manager?{name:manager.display_name??"Operations Manager"}:null,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+ return {role:ctx.role,company:publicCompany,viewerId:ctx.userId,operationsManager:manager?{name:manager.display_name??"Operations Manager"}:null,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
   documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),
   jobs:jobs.data,invoices:invoices.data};
 }
@@ -250,15 +250,23 @@ export async function POST(request:Request){
    await audited(ctx,{companyId,type:"Company Updated",detail:{fields:Object.keys(changes)}});
    return noCache({ok:true});
   }
-  if(action==="submitOpportunity"){
+  if(action==="submitOpportunity"||action==="editOpportunity"){
    requirePartner(ctx);
+   const editing=action==="editOpportunity"?await partnerOpportunity(ctx,uuid(input.opportunityId)):null;
+   if(editing&&editing.submitted_by!==ctx.userId)throw new ContractorAccessError("Only the contractor who submitted this request can edit it.");
+   if(editing&&(editing.linked_job_id||editing.internal_confirmed_at||!editableContractorRequestStatuses.includes(editing.status)))
+    throw new ContractorAccessError("This request is locked.",409);
+   if(editing&&input.updatedAt!==editing.updated_at)
+    throw new ContractorAccessError("This request changed. Reload it before editing.",409);
    const date=required(input.requestedDate,"service date",10);
    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new ContractorAccessError("Valid service date required.",400);
    const type=required(input.propertyType,"property type",30);
    if(!["Residential","Commercial"].includes(type))throw new ContractorAccessError("Property type must be Residential or Commercial.",400);
+   const propertyName=type==="Residential"?required(input.propertyName,"residential customer or property name",160):optional(input.propertyName,160);
    const serviceType=required(input.serviceType,"service type",160);
    const condition=optional(input.condition,250);
    let scope=input.scope;
+   let requestOptions:ContractorRequestOptions|Record<string,never>={};
    if(input.scopeItems!==undefined||input.addons!==undefined){
     const scopeItems=validatedSelections(input.scopeItems,contractorScopeOptions[type as ContractorPropertyType],"scope of work");
     if(!scopeItems.length)throw new ContractorAccessError("Select at least one scope of work option.",400);
@@ -269,6 +277,7 @@ export async function POST(request:Request){
     if(!service)throw new ContractorAccessError("Select a service type for this property.",400);
     const addons=validatedSelections(input.addons??[],service.addons,"add-on");
     const details=scopeItems.includes("Other")?required(input.scopeDetails,"other scope details",2000):null;
+    requestOptions={scopeItems,scopeDetails:details,addons};
     const areas=scopeItems.filter(item=>item!=="Other");
     scope=[areas.length&&`Scope of work: ${areas.join(", ")}`,details&&`Scope details: ${details}`,
      addons.length&&`Requested add-ons: ${addons.join(", ")}`].filter(Boolean).join("\n");
@@ -276,21 +285,36 @@ export async function POST(request:Request){
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
    const proposed=money(input.amount,"proposed payment");
-   // Require a stable submission key so browser retries cannot create duplicate jobs.
-   const externalRef=uuid(input.externalReference);
-   const {data,error}=await db.from("contractor_opportunities").insert({
-    company_id:ctx.companyId,submitted_by:ctx.userId,service_type:serviceType,
+   const values={
+    service_type:serviceType,property_name:propertyName,request_options:requestOptions,
     property_address:required(input.address,"property address",500),property_type:type,
     square_feet:input.squareFeet===null||input.squareFeet===""?null:money(input.squareFeet,"square footage"),
-    bedrooms:input.bedrooms===null||input.bedrooms===""?null:money(input.bedrooms,"bedrooms"),
-    bathrooms:input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),
+    bedrooms:type!=="Residential"||input.bedrooms===null||input.bedrooms===""?null:money(input.bedrooms,"bedrooms"),
+    bathrooms:type!=="Residential"||input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),
     scope_of_work:required(scope,"scope of work",10000),
     property_condition:condition,requested_date:date,
     requested_time:optional(input.requestedTime,8),estimated_person_hours:hours,
     cleaner_count:Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1))),
     proposed_amount:proposed,pricing_basis:required(input.pricingBasis??"Flat Price","pricing basis",80),
     special_instructions:optional(input.instructions,5000),access_arrangements:optional(input.access,2500),
-    external_reference:externalRef,
+   };
+   if(editing){
+    const {data,error}=await db.from("contractor_opportunities").update({...values,
+     request_revision:editing.request_revision+1,updated_at:new Date().toISOString(),status:"New Opportunity",
+     final_scope:null,agreed_amount:null,partner_confirmed_at:null,internal_confirmed_at:null,
+    }).eq("id",editing.id).eq("company_id",ctx.companyId).eq("submitted_by",ctx.userId)
+     .eq("updated_at",editing.updated_at).in("status",editableContractorRequestStatuses)
+     .is("linked_job_id",null).is("internal_confirmed_at",null).select("id,opportunity_number").maybeSingle();
+    if(error)throw error;
+    if(!data)throw new ContractorAccessError("This request changed or was approved. Reload it before editing.",409);
+    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Edited"});
+    await notify(ctx,"Contractor request updated",`Opportunity ${data.opportunity_number} was updated and needs review.`,ctx.companyId,data.id,"internal");
+    return noCache({opportunity:data});
+   }
+   // Require a stable submission key so browser retries cannot create duplicate jobs.
+   const externalRef=uuid(input.externalReference);
+   const {data,error}=await db.from("contractor_opportunities").insert({...values,
+    company_id:ctx.companyId,submitted_by:ctx.userId,external_reference:externalRef,
    }).select("id,opportunity_number").single();
    if(error){if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Submitted"});
@@ -391,7 +415,7 @@ export async function POST(request:Request){
    });
    const minimum=projection.recommendedMinimumPrice,valid=projection.costComplete&&projection.travelCostsVerified&&minimum!==null;
    const {error}=await db.from("contractor_profitability").upsert({
-    opportunity_id:opp.id,assessed_by:ctx.userId,assessed_amount:projection.price,
+    opportunity_id:opp.id,request_revision:opp.request_revision,assessed_by:ctx.userId,assessed_amount:projection.price,
     assessed_scope:opp.final_scope??opp.scope_of_work,projection,
     minimum_price:minimum,projected_margin:projection.grossMarginPercent,
     cost_complete:valid,override_approved_by:null,override_reason:null,override_at:null,
@@ -436,7 +460,7 @@ export async function POST(request:Request){
     throw new ContractorAccessError("Contractor must confirm final scope and compensation in writing.",409);
    const {data:a,error:ae}=await db.from("contractor_profitability").select("*").eq("opportunity_id",opp.id).maybeSingle();
    if(ae||!a)throw new ContractorAccessError("Complete a profitability assessment first.",409);
-   if(Number(a.assessed_amount)!==Number(opp.agreed_amount)||a.assessed_scope!==opp.final_scope)
+   if(a.request_revision!==opp.request_revision||Number(a.assessed_amount)!==Number(opp.agreed_amount)||a.assessed_scope!==opp.final_scope)
     throw new ContractorAccessError("Final terms changed. Recalculate profitability and obtain any new override before acceptance.",409);
    const below=a.minimum_price===null||Number(opp.agreed_amount)<Number(a.minimum_price)||!a.cost_complete;
    if(below&&(!a.override_approved_by||!a.override_reason))

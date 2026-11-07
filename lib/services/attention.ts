@@ -49,11 +49,17 @@ export const ATTENTION_REALTIME_TABLES = [
   "employee_time_off_notifications",
 ] as const;
 
+async function getContractorRequestReviews(){
+  const {data,error}=await getSupabaseClient().rpc("get_my_contractor_request_reviews");
+  if(error)throw new Error(`Contractor review alerts could not be loaded: ${error.message}`);
+  return data;
+}
+
 export async function getAttentionItems(view: AttentionView = "Active"): Promise<AttentionItem[]> {
   const badgeRequest = beginAppBadgeSync();
   const profile = await getCurrentProfile();
   if (!profile?.is_active) throw new Error("An active StudioScrubz profile is required.");
-  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings, equipmentResponsibilityTasks, timeOffNotifications] = await Promise.all([
+  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, settings, equipmentResponsibilityTasks, timeOffNotifications, contractorRequestReviews] = await Promise.all([
     hasPermission(profile, "estimates.view") ? getEstimates() : Promise.resolve([]),
     hasPermission(profile, "jobs.view") ? getJobs() : Promise.resolve([]),
     hasPermission(profile, "walkthroughs.view") ? getWalkthroughs() : Promise.resolve([]),
@@ -67,6 +73,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     getBusinessSettings().catch(() => null),
     getMyEquipmentResponsibilityTasks().catch(() => []),
     getMyTimeOffNotifications().catch(() => []),
+    hasPermission(profile, "contractors.view") ? getContractorRequestReviews() : Promise.resolve([]),
   ]);
   const [jobRouteIds, agreementRoutes] = await Promise.all([
     hasPermission(profile, "jobs.view")
@@ -124,7 +131,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     const event = Array.isArray(row.event) ? row.event[0] : row.event;
     return event && event.status === "Scheduled" ? [{ id: event.id, title: event.title, startsAt: event.starts_at, location: event.location, invitedAt: row.invited_at }] : [];
   });
-  const input: AttentionRuleInput = { equipmentResponsibilityTasks, timeOffNotifications, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const input: AttentionRuleInput = { equipmentResponsibilityTasks, timeOffNotifications, contractorRequestReviews, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -137,6 +144,7 @@ export type AssignedWalkthroughAttention = { id: string; employeeId: string; dat
 export type AttentionRuleInput = {
   equipmentResponsibilityTasks?: EquipmentResponsibilityAttention[];
   timeOffNotifications?: TimeOffNotification[];
+  contractorRequestReviews?: Awaited<ReturnType<typeof getContractorRequestReviews>>;
   /** When Manager can see all Jobs, personal Crew Lead alerts must be limited to the Manager\'s own employee/crew assignments. */
   assignedOperationalJobIds?: string[];
   assignedEvents?: Array<{ id: string; title: string; startsAt: string; location: string | null; invitedAt: string }>;
@@ -170,6 +178,16 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const today = clock.date, inSeven = addDays(today, 7), inThirty = addDays(today, 30), items: AttentionItem[] = [];
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
+
+  for(const request of input.contractorRequestReviews??[]){
+    const label=request.property_name??request.service_type;
+    items.push(item(
+      `contractor-request:${request.id}:${request.request_revision}:${request.status}`,
+      "Contractor Request Requires Review","Attention","Jobs","Contractor Request Requires Review",
+      `${label} · ${request.opportunity_number}`,"Contractor Opportunity",request.id,null,label,
+      null,null,request.updated_at,`/contractors/opportunities?opportunityId=${request.id}`,"Review Request",
+    ));
+  }
 
   for (const task of input.equipmentResponsibilityTasks ?? []) {
     const label=task.job_number||"Job";
