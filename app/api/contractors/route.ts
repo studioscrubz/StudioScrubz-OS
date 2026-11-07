@@ -1,4 +1,5 @@
 import "server-only";
+import { contractorScheduledJobStatuses, type ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
 import { US_STATE_OPTIONS } from "@/components/forms/UsStateSelect";
 import { contractorPropertyConditions, contractorScopeOptions, editableContractorRequestStatuses, type ContractorRequestOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
@@ -106,6 +107,25 @@ async function contractorInvoiceTotals(db:ContractorContext["admin"],clientIds:s
  return totals;
 }
 
+async function upcomingContractorJobs(db:ContractorContext["admin"],clientIds:string[]):Promise<ContractorScheduledJob[]>{
+ if(!clientIds.length)return [];
+ const today=new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ const {data,error}=await db.from("jobs")
+  .select("id,client_id,job_number,service_name,property_name,scheduled_date,start_time,client:clients!jobs_client_id_fkey!inner(id),property:properties!jobs_property_id_fkey(client_id,address,address_line_2,city,state,zip)")
+  .in("client_id",clientIds).eq("client.client_type","Contractor").eq("client.status","Active").is("client.archived_at",null)
+  .is("archived_at",null).in("status",contractorScheduledJobStatuses).gte("scheduled_date",today)
+  .order("scheduled_date").order("start_time").order("id");
+ if(error)throw error;
+ return (data??[]).flatMap(row=>{
+  if(!row.scheduled_date)return [];
+  const linkedProperty=Array.isArray(row.property)?row.property[0]:row.property;
+  const property=linkedProperty?.client_id===row.client_id?linkedProperty:null;
+  const location=property?[property.address,property.address_line_2,property.city,[property.state,property.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "):null;
+  return [{id:row.id,job_number:row.job_number,service_name:row.service_name,property_name:row.property_name,
+   location,scheduled_date:row.scheduled_date,start_time:row.start_time}];
+ });
+}
+
 async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  const db=ctx.admin;
  if(ctx.type==="internal"){
@@ -151,15 +171,18 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
     phone:portal.phone?.trim()||client.phone,portalStatus:portal.status,
    }];
   }).sort((a,b)=>a.name.localeCompare(b.name));
-  const invoiceTotals=includeInvoiceTotals?await contractorInvoiceTotals(db,directory.map(entry=>entry.clientId)):undefined;
-  return {role:ctx.role,companies:companies.data,directory,invoiceTotals,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+  const directoryClientIds=directory.map(entry=>entry.clientId);
+  const [invoiceTotals,upcomingJobs]=includeInvoiceTotals?await Promise.all([
+   contractorInvoiceTotals(db,directoryClientIds),upcomingContractorJobs(db,directoryClientIds),
+  ]):[undefined,[]];
+  return {role:ctx.role,companies:companies.data,directory,invoiceTotals,upcomingJobs,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    viewerId:ctx.userId,attempts:attempts.data,followups:followups.data,
    jobs:jobs.data,invoices:invoices.data};
  }
  const companyId=ctx.companyId;
  const [company,opportunities,offers,documents]=await Promise.all([
-  db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id")
+  db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id,client_id")
    .eq("id",companyId).single(),
   db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_name,property_address,property_type,request_options,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at,updated_at,internal_confirmed_at,submitted_by").eq("company_id",companyId).or("status.neq.Cancelled,linked_job_id.not.is.null").order("created_at",{ascending:false}).limit(500),
   db.from("contractor_offers").select("id,opportunity_id,company_id,offered_by_side,amount,pricing_basis,scope_text,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
@@ -167,7 +190,8 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  ]);
  for(const item of [company,opportunities,offers,documents])if(item.error)throw item.error;
  if(!company.data)throw new ContractorAccessError("Company unavailable.",404);
- const {assigned_manager_id:managerId,...publicCompany}=company.data;
+ const {assigned_manager_id:managerId,client_id:clientId,...publicCompany}=company.data;
+ if(publicCompany.status!=="Active")throw new ContractorAccessError("Company portal access is inactive.");
  const manager=await activeOperationsManager(ctx,managerId);
  const {data:messages,error:messagesError}=manager
   ?await db.from("contractor_private_messages").select("id,opportunity_id,sender_side,body,created_at,read_at")
@@ -178,12 +202,13 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
  const approvedJobIds=(opportunities.data??[]).filter(x=>Boolean(x.quality_approved_at))
   .map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
- const [jobs,invoices]=await Promise.all([
+ const [upcomingJobs,jobs,invoices]=await Promise.all([
+  upcomingContractorJobs(db,clientId?[clientId]:[]),
   linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,completed_at").in("id",linkedIds):Promise.resolve({data:[],error:null}),
   approvedJobIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",approvedJobIds).is("archived_at",null).neq("status","Cancelled"):Promise.resolve({data:[],error:null}),
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
- return {role:ctx.role,company:publicCompany,viewerId:ctx.userId,operationsManager:manager?{name:manager.display_name??"Operations Manager"}:null,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+ return {role:ctx.role,company:publicCompany,viewerId:ctx.userId,upcomingJobs,operationsManager:manager?{name:manager.display_name??"Operations Manager"}:null,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
   documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),
   jobs:jobs.data,invoices:invoices.data};
 }

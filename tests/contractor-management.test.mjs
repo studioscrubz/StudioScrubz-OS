@@ -203,3 +203,13 @@ test("contractors can withdraw only their own unlocked requests and preserve the
  assert.match(api,/\.or\("status\.neq\.Cancelled,linked_job_id\.not\.is\.null"\)/);
  assert.match(portal,/\{canEdit&&[\s\S]*?window\.confirm[\s\S]*?Delete request<\/button>/);
 });
+
+test("upcoming contractor jobs use OS bookings and are scoped to the authenticated company's client",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ const management=read("components/contractors/ContractorManagement.tsx");
+ assert.match(api,/\.in\("client_id",clientIds\)[\s\S]*?\.is\("archived_at",null\)\.in\("status",contractorScheduledJobStatuses\)\.gte\("scheduled_date",today\)/);
+ assert.match(api,/assigned_manager_id:managerId,client_id:clientId[\s\S]*?upcomingContractorJobs\(db,clientId\?\[clientId\]:\[\]\)/);
+ assert.match(api,/linkedProperty\?\.client_id===row\.client_id/);
+ assert.match(management,/"Upcoming contractor jobs",data\?\.upcomingJobs\?\.length/);
+ assert.match(portal,/<PortalPanel title="Upcoming jobs">[\s\S]*?data\.upcomingJobs\?\.length/);
+});

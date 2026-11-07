@@ -1,6 +1,8 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
+import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
+import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
 import {useRouter} from "next/navigation";
 import dynamic from "next/dynamic";
 import {useAuth} from "@/components/auth/AuthProvider";
@@ -20,7 +22,7 @@ type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
-type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
+type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];upcomingJobs?:ContractorScheduledJob[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -65,6 +67,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   setCompanyId(current=>current||requested?.company_id||result.companies?.[0]?.id||"");
   setOpportunityId(current=>visible.some(opportunity=>opportunity.id===current)?current:requested?.id??visible[0]?.id??"");
  },[view]);
+ useOperationalRealtime(view==="dashboard"?["jobs"]:[],refresh);
  useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(String(e.message));}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[refresh]);
  const run=async(action:string,payload:Record<string,unknown>={})=>{
   setBusy(true);setError("");setNotice("");
@@ -128,7 +131,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   ["New opportunities",count(["New Opportunity","Information Requested"])],
   ["Negotiating / awaiting reply",count(["Negotiating","Awaiting Approval"])],
   ["Awaiting crew",count(["Accepted","Crew Assignment"])],
-  ["Upcoming contractor jobs",data?.jobs.filter(x=>["Scheduled","Crew Assigned","Ready to Schedule"].includes(x.status)).length??0],
+  ["Upcoming contractor jobs",data?.upcomingJobs?.length??0],
   ["Pending quality review",count(["Pending Quality Review"])],
   ["Completed / awaiting invoicing",allOpportunities.filter(x=>x.linked_job_id&&data?.jobs.find(j=>j.id===x.linked_job_id)?.status==="Completed"
     &&!data.invoices.some(inv=>inv.job_id===x.linked_job_id)).length],
