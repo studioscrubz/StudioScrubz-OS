@@ -1,8 +1,6 @@
 -- Contractor management isolation layer. NOT for production until explicitly approved.
 -- Partner auth users have NO user_profiles employee record and NO direct access to
 -- jobs, invoices, profitability, contractor companies, or contractor private records.
-begin;
-
 create table public.contractor_companies (
  id uuid primary key default gen_random_uuid(),
  contractor_code text not null unique default ('CTR-' || upper(substr(replace(gen_random_uuid()::text,'-',''),1,10))),
@@ -238,4 +236,3 @@ grant select on public.contractor_companies,public.contractor_members,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
  public.contractor_documents to authenticated;
 
-commit;
