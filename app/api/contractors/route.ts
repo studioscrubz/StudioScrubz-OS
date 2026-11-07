@@ -93,9 +93,10 @@ export async function POST(request:Request){
    if(ctx.type==="internal"){
     if(input.name!==undefined)changes.name=required(input.name,"name",200);
     if(input.status!==undefined){
-     requireMaster(ctx);
      const status=required(input.status,"status",30);
      if(!["Active","Pending","Suspended","Archived"].includes(status))throw new ContractorAccessError("Invalid company status.",400);
+     if(ctx.role!=="Master Admin"&&!(current.status==="Pending"&&status==="Active"))
+      throw new ContractorAccessError("Suspension, archiving, and reactivation require Master Admin authorization.");
      changes.status=status;
     }
     if(input.internal_notes!==undefined)changes.internal_notes=optional(input.internal_notes,10000);
