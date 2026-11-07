@@ -498,3 +498,25 @@ do $$begin
   raise exception 'Owner redemption did not atomically activate company and membership';
  end if;
 end$$;
+
+-- The portal keeps a formatted display address and writes separate Accounts fields.
+\ir ../migrations/20261107211116_contractor_structured_property_addresses.sql
+insert into public.contractor_opportunities(company_id,submitted_by,property_name,property_address,property_type,
+ service_type,requested_date,estimated_person_hours,proposed_amount,scope_of_work,request_options)
+select c.id,'00000000-0000-4000-8000-000000000015','Structured Test',
+ format('123 Example Avenue, Unit %s, Los Angeles, CA 90001',unit),'Residential','Standard',current_date,2,150,
+ 'Clean test unit',jsonb_build_object('address',jsonb_build_object(
+ 'street','123 Example Avenue','line2','Unit '||unit,'city','Los Angeles','state','CA','zip','90001'))
+from public.contractor_companies c cross join (values ('1'),('1'),('2')) as units(unit)
+where c.name='New Portal Contractor';
+do $$begin
+ if (select count(*) from public.properties p join public.clients c on c.id=p.client_id
+  where c.company_name='New Portal Contractor' and p.address='123 Example Avenue'
+    and p.address_line_2 in ('Unit 1','Unit 2') and p.city='Los Angeles' and p.state='CA' and p.zip='90001')<>2 then
+  raise exception 'Structured addresses were not saved or separate units were merged';
+ end if;
+ if (select count(distinct request_property_id) from public.contractor_opportunities
+  where property_address='123 Example Avenue, Unit 1, Los Angeles, CA 90001')<>1 then
+  raise exception 'Repeated address did not reuse the existing property';
+ end if;
+end$$;

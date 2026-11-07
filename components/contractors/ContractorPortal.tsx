@@ -1,5 +1,6 @@
 "use client";
-import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions } from "@/lib/contractors/jobOptions";
+import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions, type ContractorPropertyAddress } from "@/lib/contractors/jobOptions";
+import { UsStateSelect } from "@/components/forms/UsStateSelect";
 import { contractorPage } from "@/lib/contractors/host";
 import {useCallback,useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
@@ -16,6 +17,7 @@ const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
 const currency=(x:number|null)=>x==null?"Pending":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(x));
+const blankAddress:ContractorPropertyAddress={street:"",line2:"",city:"",state:"",zip:""};
 type Tab="dashboard"|"submit"|"jobs"|"messages"|"company";
 export function ContractorPortal(){
  const router=useRouter();
@@ -27,7 +29,7 @@ export function ContractorPortal(){
  const [editing,setEditing]=useState<{id:string;updatedAt:string}|null>(null);
  const [propertyName,setPropertyName]=useState("");
  const [submissionKey,setSubmissionKey]=useState(()=>crypto.randomUUID());
- const [serviceType,setServiceType]=useState(""),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState<ContractorPropertyType>("Residential");
+ const [serviceType,setServiceType]=useState(""),[address,setAddress]=useState(blankAddress),[propertyType,setPropertyType]=useState<ContractorPropertyType>("Residential");
  const [squareFeet,setSquareFeet]=useState(""),[bedrooms,setBedrooms]=useState(""),[bathrooms,setBathrooms]=useState("");
  const [jobOptions,setJobOptions]=useState<ContractorJobOptions|null>(null);
  const [jobOptionsError,setJobOptionsError]=useState("");
@@ -69,14 +71,14 @@ export function ContractorPortal(){
  const chosen=data?.opportunities.find(x=>x.id===opportunityId);
  const canEdit=Boolean(chosen&&chosen.submitted_by===data?.viewerId&&!chosen.linked_job_id&&!chosen.internal_confirmed_at&&editableContractorRequestStatuses.includes(chosen.status));
  const resetJobForm=()=>{
-  setEditing(null);setPropertyName("");setPropertyType("Residential");setServiceType("");setAddress("");
+  setEditing(null);setPropertyName("");setPropertyType("Residential");setServiceType("");setAddress(blankAddress);
   setSquareFeet("");setBedrooms("");setBathrooms("");setScopeItems([]);setScopeDetails("");setAddons([]);
   setCondition("");setRequestedDate("");setRequestedTime("");setHours("");setCleaners("2");setAmount("");setBasis("Flat Price");setInstructions("");setAccess("");
  };
  const editJob=(request:Opportunity)=>{
   const options=request.request_options;
   setEditing({id:request.id,updatedAt:request.updated_at});
-  setPropertyName(request.property_name??"");setPropertyType(request.property_type);setAddress(request.property_address);setServiceType(request.service_type);
+  setPropertyName(request.property_name??"");setPropertyType(request.property_type);setAddress(options?.address??{...blankAddress,street:request.property_address});setServiceType(request.service_type);
   setSquareFeet(String(request.square_feet??""));setBedrooms(String(request.bedrooms??""));setBathrooms(String(request.bathrooms??""));
   setScopeItems(options?.scopeItems??["Other"]);setScopeDetails(options?.scopeItems?options.scopeDetails??"":request.scope_of_work);setAddons(options?.addons??[]);
   setCondition(contractorPropertyConditions.some(option=>option===request.property_condition)?request.property_condition??"":"");
@@ -103,7 +105,7 @@ export function ContractorPortal(){
     <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(x=><button key={x.id} className="flex w-full flex-wrap items-center justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(x.id);setTab("jobs")}}><span><b>{x.property_name??x.property_address}</b><small className="block">{x.opportunity_number} · {x.service_type}</small></span><span>{x.status}</span></button>)}</PortalPanel></>}
    {data&&tab==="submit"&&<PortalPanel title={editing?"Edit job request":"Submit a cleaning opportunity"}>
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
      <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
       {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
      </select></label>
@@ -114,7 +116,16 @@ export function ContractorPortal(){
      {jobOptionsError&&<div className="md:col-span-2"><p role="alert" className="mb-2 text-sm text-red-700">{jobOptionsError}</p><button type="button" className={secondary} onClick={()=>{setJobOptionsError("");setJobOptionsRetry(value=>value+1);}}>Retry loading options</button></div>}
      {jobOptions&&!availableServices.length&&<p className="text-sm text-neutral-600 md:col-span-2">No services are currently available for this property type.</p>}
      <PortalField label={propertyType==="Residential"?"Residential customer or property name":"Property name"} value={propertyName} set={setPropertyName} required={propertyType==="Residential"}/>
-     <PortalField label="Property address" value={address} set={setAddress} required/>
+     <fieldset className="grid gap-4 md:col-span-2 md:grid-cols-2">
+      <legend className="mb-2 font-extrabold">Property address</legend>
+      <PortalField label="Street address" value={address.street} set={street=>setAddress(current=>({...current,street}))} autoComplete="address-line1" required/>
+      <PortalField label="Address line 2 (unit or suite)" value={address.line2} set={line2=>setAddress(current=>({...current,line2}))} autoComplete="address-line2"/>
+      <PortalField label="City" value={address.city} set={city=>setAddress(current=>({...current,city}))} autoComplete="address-level2" required/>
+      <div className="grid grid-cols-2 gap-4">
+       <label className="block text-sm font-bold">State<UsStateSelect value={address.state} onChange={state=>setAddress(current=>({...current,state}))} className={input} required/></label>
+       <PortalField label="ZIP code" value={address.zip} set={zip=>setAddress(current=>({...current,zip}))} autoComplete="postal-code" required/>
+      </div>
+     </fieldset>
      <PortalField label="Square footage, if known" value={squareFeet} set={setSquareFeet} type="number"/>
      {propertyType==="Residential"&&<><PortalField label="Bedrooms" value={bedrooms} set={setBedrooms} type="number"/><PortalField label="Bathrooms" value={bathrooms} set={setBathrooms} type="number"/></>}
      <label className="text-sm font-bold">Property condition<select className={input} value={condition} required onChange={e=>setCondition(e.target.value)}>
@@ -258,7 +269,7 @@ export function ContractorPortal(){
  }
 }
 function PortalPanel({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-xl border bg-white p-5"><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">{title}</h2>{children}</section>}
-function PortalField({label,value,set,type="text",required=false}:{label:string;value:string;set:(x:string)=>void;type?:string;required?:boolean}){return <label className="block text-sm font-bold">{label}<input className={input} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} required={required} value={value} onChange={e=>set(e.target.value)}/></label>}
+function PortalField({label,value,set,type="text",required=false,autoComplete}:{label:string;value:string;set:(x:string)=>void;type?:string;required?:boolean;autoComplete?:string}){return <label className="block text-sm font-bold">{label}<input className={input} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} autoComplete={autoComplete} required={required} value={value} onChange={e=>set(e.target.value)}/></label>}
 
 
 function JobCheckboxes({label,help,options,value,set}:{label:string;help:string;options:readonly string[];value:string[];set:(value:string[])=>void}){
