@@ -1,6 +1,7 @@
 import type { UserProfile, UserRole } from "@/types/auth";
 
 export const PERMISSIONS = [
+  "contractors.view", "contractors.manage",
   "porterVisits.view", "porterVisits.manage",
   "propertyServicePlans.manage",
   "marketingMaterials.send",
@@ -75,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
 
   Manager: new Set([
     ...crewLeadPermissions,
+    "contractors.view", "contractors.manage",
     "porterVisits.view", "porterVisits.manage",
     "propertyServicePlans.manage",
     "marketingMaterials.send",
@@ -207,6 +209,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) =>
   ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/contractors", "contractors.view"],
   ["/communications/employee-email", "employeeEmails.send"],
   ["/lead-commission-payouts", "leadRep.payouts.manage"],
   ["/lead-rep/commissions", "leadRep.commissions.viewOwn"],
