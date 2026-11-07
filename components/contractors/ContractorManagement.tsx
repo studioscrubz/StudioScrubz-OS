@@ -5,16 +5,16 @@ import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAss
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type Opportunity={id:string;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
-type Message={id:string;company_id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
+type Message={id:string;company_id:string;partner_user_id:string;read_at:string|null;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
 type Invite={id:string;company_id:string;invited_email:string;status:string;delivery_status:string;expires_at:string;member_role:string};
-type ContractorMember={id:string;company_id:string;email:string;member_role:string;is_active:boolean;joined_at:string};
+type ContractorMember={id:string;company_id:string;user_id:string;email:string;member_role:string;is_active:boolean;joined_at:string};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;estimated_duration:number|null;assigned_crew_id:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
-type Data={role:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];unread:Record<string,number>;attempts:ContactAttempt[];followups:Followup[]};
+type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages"|"invitations";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -32,6 +32,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  useEffect(()=>{setCompanyEdit({});},[companyId]);
  const [inviteEmail,setInviteEmail]=useState(""),[inviteRole,setInviteRole]=useState("Company Admin");
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
+ const [messagePartnerId,setMessagePartnerId]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
  const [roundTripMiles,setRoundTripMiles]=useState(""),[roundTripMinutes,setRoundTripMinutes]=useState("");
  const [supplies,setSupplies]=useState("0"),[equipment,setEquipment]=useState("0"),[overhead,setOverhead]=useState("0");
@@ -95,8 +96,12 @@ export function ContractorManagement({view}: {view:ContractorView}){
   ["Pending follow-ups",data?.followups.filter(x=>x.status==="Pending").length??0],
   ["Overdue follow-ups",data?.followups.filter(x=>x.status==="Pending"&&Date.parse(x.due_at)<Date.now()).length??0],
  ];
+ const canMessagePartner=selectedCompany?.status==="Active"&&selectedCompany.assigned_manager_id===data?.viewerId;
+ const messagePartners=canMessagePartner?(data?.members.filter(m=>m.company_id===companyId&&m.is_active)??[]):[];
+ const messagePartner=messagePartners.find(m=>m.user_id===messagePartnerId);
+ const privateMessages=messagePartner?(data?.messages.filter(m=>m.company_id===companyId&&m.partner_user_id===messagePartner.user_id)??[]):[];
  const companySelect=<label className="block text-sm font-semibold">Partner company
- <select className={input} value={companyId} onChange={e=>{setCompanyId(e.target.value);setOpportunityId("");}}>
+ <select className={input} value={companyId} onChange={e=>{setCompanyId(e.target.value);setOpportunityId("");setMessagePartnerId("");setMessage("");}}>
  <option value="">All companies</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>;
  if(loading)return <p className="p-8">Loading Contractor Management…</p>;
  return <main className="space-y-6 p-4 md:p-7">
@@ -273,13 +278,21 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {data?.documents.filter(x=>x.opportunity_id===selected.id).map(x=><a key={x.id} className="mr-2 mt-2 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${x.id}`}>{x.file_name}</a>)}
    </Panel>}
   </>}
-  {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Partner">{companySelect}<label className="mt-3 block text-sm font-semibold">Opportunity
-   <select className={input} value={opportunityId} onChange={e=>setOpportunityId(e.target.value)}><option value="">Company-wide conversation</option>{allOpportunities.filter(x=>x.company_id===companyId).map(o=><option key={o.id} value={o.id}>{o.opportunity_number}</option>)}</select></label></Panel>
-   <Panel title="Contractor thread"><p className="mb-2 text-sm text-neutral-600">Unread from partner: <b>{data?.unread?.[companyId]??0}</b></p>
-    <button type="button" className={secondary} disabled={busy||!companyId} onClick={()=>void run("markMessagesRead",{companyId})}>Mark company messages read</button>
-    <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{data?.messages.filter(x=>x.company_id===companyId&&x.opportunity_id===(opportunityId||null)).map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
-    <label className="mt-3 block text-sm font-semibold">Message<textarea className={input} value={message} onChange={e=>setMessage(e.target.value)} rows={3}/></label>
-    <button className={button} disabled={busy||!companyId||!message.trim()} onClick={async()=>{const r=await run("message",{companyId,opportunityId:opportunityId||null,message});if(r)setMessage("");}}>Send message</button>
+  {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Partner">{companySelect}
+   {canMessagePartner&&<label className="mt-3 block text-sm font-semibold">Contractor profile
+    <select className={input} value={messagePartner?.user_id??""} onChange={e=>{setMessagePartnerId(e.target.value);setMessage("");}}>
+     <option value="">Select a contractor</option>{messagePartners.map(member=><option key={member.user_id} value={member.user_id}>{member.email}</option>)}
+    </select></label>}</Panel>
+   <Panel title="Private contractor conversation">
+    {!canMessagePartner&&<p className="text-sm text-neutral-600">Private messages are available only to the Operations Manager assigned to an active partner company.</p>}
+    {canMessagePartner&&!messagePartner&&<p className="text-sm text-neutral-600">Select an active contractor profile to start a private conversation.</p>}
+    {messagePartner&&<>
+     <p className="mb-2 text-sm text-neutral-600">Unread from contractor: <b>{privateMessages.filter(x=>x.sender_side==="Contractor"&&!x.read_at).length}</b></p>
+     <button type="button" className={secondary} disabled={busy} onClick={()=>void run("markMessagesRead",{companyId,partnerUserId:messagePartner.user_id})}>Mark messages read</button>
+     <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{privateMessages.map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side==="Contractor"?messagePartner.email:"You"}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
+     <label className="mt-3 block text-sm font-semibold">Message<textarea className={input} value={message} onChange={e=>setMessage(e.target.value)} rows={3}/></label>
+     <button className={button} disabled={busy||!message.trim()} onClick={async()=>{const r=await run("message",{companyId,partnerUserId:messagePartner.user_id,message});if(r)setMessage("");}}>Send private message</button>
+    </>}
     <div className="mt-6 space-y-3 border-t pt-4"><h3 className="font-extrabold">Contact attempts & follow-ups</h3>
      <label className="block text-xs font-semibold">Contact method<select className={input} value={contactMethod} onChange={e=>setContactMethod(e.target.value)}>
       {["Phone","Email","SMS","Other"].map(m=><option key={m}>{m}</option>)}</select></label>

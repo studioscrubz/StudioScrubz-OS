@@ -6,11 +6,11 @@ import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
 type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
-type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
+type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string;read_at:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at:string|null};
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
-type Portal={role:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];members:Array<{id:string;email:string;member_role:string;is_active:boolean}>;jobs:Job[];invoices:Invoice[];documents:Document[];unread:Record<string,number>};
+type Portal={role:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -20,7 +20,7 @@ export function ContractorPortal(){
  const router=useRouter();
  const [data,setData]=useState<Portal|null>(null),[tab,setTab]=useState<Tab>("dashboard");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState(""),[staffEmail,setStaffEmail]=useState("");
+ const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState("");
  const [profileEdit,setProfileEdit]=useState<Record<string,string>>({});
  const [submissionKey,setSubmissionKey]=useState(()=>crypto.randomUUID());
  const [serviceType,setServiceType]=useState("Standard Cleaning"),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState("Residential");
@@ -56,7 +56,7 @@ export function ContractorPortal(){
    <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut({scope:"local"});router.replace(contractorPage("/login"))}}>Sign out</button>
   </div></header>
   <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
-   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>setTab(t)}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
+   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>setTab(t)}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
    {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
@@ -86,7 +86,7 @@ export function ContractorPortal(){
     </form>
    </PortalPanel>}
    {data&&tab==="jobs"&&<div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
-    <PortalPanel title="My opportunities">{data.opportunities.map(x=><button key={x.id} type="button" className={`mb-2 block w-full rounded-lg border p-3 text-left text-sm ${opportunityId===x.id?"border-[#143d1a] bg-green-50":"bg-white"}`} onClick={()=>setOpportunityId(x.id)}>
+    <PortalPanel title="Requests & jobs"><p className="mb-3 text-sm text-neutral-600">Track cleaning requests you’ve submitted and see the schedule, completion details, and invoice status once a job is accepted.</p>{data.opportunities.map(x=><button key={x.id} type="button" className={`mb-2 block w-full rounded-lg border p-3 text-left text-sm ${opportunityId===x.id?"border-[#143d1a] bg-green-50":"bg-white"}`} onClick={()=>setOpportunityId(x.id)}>
      <b>{x.opportunity_number}</b><span className="mt-1 block">{x.service_type} · {x.status}</span></button>)}
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>
     <PortalPanel title={chosen?.opportunity_number??"Select an opportunity"}>{chosen&&<div className="space-y-3 text-sm">
@@ -129,31 +129,31 @@ export function ContractorPortal(){
      <button className={secondary} type="button" disabled={busy||!file} onClick={()=>void upload(chosen.id)}>Upload attachment</button>
     </div>}</PortalPanel>
    </div>}
-   {data&&tab==="messages"&&<div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
-    <PortalPanel title="Conversation"><select className={input} value={opportunityId} onChange={e=>setOpportunityId(e.target.value)}><option value="">Company-wide messages</option>{data.opportunities.map(x=><option key={x.id} value={x.id}>{x.opportunity_number}</option>)}</select></PortalPanel>
-    <PortalPanel title="Messages"><p className="mb-2 text-sm">Unread from StudioScrubz: <b>{data.unread?.[data.company.id]??0}</b></p>
+   {data&&tab==="messages"&&<PortalPanel title="Private messages with Operations">
+    <p className="mb-3 text-sm text-neutral-600">{data.operationsManager
+     ?`Your conversation with ${data.operationsManager.name} is private to you and your assigned Operations Manager.`
+     :"StudioScrubz will enable messaging when an Operations Manager is assigned."}</p>
+    {data.operationsManager&&<>
+     <p className="mb-2 text-sm">Unread: {data.messages.filter(x=>x.sender_side==="StudioScrubz"&&!x.read_at).length}</p>
      <button type="button" className={secondary} disabled={busy} onClick={()=>void action("markMessagesRead",{})}>Mark messages read</button>
-     <div className="mt-3 max-h-96 space-y-2 overflow-auto">{data.messages.filter(x=>x.opportunity_id===(opportunityId||null)).map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
+     <div className="mt-3 max-h-96 space-y-2 overflow-auto">{data.messages.map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side==="Contractor"?"You":data.operationsManager?.name}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
      <label className="mt-3 block font-bold">Your message<textarea className={input} rows={3} value={message} onChange={e=>setMessage(e.target.value)}/></label>
-     <button className={primary} disabled={busy||!message.trim()} onClick={async()=>{const r=await action("message",{opportunityId:opportunityId||null,message});if(r)setMessage("");}}>Send to StudioScrubz</button>
-    </PortalPanel></div>}
+     <button className={primary} disabled={busy||!message.trim()} onClick={async()=>{const r=await action("message",{message});if(r)setMessage("");}}>Send to Operations Manager</button>
+    </>}
+   </PortalPanel>}
    {data&&tab==="company"&&<div className="grid gap-4 lg:grid-cols-2">
     <PortalPanel title="Company profile"><p className="text-sm"><b>{data.company.name}</b> · {data.company.contractor_code}</p><p>{data.company.contact_email}</p><p>{data.company.phone??""}</p><p>{data.company.business_address??""}</p><p>Payment terms: {data.company.payment_terms??"Not specified"}</p>
-    {data.role==="Company Admin"&&<form className="mt-5 space-y-3 border-t pt-4" onSubmit={async e=>{
-      e.preventDefault();await action("updateCompany",{
-       contact_name:profileEdit.contact_name??data.company.contact_name,
-       contact_email:profileEdit.contact_email??data.company.contact_email,
-       phone:profileEdit.phone??data.company.phone,
-       business_address:profileEdit.business_address??data.company.business_address,
-      });
+    <form className="mt-5 space-y-3 border-t pt-4" onSubmit={async e=>{
+      e.preventDefault();const saved=await action("updateCompany",profileEdit);
+      if(saved)setProfileEdit({});
      }}>
       <p className="text-sm font-extrabold">Update company contact information</p>
-      {(["contact_name","contact_email","phone","business_address"] as const).map(key=><label key={key} className="block text-sm font-bold">
-       {({contact_name:"Primary contact",contact_email:"Business email",phone:"Phone",business_address:"Business address"} as Record<string,string>)[key]}
-       <input className={input} type={key==="contact_email"?"email":"text"} value={profileEdit[key]??data.company[key]??""}
+      {(["name","contact_name","contact_email","phone","business_address"] as const).map(key=><label key={key} className="block text-sm font-bold">
+       {({name:"Company name",contact_name:"Primary contact",contact_email:"Business email",phone:"Phone",business_address:"Business address"} as Record<string,string>)[key]}
+       <input className={input} type={key==="contact_email"?"email":"text"} required={key==="name"||key==="contact_email"} value={profileEdit[key]??data.company[key]??""}
         onChange={e=>setProfileEdit(v=>({...v,[key]:e.target.value}))}/></label>)}
-      <button className={primary} disabled={busy}>Save contact details</button>
-     </form>}
+      <button className={primary} disabled={busy||!Object.keys(profileEdit).length}>Save company information</button>
+     </form>
     <p className="mt-3 text-xs text-neutral-500">Legal, tax, insurance and contract records are reviewed by StudioScrubz Operations.</p></PortalPanel>
     <PortalPanel title="Company documents"><p className="mb-3 text-xs text-neutral-600">Secure company tax, insurance and agreement files. Upload PDF, PNG, JPEG or WebP files up to 4 MB. Tax documents are visible only to company administrators and StudioScrubz Operations.</p>
      <div className="space-y-2">{data.documents.filter(d=>!d.opportunity_id).map(d=><a key={d.id} className="block text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}</div>
@@ -169,10 +169,6 @@ export function ContractorPortal(){
        }catch(e){setError(e instanceof Error?e.message:"Company document upload failed");}finally{setBusy(false);}
       }}>Upload secure document</button>
      </div>}
-    </PortalPanel>
-    <PortalPanel title="Authorized contacts">{data.members.map(m=><p key={m.id} className="border-b p-2 text-sm">{m.email} · {m.member_role} · {m.is_active?"Active":"Inactive"}</p>)}
-     {data.role==="Company Admin"&&<><div className="mt-3"><PortalField label="Request additional staff access" value={staffEmail} set={setStaffEmail} type="email"/></div>
-     <button className={primary} disabled={busy||!staffEmail.includes("@")} onClick={()=>void action("requestStaff",{email:staffEmail})}>Request StudioScrubz approval</button></>}
     </PortalPanel>
    </div>}
   </div>

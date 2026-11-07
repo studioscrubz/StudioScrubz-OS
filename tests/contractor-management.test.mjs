@@ -96,8 +96,8 @@ test("contractor communications record unread receipts, contact attempts and due
  assert.match(api,/action==="logContactAttempt"/);
  assert.match(api,/action==="createFollowup"/);
  assert.match(api,/action==="resolveFollowup"/);
- assert.match(api,/unreadByCompany\(/);
- assert.match(migration,/create table public\.contractor_message_reads/);
+ assert.match(api,/\.match\(thread\)\.eq\("sender_side"/);
+ assert.match(api,/read_at:new Date\(\)\.toISOString\(\)/);
  assert.match(migration,/create table public\.contractor_contact_attempts/);
  assert.match(migration,/create table public\.contractor_followups/);
 });
@@ -144,4 +144,22 @@ test("activation reuses the confirmed browser session before offering password e
  assert.match(activate,/await session;[\s\S]*?current\?\.user\.email_confirmed_at[\s\S]*?promise:redeem\(invitationToken\)/);
  assert.match(activate,/router\.replace\(contractorPage\("\/"\)\)/);
  assert.match(activate,/signInWithPassword/);
+});
+
+
+test("partner profile updates and private messages use the server identity",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ const management=read("components/contractors/ContractorManagement.tsx");
+ const privacy=read("supabase/migrations/20261107192154_contractor_private_messages.sql");
+ const profile=api.slice(api.indexOf('if(action==="updateCompany")'),api.indexOf('if(action==="submitOpportunity")'));
+ assert.match(profile,/ctx\.type==="internal"\?uuid\(input\.companyId\):ctx\.companyId/);
+ assert.match(profile,/if\(ctx\.type==="internal"\)\{\s*if\(input\.payment_terms/);
+ assert.doesNotMatch(profile,/Company administrator access required/);
+ assert.match(api,/ctx\.type==="partner"\?ctx\.userId:uuid\(input\.partnerUserId\)/);
+ assert.match(api,/\.eq\("partner_user_id",ctx\.userId\)\.eq\("manager_user_id",manager\.id\)/);
+ assert.match(api,/manager\.id!==ctx\.userId/);
+ assert.match(api,/\.eq\("manager_user_id",ctx\.userId\)\.in\("company_id",managedCompanies\)/);
+ assert.doesNotMatch(api,/\.from\("contractor_messages"\)/);
+ assert.doesNotMatch(portal+management,/Company-wide (?:messages|conversation)/i);
+ assert.match(privacy,/revoke all on public\.contractor_private_messages from public,anon,authenticated/);
 });
