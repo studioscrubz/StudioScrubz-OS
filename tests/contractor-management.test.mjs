@@ -62,3 +62,29 @@ test("attachments require exact file signatures, private storage and scoped sign
  assert.match(files,/document\.company_id!==ctx\.companyId/);
  assert.match(files,/\.eq\("company_id",companyId\)/);
 });
+
+test("company administrator tax files and quality-reviewed financial outputs stay company scoped",()=>{
+ const upload=read("app/api/contractors/files/route.ts");
+ const photos=read("app/api/contractors/completion-photos/route.ts");
+ assert.match(upload,/ctx\.role!=="Company Admin"&&document\.category==="Tax"/);
+ assert.match(upload,/category==="Tax"&&ctx\.role!=="Company Admin"/);
+ assert.match(api,/ctx\.role==="Company Admin"\?documents\.data/);
+ assert.match(api,/approvedJobIds\.length\?db\.from\("invoices"\)/);
+ assert.match(api,/action==="approveQuality"/);
+ assert.match(api,/action==="invoiceJob"/);
+ assert.match(api,/create_completed_job_invoice/);
+ assert.match(api,/action==="setMemberAccess"/);
+ assert.match(api,/action==="sendPaymentReminder"/);
+ assert.match(photos,/!op\.quality_approved_at/);
+ assert.match(photos,/\.eq\("customer_visible",true\)/);
+});
+test("contractor opportunities are idempotent and use existing guarded crew assignment",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ const assignment=read("components/contractors/ContractorJobAssignment.tsx");
+ assert.match(portal,/externalReference:submissionKey/);
+ assert.match(api,/const externalRef=uuid\(input\.externalReference\)/);
+ assert.match(assignment,/assignJobWorker\(/);
+ assert.match(assignment,/findCrewConflicts/);
+ assert.match(assignment,/findIndividualTechConflicts/);
+ assert.match(assignment,/getActiveCrews\(/);
+});
