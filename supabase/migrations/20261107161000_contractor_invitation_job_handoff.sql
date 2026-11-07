@@ -52,6 +52,8 @@ begin
   raise exception 'Final written scope and compensation confirmation are required.'; end if;
  select * into v_pr from public.contractor_profitability where opportunity_id=v_op.id;
  if not found then raise exception 'Internal profitability assessment is required.'; end if;
+ if v_pr.assessed_amount<>v_op.agreed_amount or v_pr.assessed_scope<>v_op.final_scope then
+  raise exception 'Profitability assessment is stale; reassess final scope and compensation.'; end if;
  if (not v_pr.cost_complete or v_pr.minimum_price is null or v_op.agreed_amount<v_pr.minimum_price)
    and v_pr.override_approved_by is null then raise exception 'Master Admin profitability approval is required.'; end if;
  if v_pr.override_approved_by is not null and (v_pr.override_reason is null or length(btrim(v_pr.override_reason))<12)
