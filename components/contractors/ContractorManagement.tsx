@@ -118,6 +118,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }
   return ids;
  },[visibleOpportunities,view]);
+ const calendarClientIds=useMemo(()=>new Set(data?.directory.map(entry=>entry.clientId)),[data?.directory]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
@@ -260,7 +261,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <p className="text-xs text-neutral-500">Operations Managers may activate pending contractors. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
-   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds}/>}
+   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">

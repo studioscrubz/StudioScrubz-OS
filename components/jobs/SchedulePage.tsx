@@ -122,7 +122,10 @@ function walkthroughClient(walkthrough: WalkthroughWithRelations) {
     "Deleted Client"
   );
 }
-export function SchedulePage({ scheduledJobIds }: { scheduledJobIds?: ReadonlySet<string> }) {
+export function SchedulePage({ scheduledJobIds, scheduledClientIds }: {
+  scheduledJobIds?: ReadonlySet<string>;
+  scheduledClientIds?: ReadonlySet<string>;
+}) {
   const contractorCalendar = scheduledJobIds !== undefined;
   const communication = useJobCommunication();
   const { profile } = useAuth();
@@ -272,7 +275,11 @@ export function SchedulePage({ scheduledJobIds }: { scheduledJobIds?: ReadonlySe
   const filteredJobs = useMemo(
     () =>
       jobs.filter((j) => {
-        if (scheduledJobIds && (!scheduledJobIds.has(j.id) || !j.scheduled_date)) return false;
+        if (scheduledJobIds) {
+          const scheduledForContractorClient = j.client_id && scheduledClientIds?.has(j.client_id)
+            && ["Scheduled", "Crew Assigned", "In Progress"].includes(j.status);
+          if (!j.scheduled_date || (!scheduledJobIds.has(j.id) && !scheduledForContractorClient)) return false;
+        }
         const hay = [
           j.job_number,
           j.client_name,
@@ -301,6 +308,7 @@ export function SchedulePage({ scheduledJobIds }: { scheduledJobIds?: ReadonlySe
       division,
       jobs,
       scheduledJobIds,
+      scheduledClientIds,
       search,
       source,
       status,
