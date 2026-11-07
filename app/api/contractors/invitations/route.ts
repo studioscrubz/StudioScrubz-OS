@@ -74,8 +74,10 @@ export async function POST(request:Request){
    const {data,error}=await ctx.admin.rpc("prepare_contractor_team_invitation",{
     p_actor:ctx.userId,p_email:email,p_token_hash:tokenHash,
    }).single();
-   if(error||!data)throw new ContractorAccessError(error?.code==="P0001"?error.message:"Team invitation preparation failed.",409);
-   invite=data;
+   if(error||!data||!("id" in data)||typeof data.id!=="string"||
+    !("expires_at" in data)||typeof data.expires_at!=="string")
+    throw new ContractorAccessError(error?.code==="P0001"?error.message:"Team invitation preparation failed.",409);
+   invite={id:data.id,expires_at:data.expires_at};
   }else{
    const {data:existingMember,error:memberError}=await ctx.admin.from("contractor_members").select("id")
     .eq("company_id",companyId).eq("email",email).eq("is_active",true).limit(1);
