@@ -84,6 +84,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
  };
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
+ const directoryCompanyIds=new Set(data?.directory.map(entry=>entry.companyId));
+ const dashboardCompanies=companies.filter(company=>directoryCompanyIds.has(company.id));
  const selectedCompany=companies.find(x=>x.id===companyId);
  const filtered=useMemo(()=>allOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
   &&(status==="All"||o.status===status)
@@ -144,7 +146,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    <h2 className="text-lg font-extrabold">Contractor performance & receivables</h2>
    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[670px] text-left text-sm">
    <thead className="bg-[#143d1a] text-white"><tr>{["Contractor","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
-   <tbody>{companies.map(c=>{
+   <tbody>{dashboardCompanies.map(c=>{
     const opps=allOpportunities.filter(o=>o.company_id===c.id),jobIds=new Set(opps.map(o=>o.linked_job_id).filter(Boolean));
     const linkedInvoices=data?.invoices.filter(inv=>jobIds.has(inv.job_id))??[];
     const completed=opps.filter(o=>data?.jobs.some(job=>job.id===o.linked_job_id&&job.status==="Completed")).length;
@@ -158,7 +160,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Math.max(0,Number(inv.total)-Number(inv.amount_paid)),0))}</td>
      <td className="p-3">{currency(projectedGrossProfit)} <span className="text-xs text-neutral-500">(estimate)</span></td></tr>;
    })}</tbody></table>
-   {!companies.length&&<p className="p-4 text-sm text-neutral-500">No contractor companies have been added.</p>}</div>
+   {!dashboardCompanies.length&&<p className="p-4 text-sm text-neutral-500">No active contractors to report.</p>}</div>
    <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies} select={setOpportunityId}/></>}
   {view==="companies"&&<section className="grid gap-5 lg:grid-cols-2">
    <Panel title="Create contractor company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
