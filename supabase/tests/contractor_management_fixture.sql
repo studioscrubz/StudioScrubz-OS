@@ -26,3 +26,6 @@ create table public.jobs(
  price numeric,balance numeric,labor_hours numeric,recommended_crew_size integer,
  scope jsonb,access_instructions text,internal_notes text
 );
+
+-- Existing invoice relation needed by the notification delivery foreign key.
+create table public.invoices(id uuid primary key,job_id uuid references public.jobs(id));
