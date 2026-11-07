@@ -303,7 +303,8 @@ export async function POST(request:Request){
    });
    const minimum=projection.recommendedMinimumPrice,valid=projection.costComplete&&projection.travelCostsVerified&&minimum!==null;
    const {error}=await db.from("contractor_profitability").upsert({
-    opportunity_id:opp.id,assessed_by:ctx.userId,projection,
+    opportunity_id:opp.id,assessed_by:ctx.userId,assessed_amount:projection.price,
+    assessed_scope:opp.final_scope??opp.scope_of_work,projection,
     minimum_price:minimum,projected_margin:projection.grossMarginPercent,
     cost_complete:valid,override_approved_by:null,override_reason:null,override_at:null,
     updated_at:new Date().toISOString(),
@@ -345,6 +346,8 @@ export async function POST(request:Request){
     throw new ContractorAccessError("Contractor must confirm final scope and compensation in writing.",409);
    const {data:a,error:ae}=await db.from("contractor_profitability").select("*").eq("opportunity_id",opp.id).maybeSingle();
    if(ae||!a)throw new ContractorAccessError("Complete a profitability assessment first.",409);
+   if(Number(a.assessed_amount)!==Number(opp.agreed_amount)||a.assessed_scope!==opp.final_scope)
+    throw new ContractorAccessError("Final terms changed. Recalculate profitability and obtain any new override before acceptance.",409);
    const below=a.minimum_price===null||Number(opp.agreed_amount)<Number(a.minimum_price)||!a.cost_complete;
    if(below&&(!a.override_approved_by||!a.override_reason))
     throw new ContractorAccessError("Below minimum or unverified costs. Master Admin override is required.",409);
