@@ -136,3 +136,12 @@ test("partner hostname is isolated from the employee application and uses canoni
  assert.match(read("components/contractors/ContractorResetPassword.tsx"),/event === "PASSWORD_RECOVERY"/);
  assert.match(login,/https:\/\/app\.studioscrubz\.com\/login/);
 });
+
+
+test("activation reuses the confirmed browser session before offering password entry",()=>{
+ const activate=read("components/contractors/ContractorActivate.tsx");
+ assert.match(activate,/const session=getSupabaseClient\(\)\.auth\.getSession\(\)/);
+ assert.match(activate,/await session;[\s\S]*?current\?\.user\.email_confirmed_at[\s\S]*?promise:redeem\(invitationToken\)/);
+ assert.match(activate,/router\.replace\(contractorPage\("\/"\)\)/);
+ assert.match(activate,/signInWithPassword/);
+});
