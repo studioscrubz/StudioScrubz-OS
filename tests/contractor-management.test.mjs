@@ -8,7 +8,7 @@ const api=read("app/api/contractors/route.ts"),invites=read("app/api/contractors
 const files=read("app/api/contractors/files/route.ts"),guards=read("lib/contractors/server.ts");
 const permissions=read("lib/auth/permissions.ts"),sidebar=read("components/layout/Sidebar.tsx");
 test("new relations are RLS-enforced and directly unwritable, including financial approvals",()=>{
- for(const name of ["contractor_companies","contractor_members","contractor_invitations","contractor_opportunities","contractor_offers","contractor_messages","contractor_profitability","contractor_audit_events","contractor_documents"]){
+ for(const name of ["contractor_companies","contractor_members","contractor_invitations","contractor_opportunities","contractor_offers","contractor_messages","contractor_profitability","contractor_audit_events","contractor_documents","contractor_message_reads","contractor_contact_attempts","contractor_followups"]){
   assert.match(migration,new RegExp("alter table public\\."+name+" enable row level security"));
  }
  assert.match(migration,/revoke insert,update,delete on public\.contractor_companies/);
@@ -87,4 +87,15 @@ test("contractor opportunities are idempotent and use existing guarded crew assi
  assert.match(assignment,/findCrewConflicts/);
  assert.match(assignment,/findIndividualTechConflicts/);
  assert.match(assignment,/getActiveCrews\(/);
+});
+
+test("contractor communications record unread receipts, contact attempts and due follow-ups",()=>{
+ assert.match(api,/action==="markMessagesRead"/);
+ assert.match(api,/action==="logContactAttempt"/);
+ assert.match(api,/action==="createFollowup"/);
+ assert.match(api,/action==="resolveFollowup"/);
+ assert.match(api,/unreadByCompany\(/);
+ assert.match(migration,/create table public\.contractor_message_reads/);
+ assert.match(migration,/create table public\.contractor_contact_attempts/);
+ assert.match(migration,/create table public\.contractor_followups/);
 });
