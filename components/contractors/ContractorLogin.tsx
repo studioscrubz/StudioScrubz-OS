@@ -30,5 +30,5 @@ export function ContractorLogin(){
    <button disabled={busy} className="w-full rounded-lg bg-[#143d1a] p-3 font-bold text-white">{busy?"Signing in…":"Sign in"}</button></form>
   <button type="button" disabled={busy} onClick={()=>void recover()} className="mt-4 text-sm text-[#143d1a] underline">Forgot your password?</button>
   <p className="mt-6 text-xs text-neutral-500">No public registration. Contact StudioScrubz Operations to request a company invitation.</p>
-  <Link href="/login" className="mt-3 block text-sm text-[#143d1a] underline">StudioScrubz employee sign-in</Link></section></main>;
+  <Link href="https://app.studioscrubz.com/login" className="mt-3 block text-sm text-[#143d1a] underline">StudioScrubz employee sign-in</Link></section></main>;
 }
