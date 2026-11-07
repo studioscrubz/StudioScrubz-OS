@@ -24,6 +24,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [status,setStatus]=useState("All"),[query,setQuery]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
+ useEffect(()=>{setCompanyEdit({});},[companyId]);
  const [inviteEmail,setInviteEmail]=useState(""),[inviteRole,setInviteRole]=useState("Company Admin");
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
