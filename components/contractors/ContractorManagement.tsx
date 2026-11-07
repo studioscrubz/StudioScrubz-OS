@@ -7,10 +7,11 @@ type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number
 type Message={id:string;company_id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
 type Invite={id:string;company_id:string;invited_email:string;status:string;delivery_status:string;expires_at:string;member_role:string};
+type ContractorMember={id:string;company_id:string;email:string;member_role:string;is_active:boolean;joined_at:string};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;assigned_crew_id:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
-type Data={role:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Data={role:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages"|"invitations";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -233,6 +234,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail,memberRole:inviteRole})}>Send invitation</button>
     <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. External staff additions require StudioScrubz approval.</p>
    </Panel>
+   <Panel title="Authorized partner users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
+    <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
+    <button type="button" className={secondary} disabled={busy} onClick={()=>void run("setMemberAccess",{memberId:member.id,isActive:!member.is_active})}>
+      {member.is_active?"Deactivate portal access":"Restore portal access"}</button>
+   </div>)}</Panel>
    <Panel title="Invitation status">{data?.invitations.map(i=><div key={i.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
     <div><b>{i.invited_email}</b><p>{companies.find(c=>c.id===i.company_id)?.name} · {i.member_role} · {i.status} / {i.delivery_status}</p><small>Expires: {new Date(i.expires_at).toLocaleDateString()}</small></div>
     {i.status==="Pending"&&<div className="flex gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{companyId:i.company_id,email:i.invited_email,memberRole:i.member_role})}>Resend new token</button></div>}
