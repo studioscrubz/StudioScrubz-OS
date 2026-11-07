@@ -212,7 +212,7 @@ const navItems: Array<NavLink | NavGroup> = [
 
       { label: "Contractor Dashboard", href: "/contractors", marker: "D", permission: "contractors.view" },
 
-      { label: "Partner Companies", href: "/contractors/companies", marker: "P", permission: "contractors.view" },
+      { label: "Contractor Companies", href: "/contractors/companies", marker: "C", permission: "contractors.view" },
 
       { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
 

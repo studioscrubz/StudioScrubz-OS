@@ -62,7 +62,7 @@ async function privateThread(ctx:ContractorContext,companyId:string,partnerUserI
  const {data:company,error}=await ctx.admin.from("contractor_companies").select("assigned_manager_id,status")
   .eq("id",companyId).maybeSingle();
  if(error)throw error;
- if(!company||company.status!=="Active")throw new ContractorAccessError("An active partner company is required.",404);
+ if(!company||company.status!=="Active")throw new ContractorAccessError("An active contractor company is required.",404);
  const manager=await activeOperationsManager(ctx,company.assigned_manager_id);
  if(!manager)throw new ContractorAccessError("StudioScrubz must assign an Operations Manager before you can send messages.",409);
  if(ctx.type==="internal"&&manager.id!==ctx.userId)

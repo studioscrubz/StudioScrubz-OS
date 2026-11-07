@@ -21,7 +21,7 @@ const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberF
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
 const button="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-3 py-2 text-sm font-semibold text-[#143d1a]";
-const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Partner Companies",opportunities:"Job Opportunities",jobs:"Subcontracted Jobs",messages:"Contractor Communications",invitations:"Invitations & Access"};
+const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Contractor Companies",opportunities:"Job Opportunities",jobs:"Subcontracted Jobs",messages:"Contractor Communications",invitations:"Invitations & Access"};
 export function ContractorManagement({view}: {view:ContractorView}){
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
@@ -103,14 +103,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const messagePartners=canMessagePartner?(data?.members.filter(m=>m.company_id===companyId&&m.is_active)??[]):[];
  const messagePartner=messagePartners.find(m=>m.user_id===messagePartnerId);
  const privateMessages=messagePartner?(data?.messages.filter(m=>m.company_id===companyId&&m.partner_user_id===messagePartner.user_id)??[]):[];
- const companySelect=<label className="block text-sm font-semibold">Partner company
+ const companySelect=<label className="block text-sm font-semibold">Contractor company
  <select className={input} value={companyId} onChange={e=>{setCompanyId(e.target.value);setOpportunityId("");setMessagePartnerId("");setMessage("");}}>
  <option value="">All companies</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>;
  if(loading)return <p className="p-8">Loading Contractor Management…</p>;
  return <main className="space-y-6 p-4 md:p-7">
   <header><p className="text-xs font-extrabold uppercase tracking-wider text-[#a08020]">Operations / Contractor Management</p>
   <h1 className="mt-1 text-3xl font-extrabold text-[#143d1a]">{titles[view]}</h1>
-  <p className="mt-2 text-sm text-neutral-600">Subcontracting partner relationships and job delivery, integrated with StudioScrubz operations.</p></header>
+  <p className="mt-2 text-sm text-neutral-600">Contractor relationships and job delivery, integrated with StudioScrubz operations.</p></header>
   {error&&<p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-lg border border-green-200 bg-green-50 p-3 text-[#143d1a]">{notice}</p>}
   <div className="flex flex-wrap gap-2">{(Object.keys(titles) as ContractorView[]).map((v)=><Link key={v}
@@ -123,9 +123,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <small className="block text-neutral-600">Due: {new Date(f.due_at).toLocaleString()}</small></span>
     <button className={secondary} type="button" disabled={busy} onClick={()=>void run("resolveFollowup",{followupId:f.id})}>Mark complete</button>
    </div>)}</div>
-   <h2 className="text-lg font-extrabold">Partner performance & receivables</h2>
+   <h2 className="text-lg font-extrabold">Contractor performance & receivables</h2>
    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[670px] text-left text-sm">
-   <thead className="bg-[#143d1a] text-white"><tr>{["Partner","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
+   <thead className="bg-[#143d1a] text-white"><tr>{["Contractor","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
    <tbody>{companies.map(c=>{
     const opps=allOpportunities.filter(o=>o.company_id===c.id),jobIds=new Set(opps.map(o=>o.linked_job_id).filter(Boolean));
     const linkedInvoices=data?.invoices.filter(inv=>jobIds.has(inv.job_id))??[];
@@ -140,10 +140,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Math.max(0,Number(inv.total)-Number(inv.amount_paid)),0))}</td>
      <td className="p-3">{currency(projectedGrossProfit)} <span className="text-xs text-neutral-500">(estimate)</span></td></tr>;
    })}</tbody></table>
-   {!companies.length&&<p className="p-4 text-sm text-neutral-500">No partner companies have been added.</p>}</div>
+   {!companies.length&&<p className="p-4 text-sm text-neutral-500">No contractor companies have been added.</p>}</div>
    <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies} select={setOpportunityId}/></>}
   {view==="companies"&&<section className="grid gap-5 lg:grid-cols-2">
-   <Panel title="Create partner company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
+   <Panel title="Create contractor company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
     <Field label="Company name" value={companyName} set={setCompanyName} required/>
     <Field label="Primary email" value={companyEmail} set={setCompanyEmail} type="email" required/>
     <Field label="Primary contact" value={companyContact} set={setCompanyContact}/>
@@ -162,7 +162,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><a key={d.id} className="mr-3 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}
 
     <p>Status: <b>{selectedCompany.status}</b></p>
-    <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit partner terms, territory and rates</summary>
+    <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit contractor terms, territory and rates</summary>
      <form className="mt-3 space-y-3" onSubmit={async e=>{
       e.preventDefault();
       try{
@@ -196,7 +196,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {data?.role==="Master Admin"&&<div className="flex flex-wrap gap-2">{["Active","Pending","Suspended","Archived"].map(status=><button key={status} type="button" disabled={busy||status===selectedCompany.status}
      onClick={()=>void run("updateCompany",{companyId:selectedCompany.id,status})} className={secondary}>{status}</button>)}</div>}
     {data?.role==="Manager"&&selectedCompany.status==="Pending"&&<button className={secondary} disabled={busy} onClick={()=>void run("updateCompany",{companyId:selectedCompany.id,status:"Active"})}>Activate verified company</button>}
-    <p className="text-xs text-neutral-500">Operations Managers may activate pending partners. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
+    <p className="text-xs text-neutral-500">Operations Managers may activate pending contractors. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
    <div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3">{companySelect}
@@ -219,7 +219,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Requested:</b> {selected.requested_date}</p><p><b>Status:</b> {selected.status}</p>
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
      <p><b>Agreed compensation:</b> {currency(selected.agreed_amount)}</p>
-     <p><b>Partner written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
+     <p><b>Contractor written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      {selected.property_condition&&<p><b>Property condition:</b> {selected.property_condition}</p>}
      <p className="whitespace-pre-line"><b>Scope:</b> {selected.final_scope??selected.scope_of_work}</p>
      {job&&<p><b>Linked operational job:</b> {job.status} · {job.scheduled_date||"Schedule pending"} <Link className="text-[#143d1a] underline" href="/jobs">Open Jobs</Link></p>}
@@ -289,13 +289,13 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {data?.documents.filter(x=>x.opportunity_id===selected.id).map(x=><a key={x.id} className="mr-2 mt-2 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${x.id}`}>{x.file_name}</a>)}
    </Panel>}
   </>}
-  {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Partner">{companySelect}
+  {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Contractor">{companySelect}
    {canMessagePartner&&<label className="mt-3 block text-sm font-semibold">Contractor profile
     <select className={input} value={messagePartner?.user_id??""} onChange={e=>{setMessagePartnerId(e.target.value);setMessage("");}}>
      <option value="">Select a contractor</option>{messagePartners.map(member=><option key={member.user_id} value={member.user_id}>{member.email}</option>)}
     </select></label>}</Panel>
    <Panel title="Private contractor conversation">
-    {!canMessagePartner&&<p className="text-sm text-neutral-600">Private messages are available only to the Operations Manager assigned to an active partner company.</p>}
+    {!canMessagePartner&&<p className="text-sm text-neutral-600">Private messages are available only to the Operations Manager assigned to an active contractor company.</p>}
     {canMessagePartner&&!messagePartner&&<p className="text-sm text-neutral-600">Select an active contractor profile to start a private conversation.</p>}
     {messagePartner&&<>
      <p className="mb-2 text-sm text-neutral-600">Unread from contractor: <b>{privateMessages.filter(x=>x.sender_side==="Contractor"&&!x.read_at).length}</b></p>
@@ -325,7 +325,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail,memberRole:inviteRole})}>Send invitation</button>
     <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. External staff additions require StudioScrubz approval.</p>
    </Panel>
-   <Panel title="Authorized partner users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
+   <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
     <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
     <button type="button" className={secondary} disabled={busy} onClick={()=>void run("setMemberAccess",{memberId:member.id,isActive:!member.is_active})}>
       {member.is_active?"Deactivate portal access":"Restore portal access"}</button>
@@ -342,7 +342,7 @@ function Panel({title,children}:{title:string;children:React.ReactNode}){return 
 function Field({label,value,set,type="text",required=false}:{label:string;value:string;set:(v:string)=>void;type?:string;required?:boolean}){return <label className="block text-sm font-semibold">{label}<input required={required} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} value={value} onChange={e=>set(e.target.value)} className={input}/></label>}
 function NumberField({label,value,set}:{label:string;value:number;set:(v:number)=>void}){return <label className="text-sm font-semibold">{label}<input type="number" min="0.1" step="0.1" value={value} onChange={e=>set(Number(e.target.value))} className={input}/></label>}
 function OpportunityTable({rows,companies,select}:{rows:Opportunity[];companies:Company[];select:(id:string)=>void}){
- return <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-[#143d1a] text-white"><tr>{["Opportunity","Partner","Service","Requested","Status","Compensation"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead>
+ return <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-[#143d1a] text-white"><tr>{["Opportunity","Contractor","Service","Requested","Status","Compensation"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead>
  <tbody>{rows.map(o=><tr key={o.id} className="border-t hover:bg-neutral-50"><td className="p-3"><button type="button" className="font-bold text-[#143d1a] underline" onClick={()=>{select(o.id);document.getElementById("opportunity-detail")?.scrollIntoView({behavior:"smooth"});}}>{o.opportunity_number}</button>{o.property_name&&<span className="block">{o.property_name}</span>}</td><td className="p-3">{companies.find(x=>x.id===o.company_id)?.name}</td><td className="p-3">{o.service_type}</td><td className="p-3">{o.requested_date}</td><td className="p-3">{o.status}</td><td className="p-3">{currency(o.agreed_amount??o.proposed_amount)}</td></tr>)}</tbody></table>
  {!rows.length&&<p className="p-5 text-sm text-neutral-500">No opportunities match these filters.</p>}</div>
 }
