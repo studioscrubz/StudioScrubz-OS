@@ -70,7 +70,7 @@ export async function POST(request:Request){
   }).select("id,expires_at").single();
   if(insertError||!invite)throw insertError??new Error("Invitation preparation failed.");
   await audited(ctx,{companyId,type:"Invitation Prepared",detail:{invitationId:invite.id,email,role}});
-  const origin=process.env.NODE_ENV==="production"?"https://app.studioscrubz.com":new URL(request.url).origin;
+  const origin=process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":new URL(request.url).origin;
   const activationUrl=`${origin}/contractor/activate?token=${token}`;
   let sent;
   try {
