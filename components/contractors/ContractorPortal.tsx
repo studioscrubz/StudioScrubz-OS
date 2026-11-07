@@ -22,6 +22,7 @@ export function ContractorPortal(){
  const [data,setData]=useState<Portal|null>(null),[tab,setTab]=useState<Tab>("dashboard");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState("");
+ const [teamInviteEmail,setTeamInviteEmail]=useState("");
  const [profileEdit,setProfileEdit]=useState<Record<string,string>>({});
  const [editing,setEditing]=useState<{id:string;updatedAt:string}|null>(null);
  const [propertyName,setPropertyName]=useState("");
@@ -213,6 +214,23 @@ export function ContractorPortal(){
       <button className={primary} disabled={busy||!Object.keys(profileEdit).length}>Save company information</button>
      </form>
     <p className="mt-3 text-xs text-neutral-500">Legal, tax, insurance and contract records are reviewed by StudioScrubz Operations.</p></PortalPanel>
+    {data.role==="Company Admin"&&<PortalPanel title="Invite a teammate">
+     <p className="mb-3 text-sm text-neutral-600">Invite someone to submit and track requests for your company.</p>
+     <form className="space-y-3" onSubmit={async e=>{
+      e.preventDefault();setBusy(true);setError("");setNotice("");
+      try{
+       const response=await fetch("/api/contractors/invitations",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({action:"invite",email:teamInviteEmail})});
+       const result=await response.json();
+       if(!response.ok)throw new Error(result.error??"Invitation failed");
+       setTeamInviteEmail("");setNotice("Teammate invitation sent.");
+      }catch(error){setError(error instanceof Error?error.message:"Invitation failed");}
+      finally{setBusy(false);}
+     }}>
+      <label className="block text-sm font-bold">Teammate email<input className={input} type="email" required value={teamInviteEmail} onChange={e=>setTeamInviteEmail(e.target.value)}/></label>
+      <button className={primary} disabled={busy||!teamInviteEmail.trim()}>Send invitation</button>
+     </form>
+    </PortalPanel>}
     <PortalPanel title="Company documents"><p className="mb-3 text-xs text-neutral-600">Secure company tax, insurance and agreement files. Upload PDF, PNG, JPEG or WebP files up to 4 MB. Tax documents are visible only to company administrators and StudioScrubz Operations.</p>
      <div className="space-y-2">{data.documents.filter(d=>!d.opportunity_id).map(d=><a key={d.id} className="block text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}</div>
      {data.role==="Company Admin"&&<div className="mt-4 space-y-2">

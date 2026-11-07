@@ -254,3 +254,5 @@ Contractor scheduled notifications (unapplied): contractor_notification_deliveri
 Private contractor messaging uses the service-role-only `contractor_private_messages` table in `20261107192154_contractor_private_messages.sql`. Each row binds a contractor profile to its assigned Operations Manager, with recipient read state recorded on the row. The API keeps historical shared threads outside the private inbox.
 
 Contractor request review uses `get_my_contractor_request_reviews` in `20261107200058_contractor_request_review.sql` to route OS Attention Center items to the assigned Operations Manager, with Master Admin fallback for unassigned requests. New requests link to an OS property and approval reuses that link.
+
+Contractor team invitations use the service-role-only `prepare_contractor_team_invitation` RPC in `20261107205053_contractor_team_invitations.sql`. It verifies active company ownership, rotates pending teammate invitations, and records the sender against `auth.users`. Activation uses the existing `redeem_contractor_invitation` RPC.

@@ -40,7 +40,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  useEffect(()=>{setCompanyEdit({});},[companyId]);
- const [inviteEmail,setInviteEmail]=useState(""),[inviteRole,setInviteRole]=useState("Company Admin");
+ const [inviteEmail,setInviteEmail]=useState("");
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
  const [messagePartnerId,setMessagePartnerId]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
@@ -179,11 +179,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <Panel title="Manage portal access">
      <div className="space-y-4">
       <h3 className="font-extrabold">Invitations &amp; Access</h3>
-      <Panel title="Send secure seven-day invitation"><div className="grid gap-3 sm:grid-cols-3">{companySelect}
+      <Panel title="Send secure seven-day invitation"><div className="grid gap-3 sm:grid-cols-2">{companySelect}
        <Field label="Invited email" value={inviteEmail} set={setInviteEmail} type="email"/>
-       <label className="text-sm font-semibold">Company role<select className={input} value={inviteRole} onChange={e=>setInviteRole(e.target.value)}><option>Company Admin</option><option>Member</option></select></label></div>
-       <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail,memberRole:inviteRole})}>Send invitation</button>
-       <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. External staff additions require StudioScrubz approval.</p>
+      </div>
+       <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail})}>Send invitation</button>
+       <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. The invited contractor can invite teammates from their company profile.</p>
       </Panel>
       <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
        <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
@@ -192,7 +192,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       </div>)}</Panel>
       <Panel title="Invitation status">{data?.invitations.map(i=><div key={i.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
        <div><b>{i.invited_email}</b><p>{companies.find(c=>c.id===i.company_id)?.name} · {i.member_role} · {i.status} / {i.delivery_status}</p><small>Expires: {new Date(i.expires_at).toLocaleDateString()}</small></div>
-       {i.status==="Pending"&&<div className="flex gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{companyId:i.company_id,email:i.invited_email,memberRole:i.member_role})}>Resend new token</button></div>}
+       {i.status==="Pending"&&<div className="flex gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{invitationId:i.id})}>Resend new token</button></div>}
       </div>)}</Panel>
      </div>
     </Panel>
