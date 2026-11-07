@@ -23,7 +23,6 @@ export async function GET(request:Request){
 }
 export async function POST(request:Request){
  try{
-  const ctx=await contractorContext();
   const raw=await request.text();
   if(raw.length>6000)throw new ContractorAccessError("Invitation request is too large.",413);
   const body=JSON.parse(raw) as Record<string,unknown>;
@@ -36,6 +35,7 @@ export async function POST(request:Request){
    if(error)throw new ContractorAccessError(error.message,409);
    return noCache({companyId:data});
   }
+  const ctx=await contractorContext();
   requireInternal(ctx);
   if(action==="revoke"){
    const invitationId=uuid(body.invitationId);
