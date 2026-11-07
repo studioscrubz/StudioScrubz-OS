@@ -25,6 +25,7 @@ export function ContractorPortal(){
  const [scope,setScope]=useState(""),[condition,setCondition]=useState(""),[requestedDate,setRequestedDate]=useState(""),[requestedTime,setRequestedTime]=useState(""),[hours,setHours]=useState("");
  const [cleaners,setCleaners]=useState("2"),[amount,setAmount]=useState(""),[basis,setBasis]=useState("Flat Price"),[instructions,setInstructions]=useState(""),[access,setAccess]=useState("");
  const [file,setFile]=useState<File|null>(null),[counterAmount,setCounterAmount]=useState(""),[counterScope,setCounterScope]=useState("");
+ const [approvedPhotos,setApprovedPhotos]=useState<Array<{id:string;category:string;caption:string|null;url:string}>>([]);
  const reload=useCallback(async()=>{
   const res=await fetch("/api/contractors",{cache:"no-store"});const body=await res.json();
   if(res.status===401){router.replace("/contractor/login");return;}
@@ -91,6 +92,13 @@ export function ContractorPortal(){
      <p><b>Scope:</b> {chosen.final_scope??chosen.scope_of_work}</p>
      {currentJob&&<p><b>Scheduled:</b> {currentJob.scheduled_date??"Pending"} · {currentJob.status} {currentJob.start_time??""}</p>}
      {currentJob?.completed_at&&<p><b>Completed:</b> {new Date(currentJob.completed_at).toLocaleDateString()}</p>}
+     {currentJob?.completed_at&&<div><button type="button" className={secondary} onClick={async()=>{
+      setError("");
+      try{const res=await fetch(`/api/contractors/completion-photos?jobId=${currentJob.id}`,{cache:"no-store"});
+       const body=await res.json();if(!res.ok)throw new Error(body.error||"Photos not available");setApprovedPhotos(body.photos??[]);
+      }catch(e){setError(e instanceof Error?e.message:"Photos not available");}
+     }}>View authorized completion photos</button>
+     {approvedPhotos.length>0&&<div className="mt-3 grid grid-cols-2 gap-2">{approvedPhotos.map(photo=><a href={photo.url} key={photo.id} target="_blank" rel="noreferrer" className="block rounded border p-2"><img alt={photo.caption||photo.category} src={photo.url} className="h-32 w-full object-cover"/><small>{photo.caption||photo.category}</small></a>)}</div>}</div>}
      {currentInvoices.map(inv=><p key={inv.id}><b>Invoice:</b> {inv.invoice_number} · {inv.status} · {currency(inv.total)} total · {currency(inv.amount_paid)} paid · Due {inv.due_date??"unspecified"}</p>)}
      <h3 className="pt-3 font-extrabold">Price negotiations</h3>
      {data.offers.filter(x=>x.opportunity_id===chosen.id).map(o=><p key={o.id} className="rounded-lg border p-3"><b>{o.offered_by_side}</b> · {currency(o.amount)}<br/>{o.scope_text}</p>)}
