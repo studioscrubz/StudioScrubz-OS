@@ -8,7 +8,7 @@ const api=read("app/api/contractors/route.ts"),invites=read("app/api/contractors
 const files=read("app/api/contractors/files/route.ts"),guards=read("lib/contractors/server.ts");
 const permissions=read("lib/auth/permissions.ts"),sidebar=read("components/layout/Sidebar.tsx");
 test("new relations are RLS-enforced and directly unwritable, including financial approvals",()=>{
- for(const name of ["contractor_companies","contractor_members","contractor_invitations","contractor_opportunities","contractor_offers","contractor_messages","contractor_profitability","contractor_audit_events","contractor_documents","contractor_message_reads","contractor_contact_attempts","contractor_followups"]){
+ for(const name of ["contractor_companies","contractor_members","contractor_invitations","contractor_opportunities","contractor_offers","contractor_messages","contractor_profitability","contractor_audit_events","contractor_documents","contractor_message_reads","contractor_contact_attempts","contractor_followups","contractor_notification_deliveries"]){
   assert.match(migration,new RegExp("alter table public\\."+name+" enable row level security"));
  }
  assert.match(migration,/revoke insert,update,delete on public\.contractor_companies/);
@@ -98,4 +98,19 @@ test("contractor communications record unread receipts, contact attempts and due
  assert.match(migration,/create table public\.contractor_message_reads/);
  assert.match(migration,/create table public\.contractor_contact_attempts/);
  assert.match(migration,/create table public\.contractor_followups/);
+});
+
+test("scheduled contractor reminders are secret-protected and idempotently receipt-tracked",()=>{
+ const cron=read("app/api/contractors/reminders/route.ts");
+ const config=read("vercel.json");
+ assert.match(cron,/process\.env\.CRON_SECRET/);
+ assert.match(cron,/request\.headers\.get\("authorization"\)/);
+ assert.match(cron,/event_key:event\.key/);
+ assert.match(cron,/insertError\.code==="23505"/);
+ assert.match(cron,/status:"Sent",provider_message_id:sent\.id/);
+ assert.match(cron,/\.lt\("due_date",today\)/);
+ assert.match(cron,/outstanding<=0/);
+ assert.match(cron,/operations-digest/);
+ assert.match(migration,/create table public\.contractor_notification_deliveries/);
+ assert.match(config,/\/api\/contractors\/reminders/);
 });
