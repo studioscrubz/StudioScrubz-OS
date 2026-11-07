@@ -54,3 +54,18 @@
 - Exact interaction between new accepted-job rows and all production operational triggers must be verified in a staging-equivalent environment before live release.
 - Native PG fixtures prove the new SQL contracts but do not reproduce every production trigger, queue and notification process.
 - Existing job completion-to-invoice workflow must be verified specifically for `client_type='Contractor'` billing; no invoice auto-generation bypass introduced.
+
+## Incremental implementation and protection updates (November 7)
+- Internal opportunities now derive current visible states from the existing operational Job and linked invoice records. Completion requires an explicit contractor quality-review approval before partner-facing invoices and finished photos appear. This preserves existing automatic invoice creation rather than changing its behavior.
+- Company administration now supports territories, service types, payment terms, rate-card JSON, assigned operational manager, authorized members, and secure documents. Tax documents are restricted to StudioScrubz or the external Company's Admin.
+- A unique per-form request ID prevents duplicate opportunities on browser retries. Accepted-to-Job conversion remains SQL-atomic and idempotent.
+- Profitability assessments persist the **exact scope and amount evaluated**, and acceptance/conversion rejects stale terms even if a prior Master Admin override was granted.
+- Subcontracted Jobs can be staffed through the existing `assignJobWorker` service; crew and technician conflicts are checked, and the existing time-off, crew, GPS, equipment, and completion controls remain active.
+- Internal dashboard adds partner-by-partner revenue, outstanding invoice balances, projected gross profit, and filters. External partners see only their own company's job, invoice and authorized completion information.
+- Operations can approve quality, reconcile/create the existing duplicate-protected job invoice, send provider-receipted payment reminders, and record disputes, cancellations and rescheduling. Individual portal memberships may be deactivated and restored.
+
+## Remaining pre-release validation / limitations
+- The exact production database cannot be used as an integration test without changing production. PostgreSQL fixture tests and current application contracts are insufficient to prove all real operational trigger interactions end-to-end. This is a release blocker until a disposable production-equivalent database can be tested.
+- Supabase Auth redirect allowlist for contractor activation and password reset must be confirmed; a real invitation delivery and redemption test is needed after production deployment is explicitly authorized.
+- Automated scheduled overdue reminders, unread-message counters, native internal contact-attempt logging, and end-to-end automatic status notifications are **not yet complete**. The existing implementation supports manual provider-confirmed reminders, auditable messages and live linked status readouts.
+- Existing completion logic can create invoices at job completion before the contractor quality review. The portal withholds those invoices until quality approval, but the internal invoicing timeline is unchanged to preserve existing business behavior.
