@@ -93,8 +93,8 @@ end $$;
 reset role;
 update public.contractor_opportunities set partner_confirmed_at=now(),internal_confirmed_at=now(),
  final_scope='Deeply clean kitchen and bathrooms',agreed_amount=450 where id='30000000-0000-4000-8000-000000000001';
-insert into public.contractor_profitability(opportunity_id,assessed_by,projection,minimum_price,cost_complete)
-values('30000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','{}',500,true);
+insert into public.contractor_profitability(opportunity_id,assessed_by,assessed_amount,assessed_scope,projection,minimum_price,cost_complete)
+values('30000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001',450,'Deeply clean kitchen and bathrooms','{}',500,true);
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
 do $$ begin
@@ -106,7 +106,20 @@ do $$ begin
  end;
 end $$;
 reset role;
+update public.contractor_profitability set assessed_scope='Stale old scope',minimum_price=420 where opportunity_id='30000000-0000-4000-8000-000000000001';
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
+do $ begin
+ begin
+ perform public.convert_contractor_opportunity_to_job('30000000-0000-4000-8000-000000000001');
+ raise exception 'Stale profitability assessment converted';
+ exception when others then
+  if sqlerrm='Stale profitability assessment converted' then raise; end if;
+ end;
+end $;
+reset role;
 update public.contractor_profitability set minimum_price=420 where opportunity_id='30000000-0000-4000-8000-000000000001';
+update public.contractor_profitability set assessed_scope='Deeply clean kitchen and bathrooms' where opportunity_id='30000000-0000-4000-8000-000000000001';
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
 create temporary table test_created as
