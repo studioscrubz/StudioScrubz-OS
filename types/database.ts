@@ -2217,6 +2217,10 @@ export interface Database {
     };
 
     Functions: {
+      prepare_contractor_team_invitation: {
+        Args: { p_actor: string; p_email: string; p_token_hash: string };
+        Returns: { id: string; expires_at: string }[];
+      };
       get_my_contractor_request_reviews: { Args: Record<PropertyKey, never>; Returns: {
         id: string; opportunity_number: string; property_name: string | null; service_type: string; request_revision: number; status: string; updated_at: string;
       }[] };

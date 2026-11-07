@@ -11,6 +11,7 @@ const deposit = await read("lib/email/postConstructionDeposit.ts");
 const vendor = await read("app/api/vendor-packets/send/route.ts");
 const marketing = await read("app/api/marketing-materials/route.ts");
 const careers = await read("lib/recruiting/leadGeneratorApplications.ts");
+const contractorInvitations = await read("app/api/contractors/invitations/route.ts");
 const clientService = await read("lib/services/communicationsEmail.ts");
 
 test("authoritative registry contains every approved sender profile", () => {
@@ -25,6 +26,7 @@ test("authoritative registry contains every approved sender profile", () => {
     vendor: ["StudioScrubz Vendors <vendors@studioscrubz.com>", "vendors@studioscrubz.com"],
     careers: ["StudioScrubz Careers <careers@studioscrubz.com>", "careers@studioscrubz.com"],
     marketing: ["StudioScrubz <donotreply@studioscrubz.com>", "info@studioscrubz.com"],
+    contractorInvitation: ["StudioScrubz Operations <operations@studioscrubz.com>", "operations@studioscrubz.com"],
     systemNotification: ["StudioScrubz Notifications <notifications@studioscrubz.com>", "donotreply@studioscrubz.com"],
     prospectOutreach: ["StudioScrubz <info@studioscrubz.com>", "info@studioscrubz.com"],
   };
@@ -49,6 +51,7 @@ test("server routes resolve locked semantic profiles", () => {
 
 test("specialized production workflows use registry identities", () => {
   assert.match(deposit, /resolveEmailSenderProfile\("postConstructionDeposit"\)/);
+  assert.match(contractorInvitations, /resolveEmailSenderProfile\("contractorInvitation"\)/);
   assert.match(vendor, /resolveEmailSenderProfile\("vendor"\)/);
   assert.match(marketing, /resolveEmailSenderProfile\("marketing"\)/);
   assert.match(careers, /resolveEmailSenderProfile\("careers"\),replyTo:clean\.email/);

@@ -368,3 +368,51 @@ do $$begin
   if sqlerrm<>'This contractor request is locked.' then raise; end if;
  end;
 end$$;
+
+-- Existing staff invitations and new teammate invitations use the same redemption flow.
+\ir ../migrations/20261107205053_contractor_team_invitations.sql
+insert into auth.users(id,email,email_confirmed_at)
+values('00000000-0000-4000-8000-000000000014','teammate@example.test',now());
+do $$begin
+ if has_function_privilege('authenticated','public.prepare_contractor_team_invitation(uuid,text,text)','EXECUTE')
+ or has_function_privilege('anon','public.prepare_contractor_team_invitation(uuid,text,text)','EXECUTE') then
+  raise exception 'Team invite preparation exposed to browser roles';
+ end if;
+end$$;
+set role service_role;
+do $$begin
+ begin
+  perform public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000011','unauthorized@example.test',repeat('4',64));
+  raise exception 'Deactivated owner was able to invite teammates';
+ exception when raise_exception then
+  if sqlerrm<>'Only an active contractor owner can invite teammates.' then raise; end if;
+ end;
+end$$;
+reset role;
+update public.contractor_members set is_active=true where email='alpha@example.test';
+set role service_role;
+select * from public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000011','teammate@example.test',repeat('1',64));
+select * from public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000011','teammate@example.test',repeat('2',64));
+reset role;
+do $$begin
+ if not exists(select 1 from public.contractor_invitations where token_hash=repeat('1',64) and status='Revoked')
+ or not exists(select 1 from public.contractor_invitations where token_hash=repeat('2',64) and status='Pending'
+  and company_id='10000000-0000-4000-8000-000000000001' and member_role='Member'
+  and invited_by='00000000-0000-4000-8000-000000000011') then
+  raise exception 'Owner invitation was not scoped, attributed, or rotated correctly';
+ end if;
+end$$;
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000014',false);
+select public.redeem_contractor_invitation(repeat('2',64));
+reset role;
+set role service_role;
+do $$begin
+ begin
+  perform public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000014','unauthorized@example.test',repeat('3',64));
+  raise exception 'Regular member was able to invite teammates';
+ exception when raise_exception then
+  if sqlerrm<>'Only an active contractor owner can invite teammates.' then raise; end if;
+ end;
+end$$;
+reset role;
