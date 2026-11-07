@@ -226,13 +226,16 @@ create policy contractor_documents_internal_select on public.contractor_document
 create policy contractor_documents_internal_insert on public.contractor_documents for insert to authenticated
  with check ((select private.contractor_is_internal()));
 
-grant select,insert,update on public.contractor_companies to authenticated;
-grant select,insert,update on public.contractor_members to authenticated;
-grant select,insert,update on public.contractor_invitations to authenticated;
-grant select,insert,update on public.contractor_opportunities to authenticated;
-grant select,insert on public.contractor_offers,public.contractor_messages,
-public.contractor_audit_events,public.contractor_documents to authenticated;
-grant select,insert,update on public.contractor_profitability to authenticated;
-
+-- No contractor relation is directly writable by the browser, including internal
+-- staff. All writes pass independently authorized server routes or the two
+-- guarded transaction RPCs. Otherwise a Manager could forge a pricing override.
+revoke insert,update,delete on public.contractor_companies,public.contractor_members,
+ public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
+ public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
+ public.contractor_documents from authenticated,anon;
+grant select on public.contractor_companies,public.contractor_members,
+ public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
+ public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
+ public.contractor_documents to authenticated;
 
 commit;
