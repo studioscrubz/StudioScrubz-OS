@@ -42,7 +42,7 @@ create table public.contractor_invitations (
  invited_email text not null,
  member_role text not null default 'Member' check(member_role in ('Company Admin','Member')),
  token_hash text not null unique check(length(token_hash)=64),
- expires_at timestamptz not null,
+ expires_at timestamptz not null default (now() + interval '7 days'),
  status text not null default 'Pending' check(status in ('Pending','Redeemed','Revoked','Expired')),
  delivery_status text not null default 'Prepared' check(delivery_status in ('Prepared','Sent','Failed')),
  delivery_provider_id text,
