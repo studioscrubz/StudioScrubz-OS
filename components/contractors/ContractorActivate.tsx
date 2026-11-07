@@ -23,7 +23,7 @@ export function ContractorActivate(){
    if(password.length<12)throw new Error("Use a password of at least 12 characters.");
    const {data,error}=await getSupabaseClient().auth.signUp({
     email:invitation.email,password,
-    options:{emailRedirectTo:`${window.location.origin}/contractor/activate?token=${encodeURIComponent(token)}`},
+    options:{emailRedirectTo:`${process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":window.location.origin}/contractor/activate?token=${encodeURIComponent(token)}`},
    });
    if(error)throw error;
    if(data.session?.user){await redeem();return;}
