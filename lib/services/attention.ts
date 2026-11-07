@@ -183,7 +183,7 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     const label=request.property_name??request.service_type;
     items.push(item(
       `contractor-request:${request.id}:${request.request_revision}:${request.status}`,
-      "Contractor Request Requires Review","Attention","Jobs","Contractor Request Requires Review",
+      "Contractor Request Requires Review","Attention","Contractor Requests","Contractor Request Requires Review",
       `${label} · ${request.opportunity_number}`,"Contractor Opportunity",request.id,null,label,
       null,null,request.updated_at,`/contractors/opportunities?opportunityId=${request.id}`,"Review Request",
     ));
