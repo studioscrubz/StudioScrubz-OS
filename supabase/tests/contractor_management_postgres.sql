@@ -109,14 +109,14 @@ reset role;
 update public.contractor_profitability set assessed_scope='Stale old scope',minimum_price=420 where opportunity_id='30000000-0000-4000-8000-000000000001';
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);
-do $ begin
+do $$ begin
  begin
  perform public.convert_contractor_opportunity_to_job('30000000-0000-4000-8000-000000000001');
  raise exception 'Stale profitability assessment converted';
  exception when others then
   if sqlerrm='Stale profitability assessment converted' then raise; end if;
  end;
-end $;
+end $$;
 reset role;
 update public.contractor_profitability set minimum_price=420 where opportunity_id='30000000-0000-4000-8000-000000000001';
 update public.contractor_profitability set assessed_scope='Deeply clean kitchen and bathrooms' where opportunity_id='30000000-0000-4000-8000-000000000001';
