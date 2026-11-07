@@ -122,6 +122,8 @@ create index contractor_messages_company_idx on public.contractor_messages(compa
 create table public.contractor_profitability (
  opportunity_id uuid primary key references public.contractor_opportunities(id) on delete restrict,
  assessed_by uuid not null references public.user_profiles(id),
+ assessed_amount numeric not null check(assessed_amount>=0),
+ assessed_scope text not null,
  projection jsonb not null,
  minimum_price numeric,
  projected_margin numeric,
