@@ -380,6 +380,17 @@ do $$begin
  end if;
 end$$;
 set role service_role;
+do $$begin
+ begin
+  perform public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000011','unauthorized@example.test',repeat('4',64));
+  raise exception 'Deactivated owner was able to invite teammates';
+ exception when raise_exception then
+  if sqlerrm<>'Only an active contractor owner can invite teammates.' then raise; end if;
+ end;
+end$$;
+reset role;
+update public.contractor_members set is_active=true where email='alpha@example.test';
+set role service_role;
 select * from public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000011','teammate@example.test',repeat('1',64));
 select * from public.prepare_contractor_team_invitation('00000000-0000-4000-8000-000000000011','teammate@example.test',repeat('2',64));
 reset role;
