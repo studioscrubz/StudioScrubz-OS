@@ -1,7 +1,7 @@
 import "server-only";
 import {randomUUID} from "node:crypto";
 import {contractorContext,ContractorAccessError,requirePartner,uuid,audited,handleContractorError,noCache} from "@/lib/contractors/server";
-const BUCKET="contractor-private",MAX=15*1024*1024;
+const BUCKET="contractor-private",MAX=4*1024*1024;
 const mimes:Record<string,string>={"application/pdf":"pdf","image/png":"png","image/jpeg":"jpg","image/webp":"webp"};
 function magic(bytes:Uint8Array,mime:string):boolean{
  if(mime==="application/pdf")return String.fromCharCode(...bytes.subarray(0,5))==="%PDF-";
@@ -14,15 +14,19 @@ export async function GET(request:Request){
  try{
   const ctx=await contractorContext();
   const id=uuid(new URL(request.url).searchParams.get("id"));
-  const {data:document,error}=await ctx.admin.from("contractor_documents").select("id,company_id,storage_path,category")
+  const {data:document,error}=await ctx.admin.from("contractor_documents").select("id,company_id,storage_path,category,file_name,mime_type")
    .eq("id",id).maybeSingle();
   if(error||!document||ctx.type==="partner"&&document.company_id!==ctx.companyId)
    throw new ContractorAccessError("File unavailable.",404);
   if(ctx.type==="partner"&&ctx.role!=="Company Admin"&&document.category==="Tax")
    throw new ContractorAccessError("Company administrator access is required for tax documents.",403);
-  const {data:signed,error:se}=await ctx.admin.storage.from(BUCKET).createSignedUrl(document.storage_path,60);
-  if(se||!signed)throw new ContractorAccessError("Secure file link unavailable.",503);
-  return noCache({url:signed.signedUrl,expiresInSeconds:60});
+  const {data:file,error:downloadError}=await ctx.admin.storage.from(BUCKET).download(document.storage_path);
+  if(downloadError||!file)throw new ContractorAccessError("Secure file unavailable.",503);
+  return new Response(file,{headers:{
+   "Cache-Control":"private, no-store","Content-Type":document.mime_type,
+   "Content-Disposition":`attachment; filename*=UTF-8''${encodeURIComponent(document.file_name).replace(/['()*]/g,c=>"%"+c.charCodeAt(0).toString(16))}`,
+   "X-Content-Type-Options":"nosniff",
+  }});
  }catch(error){return handleContractorError(error);}
 }
 export async function POST(request:Request){
@@ -31,7 +35,7 @@ export async function POST(request:Request){
   const form=await request.formData();
   const uploaded=form.get("file"),category=form.get("category"),companyArg=form.get("companyId");
   if(!(uploaded instanceof File))throw new ContractorAccessError("Select a file.",400);
-  if(uploaded.size<1||uploaded.size>MAX||!Object.hasOwn(mimes,uploaded.type))throw new ContractorAccessError("Unsupported or oversized file.",400);
+  if(uploaded.size<1||uploaded.size>MAX||!Object.hasOwn(mimes,uploaded.type))throw new ContractorAccessError("Select a PDF, PNG, JPEG or WebP file up to 4 MB.",400);
   const bytes=new Uint8Array(await uploaded.arrayBuffer());
   if(!magic(bytes,uploaded.type))throw new ContractorAccessError("File contents do not match declared format.",400);
   const companyId=ctx.type==="partner"?ctx.companyId:uuid(companyArg);

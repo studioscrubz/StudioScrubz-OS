@@ -1,4 +1,6 @@
 import "server-only";
+import { headers } from "next/headers";
+import { isPartnerHost } from "./host";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -18,6 +20,9 @@ export async function contractorContext():Promise<ContractorContext> {
     .select("role,is_active").eq("id",user.id).maybeSingle();
   if(staffError)throw new Error("Internal account could not be verified.");
   if(staff?.is_active && (staff.role==="Master Admin"||staff.role==="Manager")) {
+    if (isPartnerHost((await headers()).get("host"))) {
+      throw new ContractorAccessError("Contractor portal access is required.");
+    }
     return {type:"internal",userId:user.id,role:staff.role,companyId:null,admin};
   }
   // A StudioScrubz employee never falls back to a partner identity.
@@ -62,7 +67,7 @@ export function money(value:unknown,label="amount"):number {
   return Math.round(amount*100)/100;
 }
 export function handleContractorError(error:unknown):Response {
-  if(error instanceof ContractorAccessError)return Response.json({error:error.message},{status:error.status});
+  if(error instanceof ContractorAccessError)return Response.json({error:error.message},{status:error.status,headers:{"Cache-Control":"private, no-store"}});
   console.error("Contractor management request failed",error);
   return Response.json({error:"Contractor request could not be completed."},{status:500});
 }

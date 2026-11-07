@@ -145,8 +145,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    {selectedCompany&&<Panel title={`Manage ${selectedCompany.name}`}><div className="space-y-3 text-sm">
     <p>Contact: {selectedCompany.contact_name||"Not supplied"}</p><p>Email: {selectedCompany.contact_email}</p><p>Terms: {selectedCompany.payment_terms||"Not specified"}</p>
     <p><b>Company documents:</b></p>
-    {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><button key={d.id}
-      type="button" className="mr-3 text-sm text-[#143d1a] underline" onClick={()=>void openDocument(d.id)}>{d.file_name} ({d.category})</button>)}
+    {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><a key={d.id} className="mr-3 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}
 
     <p>Status: <b>{selectedCompany.status}</b></p>
     <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit partner terms, territory and rates</summary>
@@ -271,7 +270,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       if(!res.ok)throw new Error(result.error||"Upload failed");await refresh();setAttachment(null);setNotice("Attachment uploaded.");
      }catch(e){setError(e instanceof Error?e.message:"Upload failed");}finally{setBusy(false);}
     }}>Upload attachment</button></div>
-    {data?.documents.filter(x=>x.opportunity_id===selected.id).map(x=><button key={x.id} type="button" className="mr-2 mt-2 text-sm text-[#143d1a] underline" onClick={()=>void openDocument(x.id)}>{x.file_name}</button>)}
+    {data?.documents.filter(x=>x.opportunity_id===selected.id).map(x=><a key={x.id} className="mr-2 mt-2 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${x.id}`}>{x.file_name}</a>)}
    </Panel>}
   </>}
   {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Partner">{companySelect}<label className="mt-3 block text-sm font-semibold">Opportunity
@@ -313,10 +312,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    </div>)}</Panel>
   </section>}
  </main>;
- async function openDocument(id:string){
-  try{const res=await fetch(`/api/contractors/files?id=${id}`,{cache:"no-store"});const body=await res.json();if(!res.ok)throw new Error(body.error||"File unavailable");window.open(body.url,"_blank","noopener,noreferrer");}
-  catch(e){setError(e instanceof Error?e.message:"Cannot access file");}
- }
+
 }
 function Panel({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-xl border bg-white p-4 shadow-sm"><h2 className="mb-4 text-lg font-extrabold text-[#143d1a]">{title}</h2>{children}</section>}
 function Field({label,value,set,type="text",required=false}:{label:string;value:string;set:(v:string)=>void;type?:string;required?:boolean}){return <label className="block text-sm font-semibold">{label}<input required={required} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} value={value} onChange={e=>set(e.target.value)} className={input}/></label>}

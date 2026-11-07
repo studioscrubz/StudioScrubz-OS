@@ -5,24 +5,37 @@ import {contractorContext,requirePartner,uuid,handleContractorError,noCache,Cont
 export async function GET(request:Request){
  try{
   const ctx=await contractorContext();requirePartner(ctx);
-  const jobId=uuid(new URL(request.url).searchParams.get("jobId"));
+  const params=new URL(request.url).searchParams;
+  const jobId=uuid(params.get("jobId"));
+  const photoId=params.has("photoId")?uuid(params.get("photoId")):null;
   const {data:op,error:oe}=await ctx.admin.from("contractor_opportunities")
    .select("id,quality_approved_at").eq("company_id",ctx.companyId).eq("linked_job_id",jobId).maybeSingle();
   if(oe||!op)throw new ContractorAccessError("Job is not assigned to this company.",404);
   if(!op.quality_approved_at)throw new ContractorAccessError("Completion photos are available after StudioScrubz quality review.",403);
-  const {data:invoice,error:ie}=await ctx.admin.from("invoices").select("id")
-   .eq("job_id",jobId).is("archived_at",null).neq("status","Cancelled").limit(1).maybeSingle();
+  const {data:invoices,error:ie}=await ctx.admin.from("invoices").select("id")
+   .eq("job_id",jobId).is("archived_at",null).neq("status","Cancelled");
   if(ie)throw ie;
-  if(!invoice)return noCache({photos:[]});
-  const {data:photos,error}=await ctx.admin.from("invoice_job_photos")
-   .select("id,category,caption,storage_path").eq("invoice_id",invoice.id)
-   .eq("customer_visible",true).limit(50);
+  if(!invoices?.length){
+   if(photoId)throw new ContractorAccessError("Completion photo unavailable.",404);
+   return noCache({photos:[]});
+  }
+  const visible=ctx.admin.from("invoice_job_photos").select("id,category,caption,storage_path")
+   .in("invoice_id",invoices.map(x=>x.id)).eq("customer_visible",true);
+  if(photoId){
+   const {data:photo,error}=await visible.eq("id",photoId).maybeSingle();
+   if(error)throw error;
+   if(!photo)throw new ContractorAccessError("Completion photo unavailable.",404);
+   const {data:file,error:downloadError}=await ctx.admin.storage.from(OPERATIONAL_PHOTO_BUCKET).download(photo.storage_path);
+   if(downloadError||!file)throw new ContractorAccessError("Completion photo unavailable.",503);
+   if(!["image/jpeg","image/png","image/webp","image/gif","image/avif","image/heic","image/heif"].includes(file.type))
+    throw new ContractorAccessError("Unsupported completion photo format.",415);
+   return new Response(file,{headers:{
+    "Content-Type":file.type,"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",
+   }});
+  }
+  const {data:photos,error}=await visible.order("id").limit(50);
   if(error)throw error;
-  if(!photos?.length)return noCache({photos:[]});
-  const signed=await ctx.admin.storage.from(OPERATIONAL_PHOTO_BUCKET)
-   .createSignedUrls(photos.map(x=>x.storage_path),60);
-  if(signed.error)throw signed.error;
-  return noCache({photos:photos.map((p,i)=>({id:p.id,category:p.category,caption:p.caption,
-    url:signed.data?.[i]?.signedUrl??null})).filter(p=>p.url)});
+  return noCache({photos:(photos??[]).map(p=>({id:p.id,category:p.category,caption:p.caption,
+    url:`/api/contractors/completion-photos?jobId=${jobId}&photoId=${p.id}`}))});
  }catch(error){return handleContractorError(error);}
 }

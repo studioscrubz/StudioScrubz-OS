@@ -11,7 +11,7 @@ test("new relations are RLS-enforced and directly unwritable, including financia
  for(const name of ["contractor_companies","contractor_members","contractor_invitations","contractor_opportunities","contractor_offers","contractor_messages","contractor_profitability","contractor_audit_events","contractor_documents","contractor_message_reads","contractor_contact_attempts","contractor_followups","contractor_notification_deliveries"]){
   assert.match(migration,new RegExp("alter table public\\."+name+" enable row level security"));
  }
- assert.match(migration,/revoke insert,update,delete on public\.contractor_companies/);
+ assert.match(migration,/revoke all on public\.contractor_companies/);
  assert.match(migration,/public\.contractor_profitability,public\.contractor_audit_events/);
  assert.doesNotMatch(migration,/grant (?:insert|update) on public\.contractor_profitability to authenticated/);
 });
@@ -41,7 +41,7 @@ test("pricing, privileged overrides, final confirmation and job idempotency are 
  assert.match(api,/!opp\.partner_confirmed_at/);
  assert.match(api,/!a\.override_approved_by/);
  assert.match(activation,/v_op\.linked_job_id is not null then return v_op\.linked_job_id/);
- assert.match(activation,/v_op\.partner_confirmed_at is null or v_op\.internal_confirmed_at is null/);
+ assert.match(activation,/v_op\.partner_confirmed_at is null or \(v_op\.status=\x27Accepted\x27 and v_op\.internal_confirmed_at is null/);
  assert.match(activation,/v_pr\.minimum_price/);
  assert.match(activation,/v_pr\.assessed_amount<>v_op\.agreed_amount/);
  assert.match(activation,/v_pr\.assessed_scope<>v_op\.final_scope/);
@@ -55,10 +55,10 @@ test("existing employee roles do not inherit contractor access, and external por
  assert.match(sidebar,/label: "Operations"[\s\S]*label: "Contractor Dashboard"/);
  assert.match(sidebar,/href: "\/contractors\/invitations"/);
 });
-test("attachments require exact file signatures, private storage and scoped signed URLs",()=>{
+test("attachments require exact file signatures, private storage and authorized downloads",()=>{
  assert.match(files,/const BUCKET="contractor-private"/);
  assert.match(files,/magic\(bytes,uploaded\.type\)/);
- assert.match(files,/createSignedUrl\(document\.storage_path,60\)/);
+ assert.match(files,/download\(document\.storage_path\)/);
  assert.match(files,/document\.company_id!==ctx\.companyId/);
  assert.match(files,/\.eq\("company_id",companyId\)/);
 });
@@ -119,14 +119,18 @@ test("partner hostname is isolated from the employee application and uses canoni
  const proxy=read("proxy.ts");
  const login=read("components/contractors/ContractorLogin.tsx");
  const activationUi=read("components/contractors/ContractorActivate.tsx");
- assert.match(proxy,/hostname === "partners\.studioscrubz\.com"/);
- assert.match(proxy,/destination\.pathname = "\/contractor\/login"/);
+ assert.match(proxy,/isPartnerHost\(hostname\)/);
+ assert.match(proxy,/pathname === "\/"\) return updateSession\(request, \{ partnerEntry: true \}\)/);
  assert.match(proxy,/destination\.pathname = \`\/contractor\$\{pathname\}\`/);
- assert.match(proxy,/pathname === "\/contractor"/);
- assert.match(proxy,/pathname\.startsWith\("\/api\/contractors\/"\)/);
+ assert.match(proxy,/"\/api\/contractors\/completion-photos"\]\.includes\(pathname\)/);
+ assert.match(guards,/isPartnerHost\(\(await headers\(\)\)\.get\("host"\)\)/);
+ assert.match(read("lib/supabase/proxy.ts"),/authenticated \? "\/contractor" : "\/contractor\/login"/);
  assert.match(proxy,/new NextResponse\("Not Found", \{ status: 404 \}\)/);
  assert.match(invites,/https:\/\/partners\.studioscrubz\.com/);
  assert.match(login,/https:\/\/partners\.studioscrubz\.com/);
  assert.match(activationUi,/https:\/\/partners\.studioscrubz\.com/);
+ assert.match(activationUi,/\/contractor\/activate#token=/);
+ assert.match(activationUi,/new URLSearchParams\(callback\.hash\.slice\(1\)\)/);
+ assert.match(read("components/contractors/ContractorResetPassword.tsx"),/event === "PASSWORD_RECOVERY"/);
  assert.match(login,/https:\/\/app\.studioscrubz\.com\/login/);
 });

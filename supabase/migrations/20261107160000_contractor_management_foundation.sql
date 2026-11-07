@@ -234,7 +234,7 @@ create policy contractor_companies_internal_insert on public.contractor_companie
 create policy contractor_companies_internal_update on public.contractor_companies for update to authenticated
  using ((select private.contractor_is_internal())) with check ((select private.contractor_is_internal()));
 create policy contractor_members_internal_select on public.contractor_members for select to authenticated
- using ((select private.contractor_is_internal()) or user_id=(select auth.uid()));
+ using ((select private.contractor_is_internal()));
 create policy contractor_members_internal_write on public.contractor_members for insert to authenticated
  with check ((select private.contractor_is_internal()));
 -- External members cannot UPDATE their own authorization or company association.
@@ -263,7 +263,7 @@ create policy contractor_messages_internal_select on public.contractor_messages 
 create policy contractor_messages_internal_insert on public.contractor_messages for insert to authenticated
  with check ((select private.contractor_is_internal()));
 create policy contractor_message_reads_internal_select on public.contractor_message_reads for select to authenticated
- using ((select private.contractor_is_internal()) or user_id=(select auth.uid()));
+ using ((select private.contractor_is_internal()));
 create policy contractor_contact_attempts_internal_select on public.contractor_contact_attempts for select to authenticated
  using ((select private.contractor_is_internal()));
 create policy contractor_followups_internal_select on public.contractor_followups for select to authenticated
@@ -286,9 +286,9 @@ create policy contractor_documents_internal_insert on public.contractor_document
  with check ((select private.contractor_is_internal()));
 
 -- No contractor relation is directly writable by the browser, including internal
--- staff. All writes pass independently authorized server routes or the two
+-- staff. All writes pass independently authorized server routes or the
 -- guarded transaction RPCs. Otherwise a Manager could forge a pricing override.
-revoke insert,update,delete on public.contractor_companies,public.contractor_members,
+revoke all on public.contractor_companies,public.contractor_members,
  public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
  public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
@@ -298,4 +298,11 @@ grant select on public.contractor_companies,public.contractor_members,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
  public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
  public.contractor_followups,public.contractor_notification_deliveries to authenticated;
+
+
+grant select,insert,update,delete on public.contractor_companies,public.contractor_members,
+ public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
+ public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
+ public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
+ public.contractor_followups,public.contractor_notification_deliveries to service_role;
 

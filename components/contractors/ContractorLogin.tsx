@@ -1,4 +1,5 @@
 "use client";
+import { contractorPage } from "@/lib/contractors/host";
 import {useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
@@ -10,7 +11,12 @@ export function ContractorLogin(){
  async function signIn(e:React.FormEvent){
   e.preventDefault();setBusy(true);setError("");
   try{const {error}=await getSupabaseClient().auth.signInWithPassword({email,password});if(error)throw error;
-   router.replace("/contractor");router.refresh();
+   const access=await fetch("/api/contractors/session",{cache:"no-store"});
+   if(!access.ok){
+    await getSupabaseClient().auth.signOut({scope:"local"});
+    throw new Error("This account does not have active contractor portal access.");
+   }
+   router.replace(contractorPage("/"));router.refresh();
   }catch(e){setError(e instanceof Error?e.message:"Unable to sign in.");}finally{setBusy(false);}
  }
  async function recover(){

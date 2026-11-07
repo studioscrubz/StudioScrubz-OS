@@ -31,6 +31,8 @@ export async function POST(request:Request){
    const token=required(body.token,"invitation token",64);
    if(!tokenFormat.test(token))throw new ContractorAccessError("Invalid invitation token.",400);
    const session=await createSupabaseServerClient();
+   const {data:{user},error:authError}=await session.auth.getUser();
+   if(authError||!user)throw new ContractorAccessError("Sign in before redeeming your invitation.",401);
    const {data,error}=await session.rpc("redeem_contractor_invitation" as never,{p_token_hash:hash(token)} as never);
    if(error)throw new ContractorAccessError(error.message,409);
    return noCache({companyId:data});
@@ -49,7 +51,7 @@ export async function POST(request:Request){
    return noCache({ok:true});
   }
   if(action!=="invite"&&action!=="resend")throw new ContractorAccessError("Unknown invitation action.",400);
-  let companyId=uuid(body.companyId),email=required(body.email,"invitation email",320).toLowerCase();
+  const companyId=uuid(body.companyId),email=required(body.email,"invitation email",320).toLowerCase();
   if(!/^\S+@\S+\.\S+$/.test(email))throw new ContractorAccessError("Valid invitation email required.",400);
   const role=body.memberRole==="Company Admin"?"Company Admin":"Member";
   const {data:company,error:companyError}=await ctx.admin.from("contractor_companies").select("id,name,status")
@@ -71,7 +73,8 @@ export async function POST(request:Request){
   if(insertError||!invite)throw insertError??new Error("Invitation preparation failed.");
   await audited(ctx,{companyId,type:"Invitation Prepared",detail:{invitationId:invite.id,email,role}});
   const origin=process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":new URL(request.url).origin;
-  const activationUrl=`${origin}/contractor/activate?token=${token}`;
+  const activationPath=process.env.NODE_ENV==="production"?"/activate":"/contractor/activate";
+  const activationUrl=`${origin}${activationPath}?token=${token}`;
   let sent;
   try {
    sent=await sendResendEmail({recipientEmail:email,subject:"StudioScrubz Contractor Partner Portal Invitation",

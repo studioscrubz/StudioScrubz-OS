@@ -1,4 +1,5 @@
 "use client";
+import { contractorPage } from "@/lib/contractors/host";
 import {useCallback,useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
@@ -31,9 +32,9 @@ export function ContractorPortal(){
  const [approvedPhotos,setApprovedPhotos]=useState<Array<{id:string;category:string;caption:string|null;url:string}>>([]);
  const reload=useCallback(async()=>{
   const res=await fetch("/api/contractors",{cache:"no-store"});const body=await res.json();
-  if(res.status===401){router.replace("/contractor/login");return;}
-  if(!res.ok)throw new Error(body.error??"Company account unavailable");
-  if(!["Member","Company Admin"].includes(body.role)){window.location.assign("https://app.studioscrubz.com/contractors");return;}
+  if(res.status===401){router.replace(contractorPage("/login"));return;}
+  if(!res.ok){setData(null);throw new Error(body.error??"Company account unavailable");}
+  if(!["Member","Company Admin"].includes(body.role))throw new Error("Contractor portal access is required.");
   setData(body);setOpportunityId(current=>current||body.opportunities?.[0]?.id||"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
@@ -52,7 +53,7 @@ export function ContractorPortal(){
  return <main className="min-h-screen bg-[#f5f6f4] text-neutral-900">
   <header className="bg-[#143d1a] px-4 py-4 text-white"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
    <div className="flex items-center gap-4"><StudioScrubzLogo size={72}/><div><h1 className="text-xl font-extrabold">Contractor Partner Portal</h1><p className="text-sm text-white/85">{data?.company.name??"StudioScrubz"}</p></div></div>
-   <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut();router.replace("/contractor/login")}}>Sign out</button>
+   <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut({scope:"local"});router.replace(contractorPage("/login"))}}>Sign out</button>
   </div></header>
   <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
    <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>setTab(t)}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
@@ -121,9 +122,9 @@ export function ContractorPortal(){
      </>}
      {["New Opportunity","Negotiating","Information Requested"].includes(chosen.status)&&!chosen.partner_confirmed_at&&<div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
       <p className="mb-3">Confirm the latest scope and price in writing before StudioScrubz can accept this job. Confirmation does not guarantee acceptance.</p>
-      <button className={primary} disabled={busy} onClick={()=>void action("confirmOffer",{opportunityId:chosen.id,confirmed:true})}>Confirm final scope and compensation</button></div>}
+      <button className={primary} disabled={busy} onClick={()=>void action("confirmOffer",{opportunityId:chosen.id,confirmed:true,amount:Number(chosen.agreed_amount??chosen.proposed_amount),scope:chosen.final_scope??chosen.scope_of_work})}>Confirm final scope and compensation</button></div>}
      <h3 className="pt-3 font-extrabold">Authorized attachments</h3>
-     <div>{data.documents.filter(d=>d.opportunity_id===chosen.id).map(d=><button key={d.id} type="button" className="mr-3 text-[#143d1a] underline" onClick={()=>void openFile(d.id)}>{d.file_name} ({d.category})</button>)}</div>
+     <div>{data.documents.filter(d=>d.opportunity_id===chosen.id).map(d=><a key={d.id} className="mr-3 text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}</div>
      <label className="block font-bold">Upload photo or scope PDF<input className={input} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={e=>setFile(e.target.files?.[0]??null)}/></label>
      <button className={secondary} type="button" disabled={busy||!file} onClick={()=>void upload(chosen.id)}>Upload attachment</button>
     </div>}</PortalPanel>
@@ -154,8 +155,8 @@ export function ContractorPortal(){
       <button className={primary} disabled={busy}>Save contact details</button>
      </form>}
     <p className="mt-3 text-xs text-neutral-500">Legal, tax, insurance and contract records are reviewed by StudioScrubz Operations.</p></PortalPanel>
-    <PortalPanel title="Company documents"><p className="mb-3 text-xs text-neutral-600">Secure company tax, insurance and agreement files. Tax documents are visible only to company administrators and StudioScrubz Operations.</p>
-     <div className="space-y-2">{data.documents.filter(d=>!d.opportunity_id).map(d=><button key={d.id} type="button" className="block text-sm text-[#143d1a] underline" onClick={()=>void openFile(d.id)}>{d.file_name} ({d.category})</button>)}</div>
+    <PortalPanel title="Company documents"><p className="mb-3 text-xs text-neutral-600">Secure company tax, insurance and agreement files. Upload PDF, PNG, JPEG or WebP files up to 4 MB. Tax documents are visible only to company administrators and StudioScrubz Operations.</p>
+     <div className="space-y-2">{data.documents.filter(d=>!d.opportunity_id).map(d=><a key={d.id} className="block text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}</div>
      {data.role==="Company Admin"&&<div className="mt-4 space-y-2">
       <label className="block text-sm font-bold">Document category<select className={input} value={companyCategory} onChange={e=>setCompanyCategory(e.target.value)}>
        {["Insurance","Tax","Agreement","Other"].map(k=><option key={k}>{k}</option>)}</select></label>
@@ -176,9 +177,7 @@ export function ContractorPortal(){
    </div>}
   </div>
  </main>;
- async function openFile(id:string){
-  try{const r=await fetch(`/api/contractors/files?id=${id}`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"File unavailable");window.open(b.url,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:"File unavailable");}
- }
+
  async function upload(oppId:string){
   if(!file)return;setBusy(true);setError("");
   try{const form=new FormData();form.set("file",file);form.set("opportunityId",oppId);form.set("category",file.type.startsWith("image/")?"Photo":"Scope");

@@ -17,7 +17,7 @@
 - All new tables have RLS and browser mutation grants revoked; only allowlisted server routes and guarded transaction RPCs mutate records.
 - External portal API selects an explicit safe field list for each resource. It never returns labor costs, wage information, assessments, audit notes, payroll, or other company data.
 - Invitation: 256-bit random secret stored only as SHA-256 hash, seven-day database-generated expiration, atomic company+verified-email redemption, single use. Expired/revoked invites cannot create membership.
-- Uploaded files: private bucket, explicit MIME and magic bytes, max 15MB, path generated on server, per-company scope verification, 60-second signed download URLs.
+- Uploaded files: private bucket, explicit MIME and magic bytes, max 4 MB, path generated on server, and company scope checked on every download. Completion photos also use authenticated downloads.
 - Financial overrides are restricted by the server to Master Admin with a reason. The job conversion RPC independently requires a completed assessment, signed-off scope/price, or a documented override.
 - Two independent schema-only native PostgreSQL migration files have a dedicated security regression workflow.
 - No historical jobs, employees, invoices, payments or financial settings are altered by migrations.
@@ -38,7 +38,7 @@
 2. Native PG: both exact migration files, replay, expiry, cross-company isolation, manager restrictions, job handoff.
 3. Supabase production migration and storage bucket state **read-only review** immediately before approval.
 4. Vercel team/project/domain/env read-only review, then production-only release after approval.
-5. Auth provider redirect allowlist must include `https://partners.studioscrubz.com/contractor/activate` and `https://partners.studioscrubz.com/contractor/reset-password`. The canonical invitation and recovery links use the partner host.
+5. Auth provider redirect allowlist must include `https://partners.studioscrubz.com/contractor/activate` and `https://partners.studioscrubz.com/contractor/reset-password`. Invitation and recovery links use the partner host. Signup email verification carries the invitation in a URL fragment so the callback matches Supabase’s exact allowed path.
 6. Send real invitation to an explicitly designated test contractor after approval, and verify activation email and first job submission.
 7. Validate real technician GPS, equipment and photo flow on a controlled test Job.
 8. Verify invoice creation and payment reconciliation with a controlled contractor job.
@@ -69,12 +69,22 @@
 - Supabase Auth redirect allowlist for contractor activation and password reset must be confirmed; a real invitation delivery and redemption test is needed after production deployment is explicitly authorized.
 - Scheduled overdue-payment reminder and internal daily attention digest code now exists behind \`CRON_SECRET\`, and records idempotent provider receipts. **It is not active** until an approved Vercel production deployment; notification coverage for every status transition still needs live integration testing. The implementation supports manual provider-confirmed reminders, persistent unread message counts/read receipts, auditable communications, contact-attempt records, assigned follow-up reminders, and linked Job/invoice status readouts.
 - Existing completion logic can create invoices at job completion before the contractor quality review. The portal withholds those invoices until quality approval, but the internal invoicing timeline is unchanged to preserve existing business behavior.
-\n2026-11-07 Communications schema additions: `contractor_message_reads`, `contractor_contact_attempts`, and `contractor_followups` (unapplied) provide durable read receipts, contact outcomes, and follow-up actions in the operations dashboard and portal. Tax documents require Company Admin membership or internal staff authorization.\n
+
+2026-11-07 Communications schema additions: `contractor_message_reads`, `contractor_contact_attempts`, and `contractor_followups` (unapplied) provide durable read receipts, contact outcomes, and follow-up actions in the operations dashboard and portal. Tax documents require Company Admin membership or internal staff authorization.
+
 Automated notifications added: `/api/contractors/reminders` and `contractor_notification_deliveries`, with a second daily Vercel cron entry; this configuration must be approved, credential-verified and tested before activation. The processor sends weekly overdue contractor invoice reminders and daily aggregate internal alerts for unassigned Jobs / due follow-ups. It does not create invoices or modify financial ledgers.
 
 ## Partner hostname cutover (pending approval)
 - Vercel project domain `partners.studioscrubz.com` is registered and ownership-verified on `studio-scrubz-os`.
-- Source `proxy.ts` routes the partner hostname root to contractor sign-in, supports activation/reset, and rejects employee application paths with 404. Contractor APIs retain their server-side authorization and company isolation.
-- Porkbun manages DNS. Its existing partner record is **not** pointed at Vercel yet. Set host `partners` CNAME to the current value shown in Vercel Domains only after app/auth security and acceptance testing is complete.
+- Source `proxy.ts` serves sign-in or the portal at the partner root, supports activation and recovery aliases, and rejects employee routes with 404. Contractor handlers also reject staff credentials on the partner hostname and recheck current company membership on every protected request.
+- Porkbun manages DNS. Its existing partner record is **not** pointed at Vercel yet. Vercel returned `c8a9ba22b868a37a.vercel-dns-017.com` as the preferred CNAME on November 7, 2026. Replace the existing `partners` CNAME to `uixie.porkbun.com` after release approval and acceptance testing. Keep the other DNS records intact.
 - Supabase authentication redirect allowlist needs the two partner callback URLs above; existing employee redirect rules remain in place.
 - No PR merge, production database migration, or production deployment is authorized by domain registration or this code change alone. Do not use production clients for test invitations.
+
+
+## Controlled release and rollback
+
+1. Recheck the production commit and required environment settings, and verify both partner callback URLs in Supabase Auth. Complete the synthetic acceptance flow on a disposable production-equivalent stack, including real Auth email callbacks and the handoff through technician completion and billing. Retain the previous READY production deployment ID and confirm a database recovery point.
+2. With explicit migration approval, apply the foundation migration first and the invitation and handoff migration second, each as a transaction through the standard production migration runner. Check migration history, RLS, RPC grants, and the private bucket before deploying. If the second migration fails, its transaction rolls back; correct it and apply it before advancing.
+3. With explicit merge and production deployment approval, merge and release the reviewed revision. Treat merging into Vercel's tracked production branch as a deployment trigger. This PR branch disables automatic Vercel Git deployments. Verify existing employee routes and test the partner host against the released app before admitting contractors.
+4. With DNS approval, replace only the Porkbun `partners` CNAME. Wait for DNS and Vercel TLS, then check the public hostname, internal-route rejection, and the invited test account's activation, recovery, and sign-out. Restore the former CNAME and previous Vercel deployment if cutover fails. Keep the additive tables and recorded contractor data during an application rollback.

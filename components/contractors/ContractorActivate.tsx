@@ -1,21 +1,41 @@
 "use client";
+import { contractorPage } from "@/lib/contractors/host";
 import {useEffect,useState} from "react";
 import {useRouter,useSearchParams} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
 export function ContractorActivate(){
- const router=useRouter(),query=useSearchParams(),token=query.get("token")??"";
- const [invitation,setInvitation]=useState<{companyName:string;email:string;expiresAt:string}|null>(null);
+ const router=useRouter(),query=useSearchParams(),invitationParam=query.get("token");
+ const [invitation,setInvitation]=useState<{companyName:string;email:string;expiresAt:string;token:string}|null>(null);
  const [password,setPassword]=useState(""),[loginPassword,setLoginPassword]=useState("");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- useEffect(()=>{if(!token)return;let alive=true;void fetch(`/api/contractors/invitations?token=${encodeURIComponent(token)}`,{cache:"no-store"}).then(async response=>{
-  const body=await response.json();if(!response.ok)throw new Error(body.error??"Invitation unavailable");
-  if(alive)setInvitation(body);
- }).catch(e=>{if(alive)setError(e instanceof Error?e.message:"Invitation unavailable");});return()=>{alive=false};},[token]);
+ useEffect(()=>{
+  const callback=new URL(window.location.href);
+  // Supabase matches the exact allowed URL after removing the fragment.
+  // Keep the invitation secret there for the email-confirmation round trip.
+  const token=invitationParam??new URLSearchParams(callback.hash.slice(1)).get("token");
+  if(callback.searchParams.has("code"))void getSupabaseClient().auth.getSession();
+  if(!token)return;
+  let alive=true;
+  void fetch(`/api/contractors/invitations?token=${encodeURIComponent(token)}`,{cache:"no-store"}).then(async response=>{
+   const body=await response.json();
+   if(!response.ok)throw new Error(body.error??"Invitation unavailable");
+   if(alive)setInvitation({...body,token});
+  }).catch(e=>{if(alive)setError(e instanceof Error?e.message:"Invitation unavailable");});
+  return()=>{alive=false;};
+ },[invitationParam]);
  async function redeem(){
-  const response=await fetch("/api/contractors/invitations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"redeem",token})});
+  if(!invitation)throw new Error("Open a valid invitation link to activate your account.");
+  const response=await fetch("/api/contractors/invitations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"redeem",token:invitation.token})});
   const data=await response.json();if(!response.ok)throw new Error(data.error??"Activation failed");
-  router.replace("/contractor");router.refresh();
+  const access=await fetch("/api/contractors/session",{cache:"no-store"});
+  if(access.status===403){
+   setInvitation(null);
+   setNotice("Your invitation was redeemed. StudioScrubz Operations will need to activate the company before you can sign in.");
+   await getSupabaseClient().auth.signOut({scope:"local"});
+   return;
+  }
+  router.replace(contractorPage("/"));router.refresh();
  }
  async function create(e:React.FormEvent){
   e.preventDefault();if(!invitation)return;setBusy(true);setError("");setNotice("");
@@ -23,7 +43,7 @@ export function ContractorActivate(){
    if(password.length<12)throw new Error("Use a password of at least 12 characters.");
    const {data,error}=await getSupabaseClient().auth.signUp({
     email:invitation.email,password,
-    options:{emailRedirectTo:`${process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":window.location.origin}/contractor/activate?token=${encodeURIComponent(token)}`},
+    options:{emailRedirectTo:`${process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":window.location.origin}/contractor/activate#token=${encodeURIComponent(invitation.token)}`},
    });
    if(error)throw error;
    if(data.session?.user){await redeem();return;}
@@ -48,7 +68,7 @@ export function ContractorActivate(){
    <form className="mt-5 space-y-3 border-t pt-5" onSubmit={existing}><h2 className="font-bold">Already have an account or confirmed your email?</h2>
     <label className="block text-sm">Password<input required type="password" autoComplete="current-password" className="mt-1 w-full rounded-lg border p-3" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)}/></label>
     <button className="w-full rounded-lg border border-[#143d1a] p-3 font-bold text-[#143d1a]" disabled={busy}>Sign in & redeem invitation</button></form>
-  </>:<p className="mt-4 text-center text-sm">Verifying single-use invitation…</p>}
+  </>:<p className="mt-4 text-center text-sm">{(invitationParam||query.has("code"))&&!error&&!notice?"Verifying single-use invitation…":"Open a valid invitation link to activate your account."}</p>}
   {error&&<p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="mt-4 rounded-lg bg-green-50 p-3 text-[#143d1a]">{notice}</p>}
  </section></main>;

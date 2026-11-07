@@ -107,7 +107,7 @@ async function list(ctx:ContractorContext){
   .map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
  const [jobs,invoices]=await Promise.all([
   linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,completed_at").in("id",linkedIds):Promise.resolve({data:[],error:null}),
-  approvedJobIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",approvedJobIds).is("archived_at",null):Promise.resolve({data:[],error:null}),
+  approvedJobIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",approvedJobIds).is("archived_at",null).neq("status","Cancelled"):Promise.resolve({data:[],error:null}),
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
  return {role:ctx.role,company:company.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
@@ -246,10 +246,11 @@ export async function POST(request:Request){
     throw new ContractorAccessError("Opportunity cannot return to preacceptance workflow.",409);
    const reason=required(input.reason,"message to partner",2000);
    const status=action==="requestInformation"?"Information Requested":"Negotiating";
-   const {error}=await db.from("contractor_opportunities").update({
+   const {data:updated,error}=await db.from("contractor_opportunities").update({
     status,updated_at:new Date().toISOString(),
-   }).eq("id",opp.id);
+   }).eq("id",opp.id).eq("status",opp.status).eq("updated_at",opp.updated_at).select("id").maybeSingle();
    if(error)throw error;
+   if(!updated)throw new ContractorAccessError("Opportunity changed. Reload and try again.",409);
    const {error:me}=await db.from("contractor_messages").insert({
     company_id:opp.company_id,opportunity_id:opp.id,
     sender_id:ctx.userId,sender_side:"StudioScrubz",body:reason,
@@ -264,39 +265,31 @@ export async function POST(request:Request){
   if(action==="offer"){
    const opp=ctx.type==="internal"?await internalOpportunity(ctx,uuid(input.opportunityId)):
     await partnerOpportunity(ctx,uuid(input.opportunityId));
-   if(["Accepted","Declined","Cancelled","Completed","Paid"].includes(opp.status))
-    throw new ContractorAccessError("This opportunity is closed for negotiation.",409);
    const amount=money(input.amount),scope=required(input.scope,"counteroffer scope",10000);
-   const {data,error}=await db.from("contractor_offers").insert({opportunity_id:opp.id,company_id:opp.company_id,
-    offered_by:ctx.userId,offered_by_side:ctx.type==="internal"?"StudioScrubz":"Contractor",
-    amount,scope_text:scope,pricing_basis:required(input.pricingBasis??opp.pricing_basis,"pricing basis",80),
-    message:optional(input.message,5000)}).select("id").single();
-   if(error)throw error;
-   const {error:ue}=await db.from("contractor_opportunities").update({
-    status:"Negotiating",final_scope:scope,agreed_amount:amount,partner_confirmed_at:null,
-    internal_confirmed_at:null,updated_at:new Date().toISOString(),
-   }).eq("id",opp.id);
-   if(ue)throw ue;
-   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Counteroffer Submitted",detail:{offerId:data.id,amount}});
+   const {data:offerId,error}=await db.rpc("record_contractor_offer",{
+    p_opportunity_id:opp.id,p_actor:ctx.userId,p_amount:amount,p_scope:scope,
+    p_basis:required(input.pricingBasis??opp.pricing_basis,"pricing basis",80),p_message:optional(input.message,5000),
+   });
+   if(error)throw new ContractorAccessError(error.message,409);
    await notify(ctx,"Contractor counteroffer",`A counteroffer was submitted for opportunity ${opp.opportunity_number}.`,opp.company_id,opp.id,
     ctx.type==="partner"?"internal":"contractor");
-   return noCache({offerId:data.id});
+   return noCache({offerId});
   }
   if(action==="confirmOffer"){
    requirePartner(ctx);
    const opp=await partnerOpportunity(ctx,uuid(input.opportunityId));
-   if(["Accepted","Declined","Cancelled"].includes(opp.status))throw new ContractorAccessError("Opportunity is already closed.",409);
-   const {data:offers,error:oe}=await db.from("contractor_offers").select("amount,scope_text,id").eq("opportunity_id",opp.id)
-    .order("created_at",{ascending:false}).limit(1);
-   if(oe)throw oe;
-   const latest=offers?.[0];
-   const amount=latest?Number(latest.amount):Number(opp.proposed_amount),scope=latest?.scope_text??opp.scope_of_work;
-   if(input.confirmed!==true)throw new ContractorAccessError("Written confirmation of final scope and compensation is required.",400);
-   const {error}=await db.from("contractor_opportunities").update({
+   if(opp.linked_job_id||!["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(opp.status))
+    throw new ContractorAccessError("Opportunity is already closed.",409);
+   const amount=Number(opp.agreed_amount??opp.proposed_amount),scope=opp.final_scope??opp.scope_of_work;
+   if(input.confirmed!==true||input.amount!==amount||input.scope!==scope)
+    throw new ContractorAccessError("Terms changed. Reload the opportunity and confirm the current scope and compensation.",409);
+   if(opp.partner_confirmed_at&&opp.status==="Awaiting Approval")return noCache({ok:true});
+   const {data:confirmed,error}=await db.from("contractor_opportunities").update({
     agreed_amount:amount,final_scope:scope,partner_confirmed_at:new Date().toISOString(),
     status:"Awaiting Approval",updated_at:new Date().toISOString(),
-   }).eq("id",opp.id);
+   }).eq("id",opp.id).eq("status",opp.status).eq("updated_at",opp.updated_at).select("id").maybeSingle();
    if(error)throw error;
+   if(!confirmed)throw new ContractorAccessError("Opportunity changed. Reload and confirm the current terms.",409);
    await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Partner Confirmed Scope and Price",detail:{amount}});
    await notify(ctx,"Contractor acceptance confirmation",`Partner confirmed scope and compensation for ${opp.opportunity_number}.`,opp.company_id,opp.id,"internal");
    return noCache({ok:true});
@@ -359,20 +352,22 @@ export async function POST(request:Request){
   if(action==="accept"||action==="decline"){
    requireInternal(ctx);
    const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
-   if(["Accepted","Declined","Cancelled","Crew Assignment","Scheduled","In Progress","Completed","Paid"].includes(opp.status))
+   if(action==="accept"&&opp.linked_job_id)return noCache({jobId:opp.linked_job_id});
+   if(!["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(opp.status))
     throw new ContractorAccessError("Opportunity has already been decided.",409);
    const reason=optional(input.reason,2000);
    if(action==="decline"){
     if(!reason)throw new ContractorAccessError("Decline reason required.",400);
-    const {error}=await db.from("contractor_opportunities").update({
+    const {data:updated,error}=await db.from("contractor_opportunities").update({
      status:"Declined",decision_reason:reason,decided_by:ctx.userId,decided_at:new Date().toISOString(),
-    }).eq("id",opp.id);
+    }).eq("id",opp.id).eq("status",opp.status).eq("updated_at",opp.updated_at).select("id").maybeSingle();
     if(error)throw error;
+    if(!updated)throw new ContractorAccessError("Opportunity changed. Reload and try again.",409);
     await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Opportunity Declined",detail:{reason}});
     await notify(ctx,"Opportunity declined",`StudioScrubz declined opportunity ${opp.opportunity_number}.`,opp.company_id,opp.id,"contractor");
     return noCache({ok:true});
    }
-   if(!opp.partner_confirmed_at||!opp.final_scope||opp.agreed_amount==null)
+   if(opp.status!=="Awaiting Approval"||!opp.partner_confirmed_at||!opp.final_scope||opp.agreed_amount==null)
     throw new ContractorAccessError("Contractor must confirm final scope and compensation in writing.",409);
    const {data:a,error:ae}=await db.from("contractor_profitability").select("*").eq("opportunity_id",opp.id).maybeSingle();
    if(ae||!a)throw new ContractorAccessError("Complete a profitability assessment first.",409);
@@ -381,18 +376,13 @@ export async function POST(request:Request){
    const below=a.minimum_price===null||Number(opp.agreed_amount)<Number(a.minimum_price)||!a.cost_complete;
    if(below&&(!a.override_approved_by||!a.override_reason))
     throw new ContractorAccessError("Below minimum or unverified costs. Master Admin override is required.",409);
-   const {error}=await db.from("contractor_opportunities").update({
-    status:"Accepted",internal_confirmed_at:new Date().toISOString(),decided_by:ctx.userId,
-    decided_at:new Date().toISOString(),decision_reason:reason??"Accepted within approved terms",
-   }).eq("id",opp.id);
-   if(error)throw error;
-   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Opportunity Accepted",detail:{agreedAmount:opp.agreed_amount}});
-   // Atomic, idempotent, authorization-checked SQL handoff. Retains existing job completion triggers.
+   // The database locks the opportunity and rechecks the approved terms before
+   // creating the Job and recording acceptance in the same transaction.
    const session=await createSupabaseServerClient();
    const {data:jobId,error:je}=await session.rpc("convert_contractor_opportunity_to_job" as never,
-    {p_opportunity_id:opp.id} as never);
-   if(je)throw new ContractorAccessError("Opportunity accepted, but operational Job creation needs review. "+je.message,409);
-   await notify(ctx,"Subcontracted job accepted",`Opportunity ${opp.opportunity_number} was accepted.`,opp.company_id,opp.id,"contractor");
+    {p_opportunity_id:opp.id,p_decision_reason:reason,p_expected_updated_at:opp.updated_at} as never);
+   if(je)throw new ContractorAccessError(je.message,409);
+   await notify(ctx,"Subcontracted job accepted",`Opportunity ${opp.opportunity_number} was accepted.`,opp.company_id,opp.id,"contractor",`accepted:${jobId}`);
    return noCache({jobId});
   }
   if(action==="retryJobConversion"){
@@ -451,11 +441,12 @@ export async function POST(request:Request){
     throw new ContractorAccessError("This opportunity can no longer be cancelled.",409);
    const nextStatus=action==="cancelOpportunity"?"Cancelled":action==="disputeOpportunity"?"Disputed":null;
    if(nextStatus){
-    const {error}=await db.from("contractor_opportunities").update({
+    const {data:updated,error}=await db.from("contractor_opportunities").update({
      status:nextStatus,updated_at:new Date().toISOString(),
      ...(nextStatus==="Cancelled"?{cancelled_at:new Date().toISOString()}:{}),
-    }).eq("id",opp.id);
+    }).eq("id",opp.id).eq("status",opp.status).eq("updated_at",opp.updated_at).select("id").maybeSingle();
     if(error)throw error;
+    if(!updated)throw new ContractorAccessError("Opportunity changed. Reload and try again.",409);
    }
    await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,
     type:action==="cancelOpportunity"?"Opportunity Cancelled":action==="disputeOpportunity"?"Job Disputed":"Reschedule Requested",
@@ -605,7 +596,7 @@ export async function POST(request:Request){
  } catch(error){return handleContractorError(error);}
 }
 
-async function notify(ctx:ContractorContext,subject:string,message:string,companyId:string,opportunityId:string|undefined,to:"internal"|"contractor"){
+async function notify(ctx:ContractorContext,subject:string,message:string,companyId:string,opportunityId:string|undefined,to:"internal"|"contractor",eventKey:string=crypto.randomUUID()){
  try{
   const db=ctx.admin;
   const {data:company}=await db.from("contractor_companies").select("name,contact_email,assigned_manager_id").eq("id",companyId).single();
@@ -623,7 +614,7 @@ async function notify(ctx:ContractorContext,subject:string,message:string,compan
   const safeMessage=message.replaceAll("<","&lt;").replaceAll(">","&gt;");
   const response=await sendResendEmail({recipientEmail:recipient,subject:`StudioScrubz | ${subject}`,
    text:message,html:`<p>${safeMessage}</p><p>Sign in to your authorized StudioScrubz dashboard for details.</p>`,
-   idempotencyKey:`contractor-event:${crypto.randomUUID()}`,replyTo:null});
+   idempotencyKey:`contractor-event:${eventKey}`,replyTo:null});
   await audited(ctx,{companyId,opportunityId,type:"Email Notification Sent",
    detail:{recipient,providerId:response.id,subject}});
  }catch(error){
