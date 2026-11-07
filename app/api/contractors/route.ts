@@ -48,10 +48,23 @@ function effectiveOpportunityStatuses<T extends {id:string;status:string;linked_
   return {...op,status};
  });
 }
+function unreadByCompany(
+ ctx:ContractorContext,messages:Array<{company_id?:string;created_at:string;sender_side:string}>,
+ reads:Array<{company_id:string;last_read_at:string}>,
+){
+ const last=new Map(reads.map(x=>[x.company_id,Date.parse(x.last_read_at)]));
+ const unread:Record<string,number>={};
+ for(const msg of messages){
+  const companyId=msg.company_id??ctx.companyId;
+  if(!companyId||msg.sender_side===(ctx.type==="partner"?"Contractor":"StudioScrubz"))continue;
+  if(Date.parse(msg.created_at)>(last.get(companyId)??0))unread[companyId]=(unread[companyId]??0)+1;
+ }
+ return unread;
+}
 async function list(ctx:ContractorContext){
  const db=ctx.admin;
  if(ctx.type==="internal"){
-  const [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers]=await Promise.all([
+  const [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers,reads,attempts,followups]=await Promise.all([
    db.from("contractor_companies").select("*").order("created_at",{ascending:false}).limit(500),
    db.from("contractor_opportunities").select("*").order("created_at",{ascending:false}).limit(500),
    db.from("contractor_offers").select("*").order("created_at",{ascending:false}).limit(500),
@@ -61,8 +74,11 @@ async function list(ctx:ContractorContext){
    db.from("contractor_members").select("id,company_id,email,member_role,is_active,joined_at").limit(500),
    db.from("contractor_documents").select("id,company_id,opportunity_id,file_name,mime_type,file_size,category,created_at").limit(500),
    db.from("user_profiles").select("id,display_name,email,role").in("role",["Master Admin","Manager"]).eq("is_active",true).limit(50),
+   db.from("contractor_message_reads").select("company_id,last_read_at").eq("user_id",ctx.userId).limit(500),
+   db.from("contractor_contact_attempts").select("id,company_id,opportunity_id,method,outcome,notes,attempted_at").order("attempted_at",{ascending:false}).limit(500),
+   db.from("contractor_followups").select("id,company_id,opportunity_id,assigned_manager_id,note,due_at,status,created_at").order("due_at",{ascending:true}).limit(500),
   ]);
-  for(const item of [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers])if(item.error)throw item.error;
+  for(const item of [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers,reads,attempts,followups])if(item.error)throw item.error;
   const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
   const [jobs,invoices]=await Promise.all([
    linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,estimated_duration,completed_at,assigned_team,assigned_crew_id").in("id",linkedIds):Promise.resolve({data:[],error:null}),
@@ -71,10 +87,11 @@ async function list(ctx:ContractorContext){
   if(jobs.error||invoices.error)throw jobs.error??invoices.error;
   return {role:ctx.role,companies:companies.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
+   unread:unreadByCompany(ctx,messages.data??[],reads.data??[]),attempts:attempts.data,followups:followups.data,
    jobs:jobs.data,invoices:invoices.data};
  }
  const companyId=ctx.companyId;
- const [company,opportunities,offers,messages,members,documents]=await Promise.all([
+ const [company,opportunities,offers,messages,members,documents,reads]=await Promise.all([
   db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status")
    .eq("id",companyId).single(),
   db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_address,property_type,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,decision_reason,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
@@ -82,8 +99,9 @@ async function list(ctx:ContractorContext){
   db.from("contractor_messages").select("id,opportunity_id,sender_side,body,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_members").select("id,email,member_role,is_active").eq("company_id",companyId),
   db.from("contractor_documents").select("id,opportunity_id,file_name,mime_type,file_size,category,created_at").eq("company_id",companyId).limit(500),
+  db.from("contractor_message_reads").select("company_id,last_read_at").eq("user_id",ctx.userId).eq("company_id",companyId).limit(1),
  ]);
- for(const item of [company,opportunities,offers,messages,members,documents])if(item.error)throw item.error;
+ for(const item of [company,opportunities,offers,messages,members,documents,reads])if(item.error)throw item.error;
  const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
  const approvedJobIds=(opportunities.data??[]).filter(x=>Boolean(x.quality_approved_at))
   .map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
@@ -93,7 +111,8 @@ async function list(ctx:ContractorContext){
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
  return {role:ctx.role,company:company.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
-  members:members.data,documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),jobs:jobs.data,invoices:invoices.data};
+  members:members.data,documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),
+  unread:unreadByCompany(ctx,(messages.data??[]).map(m=>({...m,company_id:companyId})),reads.data??[]),jobs:jobs.data,invoices:invoices.data};
 }
 export async function GET(){
  try{return noCache(await list(await contractorContext()));}catch(error){return handleContractorError(error);}
@@ -502,6 +521,72 @@ export async function POST(request:Request){
    if(error)throw error;
    await audited(ctx,{companyId:member.company_id,type:input.isActive?"Member Access Restored":"Member Access Deactivated",
      detail:{memberId:member.id}});
+   return noCache({ok:true});
+  }
+  if(action==="markMessagesRead"){
+   const companyId=ctx.type==="partner"?ctx.companyId:uuid(input.companyId);
+   if(ctx.type==="internal"){
+    const {data:exists,error:ce}=await db.from("contractor_companies").select("id")
+     .eq("id",companyId).maybeSingle();
+    if(ce||!exists)throw new ContractorAccessError("Company not found.",404);
+   }
+   const {error}=await db.from("contractor_message_reads").upsert({
+    company_id:companyId,user_id:ctx.userId,last_read_at:new Date().toISOString(),
+   },{onConflict:"company_id,user_id"});
+   if(error)throw error;
+   return noCache({ok:true});
+  }
+  if(action==="logContactAttempt"||action==="createFollowup"){
+   requireInternal(ctx);
+   const companyId=uuid(input.companyId),oppId=input.opportunityId?uuid(input.opportunityId):null;
+   const {data:company,error:ce}=await db.from("contractor_companies").select("id").eq("id",companyId).maybeSingle();
+   if(ce||!company)throw new ContractorAccessError("Company not found.",404);
+   if(oppId){
+    const {data:op,error:oe}=await db.from("contractor_opportunities").select("id")
+     .eq("id",oppId).eq("company_id",companyId).maybeSingle();
+    if(oe||!op)throw new ContractorAccessError("Opportunity does not belong to this company.",404);
+   }
+   if(action==="logContactAttempt"){
+    const method=required(input.method,"contact method",30);
+    if(!["Phone","Email","SMS","Other"].includes(method))throw new ContractorAccessError("Invalid contact method.",400);
+    const outcome=required(input.outcome,"contact outcome",200);
+    const {data,error}=await db.from("contractor_contact_attempts").insert({
+     company_id:companyId,opportunity_id:oppId,actor_id:ctx.userId,method,outcome,
+     notes:optional(input.notes,3000),
+    }).select("id").single();
+    if(error)throw error;
+    await audited(ctx,{companyId,opportunityId:oppId??undefined,type:"Contact Attempt Logged",
+      detail:{attemptId:data.id,method}});
+    return noCache({attemptId:data.id});
+   }
+   const note=required(input.note,"follow-up note",1000),due=required(input.dueAt,"follow-up date",40);
+   if(!Number.isFinite(Date.parse(due)))throw new ContractorAccessError("Invalid follow-up date.",400);
+   const managerId=input.managerId?uuid(input.managerId):ctx.userId;
+   const {data:manager,error:managerError}=await db.from("user_profiles").select("id")
+    .eq("id",managerId).in("role",["Manager","Master Admin"]).eq("is_active",true).maybeSingle();
+   if(managerError||!manager)throw new ContractorAccessError("Select an active Operations Manager.",400);
+   const {data,error}=await db.from("contractor_followups").insert({
+    company_id:companyId,opportunity_id:oppId,created_by:ctx.userId,
+    assigned_manager_id:managerId,note,due_at:new Date(due).toISOString(),
+   }).select("id").single();
+   if(error)throw error;
+   await audited(ctx,{companyId,opportunityId:oppId??undefined,type:"Follow-up Scheduled",
+    detail:{followupId:data.id,dueAt:due}});
+   return noCache({followupId:data.id});
+  }
+  if(action==="resolveFollowup"){
+   requireInternal(ctx);
+   const id=uuid(input.followupId);
+   const {data:followup,error:fe}=await db.from("contractor_followups")
+    .select("id,company_id,opportunity_id,status").eq("id",id).maybeSingle();
+   if(fe||!followup)throw new ContractorAccessError("Follow-up not found.",404);
+   if(followup.status!=="Pending")return noCache({ok:true,unchanged:true});
+   const {error}=await db.from("contractor_followups").update({
+    status:"Completed",completed_at:new Date().toISOString(),
+   }).eq("id",id).eq("status","Pending");
+   if(error)throw error;
+   await audited(ctx,{companyId:followup.company_id,opportunityId:followup.opportunity_id??undefined,
+    type:"Follow-up Completed",detail:{followupId:id}});
    return noCache({ok:true});
   }
   if(action==="requestStaff"){
