@@ -1,4 +1,5 @@
 "use client";
+import { contractorScheduledJobStatuses } from "@/lib/contractors/scheduledJobs";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -277,7 +278,7 @@ export function SchedulePage({ scheduledJobIds, scheduledClientIds }: {
       jobs.filter((j) => {
         if (scheduledJobIds) {
           const scheduledForContractorClient = j.client_id && scheduledClientIds?.has(j.client_id)
-            && ["Scheduled", "Crew Assigned", "In Progress"].includes(j.status);
+            && contractorScheduledJobStatuses.includes(j.status);
           if (!j.scheduled_date || (!scheduledJobIds.has(j.id) && !scheduledForContractorClient)) return false;
         }
         const hay = [

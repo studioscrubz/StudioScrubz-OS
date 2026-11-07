@@ -14,7 +14,8 @@
       "fix/remove-employee-portal-link": false,
       "fix/contractor-existing-invoices": false,
       "fix/contractor-recent-schedule": false,
-      "fix/remove-contractor-job-filters": false
+      "fix/remove-contractor-job-filters": false,
+      "fix/sync-contractor-scheduled-jobs": false
     }
   },
   "crons": [

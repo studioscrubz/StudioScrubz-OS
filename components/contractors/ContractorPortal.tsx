@@ -1,5 +1,6 @@
 "use client";
 import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions, type ContractorPropertyAddress } from "@/lib/contractors/jobOptions";
+import type { ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
 import { formatTime12Hour } from "@/lib/formatTime";
 import { contractorPage } from "@/lib/contractors/host";
@@ -13,7 +14,7 @@ type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;cr
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at:string|null};
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
-type Portal={role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Portal={upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -49,6 +50,15 @@ export function ContractorPortal(){
   setData(body);setOpportunityId(current=>body.opportunities?.some((request:Opportunity)=>request.id===current)?current:body.opportunities?.[0]?.id||"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
+ useEffect(()=>{
+  if(tab!=="dashboard"&&tab!=="jobs")return;
+  const refreshSchedule=()=>{
+   if(document.visibilityState==="visible")void reload().catch(()=>undefined);
+  };
+  const timer=window.setInterval(refreshSchedule,60_000);
+  document.addEventListener("visibilitychange",refreshSchedule);
+  return()=>{window.clearInterval(timer);document.removeEventListener("visibilitychange",refreshSchedule);};
+ },[reload,tab]);
  useEffect(()=>{
   if(tab!=="submit")return;
   const controller=new AbortController();
@@ -100,6 +110,14 @@ export function ContractorPortal(){
    {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
+   {data&&(tab==="dashboard"||tab==="jobs")&&<PortalPanel title="Upcoming jobs">
+    {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-b-0">
+     <b>{job.property_name??job.service_name??job.job_number}</b>
+     <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
+     <p className="text-sm">{new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))} · {formatTime12Hour(job.start_time,"Time pending")}</p>
+     {job.location&&<p className="text-sm">{job.location}</p>}
+    </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
+   </PortalPanel>}
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(data.invoices.reduce((sum,x)=>sum+Math.max(0,Number(x.total)-Number(x.amount_paid)),0))]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
