@@ -6,7 +6,8 @@
       "fix/contractor-private-messaging": false,
       "fix/contractor-job-options": false,
       "fix/contractor-request-review": false,
-      "fix/contractor-withdraw-request": false
+      "fix/contractor-withdraw-request": false,
+      "fix/active-contractor-directory": false
     }
   },
   "crons": [

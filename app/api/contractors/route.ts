@@ -85,7 +85,7 @@ async function postPrivateMessage(ctx:ContractorContext,thread:Awaited<ReturnTyp
 async function list(ctx:ContractorContext){
  const db=ctx.admin;
  if(ctx.type==="internal"){
-  const [companies,opportunities,offers,invitations,assessments,members,documents,managers,attempts,followups]=await Promise.all([
+  const [companies,opportunities,offers,invitations,assessments,members,documents,managers,attempts,followups,activeClients]=await Promise.all([
    db.from("contractor_companies").select("*").order("created_at",{ascending:false}).limit(500),
    db.from("contractor_opportunities").select("*").order("created_at",{ascending:false}).limit(500),
    db.from("contractor_offers").select("*").order("created_at",{ascending:false}).limit(500),
@@ -96,8 +96,10 @@ async function list(ctx:ContractorContext){
    db.from("user_profiles").select("id,display_name,email,role").in("role",["Master Admin","Manager"]).eq("is_active",true).limit(50),
    db.from("contractor_contact_attempts").select("id,company_id,opportunity_id,method,outcome,notes,attempted_at").order("attempted_at",{ascending:false}).limit(500),
    db.from("contractor_followups").select("id,company_id,opportunity_id,assigned_manager_id,note,due_at,status,created_at").order("due_at",{ascending:true}).limit(500),
+   db.from("clients").select("id,company_name,first_name,last_name,phone,email")
+    .eq("client_type","Contractor").eq("status","Active").is("archived_at",null),
   ]);
-  for(const item of [companies,opportunities,offers,invitations,assessments,members,documents,managers,attempts,followups])if(item.error)throw item.error;
+  for(const item of [companies,opportunities,offers,invitations,assessments,members,documents,managers,attempts,followups,activeClients])if(item.error)throw item.error;
   const managedCompanies=(companies.data??[]).filter(c=>c.assigned_manager_id===ctx.userId&&c.status==="Active").map(c=>c.id);
   const activeMembers=new Set((members.data??[]).filter(m=>m.is_active).map(m=>`${m.company_id}:${m.user_id}`));
   const {data:privateMessages,error:messagesError}=managedCompanies.length
@@ -112,7 +114,20 @@ async function list(ctx:ContractorContext){
    linkedIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date,archived_at").in("job_id",linkedIds):Promise.resolve({data:[],error:null}),
   ]);
   if(jobs.error||invoices.error)throw jobs.error??invoices.error;
-  return {role:ctx.role,companies:companies.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+  const portalByClient=new Map((companies.data??[]).map(company=>[company.client_id,company]));
+  const directory=(activeClients.data??[]).flatMap(client=>{
+   const portal=portalByClient.get(client.id);
+   if(portal?.status==="Archived"||portal?.status==="Suspended")return [];
+   const contactName=[client.first_name,client.last_name].filter(Boolean).join(" ");
+   return [{
+    clientId:client.id,companyId:portal?.id??null,
+    name:client.company_name?.trim()||contactName||portal?.name||"Unnamed contractor",
+    contactName:portal?.contact_name?.trim()||contactName,
+    email:portal?.contact_email?.trim()||client.email,
+    phone:portal?.phone?.trim()||client.phone,portalStatus:portal?.status??null,
+   }];
+  }).sort((a,b)=>a.name.localeCompare(b.name));
+  return {role:ctx.role,companies:companies.data,directory,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    viewerId:ctx.userId,attempts:attempts.data,followups:followups.data,
    jobs:jobs.data,invoices:invoices.data};
