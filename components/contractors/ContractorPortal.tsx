@@ -20,6 +20,7 @@ export function ContractorPortal(){
  const [data,setData]=useState<Portal|null>(null),[tab,setTab]=useState<Tab>("dashboard");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState(""),[staffEmail,setStaffEmail]=useState("");
+ const [submissionKey,setSubmissionKey]=useState(()=>crypto.randomUUID());
  const [serviceType,setServiceType]=useState("Standard Cleaning"),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState("Residential");
  const [squareFeet,setSquareFeet]=useState(""),[bedrooms,setBedrooms]=useState(""),[bathrooms,setBathrooms]=useState("");
  const [scope,setScope]=useState(""),[condition,setCondition]=useState(""),[requestedDate,setRequestedDate]=useState(""),[requestedTime,setRequestedTime]=useState(""),[hours,setHours]=useState("");
@@ -62,7 +63,7 @@ export function ContractorPortal(){
     <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(x=><button key={x.id} className="flex w-full flex-wrap items-center justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(x.id);setTab("jobs")}}><span><b>{x.opportunity_number}</b><small className="block">{x.service_type} · {x.property_address}</small></span><span>{x.status}</span></button>)}</PortalPanel></>}
    {data&&tab==="submit"&&<PortalPanel title="Submit a cleaning opportunity">
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action("submitOpportunity",{serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scope,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access});if(r){setAddress("");setScope("");setAmount("");setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action("submitOpportunity",{serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scope,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());setAddress("");setScope("");setAmount("");setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
      <PortalField label="Service type" value={serviceType} set={setServiceType} required/>
      <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>setPropertyType(e.target.value)}><option>Residential</option><option>Commercial</option></select></label>
      <PortalField label="Property address" value={address} set={setAddress} required/>
