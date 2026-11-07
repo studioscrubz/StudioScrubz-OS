@@ -1,6 +1,5 @@
 -- Atomic single-use activation and accepted-opportunity -> existing operational Job handoff.
 -- Security definer functions validate auth identity and never grant partner access to Job tables.
-begin;
 create or replace function public.redeem_contractor_invitation(p_token_hash text)
 returns uuid language plpgsql security definer set search_path='' as $$
 declare v_inv public.contractor_invitations%rowtype; v_user uuid; v_email text;
@@ -102,4 +101,3 @@ begin
    on conflict (id) do nothing;
  end if;
 end $$;
-commit;
