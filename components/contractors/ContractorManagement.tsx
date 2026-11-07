@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null};
-type Opportunity={id:string;opportunity_number:string;company_id:string;service_type:string;property_address:string;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null};
+type Opportunity={id:string;opportunity_number:string;company_id:string;service_type:string;property_address:string;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
@@ -128,6 +128,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Partner written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      <p><b>Scope:</b> {selected.final_scope??selected.scope_of_work}</p>
      {job&&<p><b>Linked operational job:</b> {job.status} · {job.scheduled_date||"Schedule pending"} <Link className="text-[#143d1a] underline" href="/jobs">Open Jobs</Link></p>}
+     {job?.status==="Completed"&&<div className="flex flex-wrap gap-2">
+       {!selected.quality_approved_at&&<button type="button" className={secondary} disabled={busy} onClick={()=>void run("approveQuality",{opportunityId:selected.id})}>Approve completed work</button>}
+       {selected.quality_approved_at&&<button type="button" className={secondary} disabled={busy} onClick={()=>void run("invoiceJob",{opportunityId:selected.id})}>Create / reconcile existing Job invoice</button>}
+     </div>}
      {selectedInvoices.map(x=><p key={x.id}><b>Invoice:</b> {x.invoice_number}, {x.status}, {currency(x.total)} total / {currency(x.amount_paid)} paid</p>)}
      <h3 className="font-extrabold">Negotiation history</h3>
      {data?.offers.filter(x=>x.opportunity_id===selected.id).map(x=><p key={x.id} className="rounded border p-2">{x.offered_by_side}: {currency(x.amount)} · {x.scope_text}</p>)}
@@ -157,7 +161,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <div className="flex flex-wrap gap-2">
       <button className={button} disabled={busy||!selected.partner_confirmed_at||!assessment} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>
       <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button>
-      {selected.status==="Accepted"&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}</div>
+      {selected.status==="Accepted"&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
+      {!selected.linked_job_id&&<button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("cancelOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Cancel opportunity</button>}
+      <button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("requestReschedule",{opportunityId:selected.id,reason:reviewReason})}>Log reschedule request</button>
+      <button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("disputeOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Record dispute</button></div>
     </div></div>
     <h3 className="mt-5 font-bold">Scope documents and photos</h3>
     <div className="mt-2 flex flex-wrap items-center gap-2"><input type="file" accept=".pdf,image/png,image/jpeg,image/webp" onChange={e=>setAttachment(e.target.files?.[0]??null)}/>
