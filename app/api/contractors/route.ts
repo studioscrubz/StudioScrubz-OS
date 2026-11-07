@@ -85,9 +85,11 @@ async function list(ctx:ContractorContext){
  ]);
  for(const item of [company,opportunities,offers,messages,members,documents])if(item.error)throw item.error;
  const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
+ const approvedJobIds=(opportunities.data??[]).filter(x=>Boolean(x.quality_approved_at))
+  .map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
  const [jobs,invoices]=await Promise.all([
   linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,completed_at").in("id",linkedIds):Promise.resolve({data:[],error:null}),
-  linkedIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",linkedIds).is("archived_at",null):Promise.resolve({data:[],error:null}),
+  approvedJobIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",approvedJobIds).is("archived_at",null):Promise.resolve({data:[],error:null}),
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
  return {role:ctx.role,company:company.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
