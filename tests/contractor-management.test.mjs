@@ -53,7 +53,9 @@ test("existing employee roles do not inherit contractor access, and external por
  assert.match(permissions,/Manager: new Set\(\[[\s\S]*"contractors.view", "contractors.manage"/);
  assert.match(permissions,/\["\/contractors", "contractors.view"\]/);
  assert.match(sidebar,/label: "Operations"[\s\S]*label: "Contractor Dashboard"/);
- assert.match(sidebar,/href: "\/contractors\/invitations"/);
+ assert.doesNotMatch(sidebar,/href: "\/contractors\/invitations"/);
+ assert.match(read("components/contractors/ContractorManagement.tsx"),/canManagePortalAccess&&[\s\S]*?<Panel title="Manage portal access">[\s\S]*?Invitations &amp; Access/);
+ assert.match(read("app/(workspace)/contractors/invitations/page.tsx"),/redirect\("\/contractors\/companies#manage-portal-access"\)/);
 });
 test("attachments require exact file signatures, private storage and authorized downloads",()=>{
  assert.match(files,/const BUCKET="contractor-private"/);
