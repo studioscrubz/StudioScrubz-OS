@@ -473,6 +473,26 @@ export async function POST(request:Request){
     detail:{invoiceId:invoice.id,providerMessageId:sent.id,outstanding}});
    return noCache({ok:true,providerMessageId:sent.id});
   }
+  if(action==="setMemberAccess"){
+   requireInternal(ctx);
+   const memberId=uuid(input.memberId);
+   if(typeof input.isActive!=="boolean")throw new ContractorAccessError("Active status must be specified.",400);
+   const {data:member,error:me}=await db.from("contractor_members").select("id,company_id,user_id,member_role,is_active")
+    .eq("id",memberId).maybeSingle();
+   if(me||!member)throw new ContractorAccessError("Contractor member not found.",404);
+   if(member.is_active===input.isActive)return noCache({ok:true,unchanged:true});
+   if(input.isActive===false&&member.member_role==="Company Admin"){
+    const {count,error:ce}=await db.from("contractor_members").select("id",{count:"exact",head:true})
+      .eq("company_id",member.company_id).eq("member_role","Company Admin").eq("is_active",true);
+    if(ce)throw ce;
+    if((count??0)<=1)throw new ContractorAccessError("Assign another company administrator before deactivating the last one.",409);
+   }
+   const {error}=await db.from("contractor_members").update({is_active:input.isActive}).eq("id",member.id);
+   if(error)throw error;
+   await audited(ctx,{companyId:member.company_id,type:input.isActive?"Member Access Restored":"Member Access Deactivated",
+     detail:{memberId:member.id}});
+   return noCache({ok:true});
+  }
   if(action==="requestStaff"){
    requirePartner(ctx);
    if(ctx.role!=="Company Admin")throw new ContractorAccessError("Only your company administrator may request staff access.");
