@@ -13,7 +13,8 @@
       "fix/link-new-contractor-clients": false,
       "fix/remove-employee-portal-link": false,
       "fix/contractor-existing-invoices": false,
-      "fix/contractor-recent-schedule": false
+      "fix/contractor-recent-schedule": false,
+      "fix/remove-contractor-job-filters": false
     }
   },
   "crons": [

@@ -42,8 +42,6 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
- const [status,setStatus]=useState("All"),[query,setQuery]=useState("");
- const [serviceFilter,setServiceFilter]=useState("All"),[managerFilter,setManagerFilter]=useState("All"),[fromDate,setFromDate]=useState(""),[toDate,setToDate]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  const [inviteEmail,setInviteEmail]=useState(""),[invitePhone,setInvitePhone]=useState<string|null>(null);
@@ -111,21 +109,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const invitationPhone=invitePhone??selectedCompany?.phone??"";
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
  const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
- const filtered=useMemo(()=>visibleOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
-  &&(status==="All"||o.status===status)
-  &&(serviceFilter==="All"||o.service_type===serviceFilter)
-  &&(managerFilter==="All"||(o.manager_id??companies.find(c=>c.id===o.company_id)?.assigned_manager_id)===managerFilter)
-  &&(!fromDate||o.requested_date>=fromDate)&&(!toDate||o.requested_date<=toDate)
-  &&(!query||[o.opportunity_number,o.property_name,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[visibleOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
  const calendarJobIds=useMemo(()=>{
   const ids=new Set<string>();
   if(view==="jobs"){
-   for(const opportunity of filtered){
+   for(const opportunity of visibleOpportunities){
     if(opportunity.linked_job_id)ids.add(opportunity.linked_job_id);
    }
   }
   return ids;
- },[filtered,view]);
+ },[visibleOpportunities,view]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
@@ -268,19 +260,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <p className="text-xs text-neutral-500">Operations Managers may activate pending contractors. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
-   <div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3">{companySelect}
-    <label className="text-sm font-semibold">Status<select className={input} value={status} onChange={e=>setStatus(e.target.value)}>
-     {["All",...new Set(visibleOpportunities.map(x=>x.status))].map(x=><option key={x}>{x}</option>)}</select></label>
-    <Field label="Search" value={query} set={setQuery}/>
-    <label className="text-sm font-semibold">Service type<select className={input} value={serviceFilter} onChange={e=>setServiceFilter(e.target.value)}>
-     {["All",...new Set(visibleOpportunities.map(x=>x.service_type))].map(x=><option key={x}>{x}</option>)}</select></label>
-    <label className="text-sm font-semibold">Assigned manager<select className={input} value={managerFilter} onChange={e=>setManagerFilter(e.target.value)}>
-     <option value="All">All managers</option>{data?.managers.map(m=><option key={m.id} value={m.id}>{m.display_name||m.email}</option>)}</select></label>
-    <Field label="From date" value={fromDate} set={setFromDate} type="date"/>
-    <Field label="To date" value={toDate} set={setToDate} type="date"/>
-   </div>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds}/>}
-   <OpportunityTable rows={filtered} companies={companies} select={setOpportunityId}/>
+   <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
      <p><b>Company:</b> {companies.find(x=>x.id===selected.company_id)?.name}</p>
