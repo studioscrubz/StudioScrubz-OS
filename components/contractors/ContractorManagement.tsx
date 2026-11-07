@@ -12,7 +12,9 @@ type ContractorMember={id:string;company_id:string;email:string;member_role:stri
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;estimated_duration:number|null;assigned_crew_id:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
-type Data={role:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[]};
+type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
+type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
+type Data={role:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];unread:Record<string,number>;attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages"|"invitations";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -34,6 +36,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [roundTripMiles,setRoundTripMiles]=useState(""),[roundTripMinutes,setRoundTripMinutes]=useState("");
  const [supplies,setSupplies]=useState("0"),[equipment,setEquipment]=useState("0"),[overhead,setOverhead]=useState("0");
  const [attachment,setAttachment]=useState<File|null>(null);
+ const [contactMethod,setContactMethod]=useState("Phone"),[contactOutcome,setContactOutcome]=useState(""),[contactNotes,setContactNotes]=useState("");
+ const [followupNote,setFollowupNote]=useState(""),[followupDue,setFollowupDue]=useState("");
  const refresh=useCallback(async()=>{
   const response=await fetch("/api/contractors",{cache:"no-store"});
   const result=await response.json();
@@ -88,6 +92,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
   ["Completed / awaiting invoicing",allOpportunities.filter(x=>x.linked_job_id&&data?.jobs.find(j=>j.id===x.linked_job_id)?.status==="Completed"
     &&!data.invoices.some(inv=>inv.job_id===x.linked_job_id)).length],
   ["Outstanding receivables",currency(data?.invoices.reduce((n,x)=>n+Math.max(0,Number(x.total)-Number(x.amount_paid)),0))],
+  ["Pending follow-ups",data?.followups.filter(x=>x.status==="Pending").length??0],
+  ["Overdue follow-ups",data?.followups.filter(x=>x.status==="Pending"&&Date.parse(x.due_at)<Date.now()).length??0],
  ];
  const companySelect=<label className="block text-sm font-semibold">Partner company
  <select className={input} value={companyId} onChange={e=>{setCompanyId(e.target.value);setOpportunityId("");}}>
@@ -103,7 +109,13 @@ export function ContractorManagement({view}: {view:ContractorView}){
    href={v==="dashboard"?"/contractors":`/contractors/${v==="companies"?"companies":v==="opportunities"?"opportunities":v==="jobs"?"jobs":v==="messages"?"messages":"invitations"}`}
    className={view===v?button:secondary}>{titles[v]}</Link>)}</div>
   {view==="dashboard"&&<><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs font-semibold text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
-  <h2 className="text-lg font-extrabold">Partner performance & receivables</h2>
+  <h2 className="text-lg font-extrabold">Upcoming and overdue contractor follow-ups</h2>
+   <div className="rounded-xl border bg-white p-4">{data?.followups.filter(f=>f.status==="Pending").slice(0,15).map(f=><div key={f.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 text-sm">
+    <span><b>{companies.find(c=>c.id===f.company_id)?.name}</b> · {f.note}
+     <small className="block text-neutral-600">Due: {new Date(f.due_at).toLocaleString()}</small></span>
+    <button className={secondary} type="button" disabled={busy} onClick={()=>void run("resolveFollowup",{followupId:f.id})}>Mark complete</button>
+   </div>)}</div>
+   <h2 className="text-lg font-extrabold">Partner performance & receivables</h2>
    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[670px] text-left text-sm">
    <thead className="bg-[#143d1a] text-white"><tr>{["Partner","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
    <tbody>{companies.map(c=>{
@@ -264,9 +276,25 @@ export function ContractorManagement({view}: {view:ContractorView}){
   </>}
   {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Partner">{companySelect}<label className="mt-3 block text-sm font-semibold">Opportunity
    <select className={input} value={opportunityId} onChange={e=>setOpportunityId(e.target.value)}><option value="">Company-wide conversation</option>{allOpportunities.filter(x=>x.company_id===companyId).map(o=><option key={o.id} value={o.id}>{o.opportunity_number}</option>)}</select></label></Panel>
-   <Panel title="Contractor thread"><div className="max-h-96 space-y-2 overflow-y-auto">{data?.messages.filter(x=>x.company_id===companyId&&x.opportunity_id===(opportunityId||null)).map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
+   <Panel title="Contractor thread"><p className="mb-2 text-sm text-neutral-600">Unread from partner: <b>{data?.unread?.[companyId]??0}</b></p>
+    <button type="button" className={secondary} disabled={busy||!companyId} onClick={()=>void run("markMessagesRead",{companyId})}>Mark company messages read</button>
+    <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{data?.messages.filter(x=>x.company_id===companyId&&x.opportunity_id===(opportunityId||null)).map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
     <label className="mt-3 block text-sm font-semibold">Message<textarea className={input} value={message} onChange={e=>setMessage(e.target.value)} rows={3}/></label>
-    <button className={button} disabled={busy||!companyId||!message.trim()} onClick={async()=>{const r=await run("message",{companyId,opportunityId:opportunityId||null,message});if(r)setMessage("");}}>Send message</button></Panel></section>}
+    <button className={button} disabled={busy||!companyId||!message.trim()} onClick={async()=>{const r=await run("message",{companyId,opportunityId:opportunityId||null,message});if(r)setMessage("");}}>Send message</button>
+    <div className="mt-6 space-y-3 border-t pt-4"><h3 className="font-extrabold">Contact attempts & follow-ups</h3>
+     <label className="block text-xs font-semibold">Contact method<select className={input} value={contactMethod} onChange={e=>setContactMethod(e.target.value)}>
+      {["Phone","Email","SMS","Other"].map(m=><option key={m}>{m}</option>)}</select></label>
+     <Field label="Outcome" value={contactOutcome} set={setContactOutcome}/>
+     <Field label="Notes" value={contactNotes} set={setContactNotes}/>
+     <button type="button" className={secondary} disabled={busy||!companyId||contactOutcome.trim().length<2}
+      onClick={async()=>{const r=await run("logContactAttempt",{companyId,opportunityId:opportunityId||null,method:contactMethod,outcome:contactOutcome,notes:contactNotes});if(r){setContactOutcome("");setContactNotes("");}}}>Log contact attempt</button>
+     {data?.attempts.filter(a=>a.company_id===companyId&&(a.opportunity_id??null)===(opportunityId||null)).slice(0,10).map(a=><p key={a.id} className="rounded border p-2 text-xs">
+      {a.method}: {a.outcome} · {new Date(a.attempted_at).toLocaleString()}<span className="block">{a.notes}</span></p>)}
+     <Field label="Follow-up note" value={followupNote} set={setFollowupNote}/>
+     <Field label="Follow-up date and time" value={followupDue} set={setFollowupDue} type="datetime-local"/>
+     <button type="button" className={secondary} disabled={busy||!companyId||followupNote.trim().length<3||!followupDue}
+      onClick={async()=>{const r=await run("createFollowup",{companyId,opportunityId:opportunityId||null,note:followupNote,dueAt:new Date(followupDue).toISOString()});if(r){setFollowupNote("");setFollowupDue("");}}}>Schedule follow-up</button>
+    </div></Panel></section>}
   {view==="invitations"&&<section className="space-y-4">
    <Panel title="Send secure seven-day invitation"><div className="grid gap-3 sm:grid-cols-3">{companySelect}
     <Field label="Invited email" value={inviteEmail} set={setInviteEmail} type="email"/>
