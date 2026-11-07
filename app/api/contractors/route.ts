@@ -93,7 +93,7 @@ async function list(ctx:ContractorContext){
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
  return {role:ctx.role,company:company.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
-  members:members.data,documents:documents.data,jobs:jobs.data,invoices:invoices.data};
+  members:members.data,documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),jobs:jobs.data,invoices:invoices.data};
 }
 export async function GET(){
  try{return noCache(await list(await contractorContext()));}catch(error){return handleContractorError(error);}
@@ -157,7 +157,16 @@ export async function POST(request:Request){
      }
     }
     if(input.internal_notes!==undefined)changes.internal_notes=optional(input.internal_notes,10000);
-    if(input.assigned_manager_id!==undefined)changes.assigned_manager_id=input.assigned_manager_id===null?null:uuid(input.assigned_manager_id);
+    if(input.assigned_manager_id!==undefined){
+     if(input.assigned_manager_id===null||input.assigned_manager_id==="")changes.assigned_manager_id=null;
+     else{
+      const managerId=uuid(input.assigned_manager_id);
+      const {data:manager,error:managerError}=await db.from("user_profiles")
+       .select("id").eq("id",managerId).in("role",["Manager","Master Admin"]).eq("is_active",true).maybeSingle();
+      if(managerError||!manager)throw new ContractorAccessError("Select an active Operations Manager.",400);
+      changes.assigned_manager_id=managerId;
+     }
+    }
    }else{
     requirePartner(ctx);
     if(ctx.role!=="Company Admin")throw new ContractorAccessError("Company administrator access required.");
