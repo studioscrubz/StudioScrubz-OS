@@ -1,4 +1,5 @@
 import "server-only";
+import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
 import { US_STATE_OPTIONS } from "@/components/forms/UsStateSelect";
 import { contractorPropertyConditions, contractorScopeOptions, editableContractorRequestStatuses, type ContractorRequestOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
 import { loadAuthoritativeCatalog, publicCatalog } from "@/lib/services/publicEstimateRequests";
@@ -370,6 +371,7 @@ export async function POST(request:Request){
     company_id:ctx.companyId,submitted_by:ctx.userId,external_reference:externalRef,
    }).select("id,opportunity_number").single();
    if(error){if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
+   scheduleAttentionPushAfterResponse();
    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Submitted"});
    await notify(ctx,"New contractor opportunity",`Opportunity ${data.opportunity_number} was submitted for review.`,ctx.companyId,data.id,"internal");
    return noCache({opportunity:data});

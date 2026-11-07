@@ -24,13 +24,16 @@ export async function processAttentionPushes() {
   const totals = { users: 0, candidates: 0, sent: 0, failed: 0, duplicates: 0, revoked: 0 };
   const repository = deliveryRepository(db);
   const disabledByUser = new Map((preferences ?? []).map((row) => [row.user_id, new Set(row.disabled_attention_categories)]));
-  for (const profile of (profiles ?? []) as UserProfile[]) {
+  const activeProfiles=(profiles??[]) as UserProfile[];
+  const activeOperationsManagerIds=new Set(activeProfiles
+    .filter(profile=>["Manager","Master Admin"].includes(profile.role)).map(profile=>profile.id));
+  for (const profile of activeProfiles) {
     const allDevices = activeSubscriptions.filter((subscription) => subscription.user_id === profile.id);
     if (!allDevices.length) continue;
     totals.users += 1;
     try {
       const disabled = disabledByUser.get(profile.id);
-      const activeItems = attentionItemsForProfile(profile, snapshot);
+      const activeItems = attentionItemsForProfile(profile, snapshot, activeOperationsManagerIds);
       const badgeCount = actionableAttentionCount(activeItems);
       const items = activeItems.filter((item) => !disabled?.has(item.category));
       const newDevices = allDevices.filter((subscription) => !initialized.has(subscription.id));
