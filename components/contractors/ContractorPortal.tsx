@@ -33,7 +33,7 @@ export function ContractorPortal(){
   const res=await fetch("/api/contractors",{cache:"no-store"});const body=await res.json();
   if(res.status===401){router.replace("/contractor/login");return;}
   if(!res.ok)throw new Error(body.error??"Company account unavailable");
-  if(!["Member","Company Admin"].includes(body.role)){router.replace("/contractors");return;}
+  if(!["Member","Company Admin"].includes(body.role)){window.location.assign("https://app.studioscrubz.com/contractors");return;}
   setData(body);setOpportunityId(current=>current||body.opportunities?.[0]?.id||"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
