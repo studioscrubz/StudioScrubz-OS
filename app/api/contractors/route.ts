@@ -1,4 +1,6 @@
 import "server-only";
+import { contractorPropertyConditions, contractorScopeOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
+import { loadAuthoritativeCatalog, publicCatalog } from "@/lib/services/publicEstimateRequests";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { validateProfitabilitySettings } from "@/lib/pricing/profitabilitySettings";
@@ -145,8 +147,25 @@ async function list(ctx:ContractorContext){
   documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),
   jobs:jobs.data,invoices:invoices.data};
 }
-export async function GET(){
- try{return noCache(await list(await contractorContext()));}catch(error){return handleContractorError(error);}
+async function loadContractorJobOptions():Promise<ContractorJobOptions>{
+ const {services}=publicCatalog(await loadAuthoritativeCatalog());
+ return {services:services.map(({name,division,addons})=>({name,division,addons:[...new Set(addons.map(addon=>addon.name))]}))};
+}
+function validatedSelections(value:unknown,available:readonly string[],label:string){
+ if(!Array.isArray(value)||value.length>available.length||
+   value.some(item=>typeof item!=="string"||!available.includes(item)))
+  throw new ContractorAccessError(`Select valid ${label} options.`,400);
+ return [...new Set<string>(value)];
+}
+export async function GET(request:Request){
+ try{
+  const ctx=await contractorContext();
+  if(new URL(request.url).searchParams.get("view")==="job-options"){
+   requirePartner(ctx);
+   return noCache(await loadContractorJobOptions());
+  }
+  return noCache(await list(ctx));
+ }catch(error){return handleContractorError(error);}
 }
 export async function POST(request:Request){
  try {
@@ -237,19 +256,36 @@ export async function POST(request:Request){
    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new ContractorAccessError("Valid service date required.",400);
    const type=required(input.propertyType,"property type",30);
    if(!["Residential","Commercial"].includes(type))throw new ContractorAccessError("Property type must be Residential or Commercial.",400);
+   const serviceType=required(input.serviceType,"service type",160);
+   const condition=optional(input.condition,250);
+   let scope=input.scope;
+   if(input.scopeItems!==undefined||input.addons!==undefined){
+    const scopeItems=validatedSelections(input.scopeItems,contractorScopeOptions[type as ContractorPropertyType],"scope of work");
+    if(!scopeItems.length)throw new ContractorAccessError("Select at least one scope of work option.",400);
+    if(!condition||!contractorPropertyConditions.some(option=>option===condition))
+     throw new ContractorAccessError("Select a property condition.",400);
+    const {services}=await loadContractorJobOptions();
+    const service=services.find(option=>option.division===type&&option.name===serviceType);
+    if(!service)throw new ContractorAccessError("Select a service type for this property.",400);
+    const addons=validatedSelections(input.addons??[],service.addons,"add-on");
+    const details=scopeItems.includes("Other")?required(input.scopeDetails,"other scope details",2000):null;
+    const areas=scopeItems.filter(item=>item!=="Other");
+    scope=[areas.length&&`Scope of work: ${areas.join(", ")}`,details&&`Scope details: ${details}`,
+     addons.length&&`Requested add-ons: ${addons.join(", ")}`].filter(Boolean).join("\n");
+   }
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
    const proposed=money(input.amount,"proposed payment");
    // Require a stable submission key so browser retries cannot create duplicate jobs.
    const externalRef=uuid(input.externalReference);
    const {data,error}=await db.from("contractor_opportunities").insert({
-    company_id:ctx.companyId,submitted_by:ctx.userId,service_type:required(input.serviceType,"service type",160),
+    company_id:ctx.companyId,submitted_by:ctx.userId,service_type:serviceType,
     property_address:required(input.address,"property address",500),property_type:type,
     square_feet:input.squareFeet===null||input.squareFeet===""?null:money(input.squareFeet,"square footage"),
     bedrooms:input.bedrooms===null||input.bedrooms===""?null:money(input.bedrooms,"bedrooms"),
     bathrooms:input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),
-    scope_of_work:required(input.scope,"scope of work",10000),
-    property_condition:optional(input.condition,250),requested_date:date,
+    scope_of_work:required(scope,"scope of work",10000),
+    property_condition:condition,requested_date:date,
     requested_time:optional(input.requestedTime,8),estimated_person_hours:hours,
     cleaner_count:Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1))),
     proposed_amount:proposed,pricing_basis:required(input.pricingBasis??"Flat Price","pricing basis",80),

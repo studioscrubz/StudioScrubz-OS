@@ -3,7 +3,8 @@
     "deploymentEnabled": {
       "feature/contractor-management-portal-20261107": false,
       "fix/contractor-auto-activation": false,
-      "fix/contractor-private-messaging": false
+      "fix/contractor-private-messaging": false,
+      "fix/contractor-job-options": false
     }
   },
   "crons": [

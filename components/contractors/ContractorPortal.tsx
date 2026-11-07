@@ -1,10 +1,11 @@
 "use client";
+import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
 import { contractorPage } from "@/lib/contractors/host";
 import {useCallback,useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
-type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
+type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;property_condition:string|null;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string;read_at:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
@@ -23,9 +24,13 @@ export function ContractorPortal(){
  const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState("");
  const [profileEdit,setProfileEdit]=useState<Record<string,string>>({});
  const [submissionKey,setSubmissionKey]=useState(()=>crypto.randomUUID());
- const [serviceType,setServiceType]=useState("Standard Cleaning"),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState("Residential");
+ const [serviceType,setServiceType]=useState(""),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState<ContractorPropertyType>("Residential");
  const [squareFeet,setSquareFeet]=useState(""),[bedrooms,setBedrooms]=useState(""),[bathrooms,setBathrooms]=useState("");
- const [scope,setScope]=useState(""),[condition,setCondition]=useState(""),[requestedDate,setRequestedDate]=useState(""),[requestedTime,setRequestedTime]=useState(""),[hours,setHours]=useState("");
+ const [jobOptions,setJobOptions]=useState<ContractorJobOptions|null>(null);
+ const [jobOptionsError,setJobOptionsError]=useState("");
+ const [jobOptionsRetry,setJobOptionsRetry]=useState(0);
+ const [scopeItems,setScopeItems]=useState<string[]>([]),[addons,setAddons]=useState<string[]>([]);
+ const [scopeDetails,setScopeDetails]=useState(""),[condition,setCondition]=useState(""),[requestedDate,setRequestedDate]=useState(""),[requestedTime,setRequestedTime]=useState(""),[hours,setHours]=useState("");
  const [cleaners,setCleaners]=useState("2"),[amount,setAmount]=useState(""),[basis,setBasis]=useState("Flat Price"),[instructions,setInstructions]=useState(""),[access,setAccess]=useState("");
  const [file,setFile]=useState<File|null>(null),[counterAmount,setCounterAmount]=useState(""),[counterScope,setCounterScope]=useState(""),[exceptionReason,setExceptionReason]=useState("");
  const [companyFile,setCompanyFile]=useState<File|null>(null),[companyCategory,setCompanyCategory]=useState("Insurance");
@@ -38,6 +43,18 @@ export function ContractorPortal(){
   setData(body);setOpportunityId(current=>current||body.opportunities?.[0]?.id||"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
+ useEffect(()=>{
+  if(tab!=="submit")return;
+  const controller=new AbortController();
+  void fetch("/api/contractors?view=job-options",{signal:controller.signal,cache:"no-store"}).then(async response=>{
+   const options=await response.json();
+   if(!response.ok)throw new Error(options.error??"Job options could not be loaded.");
+   if(!controller.signal.aborted){setJobOptions(options);setJobOptionsError("");}
+  }).catch(error=>{if(!controller.signal.aborted){setJobOptions(null);setJobOptionsError(error instanceof Error?error.message:"Job options could not be loaded.");}});
+  return()=>controller.abort();
+ },[tab,jobOptionsRetry]);
+ const availableServices=jobOptions?.services.filter(service=>service.division===propertyType)??[];
+ const selectedService=availableServices.find(service=>service.name===serviceType);
  const action=async(name:string,args:Record<string,unknown>)=>{
   setBusy(true);setError("");setNotice("");
   try{const r=await fetch("/api/contractors",{method:"POST",headers:{"content-type":"application/json"},
@@ -66,23 +83,34 @@ export function ContractorPortal(){
     <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(x=><button key={x.id} className="flex w-full flex-wrap items-center justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(x.id);setTab("jobs")}}><span><b>{x.opportunity_number}</b><small className="block">{x.service_type} · {x.property_address}</small></span><span>{x.status}</span></button>)}</PortalPanel></>}
    {data&&tab==="submit"&&<PortalPanel title="Submit a cleaning opportunity">
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action("submitOpportunity",{serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scope,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());setAddress("");setScope("");setAmount("");setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
-     <PortalField label="Service type" value={serviceType} set={setServiceType} required/>
-     <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>setPropertyType(e.target.value)}><option>Residential</option><option>Commercial</option></select></label>
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action("submitOpportunity",{serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());setAddress("");setScopeItems([]);setScopeDetails("");setAddons([]);setAmount("");setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
+     <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
+      {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
+     </select></label>
+     <label className="text-sm font-bold">Service type<select className={input} value={serviceType} required disabled={!jobOptions} onChange={e=>{setServiceType(e.target.value);setAddons([]);}}>
+      <option value="">{jobOptions?"Select service type":"Loading service types…"}</option>
+      {availableServices.map(service=><option key={service.name}>{service.name}</option>)}
+     </select></label>
+     {jobOptionsError&&<div className="md:col-span-2"><p role="alert" className="mb-2 text-sm text-red-700">{jobOptionsError}</p><button type="button" className={secondary} onClick={()=>{setJobOptionsError("");setJobOptionsRetry(value=>value+1);}}>Retry loading options</button></div>}
+     {jobOptions&&!availableServices.length&&<p className="text-sm text-neutral-600 md:col-span-2">No services are currently available for this property type.</p>}
      <PortalField label="Property address" value={address} set={setAddress} required/>
      <PortalField label="Square footage, if known" value={squareFeet} set={setSquareFeet} type="number"/>
      {propertyType==="Residential"&&<><PortalField label="Bedrooms" value={bedrooms} set={setBedrooms} type="number"/><PortalField label="Bathrooms" value={bathrooms} set={setBathrooms} type="number"/></>}
-     <PortalField label="Property condition" value={condition} set={setCondition}/>
+     <label className="text-sm font-bold">Property condition<select className={input} value={condition} required onChange={e=>setCondition(e.target.value)}>
+      <option value="">Select property condition</option>{contractorPropertyConditions.map(option=><option key={option}>{option}</option>)}
+     </select></label>
      <PortalField label="Requested service date" value={requestedDate} set={setRequestedDate} type="date" required/>
      <PortalField label="Requested start time" value={requestedTime} set={setRequestedTime} type="time"/>
      <PortalField label="Estimated total person-hours" value={hours} set={setHours} type="number" required/>
      <PortalField label="Suggested cleaners" value={cleaners} set={setCleaners} type="number" required/>
      <PortalField label="Proposed payment amount ($)" value={amount} set={setAmount} type="number" required/>
      <PortalField label="Pricing basis" value={basis} set={setBasis} required/>
-     <label className="block text-sm font-bold md:col-span-2">Scope of work<textarea className={input} rows={4} required minLength={10} value={scope} onChange={e=>setScope(e.target.value)}/></label>
+     <JobCheckboxes label="Scope of work" help="Select at least one area or task." options={contractorScopeOptions[propertyType]} value={scopeItems} set={setScopeItems}/>
+     {scopeItems.includes("Other")&&<label className="block text-sm font-bold md:col-span-2">Other scope details<textarea className={input} rows={2} required maxLength={2000} value={scopeDetails} onChange={e=>setScopeDetails(e.target.value)}/></label>}
+     <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
-     <div className="md:col-span-2"><button className={primary} disabled={busy}>Submit opportunity</button></div>
+     <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length}>Submit opportunity</button></div>
     </form>
    </PortalPanel>}
    {data&&tab==="jobs"&&<div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
@@ -93,7 +121,8 @@ export function ContractorPortal(){
      <p><b>Service:</b> {chosen.service_type}</p><p><b>Address:</b> {chosen.property_address}</p>
      <p><b>Requested:</b> {chosen.requested_date}</p><p><b>Status:</b> {chosen.status}</p>
      <p><b>Original compensation:</b> {currency(chosen.proposed_amount)}</p><p><b>Agreed compensation:</b> {currency(chosen.agreed_amount)}</p>
-     <p><b>Scope:</b> {chosen.final_scope??chosen.scope_of_work}</p>
+     {chosen.property_condition&&<p><b>Property condition:</b> {chosen.property_condition}</p>}
+     <p className="whitespace-pre-line"><b>Scope:</b> {chosen.final_scope??chosen.scope_of_work}</p>
      {currentJob&&<p><b>Scheduled:</b> {currentJob.scheduled_date??"Pending"} · {currentJob.status} {currentJob.start_time??""}</p>}
      {currentJob?.completed_at&&<p><b>Completed:</b> {new Date(currentJob.completed_at).toLocaleDateString()}</p>}
      {currentJob?.completed_at&&<div><button type="button" className={secondary} onClick={async()=>{
@@ -183,3 +212,16 @@ export function ContractorPortal(){
 }
 function PortalPanel({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-xl border bg-white p-5"><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">{title}</h2>{children}</section>}
 function PortalField({label,value,set,type="text",required=false}:{label:string;value:string;set:(x:string)=>void;type?:string;required?:boolean}){return <label className="block text-sm font-bold">{label}<input className={input} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} required={required} value={value} onChange={e=>set(e.target.value)}/></label>}
+
+
+function JobCheckboxes({label,help,options,value,set}:{label:string;help:string;options:readonly string[];value:string[];set:(value:string[])=>void}){
+ return <fieldset className="rounded-lg border border-neutral-300 p-3 md:col-span-2">
+  <legend className="px-1 text-sm font-bold">{label}</legend>
+  <p className="mb-2 text-sm text-neutral-600">{help}</p>
+  <div className="grid gap-2 sm:grid-cols-2">
+   {options.map(option=><label className="flex items-center gap-2 text-sm" key={option}>
+    <input type="checkbox" checked={value.includes(option)} onChange={event=>set(event.target.checked?[...value,option]:value.filter(item=>item!==option))}/>{option}
+   </label>)}
+  </div>
+ </fieldset>;
+}

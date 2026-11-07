@@ -163,3 +163,16 @@ test("partner profile updates and private messages use the server identity",()=>
  assert.doesNotMatch(portal+management,/Company-wide (?:messages|conversation)/i);
  assert.match(privacy,/revoke all on public\.contractor_private_messages from public,anon,authenticated/);
 });
+
+test("contractor job options validate catalog selections and preserve scope through job handoff",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ assert.match(portal,/Service type<select/);
+ assert.match(portal,/Property condition<select/);
+ assert.match(portal,/<JobCheckboxes label="Scope of work"/);
+ assert.match(portal,/<JobCheckboxes label="Add-ons"/);
+ assert.match(api,/publicCatalog\(await loadAuthoritativeCatalog\(\)\)/);
+ assert.match(api,/validatedSelections\(input\.addons\?\?\[\],service\.addons,"add-on"\)/);
+ assert.match(api,/Requested add-ons: \$\{addons\.join/);
+ assert.match(api,/scope_of_work:required\(scope,"scope of work"/);
+ assert.match(activation,/v_op\.final_scope/);
+});
