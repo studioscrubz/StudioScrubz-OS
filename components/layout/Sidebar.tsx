@@ -220,7 +220,6 @@ const navItems: Array<NavLink | NavGroup> = [
 
       { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
 
-      { label: "Invitations & Access", href: "/contractors/invitations", marker: "I", permission: "contractors.manage" },
 
     ],
 

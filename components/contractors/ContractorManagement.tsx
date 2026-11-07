@@ -2,6 +2,8 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import {useAuth} from "@/components/auth/AuthProvider";
+import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
@@ -17,14 +19,19 @@ type Document={id:string;company_id:string;opportunity_id:string|null;file_name:
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
 type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
-export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages"|"invitations";
+export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
 const button="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-3 py-2 text-sm font-semibold text-[#143d1a]";
 const ContractorCalendar=dynamic(()=>import("@/components/jobs/SchedulePage").then(module=>module.SchedulePage),{loading:()=> <p role="status">Loading contractor calendar…</p>});
-const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Contractors",opportunities:"Job Opportunities",jobs:"Scheduled Jobs",messages:"Contractor Communications",invitations:"Invitations & Access"};
+const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Contractors",opportunities:"Job Opportunities",jobs:"Scheduled Jobs",messages:"Contractor Communications"};
 export function ContractorManagement({view}: {view:ContractorView}){
+ const {profile}=useAuth();
+ const canManagePortalAccess=hasPermission(profile,"contractors.manage");
+ const portalAccessRef=useCallback((section:HTMLDivElement|null)=>{
+  if(section&&window.location.hash==="#manage-portal-access")section.scrollIntoView();
+ },[]);
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
@@ -77,6 +84,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
  };
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
+ const directoryCompanyIds=new Set(data?.directory.map(entry=>entry.companyId));
+ const dashboardCompanies=companies.filter(company=>directoryCompanyIds.has(company.id));
  const selectedCompany=companies.find(x=>x.id===companyId);
  const filtered=useMemo(()=>allOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
   &&(status==="All"||o.status===status)
@@ -125,7 +134,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   {error&&<p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-lg border border-green-200 bg-green-50 p-3 text-[#143d1a]">{notice}</p>}
   <div className="flex flex-wrap gap-2">{(Object.keys(titles) as ContractorView[]).map((v)=><Link key={v}
-   href={v==="dashboard"?"/contractors":`/contractors/${v==="companies"?"companies":v==="opportunities"?"opportunities":v==="jobs"?"jobs":v==="messages"?"messages":"invitations"}`}
+   href={v==="dashboard"?"/contractors":`/contractors/${v}`}
    className={view===v?button:secondary}>{titles[v]}</Link>)}</div>
   {view==="dashboard"&&<><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs font-semibold text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
   <h2 className="text-lg font-extrabold">Upcoming and overdue contractor follow-ups</h2>
@@ -137,7 +146,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    <h2 className="text-lg font-extrabold">Contractor performance & receivables</h2>
    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[670px] text-left text-sm">
    <thead className="bg-[#143d1a] text-white"><tr>{["Contractor","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
-   <tbody>{companies.map(c=>{
+   <tbody>{dashboardCompanies.map(c=>{
     const opps=allOpportunities.filter(o=>o.company_id===c.id),jobIds=new Set(opps.map(o=>o.linked_job_id).filter(Boolean));
     const linkedInvoices=data?.invoices.filter(inv=>jobIds.has(inv.job_id))??[];
     const completed=opps.filter(o=>data?.jobs.some(job=>job.id===o.linked_job_id&&job.status==="Completed")).length;
@@ -151,7 +160,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Math.max(0,Number(inv.total)-Number(inv.amount_paid)),0))}</td>
      <td className="p-3">{currency(projectedGrossProfit)} <span className="text-xs text-neutral-500">(estimate)</span></td></tr>;
    })}</tbody></table>
-   {!companies.length&&<p className="p-4 text-sm text-neutral-500">No contractor companies have been added.</p>}</div>
+   {!dashboardCompanies.length&&<p className="p-4 text-sm text-neutral-500">No active contractors to report.</p>}</div>
    <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies} select={setOpportunityId}/></>}
   {view==="companies"&&<section className="grid gap-5 lg:grid-cols-2">
    <Panel title="Create contractor company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
@@ -166,7 +175,28 @@ export function ContractorManagement({view}: {view:ContractorView}){
     </button>)}
     {!data?.directory.length&&<p className="text-sm text-neutral-500">No active contractor clients found.</p>}
    </div></Panel>
-   <Panel title="Manage portal access">{companySelect}</Panel>
+   {canManagePortalAccess&&<div id="manage-portal-access" ref={portalAccessRef} className="scroll-mt-20">
+    <Panel title="Manage portal access">
+     <div className="space-y-4">
+      <h3 className="font-extrabold">Invitations &amp; Access</h3>
+      <Panel title="Send secure seven-day invitation"><div className="grid gap-3 sm:grid-cols-3">{companySelect}
+       <Field label="Invited email" value={inviteEmail} set={setInviteEmail} type="email"/>
+       <label className="text-sm font-semibold">Company role<select className={input} value={inviteRole} onChange={e=>setInviteRole(e.target.value)}><option>Company Admin</option><option>Member</option></select></label></div>
+       <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail,memberRole:inviteRole})}>Send invitation</button>
+       <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. External staff additions require StudioScrubz approval.</p>
+      </Panel>
+      <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
+       <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
+       <button type="button" className={secondary} disabled={busy} onClick={()=>void run("setMemberAccess",{memberId:member.id,isActive:!member.is_active})}>
+         {member.is_active?"Deactivate portal access":"Restore portal access"}</button>
+      </div>)}</Panel>
+      <Panel title="Invitation status">{data?.invitations.map(i=><div key={i.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
+       <div><b>{i.invited_email}</b><p>{companies.find(c=>c.id===i.company_id)?.name} · {i.member_role} · {i.status} / {i.delivery_status}</p><small>Expires: {new Date(i.expires_at).toLocaleDateString()}</small></div>
+       {i.status==="Pending"&&<div className="flex gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{companyId:i.company_id,email:i.invited_email,memberRole:i.member_role})}>Resend new token</button></div>}
+      </div>)}</Panel>
+     </div>
+    </Panel>
+   </div>}
    {selectedCompany&&<Panel title={`Manage ${selectedCompany.name}`}><div className="space-y-3 text-sm">
     <p>Contact: {selectedCompany.contact_name||"Not supplied"}</p><p>Email: {selectedCompany.contact_email}</p><p>Terms: {selectedCompany.payment_terms||"Not specified"}</p>
     <p><b>Company documents:</b></p>
@@ -330,23 +360,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <button type="button" className={secondary} disabled={busy||!companyId||followupNote.trim().length<3||!followupDue}
       onClick={async()=>{const r=await run("createFollowup",{companyId,opportunityId:opportunityId||null,note:followupNote,dueAt:new Date(followupDue).toISOString()});if(r){setFollowupNote("");setFollowupDue("");}}}>Schedule follow-up</button>
     </div></Panel></section>}
-  {view==="invitations"&&<section className="space-y-4">
-   <Panel title="Send secure seven-day invitation"><div className="grid gap-3 sm:grid-cols-3">{companySelect}
-    <Field label="Invited email" value={inviteEmail} set={setInviteEmail} type="email"/>
-    <label className="text-sm font-semibold">Company role<select className={input} value={inviteRole} onChange={e=>setInviteRole(e.target.value)}><option>Company Admin</option><option>Member</option></select></label></div>
-    <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail,memberRole:inviteRole})}>Send invitation</button>
-    <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. External staff additions require StudioScrubz approval.</p>
-   </Panel>
-   <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
-    <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
-    <button type="button" className={secondary} disabled={busy} onClick={()=>void run("setMemberAccess",{memberId:member.id,isActive:!member.is_active})}>
-      {member.is_active?"Deactivate portal access":"Restore portal access"}</button>
-   </div>)}</Panel>
-   <Panel title="Invitation status">{data?.invitations.map(i=><div key={i.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
-    <div><b>{i.invited_email}</b><p>{companies.find(c=>c.id===i.company_id)?.name} · {i.member_role} · {i.status} / {i.delivery_status}</p><small>Expires: {new Date(i.expires_at).toLocaleDateString()}</small></div>
-    {i.status==="Pending"&&<div className="flex gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{companyId:i.company_id,email:i.invited_email,memberRole:i.member_role})}>Resend new token</button></div>}
-   </div>)}</Panel>
-  </section>}
+
  </main>;
 
 }
