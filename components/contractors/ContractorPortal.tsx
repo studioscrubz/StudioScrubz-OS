@@ -20,6 +20,7 @@ export function ContractorPortal(){
  const [data,setData]=useState<Portal|null>(null),[tab,setTab]=useState<Tab>("dashboard");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState(""),[staffEmail,setStaffEmail]=useState("");
+ const [profileEdit,setProfileEdit]=useState<Record<string,string>>({});
  const [submissionKey,setSubmissionKey]=useState(()=>crypto.randomUUID());
  const [serviceType,setServiceType]=useState("Standard Cleaning"),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState("Residential");
  const [squareFeet,setSquareFeet]=useState(""),[bedrooms,setBedrooms]=useState(""),[bathrooms,setBathrooms]=useState("");
@@ -134,7 +135,22 @@ export function ContractorPortal(){
     </PortalPanel></div>}
    {data&&tab==="company"&&<div className="grid gap-4 lg:grid-cols-2">
     <PortalPanel title="Company profile"><p className="text-sm"><b>{data.company.name}</b> · {data.company.contractor_code}</p><p>{data.company.contact_email}</p><p>{data.company.phone??""}</p><p>{data.company.business_address??""}</p><p>Payment terms: {data.company.payment_terms??"Not specified"}</p>
-    <p className="mt-3 text-xs text-neutral-500">For company details or legal-document corrections, contact StudioScrubz Operations.</p></PortalPanel>
+    {data.role==="Company Admin"&&<form className="mt-5 space-y-3 border-t pt-4" onSubmit={async e=>{
+      e.preventDefault();await action("updateCompany",{
+       contact_name:profileEdit.contact_name??data.company.contact_name,
+       contact_email:profileEdit.contact_email??data.company.contact_email,
+       phone:profileEdit.phone??data.company.phone,
+       business_address:profileEdit.business_address??data.company.business_address,
+      });
+     }}>
+      <p className="text-sm font-extrabold">Update company contact information</p>
+      {(["contact_name","contact_email","phone","business_address"] as const).map(key=><label key={key} className="block text-sm font-bold">
+       {({contact_name:"Primary contact",contact_email:"Business email",phone:"Phone",business_address:"Business address"} as Record<string,string>)[key]}
+       <input className={input} type={key==="contact_email"?"email":"text"} value={profileEdit[key]??data.company[key]??""}
+        onChange={e=>setProfileEdit(v=>({...v,[key]:e.target.value}))}/></label>)}
+      <button className={primary} disabled={busy}>Save contact details</button>
+     </form>}
+    <p className="mt-3 text-xs text-neutral-500">Legal, tax, insurance and contract records are reviewed by StudioScrubz Operations.</p></PortalPanel>
     <PortalPanel title="Authorized contacts">{data.members.map(m=><p key={m.id} className="border-b p-2 text-sm">{m.email} · {m.member_role} · {m.is_active?"Active":"Inactive"}</p>)}
      {data.role==="Company Admin"&&<><div className="mt-3"><PortalField label="Request additional staff access" value={staffEmail} set={setStaffEmail} type="email"/></div>
      <button className={primary} disabled={busy||!staffEmail.includes("@")} onClick={()=>void action("requestStaff",{email:staffEmail})}>Request StudioScrubz approval</button></>}
