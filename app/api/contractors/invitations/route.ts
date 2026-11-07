@@ -3,6 +3,7 @@ import { randomBytes,createHash } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendResendEmail } from "@/lib/email/resend";
+import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
 import { contractorContext,requireInternal,ContractorAccessError,handleContractorError,
   uuid,required,audited,noCache } from "@/lib/contractors/server";
 
@@ -101,7 +102,7 @@ export async function POST(request:Request){
    sent=await sendResendEmail({recipientEmail:email,subject:"StudioScrubz Contractor Portal Invitation",
     text:`You have been invited to join ${company.name} on the StudioScrubz Contractor Portal. Activate your account within seven days: ${activationUrl}`,
     html:`<p>Your company has been invited to use the StudioScrubz Contractor Portal.</p><p><a href="${activationUrl}" style="display:inline-block;background:#143d1a;color:white;padding:12px 18px;text-decoration:none">Activate contractor account</a></p><p>Invitation expires in seven days. If you did not expect this invitation, ignore this message.</p>`,
-    idempotencyKey:`contractor-invitation:${invite.id}`,replyTo:null});
+    idempotencyKey:`contractor-invitation:${invite.id}`,...resolveEmailSenderProfile("contractorInvitation")});
   }catch(error){
    await ctx.admin.from("contractor_invitations").update({delivery_status:"Failed"}).eq("id",invite.id);
    await audited(ctx,{companyId,type:"Invitation Delivery Failed",detail:{invitationId:invite.id}});

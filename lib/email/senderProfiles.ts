@@ -9,6 +9,7 @@ export const EMAIL_SENDER_PROFILES = {
   vendor: { from: "StudioScrubz Vendors <vendors@studioscrubz.com>", replyTo: "vendors@studioscrubz.com" },
   careers: { from: "StudioScrubz Careers <careers@studioscrubz.com>", replyTo: "careers@studioscrubz.com" },
   marketing: { from: "StudioScrubz <donotreply@studioscrubz.com>", replyTo: "info@studioscrubz.com" },
+  contractorInvitation: { from: "StudioScrubz Operations <operations@studioscrubz.com>", replyTo: "operations@studioscrubz.com" },
   systemNotification: { from: "StudioScrubz Notifications <notifications@studioscrubz.com>", replyTo: "donotreply@studioscrubz.com" },
   noReply: { from: "StudioScrubz <donotreply@studioscrubz.com>", replyTo: null },
   prospectOutreach: { from: "StudioScrubz <info@studioscrubz.com>", replyTo: "info@studioscrubz.com" },
