@@ -51,7 +51,7 @@ function effectiveOpportunityStatuses<T extends {id:string;status:string;linked_
 async function list(ctx:ContractorContext){
  const db=ctx.admin;
  if(ctx.type==="internal"){
-  const [companies,opportunities,offers,messages,invitations,assessments,members,documents]=await Promise.all([
+  const [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers]=await Promise.all([
    db.from("contractor_companies").select("*").order("created_at",{ascending:false}).limit(500),
    db.from("contractor_opportunities").select("*").order("created_at",{ascending:false}).limit(500),
    db.from("contractor_offers").select("*").order("created_at",{ascending:false}).limit(500),
@@ -60,8 +60,9 @@ async function list(ctx:ContractorContext){
    db.from("contractor_profitability").select("*").limit(500),
    db.from("contractor_members").select("id,company_id,email,member_role,is_active,joined_at").limit(500),
    db.from("contractor_documents").select("id,company_id,opportunity_id,file_name,mime_type,file_size,category,created_at").limit(500),
+   db.from("user_profiles").select("id,display_name,email,role").in("role",["Master Admin","Manager"]).eq("is_active",true).limit(50),
   ]);
-  for(const item of [companies,opportunities,offers,messages,invitations,assessments,members,documents])if(item.error)throw item.error;
+  for(const item of [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers])if(item.error)throw item.error;
   const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
   const [jobs,invoices]=await Promise.all([
    linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,completed_at,assigned_team,assigned_crew_id").in("id",linkedIds):Promise.resolve({data:[],error:null}),
@@ -69,7 +70,7 @@ async function list(ctx:ContractorContext){
   ]);
   if(jobs.error||invoices.error)throw jobs.error??invoices.error;
   return {role:ctx.role,companies:companies.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
-   invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,
+   invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    jobs:jobs.data,invoices:invoices.data};
  }
  const companyId=ctx.companyId;
@@ -143,6 +144,15 @@ export async function POST(request:Request){
      if(ctx.role!=="Master Admin"&&!(current.status==="Pending"&&status==="Active"))
       throw new ContractorAccessError("Suspension, archiving, and reactivation require Master Admin authorization.");
      changes.status=status;
+    }
+    for(const key of ["proposed_rates","negotiated_rates"] as const){
+     if(input[key]!==undefined){
+      const value=input[key];
+      if(!value||typeof value!=="object"||Array.isArray(value)||
+        JSON.stringify(value).length>8000)
+       throw new ContractorAccessError("Rates must be a small structured JSON object.",400);
+      changes[key]=value;
+     }
     }
     if(input.internal_notes!==undefined)changes.internal_notes=optional(input.internal_notes,10000);
     if(input.assigned_manager_id!==undefined)changes.assigned_manager_id=input.assigned_manager_id===null?null:uuid(input.assigned_manager_id);
