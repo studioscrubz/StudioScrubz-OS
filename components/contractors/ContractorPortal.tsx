@@ -27,6 +27,7 @@ export function ContractorPortal(){
  const [scope,setScope]=useState(""),[condition,setCondition]=useState(""),[requestedDate,setRequestedDate]=useState(""),[requestedTime,setRequestedTime]=useState(""),[hours,setHours]=useState("");
  const [cleaners,setCleaners]=useState("2"),[amount,setAmount]=useState(""),[basis,setBasis]=useState("Flat Price"),[instructions,setInstructions]=useState(""),[access,setAccess]=useState("");
  const [file,setFile]=useState<File|null>(null),[counterAmount,setCounterAmount]=useState(""),[counterScope,setCounterScope]=useState(""),[exceptionReason,setExceptionReason]=useState("");
+ const [companyFile,setCompanyFile]=useState<File|null>(null),[companyCategory,setCompanyCategory]=useState("Insurance");
  const [approvedPhotos,setApprovedPhotos]=useState<Array<{id:string;category:string;caption:string|null;url:string}>>([]);
  const reload=useCallback(async()=>{
   const res=await fetch("/api/contractors",{cache:"no-store"});const body=await res.json();
@@ -151,6 +152,21 @@ export function ContractorPortal(){
       <button className={primary} disabled={busy}>Save contact details</button>
      </form>}
     <p className="mt-3 text-xs text-neutral-500">Legal, tax, insurance and contract records are reviewed by StudioScrubz Operations.</p></PortalPanel>
+    <PortalPanel title="Company documents"><p className="mb-3 text-xs text-neutral-600">Secure company tax, insurance and agreement files. Tax documents are visible only to company administrators and StudioScrubz Operations.</p>
+     <div className="space-y-2">{data.documents.filter(d=>!d.opportunity_id).map(d=><button key={d.id} type="button" className="block text-sm text-[#143d1a] underline" onClick={()=>void openFile(d.id)}>{d.file_name} ({d.category})</button>)}</div>
+     {data.role==="Company Admin"&&<div className="mt-4 space-y-2">
+      <label className="block text-sm font-bold">Document category<select className={input} value={companyCategory} onChange={e=>setCompanyCategory(e.target.value)}>
+       {["Insurance","Tax","Agreement","Other"].map(k=><option key={k}>{k}</option>)}</select></label>
+      <label className="block text-sm font-bold">Private file<input type="file" className={input} accept=".pdf,image/png,image/jpeg,image/webp" onChange={e=>setCompanyFile(e.target.files?.[0]??null)}/></label>
+      <button type="button" className={secondary} disabled={busy||!companyFile} onClick={async()=>{
+       if(!companyFile)return;setBusy(true);setError("");
+       try{const form=new FormData();form.set("file",companyFile);form.set("category",companyCategory);
+        const r=await fetch("/api/contractors/files",{method:"POST",body:form});const body=await r.json();
+        if(!r.ok)throw new Error(body.error||"Upload failed");await reload();setCompanyFile(null);setNotice("Company document uploaded securely.");
+       }catch(e){setError(e instanceof Error?e.message:"Company document upload failed");}finally{setBusy(false);}
+      }}>Upload secure document</button>
+     </div>}
+    </PortalPanel>
     <PortalPanel title="Authorized contacts">{data.members.map(m=><p key={m.id} className="border-b p-2 text-sm">{m.email} · {m.member_role} · {m.is_active?"Active":"Inactive"}</p>)}
      {data.role==="Company Admin"&&<><div className="mt-3"><PortalField label="Request additional staff access" value={staffEmail} set={setStaffEmail} type="email"/></div>
      <button className={primary} disabled={busy||!staffEmail.includes("@")} onClick={()=>void action("requestStaff",{email:staffEmail})}>Request StudioScrubz approval</button></>}
