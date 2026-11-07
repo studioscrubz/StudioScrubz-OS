@@ -258,3 +258,5 @@ Contractor request review uses `get_my_contractor_request_reviews` in `202611072
 Contractor team invitations use the service-role-only `prepare_contractor_team_invitation` RPC in `20261107205053_contractor_team_invitations.sql`. It verifies active company ownership, rotates pending teammate invitations, and records the sender against `auth.users`. Activation uses the existing `redeem_contractor_invitation` RPC.
 
 New portal companies use the `link_new_contractor_client` insert trigger from `20261107210215_link_new_contractor_clients.sql` to link a matching Contractor client or create an active Accounts client atomically. Portal activation remains a separate status.
+
+`20261107210843_activate_contractor_company_on_owner_redemption.sql` updates `redeem_contractor_invitation` so a verified owner activates a pending contractor company in the same transaction. Pending companies require owner redemption, and suspended or archived companies remain blocked.

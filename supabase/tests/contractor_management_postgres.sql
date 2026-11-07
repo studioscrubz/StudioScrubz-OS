@@ -452,3 +452,49 @@ do $$begin
   raise exception 'Duplicate Accounts client created';
  end if;
 end$$;
+
+-- A verified owner activates a pending company without a separate Operations action.
+\ir ../migrations/20261107210843_activate_contractor_company_on_owner_redemption.sql
+insert into auth.users(id,email,email_confirmed_at)
+values('00000000-0000-4000-8000-000000000015','newowner@example.test',now());
+insert into public.contractor_invitations(company_id,invited_email,member_role,token_hash,invited_by)
+select id,'newowner@example.test','Member',repeat('5',64),'00000000-0000-4000-8000-000000000001'::uuid
+from public.contractor_companies where name='New Portal Contractor'
+union all
+select id,'newowner@example.test','Company Admin',repeat('6',64),'00000000-0000-4000-8000-000000000001'::uuid
+from public.contractor_companies where name='New Portal Contractor';
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000015',false);
+do $$begin
+ begin
+  perform public.redeem_contractor_invitation(repeat('5',64));
+  raise exception 'A teammate invitation activated a pending company';
+ exception when raise_exception then
+  if sqlerrm<>'Company access is unavailable.' then raise; end if;
+ end;
+end$$;
+reset role;
+update public.contractor_companies set status='Suspended' where name='New Portal Contractor';
+set role authenticated;
+do $$begin
+ begin
+  perform public.redeem_contractor_invitation(repeat('6',64));
+  raise exception 'An owner invitation reactivated a suspended company';
+ exception when raise_exception then
+  if sqlerrm<>'Company access is unavailable.' then raise; end if;
+ end;
+end$$;
+reset role;
+update public.contractor_companies set status='Pending' where name='New Portal Contractor';
+set role authenticated;
+select public.redeem_contractor_invitation(repeat('6',64));
+reset role;
+do $$begin
+ if not exists(select 1 from public.contractor_companies c
+  join public.contractor_members m on m.company_id=c.id
+  join public.contractor_invitations i on i.company_id=c.id and i.redeemed_by=m.user_id
+  where c.name='New Portal Contractor' and c.status='Active' and m.is_active
+    and m.member_role='Company Admin' and i.status='Redeemed' and i.token_hash=repeat('6',64)) then
+  raise exception 'Owner redemption did not atomically activate company and membership';
+ end if;
+end$$;

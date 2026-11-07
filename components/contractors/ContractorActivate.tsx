@@ -14,14 +14,6 @@ export function ContractorActivate(){
   const response=await fetch("/api/contractors/invitations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"redeem",token})});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error??"Activation failed");
-  const access=await fetch("/api/contractors/session",{cache:"no-store"});
-  if(access.status===403){
-   setInvitation(null);
-   setNotice("Your invitation was redeemed. StudioScrubz Operations will need to activate the company before you can sign in.");
-   await getSupabaseClient().auth.signOut({scope:"local"});
-   return;
-  }
-  if(!access.ok)throw new Error("Your invitation was redeemed. Please return to partner sign-in.");
   router.replace(contractorPage("/"));router.refresh();
  },[router]);
  useEffect(()=>{
