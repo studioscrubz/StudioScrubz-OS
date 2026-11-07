@@ -122,10 +122,11 @@ function walkthroughClient(walkthrough: WalkthroughWithRelations) {
     "Deleted Client"
   );
 }
-export function SchedulePage() {
+export function SchedulePage({ scheduledJobIds }: { scheduledJobIds?: ReadonlySet<string> }) {
+  const contractorCalendar = scheduledJobIds !== undefined;
   const communication = useJobCommunication();
   const { profile } = useAuth();
-  const canViewWalkthroughs = hasPermission(profile, "walkthroughs.view");
+  const canViewWalkthroughs = !contractorCalendar && hasPermission(profile, "walkthroughs.view");
   const canManageTimeOff = hasPermission(profile, "timeOff.manage");
   const canEditSchedule = hasPermission(profile, "schedule.edit");
   const canViewJobTime = hasPermission(profile, "jobs.view");
@@ -154,7 +155,7 @@ export function SchedulePage() {
   const [status, setStatus] = useState<(typeof statuses)[number]>("All");
   const [division, setDivision] = useState("All");
   const [crew, setCrew] = useState("All");
-  const [source, setSource] = useState<EventSource>("All Events");
+  const [source, setSource] = useState<EventSource>(contractorCalendar ? "Jobs" : "All Events");
   const [edit, setEdit] = useState<JobWithRelations | null>(null);
   const [detail, setDetail] = useState<JobWithRelations | null>(null);
   const [internalDetail, setInternalDetail] =
@@ -171,7 +172,7 @@ export function SchedulePage() {
       internalAccess !== "None"
         ? getInternalScheduleEvents()
         : Promise.resolve([]),
-      getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
+      contractorCalendar ? Promise.resolve([]) : getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
       canManageTimeOff ? getApprovedAbsences(addDays(today(), -30), addDays(today(), 365)) : Promise.resolve([]),
     ]);
     setJobs(j.filter((x) => !x.archived_at));
@@ -185,6 +186,7 @@ export function SchedulePage() {
   useOperationalRealtime(["jobs", "walkthroughs", "crews", "employees", "service_occurrences", "service_agreements", "employee_time_off_requests"], load);
 
   useEffect(() => {
+    if (contractorCalendar) return;
     let active = true;
     void getInternalEventAccessLevel()
       .then((level) => {
@@ -211,7 +213,7 @@ export function SchedulePage() {
     return () => {
       active = false;
     };
-  }, [profile]);
+  }, [contractorCalendar, profile]);
 
   useEffect(() => {
     let active = true;
@@ -222,7 +224,7 @@ export function SchedulePage() {
       internalAccess !== "None"
         ? getInternalScheduleEvents()
         : Promise.resolve([]),
-      getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
+      contractorCalendar ? Promise.resolve([]) : getUpcomingOccurrences(addDays(today(), -1), addDays(today(), 365)),
       canManageTimeOff ? getApprovedAbsences(addDays(today(), -30), addDays(today(), 365)) : Promise.resolve([]),
     ])
       .then(([j, w, c, i, o, a]) => {
@@ -245,7 +247,7 @@ export function SchedulePage() {
     return () => {
       active = false;
     };
-  }, [canManageTimeOff, canViewWalkthroughs, internalAccess, salesReadOnly]);
+  }, [canManageTimeOff, canViewWalkthroughs, contractorCalendar, internalAccess, salesReadOnly]);
 
   const crewFilterOptions = useMemo<CrewDisplayOption[]>(
     () =>
@@ -270,6 +272,7 @@ export function SchedulePage() {
   const filteredJobs = useMemo(
     () =>
       jobs.filter((j) => {
+        if (scheduledJobIds && (!scheduledJobIds.has(j.id) || !j.scheduled_date)) return false;
         const hay = [
           j.job_number,
           j.client_name,
@@ -297,6 +300,7 @@ export function SchedulePage() {
       crew,
       division,
       jobs,
+      scheduledJobIds,
       search,
       source,
       status,
@@ -407,11 +411,14 @@ export function SchedulePage() {
   return (
     <>
       {communication.composer}
-      <Header
+      {contractorCalendar ? <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-extrabold">Contractor calendar</h2>
+        <Link href="/schedule" className="font-semibold text-[#143d1a] underline">Open full OS calendar</Link>
+      </div> : <Header
         createInternal={
           internalAccess === "Management" || internalAccess === "Sales" ? () => setInternalEdit("new") : null
         }
-      />
+      />}
       {internalAccessError && <Alert text={internalAccessError} />}
       <section aria-label="Calendar navigation" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:p-5">
         <div className="flex rounded-xl bg-[#edf1eb] p-1">
@@ -468,7 +475,7 @@ export function SchedulePage() {
         setCrew={setCrew}
         crews={crewFilterOptions}
         source={source}
-        setSource={setSource}
+        setSource={contractorCalendar ? undefined : setSource}
       />
       {notice && <Alert text={notice} good />}
       {error && <Alert text={error} />}{" "}
@@ -542,7 +549,7 @@ export function SchedulePage() {
           )}{" "}
         </>
       )}
-      <ScheduleOccurrences />
+      {!contractorCalendar && <ScheduleOccurrences />}
       {canEditSchedule && edit && (
         <ScheduleModal
           job={edit}
@@ -624,11 +631,11 @@ function Filters(p: {
   setCrew: (v: string) => void;
   crews: CrewDisplayOption[];
   source: EventSource;
-  setSource: (v: EventSource) => void;
+  setSource?: (v: EventSource) => void;
 }) {
   return (
     <section aria-label="Schedule filters" className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:p-5">
-      <div className="mb-3"><h2 className="text-sm font-extrabold text-[var(--brand-green)]">Filter calendar</h2><p className="mt-1 text-xs text-[var(--muted)]">Narrow events by type, job status, division, or assigned crew.</p></div>
+      <div className="mb-3"><h2 className="text-sm font-extrabold text-[var(--brand-green)]">Filter calendar</h2><p className="mt-1 text-xs text-[var(--muted)]">{p.setSource ? "Narrow events by type, job status, division, or assigned crew." : "Narrow jobs by status, division, or assigned crew."}</p></div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <input
           className={input}
@@ -636,10 +643,10 @@ function Filters(p: {
           onChange={(e) => p.setSearch(e.target.value)}
           placeholder="Search schedule"
         />
-        <select
+        {p.setSource && <select
           className={input}
           value={p.source}
-          onChange={(e) => p.setSource(e.target.value as EventSource)}
+          onChange={(e) => p.setSource?.(e.target.value as EventSource)}
         >
           {(
             [
@@ -652,7 +659,7 @@ function Filters(p: {
           ).map((value) => (
             <option key={value}>{value}</option>
           ))}
-        </select>
+        </select>}
         <select
           className={input}
           value={p.status}
