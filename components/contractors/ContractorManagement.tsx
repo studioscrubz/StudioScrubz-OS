@@ -3,7 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
-type Opportunity={id:string;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
+type Opportunity={id:string;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;partner_user_id:string;read_at:string|null;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
@@ -44,9 +44,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
   const result=await response.json();
   if(!response.ok)throw new Error(result.error??"Contractor data unavailable");
   setData(result);
-  setCompanyId(current=>current||result.companies?.[0]?.id||"");
-  setOpportunityId(current=>current||result.opportunities?.[0]?.id||"");
- },[]);
+  const requestedId=view==="opportunities"?new URLSearchParams(window.location.search).get("opportunityId"):null;
+  const requested=result.opportunities?.find((opportunity:Opportunity)=>opportunity.id===requestedId);
+  setCompanyId(current=>current||requested?.company_id||result.companies?.[0]?.id||"");
+  setOpportunityId(current=>current||requested?.id||result.opportunities?.[0]?.id||"");
+ },[view]);
  useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(String(e.message));}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[refresh]);
  const run=async(action:string,payload:Record<string,unknown>={})=>{
   setBusy(true);setError("");setNotice("");
@@ -78,7 +80,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   &&(serviceFilter==="All"||o.service_type===serviceFilter)
   &&(managerFilter==="All"||(o.manager_id??companies.find(c=>c.id===o.company_id)?.assigned_manager_id)===managerFilter)
   &&(!fromDate||o.requested_date>=fromDate)&&(!toDate||o.requested_date<=toDate)
-  &&(!query||[o.opportunity_number,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[allOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
+  &&(!query||[o.opportunity_number,o.property_name,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[allOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
  const selected=allOpportunities.find(x=>x.id===opportunityId);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
@@ -205,6 +207,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
      <p><b>Company:</b> {companies.find(x=>x.id===selected.company_id)?.name}</p>
+     {selected.property_name&&<p><b>Name:</b> {selected.property_name}</p>}
      <p><b>Service:</b> {selected.service_type}</p><p><b>Property:</b> {selected.property_address}</p>
      <p><b>Requested:</b> {selected.requested_date}</p><p><b>Status:</b> {selected.status}</p>
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
@@ -333,6 +336,6 @@ function Field({label,value,set,type="text",required=false}:{label:string;value:
 function NumberField({label,value,set}:{label:string;value:number;set:(v:number)=>void}){return <label className="text-sm font-semibold">{label}<input type="number" min="0.1" step="0.1" value={value} onChange={e=>set(Number(e.target.value))} className={input}/></label>}
 function OpportunityTable({rows,companies,select}:{rows:Opportunity[];companies:Company[];select:(id:string)=>void}){
  return <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-[#143d1a] text-white"><tr>{["Opportunity","Partner","Service","Requested","Status","Compensation"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead>
- <tbody>{rows.map(o=><tr key={o.id} className="border-t hover:bg-neutral-50"><td className="p-3"><button type="button" className="font-bold text-[#143d1a] underline" onClick={()=>{select(o.id);document.getElementById("opportunity-detail")?.scrollIntoView({behavior:"smooth"});}}>{o.opportunity_number}</button></td><td className="p-3">{companies.find(x=>x.id===o.company_id)?.name}</td><td className="p-3">{o.service_type}</td><td className="p-3">{o.requested_date}</td><td className="p-3">{o.status}</td><td className="p-3">{currency(o.agreed_amount??o.proposed_amount)}</td></tr>)}</tbody></table>
+ <tbody>{rows.map(o=><tr key={o.id} className="border-t hover:bg-neutral-50"><td className="p-3"><button type="button" className="font-bold text-[#143d1a] underline" onClick={()=>{select(o.id);document.getElementById("opportunity-detail")?.scrollIntoView({behavior:"smooth"});}}>{o.opportunity_number}</button>{o.property_name&&<span className="block">{o.property_name}</span>}</td><td className="p-3">{companies.find(x=>x.id===o.company_id)?.name}</td><td className="p-3">{o.service_type}</td><td className="p-3">{o.requested_date}</td><td className="p-3">{o.status}</td><td className="p-3">{currency(o.agreed_amount??o.proposed_amount)}</td></tr>)}</tbody></table>
  {!rows.length&&<p className="p-5 text-sm text-neutral-500">No opportunities match these filters.</p>}</div>
 }

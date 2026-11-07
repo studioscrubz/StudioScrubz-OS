@@ -1,17 +1,17 @@
 "use client";
-import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
+import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions } from "@/lib/contractors/jobOptions";
 import { contractorPage } from "@/lib/contractors/host";
 import {useCallback,useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
-type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;property_condition:string|null;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
+type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;property_name:string|null;property_type:ContractorPropertyType;request_options:Partial<ContractorRequestOptions>|null;updated_at:string;submitted_by:string|null;internal_confirmed_at:string|null;square_feet:number|null;bedrooms:number|null;bathrooms:number|null;estimated_person_hours:number;cleaner_count:number;pricing_basis:string;special_instructions:string|null;access_arrangements:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string;read_at:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at:string|null};
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
-type Portal={role:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Portal={role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -23,6 +23,8 @@ export function ContractorPortal(){
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState("");
  const [profileEdit,setProfileEdit]=useState<Record<string,string>>({});
+ const [editing,setEditing]=useState<{id:string;updatedAt:string}|null>(null);
+ const [propertyName,setPropertyName]=useState("");
  const [submissionKey,setSubmissionKey]=useState(()=>crypto.randomUUID());
  const [serviceType,setServiceType]=useState(""),[address,setAddress]=useState(""),[propertyType,setPropertyType]=useState<ContractorPropertyType>("Residential");
  const [squareFeet,setSquareFeet]=useState(""),[bedrooms,setBedrooms]=useState(""),[bathrooms,setBathrooms]=useState("");
@@ -64,6 +66,23 @@ export function ContractorPortal(){
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}finally{setBusy(false);}
  };
  const chosen=data?.opportunities.find(x=>x.id===opportunityId);
+ const canEdit=Boolean(chosen&&chosen.submitted_by===data?.viewerId&&!chosen.linked_job_id&&!chosen.internal_confirmed_at&&editableContractorRequestStatuses.includes(chosen.status));
+ const resetJobForm=()=>{
+  setEditing(null);setPropertyName("");setPropertyType("Residential");setServiceType("");setAddress("");
+  setSquareFeet("");setBedrooms("");setBathrooms("");setScopeItems([]);setScopeDetails("");setAddons([]);
+  setCondition("");setRequestedDate("");setRequestedTime("");setHours("");setCleaners("2");setAmount("");setBasis("Flat Price");setInstructions("");setAccess("");
+ };
+ const editJob=(request:Opportunity)=>{
+  const options=request.request_options;
+  setEditing({id:request.id,updatedAt:request.updated_at});
+  setPropertyName(request.property_name??"");setPropertyType(request.property_type);setAddress(request.property_address);setServiceType(request.service_type);
+  setSquareFeet(String(request.square_feet??""));setBedrooms(String(request.bedrooms??""));setBathrooms(String(request.bathrooms??""));
+  setScopeItems(options?.scopeItems??["Other"]);setScopeDetails(options?.scopeItems?options.scopeDetails??"":request.scope_of_work);setAddons(options?.addons??[]);
+  setCondition(contractorPropertyConditions.some(option=>option===request.property_condition)?request.property_condition??"":"");
+  setRequestedDate(request.requested_date);setRequestedTime(request.requested_time?.slice(0,5)??"");
+  setHours(String(request.estimated_person_hours));setCleaners(String(request.cleaner_count));setAmount(String(request.proposed_amount));
+  setBasis(request.pricing_basis);setInstructions(request.special_instructions??"");setAccess(request.access_arrangements??"");setTab("submit");
+ };
  const currentJob=data?.jobs.find(x=>x.id===chosen?.linked_job_id);
  const currentInvoices=data?.invoices.filter(x=>x.job_id===chosen?.linked_job_id)??[];
  if(loading)return <main className="grid min-h-screen place-items-center">Loading private contractor portal…</main>;
@@ -73,17 +92,17 @@ export function ContractorPortal(){
    <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut({scope:"local"});router.replace(contractorPage("/login"))}}>Sign out</button>
   </div></header>
   <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
-   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>setTab(t)}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
+   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>{if(t==="submit"&&editing)resetJobForm();setTab(t);}}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
    {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(data.invoices.reduce((sum,x)=>sum+Math.max(0,Number(x.total)-Number(x.amount_paid)),0))]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
-    <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(x=><button key={x.id} className="flex w-full flex-wrap items-center justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(x.id);setTab("jobs")}}><span><b>{x.opportunity_number}</b><small className="block">{x.service_type} · {x.property_address}</small></span><span>{x.status}</span></button>)}</PortalPanel></>}
-   {data&&tab==="submit"&&<PortalPanel title="Submit a cleaning opportunity">
+    <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(x=><button key={x.id} className="flex w-full flex-wrap items-center justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(x.id);setTab("jobs")}}><span><b>{x.property_name??x.property_address}</b><small className="block">{x.opportunity_number} · {x.service_type}</small></span><span>{x.status}</span></button>)}</PortalPanel></>}
+   {data&&tab==="submit"&&<PortalPanel title={editing?"Edit job request":"Submit a cleaning opportunity"}>
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action("submitOpportunity",{serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());setAddress("");setScopeItems([]);setScopeDetails("");setAddons([]);setAmount("");setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
      <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
       {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
      </select></label>
@@ -93,6 +112,7 @@ export function ContractorPortal(){
      </select></label>
      {jobOptionsError&&<div className="md:col-span-2"><p role="alert" className="mb-2 text-sm text-red-700">{jobOptionsError}</p><button type="button" className={secondary} onClick={()=>{setJobOptionsError("");setJobOptionsRetry(value=>value+1);}}>Retry loading options</button></div>}
      {jobOptions&&!availableServices.length&&<p className="text-sm text-neutral-600 md:col-span-2">No services are currently available for this property type.</p>}
+     <PortalField label={propertyType==="Residential"?"Residential customer or property name":"Property name"} value={propertyName} set={setPropertyName} required={propertyType==="Residential"}/>
      <PortalField label="Property address" value={address} set={setAddress} required/>
      <PortalField label="Square footage, if known" value={squareFeet} set={setSquareFeet} type="number"/>
      {propertyType==="Residential"&&<><PortalField label="Bedrooms" value={bedrooms} set={setBedrooms} type="number"/><PortalField label="Bathrooms" value={bathrooms} set={setBathrooms} type="number"/></>}
@@ -110,14 +130,18 @@ export function ContractorPortal(){
      <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
-     <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length}>Submit opportunity</button></div>
+     <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length}>{editing?"Save changes":"Submit opportunity"}</button>{editing&&<button type="button" className={`${secondary} ml-2`} onClick={()=>{resetJobForm();setTab("jobs");}}>Cancel edit</button>}</div>
     </form>
    </PortalPanel>}
    {data&&tab==="jobs"&&<div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
     <PortalPanel title="Requests & jobs"><p className="mb-3 text-sm text-neutral-600">Track cleaning requests you’ve submitted and see the schedule, completion details, and invoice status once a job is accepted.</p>{data.opportunities.map(x=><button key={x.id} type="button" className={`mb-2 block w-full rounded-lg border p-3 text-left text-sm ${opportunityId===x.id?"border-[#143d1a] bg-green-50":"bg-white"}`} onClick={()=>setOpportunityId(x.id)}>
-     <b>{x.opportunity_number}</b><span className="mt-1 block">{x.service_type} · {x.status}</span></button>)}
+     <b>{x.property_name??x.property_address}</b><span className="mt-1 block">{x.opportunity_number} · {x.service_type} · {x.status}</span></button>)}
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>
     <PortalPanel title={chosen?.opportunity_number??"Select an opportunity"}>{chosen&&<div className="space-y-3 text-sm">
+          {chosen.property_name&&<p><b>Name:</b> {chosen.property_name}</p>}
+     {canEdit&&<div><button type="button" className={secondary} onClick={()=>editJob(chosen)}>Edit request</button>
+      <p className="mt-1 text-xs text-neutral-600">Changes return this request to Operations for review and clear any previous confirmation.</p></div>}
+     {(chosen.linked_job_id||chosen.internal_confirmed_at)&&<p className="font-bold text-[#143d1a]">Approved request · editing locked</p>}
      <p><b>Service:</b> {chosen.service_type}</p><p><b>Address:</b> {chosen.property_address}</p>
      <p><b>Requested:</b> {chosen.requested_date}</p><p><b>Status:</b> {chosen.status}</p>
      <p><b>Original compensation:</b> {currency(chosen.proposed_amount)}</p><p><b>Agreed compensation:</b> {currency(chosen.agreed_amount)}</p>

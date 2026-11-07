@@ -252,3 +252,5 @@ Contractor communications (unapplied): contractor_message_reads, contractor_cont
 Contractor scheduled notifications (unapplied): contractor_notification_deliveries is created and RLS-protected by 20261107160000_contractor_management_foundation.sql. The CRON_SECRET-protected /api/contractors/reminders route uses provider receipt IDs, event-key uniqueness, a weekly invoice reminder cadence and daily internal operational digests. Requires production approval before Vercel cron activation.
 
 Private contractor messaging uses the service-role-only `contractor_private_messages` table in `20261107192154_contractor_private_messages.sql`. Each row binds a contractor profile to its assigned Operations Manager, with recipient read state recorded on the row. The API keeps historical shared threads outside the private inbox.
+
+Contractor request review uses `get_my_contractor_request_reviews` in `20261107200058_contractor_request_review.sql` to route OS Attention Center items to the assigned Operations Manager, with Master Admin fallback for unassigned requests. New requests link to an OS property and approval reuses that link.

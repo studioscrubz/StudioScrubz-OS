@@ -176,3 +176,15 @@ test("contractor job options validate catalog selections and preserve scope thro
  assert.match(api,/scope_of_work:required\(scope,"scope of work"/);
  assert.match(activation,/v_op\.final_scope/);
 });
+
+test("contractor requests require a residential name and use a guarded revision update",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ const review=read("supabase/migrations/20261107200058_contractor_request_review.sql");
+ const attention=read("lib/services/attention.ts");
+ assert.match(api,/required\(input\.propertyName,"residential customer or property name"/);
+ assert.match(api,/\.eq\("submitted_by",ctx\.userId\)[\s\S]*?\.eq\("updated_at",editing\.updated_at\)[\s\S]*?\.is\("linked_job_id",null\)/);
+ assert.match(portal,/x\.property_name\?\?x\.property_address[\s\S]*?x\.opportunity_number/);
+ assert.match(review,/new\.request_property_id:=private\.save_contractor_request_property\(new\)/);
+ assert.match(review,/v_pr\.request_revision<>v_op\.request_revision/);
+ assert.match(attention,/get_my_contractor_request_reviews/);
+});

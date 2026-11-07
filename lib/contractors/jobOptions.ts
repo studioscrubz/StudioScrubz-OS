@@ -13,3 +13,11 @@ export const contractorScopeOptions: Record<ContractorPropertyType, string[]> = 
 export type ContractorJobOptions = {
  services: Array<{name:string;division:ContractorPropertyType;addons:string[]}>;
 };
+
+export const editableContractorRequestStatuses = ["New Opportunity", "Information Requested", "Negotiating", "Awaiting Approval"];
+
+export type ContractorRequestOptions = {
+ scopeItems: string[];
+ scopeDetails: string | null;
+ addons: string[];
+};
