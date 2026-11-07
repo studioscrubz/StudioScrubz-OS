@@ -114,3 +114,19 @@ test("scheduled contractor reminders are secret-protected and idempotently recei
  assert.match(migration,/create table public\.contractor_notification_deliveries/);
  assert.match(config,/\/api\/contractors\/reminders/);
 });
+
+test("partner hostname is isolated from the employee application and uses canonical authentication links",()=>{
+ const proxy=read("proxy.ts");
+ const login=read("components/contractors/ContractorLogin.tsx");
+ const activationUi=read("components/contractors/ContractorActivate.tsx");
+ assert.match(proxy,/hostname === "partners\\.studioscrubz\\.com"/);
+ assert.match(proxy,/destination\\.pathname = "\/contractor\/login"/);
+ assert.match(proxy,/destination\\.pathname = \`\/contractor\\$\\{pathname\\}\`/);
+ assert.match(proxy,/pathname === "\/contractor"/);
+ assert.match(proxy,/pathname\\.startsWith\\("\/api\/contractors\/"\\)/);
+ assert.match(proxy,/new NextResponse\\("Not Found", \\{ status: 404 \\}\\)/);
+ assert.match(invites,/https:\\/\\/partners\\.studioscrubz\\.com/);
+ assert.match(login,/https:\\/\\/partners\\.studioscrubz\\.com/);
+ assert.match(activationUi,/https:\\/\\/partners\\.studioscrubz\\.com/);
+ assert.match(login,/https:\\/\\/app\\.studioscrubz\\.com\\/login/);
+});
