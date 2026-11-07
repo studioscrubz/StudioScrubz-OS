@@ -38,7 +38,7 @@
 2. Native PG: both exact migration files, replay, expiry, cross-company isolation, manager restrictions, job handoff.
 3. Supabase production migration and storage bucket state **read-only review** immediately before approval.
 4. Vercel team/project/domain/env read-only review, then production-only release after approval.
-5. Auth provider redirect allowlist must include `https://app.studioscrubz.com/contractor/activate` and `https://app.studioscrubz.com/contractor/reset-password`.
+5. Auth provider redirect allowlist must include `https://partners.studioscrubz.com/contractor/activate` and `https://partners.studioscrubz.com/contractor/reset-password`. The canonical invitation and recovery links use the partner host.
 6. Send real invitation to an explicitly designated test contractor after approval, and verify activation email and first job submission.
 7. Validate real technician GPS, equipment and photo flow on a controlled test Job.
 8. Verify invoice creation and payment reconciliation with a controlled contractor job.
@@ -71,3 +71,10 @@
 - Existing completion logic can create invoices at job completion before the contractor quality review. The portal withholds those invoices until quality approval, but the internal invoicing timeline is unchanged to preserve existing business behavior.
 \n2026-11-07 Communications schema additions: `contractor_message_reads`, `contractor_contact_attempts`, and `contractor_followups` (unapplied) provide durable read receipts, contact outcomes, and follow-up actions in the operations dashboard and portal. Tax documents require Company Admin membership or internal staff authorization.\n
 Automated notifications added: `/api/contractors/reminders` and `contractor_notification_deliveries`, with a second daily Vercel cron entry; this configuration must be approved, credential-verified and tested before activation. The processor sends weekly overdue contractor invoice reminders and daily aggregate internal alerts for unassigned Jobs / due follow-ups. It does not create invoices or modify financial ledgers.
+
+## Partner hostname cutover (pending approval)
+- Vercel project domain `partners.studioscrubz.com` is registered and ownership-verified on `studio-scrubz-os`.
+- Source `proxy.ts` routes the partner hostname root to contractor sign-in, supports activation/reset, and rejects employee application paths with 404. Contractor APIs retain their server-side authorization and company isolation.
+- Porkbun manages DNS. Its existing partner record is **not** pointed at Vercel yet. Set host `partners` CNAME to the current value shown in Vercel Domains only after app/auth security and acceptance testing is complete.
+- Supabase authentication redirect allowlist needs the two partner callback URLs above; existing employee redirect rules remain in place.
+- No PR merge, production database migration, or production deployment is authorized by domain registration or this code change alone. Do not use production clients for test invitations.
