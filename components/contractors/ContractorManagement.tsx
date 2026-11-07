@@ -193,6 +193,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
       <p>Cost coverage: <b>{assessment.cost_complete?"Complete":"Incomplete – cannot accept without Master Admin override"}</b></p>
       <p>Override: {assessment.override_approved_by?"Approved with audited reason":"Not approved"}</p></div>}
      <Field label="Decision / override reason" value={reviewReason} set={setReviewReason}/>
+     {!selected.linked_job_id&&!["Accepted","Declined","Cancelled","Disputed"].includes(selected.status)&&
+      <div className="flex flex-wrap gap-2">
+       <button type="button" className={secondary} disabled={busy||!reviewReason.trim()} onClick={()=>void run("requestInformation",{opportunityId:selected.id,reason:reviewReason})}>Request more information</button>
+       <button type="button" className={secondary} disabled={busy||!reviewReason.trim()} onClick={()=>void run("markNegotiating",{opportunityId:selected.id,reason:reviewReason})}>Mark negotiating</button>
+      </div>}
      {data?.role==="Master Admin"&&<button className={secondary} disabled={busy||reviewReason.length<12} type="button"
       onClick={()=>void run("approveOverride",{opportunityId:selected.id,reason:reviewReason})}>Master Admin: approve override</button>}
      <div className="flex flex-wrap gap-2">
