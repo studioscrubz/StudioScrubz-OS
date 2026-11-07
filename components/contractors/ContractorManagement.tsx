@@ -167,7 +167,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <Field label="Company name" value={companyName} set={setCompanyName} required/>
     <Field label="Primary email" value={companyEmail} set={setCompanyEmail} type="email" required/>
     <Field label="Primary contact" value={companyContact} set={setCompanyContact}/>
-    <button disabled={busy} className={button}>Create Company</button></form></Panel>
+    <button disabled={busy} className={button}>Create Company</button><p className="text-xs text-neutral-600">Saves the company under Accounts → Clients. Portal access is managed separately.</p></form></Panel>
    <Panel title="Active contractor directory"><div className="space-y-2">
     {data?.directory.map(entry=><button key={entry.clientId} type="button" className="block w-full rounded-lg border bg-white p-3 text-left hover:border-[#143d1a]" onClick={()=>setCompanyId(entry.companyId)}>
      <b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>

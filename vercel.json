@@ -9,7 +9,8 @@
       "fix/contractor-withdraw-request": false,
       "fix/active-contractor-directory": false,
       "fix/contractor-portal-access": false,
-      "fix/contractor-team-invitations": false
+      "fix/contractor-team-invitations": false,
+      "fix/link-new-contractor-clients": false
     }
   },
   "crons": [

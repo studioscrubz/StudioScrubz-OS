@@ -197,6 +197,7 @@ export async function POST(request:Request){
     service_types:Array.isArray(input.serviceTypes)?input.serviceTypes.filter(x=>typeof x==="string").slice(0,30):[],
     assigned_manager_id:ctx.userId,payment_terms:optional(input.paymentTerms,500),
    }).select("id").single();
+   if(error?.code==="P0001")throw new ContractorAccessError(error.message,409);
    if(error||!data)throw error??new Error("Company not saved.");
    await audited(ctx,{companyId:data.id,type:"Company Created"});
    return noCache({companyId:data.id});

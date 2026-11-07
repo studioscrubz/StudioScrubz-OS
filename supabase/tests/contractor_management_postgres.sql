@@ -416,3 +416,39 @@ do $$begin
  end;
 end$$;
 reset role;
+
+-- Portal company creation and Accounts client linking are atomic.
+\ir ../migrations/20261107210215_link_new_contractor_clients.sql
+insert into public.clients(id,client_type,company_name,email,status)
+values('40000000-0000-4000-8000-000000000099','Contractor','Existing Accounts Contractor','existing@example.test','Lead');
+grant select,insert,update on public.clients to service_role;
+set role service_role;
+insert into public.contractor_companies(name,contact_email,contact_name,phone)
+values('New Portal Contractor','new@example.test','Jamie Example','555-0100');
+insert into public.contractor_companies(name,contact_email)
+values(' existing accounts contractor ','EXISTING@example.test');
+do $$begin
+ begin
+  insert into public.contractor_companies(name,contact_email)
+  values('New Portal Contractor','new@example.test');
+  raise exception 'Repeated company creation unexpectedly succeeded';
+ exception when raise_exception then
+  if sqlerrm<>'This Contractor client already has a portal company.' then raise; end if;
+ end;
+end$$;
+reset role;
+do $$begin
+ if not exists(select 1 from public.contractor_companies p join public.clients c on c.id=p.client_id
+  where p.name='New Portal Contractor' and p.status='Pending' and c.client_type='Contractor'
+  and c.status='Active' and c.first_name='Jamie' and c.last_name='Example'
+  and c.email='new@example.test' and c.phone='555-0100') then
+  raise exception 'New contractor did not receive the expected Accounts client';
+ end if;
+ if not exists(select 1 from public.contractor_companies p join public.clients c on c.id=p.client_id
+  where c.id='40000000-0000-4000-8000-000000000099' and c.status='Lead') then
+  raise exception 'Existing Accounts client was not reused with its existing status';
+ end if;
+ if (select count(*) from public.clients where company_name='New Portal Contractor')<>1 then
+  raise exception 'Duplicate Accounts client created';
+ end if;
+end$$;

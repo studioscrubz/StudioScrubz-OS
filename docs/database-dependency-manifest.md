@@ -256,3 +256,5 @@ Private contractor messaging uses the service-role-only `contractor_private_mess
 Contractor request review uses `get_my_contractor_request_reviews` in `20261107200058_contractor_request_review.sql` to route OS Attention Center items to the assigned Operations Manager, with Master Admin fallback for unassigned requests. New requests link to an OS property and approval reuses that link.
 
 Contractor team invitations use the service-role-only `prepare_contractor_team_invitation` RPC in `20261107205053_contractor_team_invitations.sql`. It verifies active company ownership, rotates pending teammate invitations, and records the sender against `auth.users`. Activation uses the existing `redeem_contractor_invitation` RPC.
+
+New portal companies use the `link_new_contractor_client` insert trigger from `20261107210215_link_new_contractor_clients.sql` to link a matching Contractor client or create an active Accounts client atomically. Portal activation remains a separate status.
