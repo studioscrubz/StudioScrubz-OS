@@ -204,29 +204,6 @@ const navItems: Array<NavLink | NavGroup> = [
 
   {
 
-    label: "Operations",
-
-    marker: "O",
-
-    children: [
-
-      { label: "Contractor Dashboard", href: "/contractors", marker: "D", permission: "contractors.view" },
-
-      { label: "Contractors", href: "/contractors/companies", marker: "C", permission: "contractors.view" },
-
-      { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
-
-      { label: "Scheduled Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
-
-      { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
-
-
-    ],
-
-  },
-
-  {
-
     label: "Jobs",
 
     marker: "J",
@@ -256,6 +233,29 @@ const navItems: Array<NavLink | NavGroup> = [
         permission: "reports.view",
 
       },
+
+    ],
+
+  },
+
+  {
+
+    label: "Operations",
+
+    marker: "O",
+
+    children: [
+
+      { label: "Contractor Dashboard", href: "/contractors", marker: "D", permission: "contractors.view" },
+
+      { label: "Contractors", href: "/contractors/companies", marker: "C", permission: "contractors.view" },
+
+      { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
+
+      { label: "Scheduled Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
+
+      { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
+
 
     ],
 
