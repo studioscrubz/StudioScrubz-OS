@@ -121,7 +121,7 @@ async function list(ctx:ContractorContext){
  const [company,opportunities,offers,documents]=await Promise.all([
   db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id")
    .eq("id",companyId).single(),
-  db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_name,property_address,property_type,request_options,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at,updated_at,internal_confirmed_at,submitted_by").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
+  db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_name,property_address,property_type,request_options,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at,updated_at,internal_confirmed_at,submitted_by").eq("company_id",companyId).or("status.neq.Cancelled,linked_job_id.not.is.null").order("created_at",{ascending:false}).limit(500),
   db.from("contractor_offers").select("id,opportunity_id,company_id,offered_by_side,amount,pricing_basis,scope_text,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_documents").select("id,opportunity_id,file_name,mime_type,file_size,category,created_at").eq("company_id",companyId).limit(500),
  ]);
@@ -519,9 +519,31 @@ export async function POST(request:Request){
     detail:{jobId:job.id,created:result?.created===true,invoiceId:result?.invoice_id}});
    return noCache({invoice:result});
   }
+  if(action==="cancelOpportunity"&&ctx.type==="partner"){
+   const opp=await partnerOpportunity(ctx,uuid(input.opportunityId));
+   if(opp.submitted_by!==ctx.userId)throw new ContractorAccessError("Only the contractor who submitted this request can delete it.");
+   if(opp.status==="Cancelled"&&!opp.linked_job_id)return noCache({ok:true});
+   if(opp.linked_job_id||opp.internal_confirmed_at||!editableContractorRequestStatuses.includes(opp.status))
+    throw new ContractorAccessError("This request is locked and cannot be deleted.",409);
+   if(input.updatedAt!==opp.updated_at)
+    throw new ContractorAccessError("This request changed. Reload it before deleting.",409);
+   const now=new Date().toISOString();
+   const {data,error}=await db.from("contractor_opportunities")
+    .update({status:"Cancelled",cancelled_at:now,updated_at:now})
+    .eq("id",opp.id).eq("company_id",ctx.companyId).eq("submitted_by",ctx.userId)
+    .eq("updated_at",opp.updated_at).in("status",editableContractorRequestStatuses)
+    .is("linked_job_id",null).is("internal_confirmed_at",null).select("id").maybeSingle();
+   if(error)throw error;
+   if(!data)throw new ContractorAccessError("This request changed or was approved. Reload it before deleting.",409);
+   await audited(ctx,{companyId:ctx.companyId,opportunityId:opp.id,type:"Opportunity Withdrawn"});
+   await notify(ctx,"Contractor request withdrawn",`Opportunity ${opp.opportunity_number} was withdrawn and no longer needs review.`,ctx.companyId,opp.id,"internal");
+   return noCache({ok:true});
+  }
   if(action==="cancelOpportunity"||action==="disputeOpportunity"||action==="requestReschedule"){
    const opp=ctx.type==="internal"?await internalOpportunity(ctx,uuid(input.opportunityId)):
     await partnerOpportunity(ctx,uuid(input.opportunityId));
+   if(opp.status==="Cancelled"&&!opp.linked_job_id)
+    throw new ContractorAccessError("This request is closed.",409);
    const reason=required(input.reason,"reason",2000);
    if(reason.length<8)throw new ContractorAccessError("Provide a meaningful reason.",400);
    if(action==="cancelOpportunity"&&opp.linked_job_id)
