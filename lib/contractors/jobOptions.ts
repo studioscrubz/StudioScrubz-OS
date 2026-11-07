@@ -16,7 +16,16 @@ export type ContractorJobOptions = {
 
 export const editableContractorRequestStatuses = ["New Opportunity", "Information Requested", "Negotiating", "Awaiting Approval"];
 
+export type ContractorPropertyAddress = {
+ street: string;
+ line2: string;
+ city: string;
+ state: string;
+ zip: string;
+};
+
 export type ContractorRequestOptions = {
+ address?: ContractorPropertyAddress;
  scopeItems: string[];
  scopeDetails: string | null;
  addons: string[];

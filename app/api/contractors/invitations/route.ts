@@ -14,11 +14,12 @@ export async function GET(request:Request){
   const raw=new URL(request.url).searchParams.get("token")??"";
   if(!tokenFormat.test(raw))throw new ContractorAccessError("Invitation unavailable.",404);
   const db=createSupabaseAdminClient(),{data:invite}=await db.from("contractor_invitations")
-   .select("id,company_id,invited_email,expires_at,status").eq("token_hash",hash(raw)).maybeSingle();
+   .select("id,company_id,invited_email,expires_at,status,member_role").eq("token_hash",hash(raw)).maybeSingle();
   if(!invite||invite.status!=="Pending"||new Date(invite.expires_at).getTime()<=Date.now())
    throw new ContractorAccessError("Invitation is expired or unavailable.",404);
   const {data:company}=await db.from("contractor_companies").select("name,status").eq("id",invite.company_id).single();
-  if(!company||!["Pending","Active"].includes(company.status))throw new ContractorAccessError("Company invitation unavailable.",404);
+  if(!company||(company.status!=="Active"&&(company.status!=="Pending"||invite.member_role!=="Company Admin")))
+   throw new ContractorAccessError("Company invitation unavailable.",404);
   return noCache({companyName:company.name,email:invite.invited_email,expiresAt:invite.expires_at});
  }catch(error){return handleContractorError(error);}
 }
@@ -66,8 +67,8 @@ export async function POST(request:Request){
   const role=ctx.type==="partner"?"Member":previous?.data?.member_role??"Company Admin";
   const {data:company,error:companyError}=await ctx.admin.from("contractor_companies").select("id,name,status")
    .eq("id",companyId).maybeSingle();
-  if(companyError||!company||!["Pending","Active"].includes(company.status))
-   throw new ContractorAccessError("Active or pending company required.",409);
+  if(companyError||!company||(company.status!=="Active"&&(company.status!=="Pending"||role!=="Company Admin")))
+   throw new ContractorAccessError("Company is unavailable for this invitation.",409);
   // Generate a fresh one-use secret every time. Never persist plaintext.
   const token=randomBytes(32).toString("hex"),tokenHash=hash(token);
   let invite:{id:string;expires_at:string};

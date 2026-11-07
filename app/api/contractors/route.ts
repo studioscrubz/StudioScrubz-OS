@@ -1,4 +1,5 @@
 import "server-only";
+import { US_STATE_OPTIONS } from "@/components/forms/UsStateSelect";
 import { contractorPropertyConditions, contractorScopeOptions, editableContractorRequestStatuses, type ContractorRequestOptions, type ContractorJobOptions, type ContractorPropertyType } from "@/lib/contractors/jobOptions";
 import { loadAuthoritativeCatalog, publicCatalog } from "@/lib/services/publicEstimateRequests";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -197,6 +198,7 @@ export async function POST(request:Request){
     service_types:Array.isArray(input.serviceTypes)?input.serviceTypes.filter(x=>typeof x==="string").slice(0,30):[],
     assigned_manager_id:ctx.userId,payment_terms:optional(input.paymentTerms,500),
    }).select("id").single();
+   if(error?.code==="P0001")throw new ContractorAccessError(error.message,409);
    if(error||!data)throw error??new Error("Company not saved.");
    await audited(ctx,{companyId:data.id,type:"Company Created"});
    return noCache({companyId:data.id});
@@ -300,9 +302,21 @@ export async function POST(request:Request){
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
    const proposed=money(input.amount,"proposed payment");
+   const address={
+    street:required(input.address,"street address",250),
+    line2:optional(input.addressLine2,100)??"",
+    city:required(input.city,"city",100),
+    state:required(input.state,"state",2).toUpperCase(),
+    zip:required(input.zip,"ZIP code",10),
+   };
+   if(!US_STATE_OPTIONS.some(([code])=>code===address.state))
+    throw new ContractorAccessError("Select a valid state.",400);
+   if(!/^\d{5}(?:-\d{4})?$/.test(address.zip))
+    throw new ContractorAccessError("Enter a valid ZIP code.",400);
+   const fullAddress=[address.street,address.line2,address.city,`${address.state} ${address.zip}`].filter(Boolean).join(", ");
    const values={
-    service_type:serviceType,property_name:propertyName,request_options:requestOptions,
-    property_address:required(input.address,"property address",500),property_type:type,
+    service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address},
+    property_address:fullAddress,property_type:type,
     square_feet:input.squareFeet===null||input.squareFeet===""?null:money(input.squareFeet,"square footage"),
     bedrooms:type!=="Residential"||input.bedrooms===null||input.bedrooms===""?null:money(input.bedrooms,"bedrooms"),
     bathrooms:type!=="Residential"||input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),

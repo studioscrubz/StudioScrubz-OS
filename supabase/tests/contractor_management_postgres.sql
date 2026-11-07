@@ -416,3 +416,107 @@ do $$begin
  end;
 end$$;
 reset role;
+
+-- Portal company creation and Accounts client linking are atomic.
+\ir ../migrations/20261107210215_link_new_contractor_clients.sql
+insert into public.clients(id,client_type,company_name,email,status)
+values('40000000-0000-4000-8000-000000000099','Contractor','Existing Accounts Contractor','existing@example.test','Lead');
+grant select,insert,update on public.clients to service_role;
+set role service_role;
+insert into public.contractor_companies(name,contact_email,contact_name,phone)
+values('New Portal Contractor','new@example.test','Jamie Example','555-0100');
+insert into public.contractor_companies(name,contact_email)
+values(' existing accounts contractor ','EXISTING@example.test');
+do $$begin
+ begin
+  insert into public.contractor_companies(name,contact_email)
+  values('New Portal Contractor','new@example.test');
+  raise exception 'Repeated company creation unexpectedly succeeded';
+ exception when raise_exception then
+  if sqlerrm<>'This Contractor client already has a portal company.' then raise; end if;
+ end;
+end$$;
+reset role;
+do $$begin
+ if not exists(select 1 from public.contractor_companies p join public.clients c on c.id=p.client_id
+  where p.name='New Portal Contractor' and p.status='Pending' and c.client_type='Contractor'
+  and c.status='Active' and c.first_name='Jamie' and c.last_name='Example'
+  and c.email='new@example.test' and c.phone='555-0100') then
+  raise exception 'New contractor did not receive the expected Accounts client';
+ end if;
+ if not exists(select 1 from public.contractor_companies p join public.clients c on c.id=p.client_id
+  where c.id='40000000-0000-4000-8000-000000000099' and c.status='Lead') then
+  raise exception 'Existing Accounts client was not reused with its existing status';
+ end if;
+ if (select count(*) from public.clients where company_name='New Portal Contractor')<>1 then
+  raise exception 'Duplicate Accounts client created';
+ end if;
+end$$;
+
+-- A verified owner activates a pending company without a separate Operations action.
+\ir ../migrations/20261107210843_activate_contractor_company_on_owner_redemption.sql
+insert into auth.users(id,email,email_confirmed_at)
+values('00000000-0000-4000-8000-000000000015','newowner@example.test',now());
+insert into public.contractor_invitations(company_id,invited_email,member_role,token_hash,invited_by)
+select id,'newowner@example.test','Member',repeat('5',64),'00000000-0000-4000-8000-000000000001'::uuid
+from public.contractor_companies where name='New Portal Contractor'
+union all
+select id,'newowner@example.test','Company Admin',repeat('6',64),'00000000-0000-4000-8000-000000000001'::uuid
+from public.contractor_companies where name='New Portal Contractor';
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000015',false);
+do $$begin
+ begin
+  perform public.redeem_contractor_invitation(repeat('5',64));
+  raise exception 'A teammate invitation activated a pending company';
+ exception when raise_exception then
+  if sqlerrm<>'Company access is unavailable.' then raise; end if;
+ end;
+end$$;
+reset role;
+update public.contractor_companies set status='Suspended' where name='New Portal Contractor';
+set role authenticated;
+do $$begin
+ begin
+  perform public.redeem_contractor_invitation(repeat('6',64));
+  raise exception 'An owner invitation reactivated a suspended company';
+ exception when raise_exception then
+  if sqlerrm<>'Company access is unavailable.' then raise; end if;
+ end;
+end$$;
+reset role;
+update public.contractor_companies set status='Pending' where name='New Portal Contractor';
+set role authenticated;
+select public.redeem_contractor_invitation(repeat('6',64));
+reset role;
+do $$begin
+ if not exists(select 1 from public.contractor_companies c
+  join public.contractor_members m on m.company_id=c.id
+  join public.contractor_invitations i on i.company_id=c.id and i.redeemed_by=m.user_id
+  where c.name='New Portal Contractor' and c.status='Active' and m.is_active
+    and m.member_role='Company Admin' and i.status='Redeemed' and i.token_hash=repeat('6',64)) then
+  raise exception 'Owner redemption did not atomically activate company and membership';
+ end if;
+end$$;
+
+-- The portal keeps a formatted display address and writes separate Accounts fields.
+\ir ../migrations/20261107211116_contractor_structured_property_addresses.sql
+insert into public.contractor_opportunities(company_id,submitted_by,property_name,property_address,property_type,
+ service_type,requested_date,estimated_person_hours,proposed_amount,scope_of_work,request_options)
+select c.id,'00000000-0000-4000-8000-000000000015','Structured Test',
+ format('123 Example Avenue, Unit %s, Los Angeles, CA 90001',unit),'Residential','Standard',current_date,2,150,
+ 'Clean test unit',jsonb_build_object('address',jsonb_build_object(
+ 'street','123 Example Avenue','line2','Unit '||unit,'city','Los Angeles','state','CA','zip','90001'))
+from public.contractor_companies c cross join (values ('1'),('1'),('2')) as units(unit)
+where c.name='New Portal Contractor';
+do $$begin
+ if (select count(*) from public.properties p join public.clients c on c.id=p.client_id
+  where c.company_name='New Portal Contractor' and p.address='123 Example Avenue'
+    and p.address_line_2 in ('Unit 1','Unit 2') and p.city='Los Angeles' and p.state='CA' and p.zip='90001')<>2 then
+  raise exception 'Structured addresses were not saved or separate units were merged';
+ end if;
+ if (select count(distinct request_property_id) from public.contractor_opportunities
+  where property_address='123 Example Avenue, Unit 1, Los Angeles, CA 90001')<>1 then
+  raise exception 'Repeated address did not reuse the existing property';
+ end if;
+end$$;

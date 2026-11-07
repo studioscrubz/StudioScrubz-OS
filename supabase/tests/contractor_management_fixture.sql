@@ -12,11 +12,11 @@ create table public.user_profiles(id uuid primary key references auth.users(id),
 grant select on public.user_profiles to service_role;
 create table public.clients(
  id uuid primary key default gen_random_uuid(),client_type text,company_name text,
- phone text,email text,status text
+ first_name text,last_name text,phone text,email text,status text,archived_at timestamptz
 );
 create table public.properties(
  id uuid primary key default gen_random_uuid(),client_id uuid references public.clients(id),
- property_type text,property_name text,archived_at timestamptz,address text,square_feet numeric,bedrooms numeric,bathrooms numeric,
+ property_type text,property_name text,archived_at timestamptz,address text,address_line_2 text,city text,state text,zip text,square_feet numeric,bedrooms numeric,bathrooms numeric,
  access_instructions text,notes text
 );
 create table public.jobs(
