@@ -10,7 +10,8 @@
       "fix/active-contractor-directory": false,
       "fix/contractor-portal-access": false,
       "fix/contractor-team-invitations": false,
-      "fix/link-new-contractor-clients": false
+      "fix/link-new-contractor-clients": false,
+      "fix/remove-employee-portal-link": false
     }
   },
   "crons": [

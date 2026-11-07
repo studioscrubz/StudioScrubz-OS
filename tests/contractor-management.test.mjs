@@ -136,7 +136,7 @@ test("partner hostname is isolated from the employee application and uses canoni
  assert.match(activationUi,/\/contractor\/activate#token=/);
  assert.match(activationUi,/new URLSearchParams\(callback\.hash\.slice\(1\)\)/);
  assert.match(read("components/contractors/ContractorResetPassword.tsx"),/event === "PASSWORD_RECOVERY"/);
- assert.match(login,/https:\/\/app\.studioscrubz\.com\/login/);
+ assert.doesNotMatch(login,/https:\/\/app\.studioscrubz\.com\/login/);
 });
 
 
