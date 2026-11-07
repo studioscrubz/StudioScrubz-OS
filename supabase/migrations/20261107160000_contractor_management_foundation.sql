@@ -119,6 +119,36 @@ create table public.contractor_messages (
  created_at timestamptz not null default now()
 );
 create index contractor_messages_company_idx on public.contractor_messages(company_id,created_at desc);
+create table public.contractor_message_reads (
+ company_id uuid not null references public.contractor_companies(id) on delete restrict,
+ user_id uuid not null references auth.users(id) on delete restrict,
+ last_read_at timestamptz not null default now(),
+ primary key(company_id,user_id)
+);
+create table public.contractor_contact_attempts (
+ id uuid primary key default gen_random_uuid(),
+ company_id uuid not null references public.contractor_companies(id) on delete restrict,
+ opportunity_id uuid references public.contractor_opportunities(id) on delete restrict,
+ actor_id uuid not null references public.user_profiles(id),
+ method text not null check(method in ('Phone','Email','SMS','Other')),
+ outcome text not null check(length(btrim(outcome)) between 2 and 200),
+ notes text,
+ attempted_at timestamptz not null default now()
+);
+create index contractor_contact_attempts_company_idx on public.contractor_contact_attempts(company_id,attempted_at desc);
+create table public.contractor_followups (
+ id uuid primary key default gen_random_uuid(),
+ company_id uuid not null references public.contractor_companies(id) on delete restrict,
+ opportunity_id uuid references public.contractor_opportunities(id) on delete restrict,
+ assigned_manager_id uuid not null references public.user_profiles(id),
+ note text not null check(length(btrim(note)) between 3 and 1000),
+ due_at timestamptz not null,
+ status text not null default 'Pending' check(status in ('Pending','Completed','Cancelled')),
+ created_by uuid not null references public.user_profiles(id),
+ created_at timestamptz not null default now(),
+ completed_at timestamptz
+);
+create index contractor_followups_due_idx on public.contractor_followups(status,due_at);
 create table public.contractor_profitability (
  opportunity_id uuid primary key references public.contractor_opportunities(id) on delete restrict,
  assessed_by uuid not null references public.user_profiles(id),
@@ -164,6 +194,9 @@ alter table public.contractor_invitations enable row level security;
 alter table public.contractor_opportunities enable row level security;
 alter table public.contractor_offers enable row level security;
 alter table public.contractor_messages enable row level security;
+alter table public.contractor_message_reads enable row level security;
+alter table public.contractor_contact_attempts enable row level security;
+alter table public.contractor_followups enable row level security;
 alter table public.contractor_profitability enable row level security;
 alter table public.contractor_audit_events enable row level security;
 alter table public.contractor_documents enable row level security;
@@ -213,6 +246,12 @@ create policy contractor_messages_internal_select on public.contractor_messages 
  using ((select private.contractor_is_internal()));
 create policy contractor_messages_internal_insert on public.contractor_messages for insert to authenticated
  with check ((select private.contractor_is_internal()));
+create policy contractor_message_reads_internal_select on public.contractor_message_reads for select to authenticated
+ using ((select private.contractor_is_internal()) or user_id=(select auth.uid()));
+create policy contractor_contact_attempts_internal_select on public.contractor_contact_attempts for select to authenticated
+ using ((select private.contractor_is_internal()));
+create policy contractor_followups_internal_select on public.contractor_followups for select to authenticated
+ using ((select private.contractor_is_internal()));
 create policy contractor_profitability_internal_select on public.contractor_profitability for select to authenticated
  using ((select private.contractor_is_internal()));
 create policy contractor_profitability_internal_write on public.contractor_profitability for insert to authenticated
@@ -234,9 +273,11 @@ create policy contractor_documents_internal_insert on public.contractor_document
 revoke insert,update,delete on public.contractor_companies,public.contractor_members,
  public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
- public.contractor_documents from authenticated,anon;
+ public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
+ public.contractor_followups from authenticated,anon;
 grant select on public.contractor_companies,public.contractor_members,
  public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
- public.contractor_documents to authenticated;
+ public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
+ public.contractor_followups to authenticated;
 
