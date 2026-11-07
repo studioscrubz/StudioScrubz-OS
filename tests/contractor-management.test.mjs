@@ -77,6 +77,8 @@ test("company administrator tax files and quality-reviewed financial outputs sta
  assert.match(api,/action==="sendPaymentReminder"/);
  assert.match(photos,/!op\.quality_approved_at/);
  assert.match(photos,/\.eq\("customer_visible",true\)/);
+ assert.match(photos,/\.eq\("job_id",jobId\)\.in\("invoice_id"/);
+ assert.match(photos,/\.download\(photo\.storage_path\)\.asStream\(\)/);
 });
 test("contractor opportunities are idempotent and use existing guarded crew assignment",()=>{
  const portal=read("components/contractors/ContractorPortal.tsx");

@@ -1,5 +1,5 @@
 import "server-only";
-import {OPERATIONAL_PHOTO_BUCKET} from "@/types/photo";
+import {OPERATIONAL_PHOTO_BUCKET,OPERATIONAL_PHOTO_MIME_TYPES} from "@/types/photo";
 import {contractorContext,requirePartner,uuid,handleContractorError,noCache,ContractorAccessError} from "@/lib/contractors/server";
 // Only customer-authorized invoice completion photos are exposed; internal Job photos never are.
 export async function GET(request:Request){
@@ -19,18 +19,18 @@ export async function GET(request:Request){
    if(photoId)throw new ContractorAccessError("Completion photo unavailable.",404);
    return noCache({photos:[]});
   }
-  const visible=ctx.admin.from("invoice_job_photos").select("id,category,caption,storage_path")
-   .in("invoice_id",invoices.map(x=>x.id)).eq("customer_visible",true);
+  const visible=ctx.admin.from("invoice_job_photos").select("id,category,caption,storage_path,mime_type")
+   .eq("job_id",jobId).in("invoice_id",invoices.map(x=>x.id)).eq("customer_visible",true);
   if(photoId){
    const {data:photo,error}=await visible.eq("id",photoId).maybeSingle();
    if(error)throw error;
    if(!photo)throw new ContractorAccessError("Completion photo unavailable.",404);
-   const {data:file,error:downloadError}=await ctx.admin.storage.from(OPERATIONAL_PHOTO_BUCKET).download(photo.storage_path);
-   if(downloadError||!file)throw new ContractorAccessError("Completion photo unavailable.",503);
-   if(!["image/jpeg","image/png","image/webp","image/gif","image/avif","image/heic","image/heif"].includes(file.type))
+   if(!(OPERATIONAL_PHOTO_MIME_TYPES as readonly string[]).includes(photo.mime_type))
     throw new ContractorAccessError("Unsupported completion photo format.",415);
-   return new Response(file,{headers:{
-    "Content-Type":file.type,"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",
+   const {data:stream,error:downloadError}=await ctx.admin.storage.from(OPERATIONAL_PHOTO_BUCKET).download(photo.storage_path).asStream();
+   if(downloadError||!stream)throw new ContractorAccessError("Completion photo unavailable.",503);
+   return new Response(stream,{headers:{
+    "Content-Type":photo.mime_type,"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",
    }});
   }
   const {data:photos,error}=await visible.order("id").limit(50);
