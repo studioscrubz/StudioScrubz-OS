@@ -4,6 +4,27 @@ import { updateSession } from "@/lib/supabase/proxy";
 export async function proxy(request: NextRequest) {
   const hostname = (request.headers.get("host") ?? request.nextUrl.hostname).split(":")[0].toLowerCase();
   const pathname = request.nextUrl.pathname;
+  // The external partner hostname is a separate public entry point to the
+  // existing contractor components. Never expose employee pages on this host.
+  if (hostname === "partners.studioscrubz.com") {
+    if (pathname === "/" || pathname === "/login") {
+      const destination = request.nextUrl.clone();
+      destination.pathname = "/contractor/login";
+      return NextResponse.rewrite(destination);
+    }
+    if (pathname === "/activate" || pathname === "/reset-password") {
+      const destination = request.nextUrl.clone();
+      destination.pathname = `/contractor${pathname}`;
+      return NextResponse.rewrite(destination);
+    }
+    if (["/contractor/login", "/contractor/activate", "/contractor/reset-password"].includes(pathname)) {
+      return NextResponse.next();
+    }
+    if (pathname === "/contractor" || pathname === "/contractor/") return updateSession(request);
+    // All contractor APIs enforce authorization and company isolation in their handlers.
+    if (pathname.startsWith("/api/contractors/") || pathname === "/api/contractors") return NextResponse.next();
+    return new NextResponse("Not Found", { status: 404 });
+  }
   if (hostname === "www.studioscrubz.com") {
     const canonical = request.nextUrl.clone();
     canonical.hostname = "studioscrubz.com";
