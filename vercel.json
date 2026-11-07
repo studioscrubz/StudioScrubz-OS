@@ -3,6 +3,10 @@
     {
       "path": "/api/integrations/google-calendar/process",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/contractors/reminders",
+      "schedule": "30 16 * * *"
     }
   ]
 }
