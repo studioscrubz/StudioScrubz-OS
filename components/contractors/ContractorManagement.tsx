@@ -1,7 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
-type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null};
+type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type Opportunity={id:string;opportunity_number:string;company_id:string;service_type:string;property_address:string;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
@@ -10,7 +10,7 @@ type Invite={id:string;company_id:string;invited_email:string;status:string;deli
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;assigned_crew_id:string|null};
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
-type Data={role:string;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Data={role:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];jobs:Job[];invoices:Invoice[];documents:Document[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages"|"invitations";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -23,6 +23,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
  const [status,setStatus]=useState("All"),[query,setQuery]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
+ const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  const [inviteEmail,setInviteEmail]=useState(""),[inviteRole,setInviteRole]=useState("Company Admin");
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
@@ -107,6 +108,37 @@ export function ContractorManagement({view}: {view:ContractorView}){
    {selectedCompany&&<Panel title={`Manage ${selectedCompany.name}`}><div className="space-y-3 text-sm">
     <p>Contact: {selectedCompany.contact_name||"Not supplied"}</p><p>Email: {selectedCompany.contact_email}</p><p>Terms: {selectedCompany.payment_terms||"Not specified"}</p>
     <p>Status: <b>{selectedCompany.status}</b></p>
+    <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit partner terms, territory and rates</summary>
+     <form className="mt-3 space-y-3" onSubmit={async e=>{
+      e.preventDefault();
+      try{
+       const rates=JSON.parse(companyEdit.proposed_rates??JSON.stringify(selectedCompany.proposed_rates??{}));
+       const negotiated=JSON.parse(companyEdit.negotiated_rates??JSON.stringify(selectedCompany.negotiated_rates??{}));
+       await run("updateCompany",{companyId:selectedCompany.id,
+        contact_name:companyEdit.contact_name??selectedCompany.contact_name,
+        phone:companyEdit.phone??selectedCompany.phone,
+        payment_terms:companyEdit.payment_terms??selectedCompany.payment_terms,
+        territories:(companyEdit.territories??selectedCompany.territories.join(",")).split(",").map(x=>x.trim()).filter(Boolean),
+        service_types:(companyEdit.service_types??selectedCompany.service_types.join(",")).split(",").map(x=>x.trim()).filter(Boolean),
+        proposed_rates:rates,negotiated_rates:negotiated,
+        assigned_manager_id:companyEdit.assigned_manager_id??selectedCompany.assigned_manager_id,
+       });
+      }catch(e){setError(e instanceof Error?e.message:"Check rate-card JSON format");}
+     }}>
+      {(["contact_name","phone","payment_terms","territories","service_types"] as const).map(key=><label key={key} className="block text-xs font-bold">
+       {({contact_name:"Primary contact",phone:"Phone",payment_terms:"Payment terms",territories:"Service territories (comma-separated)",service_types:"Cleaning work types (comma-separated)"} as Record<string,string>)[key]}
+       <input className={input} value={companyEdit[key]??(Array.isArray(selectedCompany[key])?selectedCompany[key].join(","):selectedCompany[key]??"")} onChange={e=>setCompanyEdit(v=>({...v,[key]:e.target.value}))}/></label>)}
+      <label className="block text-xs font-bold">Assigned Operations Manager<select className={input}
+       value={companyEdit.assigned_manager_id??selectedCompany.assigned_manager_id??""}
+       onChange={e=>setCompanyEdit(v=>({...v,assigned_manager_id:e.target.value}))}>
+       <option value="">Unassigned</option>{data?.managers.map(m=><option key={m.id} value={m.id}>{m.display_name||m.email} ({m.role})</option>)}</select></label>
+      {(["proposed_rates","negotiated_rates"] as const).map(key=><label key={key} className="block text-xs font-bold">
+       {key==="proposed_rates"?"Proposed rates (JSON)":"Negotiated rates (JSON)"}
+       <textarea rows={3} className={input} value={companyEdit[key]??JSON.stringify(selectedCompany[key]??{},null,2)}
+        onChange={e=>setCompanyEdit(v=>({...v,[key]:e.target.value}))}/></label>)}
+      <button className={button} disabled={busy}>Save company details</button>
+     </form>
+    </details>
     {data?.role==="Master Admin"&&<div className="flex flex-wrap gap-2">{["Active","Pending","Suspended","Archived"].map(status=><button key={status} type="button" disabled={busy||status===selectedCompany.status}
      onClick={()=>void run("updateCompany",{companyId:selectedCompany.id,status})} className={secondary}>{status}</button>)}</div>}
     {data?.role==="Manager"&&selectedCompany.status==="Pending"&&<button className={secondary} disabled={busy} onClick={()=>void run("updateCompany",{companyId:selectedCompany.id,status:"Active"})}>Activate verified company</button>}
