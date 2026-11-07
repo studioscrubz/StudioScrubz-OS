@@ -2,12 +2,22 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
-export async function updateSession(request: NextRequest) {
+export async function updateSession(request: NextRequest, { partnerEntry = false } = {}) {
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!url || !publishableKey) return response;
+  function partnerPage(authenticated: boolean) {
+    const destination = request.nextUrl.clone();
+    destination.pathname = authenticated ? "/contractor" : "/contractor/login";
+    const rewrite = NextResponse.rewrite(destination, { request });
+    for (const cookie of response.cookies.getAll()) rewrite.cookies.set(cookie);
+    rewrite.headers.set("Cache-Control", "private, no-store");
+    rewrite.headers.set("Referrer-Policy", "no-referrer");
+    return rewrite;
+  }
+
+  if (!url || !publishableKey) return partnerEntry ? partnerPage(false) : response;
 
   const supabase = createServerClient<Database>(url, publishableKey, {
     cookies: {
@@ -21,6 +31,7 @@ export async function updateSession(request: NextRequest) {
   });
 
   const { data, error } = await supabase.auth.getClaims();
+  if (partnerEntry) return partnerPage(!error && Boolean(data?.claims));
   const isLogin = request.nextUrl.pathname === "/login";
   const isPublicDocument = request.nextUrl.pathname === "/request-estimate"
     || request.nextUrl.pathname === "/api/webhooks/square"

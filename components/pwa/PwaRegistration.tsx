@@ -1,11 +1,12 @@
 "use client";
 
+import { isPartnerHost } from "@/lib/contractors/host";
 import { useEffect } from "react";
 import { registerStudioScrubzServiceWorker } from "@/lib/services/pushNotifications";
 
 export function PwaRegistration() {
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || process.env.NODE_ENV !== "production") return;
+    if (isPartnerHost(window.location.host) || !("serviceWorker" in navigator) || process.env.NODE_ENV !== "production") return;
     const register = () => registerStudioScrubzServiceWorker()
       .then((registration) => registration.update())
       .catch((error: unknown) => console.error("StudioScrubz service worker registration failed", error));

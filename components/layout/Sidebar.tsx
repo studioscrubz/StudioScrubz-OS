@@ -204,6 +204,30 @@ const navItems: Array<NavLink | NavGroup> = [
 
   {
 
+    label: "Operations",
+
+    marker: "O",
+
+    children: [
+
+      { label: "Contractor Dashboard", href: "/contractors", marker: "D", permission: "contractors.view" },
+
+      { label: "Partner Companies", href: "/contractors/companies", marker: "P", permission: "contractors.view" },
+
+      { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
+
+      { label: "Subcontracted Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
+
+      { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
+
+      { label: "Invitations & Access", href: "/contractors/invitations", marker: "I", permission: "contractors.manage" },
+
+    ],
+
+  },
+
+  {
+
     label: "Jobs",
 
     marker: "J",

@@ -1,0 +1,29 @@
+name: Contractor isolation and workflow PostgreSQL release gate
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contractor-native-postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Start native PostgreSQL
+        run: sudo systemctl start postgresql.service
+      - name: Build disposable contractor schema fixture
+        run: |
+          sudo -u postgres createdb studioscrubz_contractor_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/tests/contractor_management_fixture.sql
+      - name: Apply exact reviewed migration files
+        run: |
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/migrations/20261107160000_contractor_management_foundation.sql
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/migrations/20261107161000_contractor_invitation_job_handoff.sql
+      - name: Load the existing completed-Job invoicing RPC
+        run: sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/migrations/20261027205000_fix_completed_job_addon_invoice_repair.sql
+      - name: Assert tenant isolation, invitation expiry, handoff rollback, and invoice idempotency
+        run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/tests/contractor_management_postgres.sql
