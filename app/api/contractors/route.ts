@@ -16,6 +16,38 @@ async function body(request:Request):Promise<Input>{
  if(!obj||Array.isArray(obj)||typeof obj!=="object")throw new ContractorAccessError("Invalid request.",400);
  return obj as Input;
 }
+type LinkedJobStatus = {id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at?:string|null};
+type LinkedInvoiceStatus = {id:string;job_id:string;status:string;total:number;amount_paid:number};
+function effectiveOpportunityStatuses<T extends {id:string;status:string;linked_job_id:string|null;quality_approved_at?:string|null}>(
+  opportunities:T[],jobs:LinkedJobStatus[],invoices:LinkedInvoiceStatus[],
+):T[]{
+ const jobsById=new Map(jobs.map(j=>[j.id,j]));
+ const invoicesByJob=new Map<string,LinkedInvoiceStatus[]>();
+ for(const invoice of invoices){
+  const all=invoicesByJob.get(invoice.job_id)??[];
+  all.push(invoice);invoicesByJob.set(invoice.job_id,all);
+ }
+ return opportunities.map(op=>{
+  if(!op.linked_job_id||["Declined","Cancelled","Disputed"].includes(op.status))return op;
+  const job=jobsById.get(op.linked_job_id);
+  if(!job)return op;
+  let status=op.status;
+  if(job.status==="Cancelled"||job.status==="Archived")status="Cancelled";
+  else if(job.status==="In Progress")status="In Progress";
+  else if(job.status==="Scheduled"||job.status==="Crew Assigned")status="Scheduled";
+  else if(job.status==="Ready to Schedule")status="Crew Assignment";
+  else if(job.status==="Completed"){
+   if(!op.quality_approved_at)status="Pending Quality Review";
+   else{
+    const linkedInvoices=invoicesByJob.get(job.id)??[];
+    if(!linkedInvoices.length)status="Completed";
+    else if(linkedInvoices.every(x=>Number(x.amount_paid)>=Number(x.total)&&Number(x.total)>0))status="Paid";
+    else status="Invoiced";
+   }
+  }
+  return {...op,status};
+ });
+}
 async function list(ctx:ContractorContext){
  const db=ctx.admin;
  if(ctx.type==="internal"){
@@ -36,7 +68,7 @@ async function list(ctx:ContractorContext){
    linkedIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date,archived_at").in("job_id",linkedIds):Promise.resolve({data:[],error:null}),
   ]);
   if(jobs.error||invoices.error)throw jobs.error??invoices.error;
-  return {role:ctx.role,companies:companies.data,opportunities:opportunities.data,offers:offers.data,messages:messages.data,
+  return {role:ctx.role,companies:companies.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,
    jobs:jobs.data,invoices:invoices.data};
  }
@@ -44,7 +76,7 @@ async function list(ctx:ContractorContext){
  const [company,opportunities,offers,messages,members,documents]=await Promise.all([
   db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status")
    .eq("id",companyId).single(),
-  db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_address,property_type,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,decision_reason,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
+  db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_address,property_type,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,decision_reason,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_offers").select("id,opportunity_id,company_id,offered_by_side,amount,pricing_basis,scope_text,message,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_messages").select("id,opportunity_id,sender_side,body,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
   db.from("contractor_members").select("id,email,member_role,is_active").eq("company_id",companyId),
@@ -57,7 +89,7 @@ async function list(ctx:ContractorContext){
   linkedIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",linkedIds).is("archived_at",null):Promise.resolve({data:[],error:null}),
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
- return {role:ctx.role,company:company.data,opportunities:opportunities.data,offers:offers.data,messages:messages.data,
+ return {role:ctx.role,company:company.data,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages:messages.data,
   members:members.data,documents:documents.data,jobs:jobs.data,invoices:invoices.data};
 }
 export async function GET(){
@@ -292,6 +324,72 @@ export async function POST(request:Request){
    const {data,error}=await session.rpc("convert_contractor_opportunity_to_job" as never,{p_opportunity_id:opp.id} as never);
    if(error)throw error;
    return noCache({jobId:data});
+  }
+  if(action==="approveQuality"){
+   requireInternal(ctx);
+   const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
+   if(!opp.linked_job_id)throw new ContractorAccessError("This opportunity has no linked operational Job.",409);
+   const {data:job,error:je}=await db.from("jobs").select("id,status,completed_at").eq("id",opp.linked_job_id).single();
+   if(je||!job||job.status!=="Completed"||!job.completed_at)
+    throw new ContractorAccessError("Complete the existing Job workflow before quality approval.",409);
+   if(opp.quality_approved_at)return noCache({ok:true,alreadyApproved:true});
+   const {data,error}=await db.from("contractor_opportunities").update({
+    quality_approved_at:new Date().toISOString(),quality_approved_by:ctx.userId,
+    status:"Completed",updated_at:new Date().toISOString(),
+   }).eq("id",opp.id).is("quality_approved_at",null).select("id").maybeSingle();
+   if(error)throw error;
+   if(!data)return noCache({ok:true,alreadyApproved:true});
+   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Quality Review Approved",
+    detail:{jobId:job.id}});
+   await notify(ctx,"Job quality review completed",`Job ${opp.opportunity_number} passed StudioScrubz quality review.`,
+    opp.company_id,opp.id,"contractor");
+   return noCache({ok:true});
+  }
+  if(action==="invoiceJob"){
+   requireInternal(ctx);
+   const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
+   if(!opp.linked_job_id||!opp.quality_approved_at)
+    throw new ContractorAccessError("Quality-approved completed contractor Job is required for invoicing.",409);
+   const {data:job,error:je}=await db.from("jobs").select("id,status").eq("id",opp.linked_job_id).single();
+   if(je||job?.status!=="Completed")throw new ContractorAccessError("Job must be completed before invoicing.",409);
+   // Reuse the existing authenticated, duplicate-aware invoicing RPC; do not
+   // insert a separate invoice or bypass its financial authorization checks.
+   const session=await createSupabaseServerClient();
+   const {data:result,error}=await session.rpc("create_completed_job_invoice",{p_job_id:job.id});
+   if(error)throw new ContractorAccessError("Existing invoice workflow rejected the request: "+error.message,409);
+   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Existing Job Invoice Reconciled",
+    detail:{jobId:job.id,created:result?.created===true,invoiceId:result?.invoice_id}});
+   return noCache({invoice:result});
+  }
+  if(action==="cancelOpportunity"||action==="disputeOpportunity"||action==="requestReschedule"){
+   const opp=ctx.type==="internal"?await internalOpportunity(ctx,uuid(input.opportunityId)):
+    await partnerOpportunity(ctx,uuid(input.opportunityId));
+   const reason=required(input.reason,"reason",2000);
+   if(reason.length<8)throw new ContractorAccessError("Provide a meaningful reason.",400);
+   if(action==="cancelOpportunity"&&opp.linked_job_id)
+    throw new ContractorAccessError("Accepted Jobs must be cancelled through the protected StudioScrubz Job workflow.",409);
+   if(action==="cancelOpportunity"&&["Declined","Paid","Cancelled"].includes(opp.status))
+    throw new ContractorAccessError("This opportunity can no longer be cancelled.",409);
+   const nextStatus=action==="cancelOpportunity"?"Cancelled":action==="disputeOpportunity"?"Disputed":null;
+   if(nextStatus){
+    const {error}=await db.from("contractor_opportunities").update({
+     status:nextStatus,updated_at:new Date().toISOString(),
+     ...(nextStatus==="Cancelled"?{cancelled_at:new Date().toISOString()}:{}),
+    }).eq("id",opp.id);
+    if(error)throw error;
+   }
+   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,
+    type:action==="cancelOpportunity"?"Opportunity Cancelled":action==="disputeOpportunity"?"Job Disputed":"Reschedule Requested",
+    detail:{reason,requestedBy:ctx.type}});
+   const {error:me}=await db.from("contractor_messages").insert({
+    company_id:opp.company_id,opportunity_id:opp.id,sender_id:ctx.userId,
+    sender_side:ctx.type==="internal"?"StudioScrubz":"Contractor",body:reason,
+   });
+   if(me)throw me;
+   await notify(ctx,action==="cancelOpportunity"?"Opportunity cancelled":action==="disputeOpportunity"?"Job dispute":"Reschedule request",
+    `A partner workflow action needs review for ${opp.opportunity_number}.`,opp.company_id,opp.id,
+    ctx.type==="internal"?"contractor":"internal");
+   return noCache({ok:true});
   }
   if(action==="requestStaff"){
    requirePartner(ctx);
