@@ -42,7 +42,7 @@ export function ContractorPortal(){
   if(res.status===401){router.replace(contractorPage("/login"));return;}
   if(!res.ok){setData(null);throw new Error(body.error??"Company account unavailable");}
   if(!["Member","Company Admin"].includes(body.role))throw new Error("Contractor portal access is required.");
-  setData(body);setOpportunityId(current=>current||body.opportunities?.[0]?.id||"");
+  setData(body);setOpportunityId(current=>body.opportunities?.some((request:Opportunity)=>request.id===current)?current:body.opportunities?.[0]?.id||"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
  useEffect(()=>{
@@ -139,7 +139,13 @@ export function ContractorPortal(){
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>
     <PortalPanel title={chosen?.opportunity_number??"Select an opportunity"}>{chosen&&<div className="space-y-3 text-sm">
           {chosen.property_name&&<p><b>Name:</b> {chosen.property_name}</p>}
-     {canEdit&&<div><button type="button" className={secondary} onClick={()=>editJob(chosen)}>Edit request</button>
+     {canEdit&&<div><div className="flex flex-wrap gap-2">
+      <button type="button" className={secondary} disabled={busy} onClick={()=>editJob(chosen)}>Edit request</button>
+      <button type="button" className={`${secondary} text-red-700`} disabled={busy} onClick={async()=>{
+       if(!window.confirm(`Delete request ${chosen.opportunity_number}? StudioScrubz will stop reviewing it.`))return;
+       const result=await action("cancelOpportunity",{opportunityId:chosen.id,updatedAt:chosen.updated_at});
+       if(result)setNotice("Request deleted.");
+      }}>Delete request</button></div>
       <p className="mt-1 text-xs text-neutral-600">Changes return this request to Operations for review and clear any previous confirmation.</p></div>}
      {(chosen.linked_job_id||chosen.internal_confirmed_at)&&<p className="font-bold text-[#143d1a]">Approved request · editing locked</p>}
      <p><b>Service:</b> {chosen.service_type}</p><p><b>Address:</b> {chosen.property_address}</p>
@@ -161,7 +167,6 @@ export function ContractorPortal(){
       <label className="block text-sm font-semibold">Describe your request or concern<textarea className={input} rows={2} value={exceptionReason} onChange={e=>setExceptionReason(e.target.value)}/></label>
       <div className="mt-2 flex flex-wrap gap-2">
        <button type="button" className={secondary} disabled={busy||exceptionReason.trim().length<8} onClick={()=>void action("requestReschedule",{opportunityId:chosen.id,reason:exceptionReason})}>Request reschedule</button>
-       {!chosen.linked_job_id&&<button type="button" className={secondary} disabled={busy||exceptionReason.trim().length<8} onClick={()=>void action("cancelOpportunity",{opportunityId:chosen.id,reason:exceptionReason})}>Cancel opportunity</button>}
        <button type="button" className={secondary} disabled={busy||exceptionReason.trim().length<8} onClick={()=>void action("disputeOpportunity",{opportunityId:chosen.id,reason:exceptionReason})}>Open dispute</button>
       </div>
       <p className="mt-2 text-xs text-neutral-500">Accepted Jobs can only be cancelled or rescheduled by StudioScrubz Operations.</p>

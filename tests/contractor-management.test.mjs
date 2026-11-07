@@ -188,3 +188,16 @@ test("contractor requests require a residential name and use a guarded revision 
  assert.match(review,/v_pr\.request_revision<>v_op\.request_revision/);
  assert.match(attention,/get_my_contractor_request_reviews/);
 });
+
+test("contractors can withdraw only their own unlocked requests and preserve the OS record",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ const withdrawal=api.split('if(action==="cancelOpportunity"&&ctx.type==="partner"){')[1]
+  .split('if(action==="cancelOpportunity"||')[0];
+ assert.match(withdrawal,/partnerOpportunity\(ctx,uuid\(input\.opportunityId\)\)/);
+ assert.match(withdrawal,/opp\.submitted_by!==ctx\.userId/);
+ assert.match(withdrawal,/input\.updatedAt!==opp\.updated_at/);
+ assert.match(withdrawal,/\.update\(\{status:"Cancelled",cancelled_at:now,updated_at:now\}\)/);
+ assert.match(withdrawal,/\.eq\("company_id",ctx\.companyId\)\.eq\("submitted_by",ctx\.userId\)[\s\S]*?\.eq\("updated_at",opp\.updated_at\)\.in\("status",editableContractorRequestStatuses\)[\s\S]*?\.is\("linked_job_id",null\)\.is\("internal_confirmed_at",null\)/);
+ assert.match(api,/\.or\("status\.neq\.Cancelled,linked_job_id\.not\.is\.null"\)/);
+ assert.match(portal,/\{canEdit&&[\s\S]*?window\.confirm[\s\S]*?Delete request<\/button>/);
+});
