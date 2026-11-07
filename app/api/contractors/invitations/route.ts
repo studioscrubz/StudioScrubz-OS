@@ -1,4 +1,6 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { randomBytes,createHash } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -101,9 +103,11 @@ export async function POST(request:Request){
   const activationUrl=`${origin}${activationPath}?token=${token}`;
   let sent;
   try {
+   const iphoneGuide=await readFile(join(process.cwd(),"assets/email/contractor-portal-iphone-guide.jpg"));
    sent=await sendResendEmail({recipientEmail:email,subject:"StudioScrubz Contractor Portal Invitation",
-    text:`You have been invited to join ${company.name} on the StudioScrubz Contractor Portal. Activate your account within seven days: ${activationUrl}`,
-    html:`<p>Your company has been invited to use the StudioScrubz Contractor Portal.</p><p><a href="${activationUrl}" style="display:inline-block;background:#143d1a;color:white;padding:12px 18px;text-decoration:none">Activate contractor account</a></p><p>Invitation expires in seven days. If you did not expect this invitation, ignore this message.</p>`,
+    text:`You have been invited to join ${company.name} on the StudioScrubz Contractor Portal. Activate your account within seven days: ${activationUrl}\n\nUsing an iPhone? After activation, follow the attached guide to add the portal to your Home Screen.`,
+    html:`<p>Your company has been invited to use the StudioScrubz Contractor Portal.</p><p><a href="${activationUrl}" style="display:inline-block;background:#143d1a;color:white;padding:12px 18px;text-decoration:none">Activate contractor account</a></p><p>Invitation expires in seven days. If you did not expect this invitation, ignore this message.</p><p>Using an iPhone? After activation, follow the attached guide to add the portal to your Home Screen.</p>`,
+    attachments:[{filename:"StudioScrubz Contractor Portal iPhone Guide.jpg",content:iphoneGuide.toString("base64"),contentType:"image/jpeg"}],
     idempotencyKey:`contractor-invitation:${invite.id}`,...resolveEmailSenderProfile("contractorInvitation")});
   }catch(error){
    await ctx.admin.from("contractor_invitations").update({delivery_status:"Failed"}).eq("id",invite.id);
