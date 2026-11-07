@@ -98,7 +98,25 @@ export function ContractorManagement({view}: {view:ContractorView}){
    href={v==="dashboard"?"/contractors":`/contractors/${v==="companies"?"companies":v==="opportunities"?"opportunities":v==="jobs"?"jobs":v==="messages"?"messages":"invitations"}`}
    className={view===v?button:secondary}>{titles[v]}</Link>)}</div>
   {view==="dashboard"&&<><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs font-semibold text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
-  <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies} select={setOpportunityId}/></>}
+  <h2 className="text-lg font-extrabold">Partner performance & receivables</h2>
+   <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[670px] text-left text-sm">
+   <thead className="bg-[#143d1a] text-white"><tr>{["Partner","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
+   <tbody>{companies.map(c=>{
+    const opps=allOpportunities.filter(o=>o.company_id===c.id),jobIds=new Set(opps.map(o=>o.linked_job_id).filter(Boolean));
+    const linkedInvoices=data?.invoices.filter(inv=>jobIds.has(inv.job_id))??[];
+    const completed=opps.filter(o=>data?.jobs.some(job=>job.id===o.linked_job_id&&job.status==="Completed")).length;
+    const projectedGrossProfit=opps.reduce((total,op)=>{
+     const profit=data?.assessments.find(a=>a.opportunity_id===op.id)?.projection.grossProfit;
+     return total+(typeof profit==="number"&&Number.isFinite(profit)?profit:0);
+    },0);
+    return <tr key={c.id} className="border-t"><td className="p-3 font-bold">{c.name}</td><td className="p-3">{opps.length}</td>
+     <td className="p-3">{opps.filter(o=>Boolean(o.linked_job_id)).length}</td><td className="p-3">{completed}</td>
+     <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Number(inv.total),0))}</td>
+     <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Math.max(0,Number(inv.total)-Number(inv.amount_paid)),0))}</td>
+     <td className="p-3">{currency(projectedGrossProfit)} <span className="text-xs text-neutral-500">(estimate)</span></td></tr>;
+   })}</tbody></table>
+   {!companies.length&&<p className="p-4 text-sm text-neutral-500">No partner companies have been added.</p>}</div>
+   <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies} select={setOpportunityId}/></>}
   {view==="companies"&&<section className="grid gap-5 lg:grid-cols-2">
    <Panel title="Create partner company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
     <Field label="Company name" value={companyName} set={setCompanyName} required/>
