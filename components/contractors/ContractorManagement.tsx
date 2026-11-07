@@ -223,6 +223,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
       roundTripMiles:Number(roundTripMiles),roundTripMinutes:Number(roundTripMinutes),supplies:Number(supplies),equipment:Number(equipment),overhead:Number(overhead)})}>Calculate internal profitability</button>
      {assessment&&<div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
       <p>Minimum acceptable price: <b>{currency(assessment.minimum_price)}</b></p>
+      {assessment.minimum_price!==null&&Number(selected.agreed_amount??selected.proposed_amount)<Number(assessment.minimum_price)&&
+       <p role="alert" className="mt-2 font-extrabold text-red-700">UNDERBID — Contractor compensation is below the required profitability minimum. Master Admin exception approval is mandatory.</p>}
+      {!assessment.cost_complete&&<p role="alert" className="mt-2 font-bold text-red-700">Travel or other required costs remain unverified; the opportunity cannot be accepted without a documented Master Admin exception.</p>}
       <p>Projected gross margin: <b>{assessment.projected_margin==null?"Unavailable":`${assessment.projected_margin}%`}</b></p>
       <p>Cost coverage: <b>{assessment.cost_complete?"Complete":"Incomplete – cannot accept without Master Admin override"}</b></p>
       <p>Override: {assessment.override_approved_by?"Approved with audited reason":"Not approved"}</p></div>}
