@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
-type Opportunity={id:string;opportunity_number:string;company_id:string;service_type:string;property_address:string;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
+type Opportunity={id:string;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
@@ -23,6 +23,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
  const [status,setStatus]=useState("All"),[query,setQuery]=useState("");
+ const [serviceFilter,setServiceFilter]=useState("All"),[managerFilter,setManagerFilter]=useState("All"),[fromDate,setFromDate]=useState(""),[toDate,setToDate]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  useEffect(()=>{setCompanyEdit({});},[companyId]);
@@ -68,7 +69,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const selectedCompany=companies.find(x=>x.id===companyId);
  const filtered=useMemo(()=>allOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
   &&(status==="All"||o.status===status)
-  &&(!query||[o.opportunity_number,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[allOpportunities,companyId,status,query]);
+  &&(serviceFilter==="All"||o.service_type===serviceFilter)
+  &&(managerFilter==="All"||(o.manager_id??companies.find(c=>c.id===o.company_id)?.assigned_manager_id)===managerFilter)
+  &&(!fromDate||o.requested_date>=fromDate)&&(!toDate||o.requested_date<=toDate)
+  &&(!query||[o.opportunity_number,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[allOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
  const selected=allOpportunities.find(x=>x.id===opportunityId);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
@@ -168,7 +172,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
    <div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3">{companySelect}
     <label className="text-sm font-semibold">Status<select className={input} value={status} onChange={e=>setStatus(e.target.value)}>
      {["All",...new Set(allOpportunities.map(x=>x.status))].map(x=><option key={x}>{x}</option>)}</select></label>
-    <Field label="Search" value={query} set={setQuery}/></div>
+    <Field label="Search" value={query} set={setQuery}/>
+    <label className="text-sm font-semibold">Service type<select className={input} value={serviceFilter} onChange={e=>setServiceFilter(e.target.value)}>
+     {["All",...new Set(allOpportunities.map(x=>x.service_type))].map(x=><option key={x}>{x}</option>)}</select></label>
+    <label className="text-sm font-semibold">Assigned manager<select className={input} value={managerFilter} onChange={e=>setManagerFilter(e.target.value)}>
+     <option value="All">All managers</option>{data?.managers.map(m=><option key={m.id} value={m.id}>{m.display_name||m.email}</option>)}</select></label>
+    <Field label="From date" value={fromDate} set={setFromDate} type="date"/>
+    <Field label="To date" value={toDate} set={setToDate} type="date"/>
+   </div>
    <OpportunityTable rows={view==="jobs"?filtered.filter(x=>Boolean(x.linked_job_id)):filtered} companies={companies} select={setOpportunityId}/>
    {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
