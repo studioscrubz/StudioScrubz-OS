@@ -122,6 +122,19 @@ export async function POST(request:Request){
    for(const [key,max] of [["contact_name",160],["phone",60],["business_address",500],["payment_terms",500]] as const)
     if(Object.prototype.hasOwnProperty.call(input,key))changes[key]=optional(input[key],max);
    if(input.contact_email!==undefined)changes.contact_email=required(input.contact_email,"email",320).toLowerCase();
+   if(input.payment_terms!==undefined)changes.payment_terms=optional(input.payment_terms,500);
+   if(input.territories!==undefined){
+    if(!Array.isArray(input.territories)||input.territories.length>30||
+      !input.territories.every(x=>typeof x==="string"&&x.length<=100))
+     throw new ContractorAccessError("Invalid service territory list.",400);
+    changes.territories=input.territories;
+   }
+   if(input.service_types!==undefined){
+    if(!Array.isArray(input.service_types)||input.service_types.length>30||
+      !input.service_types.every(x=>typeof x==="string"&&x.length<=100))
+     throw new ContractorAccessError("Invalid cleaning work types.",400);
+    changes.service_types=input.service_types;
+   }
    if(ctx.type==="internal"){
     if(input.name!==undefined)changes.name=required(input.name,"name",200);
     if(input.status!==undefined){
@@ -151,7 +164,8 @@ export async function POST(request:Request){
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
    const proposed=money(input.amount,"proposed payment");
-   const externalRef=optional(input.externalReference,100);
+   // Require a stable submission key so browser retries cannot create duplicate jobs.
+   const externalRef=uuid(input.externalReference);
    const {data,error}=await db.from("contractor_opportunities").insert({
     company_id:ctx.companyId,submitted_by:ctx.userId,service_type:required(input.serviceType,"service type",160),
     property_address:required(input.address,"property address",500),property_type:type,
@@ -390,6 +404,39 @@ export async function POST(request:Request){
     `A partner workflow action needs review for ${opp.opportunity_number}.`,opp.company_id,opp.id,
     ctx.type==="internal"?"contractor":"internal");
    return noCache({ok:true});
+  }
+  if(action==="sendPaymentReminder"){
+   requireInternal(ctx);
+   const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
+   if(!opp.linked_job_id)throw new ContractorAccessError("This opportunity is not linked to a Job.",409);
+   const invoiceId=uuid(input.invoiceId);
+   const {data:invoice,error:ie}=await db.from("invoices")
+    .select("id,invoice_number,total,amount_paid,due_date,status")
+    .eq("id",invoiceId).eq("job_id",opp.linked_job_id)
+    .is("archived_at",null).neq("status","Cancelled").maybeSingle();
+   if(ie||!invoice)throw new ContractorAccessError("Invoice is not linked to this contractor Job.",404);
+   const outstanding=Math.max(0,Number(invoice.total)-Number(invoice.amount_paid));
+   if(outstanding<=0)throw new ContractorAccessError("There is no outstanding invoice balance.",409);
+   const {data:company,error:ce}=await db.from("contractor_companies")
+    .select("contact_email,name").eq("id",opp.company_id).single();
+   if(ce||!company?.contact_email)throw new ContractorAccessError("Contractor email is unavailable.",409);
+   const message=`Payment follow-up for invoice ${invoice.invoice_number}. Outstanding balance: ${outstanding.toFixed(2)}. Due date: ${invoice.due_date??"not specified"}. Please contact StudioScrubz Operations with payment questions.`;
+   let sent;
+   try{
+    sent=await sendResendEmail({recipientEmail:company.contact_email,
+      subject:`StudioScrubz payment follow-up | ${invoice.invoice_number}`,
+      text:message,html:`<p>${message}</p>`,
+      idempotencyKey:`contractor-invoice-reminder:${invoice.id}:${crypto.randomUUID()}`,
+      replyTo:null});
+   }catch(error){
+    await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,
+      type:"Contractor Payment Reminder Failed",detail:{invoiceId:invoice.id}});
+    throw new ContractorAccessError("Email provider did not confirm reminder delivery.",503);
+   }
+   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,
+    type:"Contractor Payment Reminder Sent",
+    detail:{invoiceId:invoice.id,providerMessageId:sent.id,outstanding}});
+   return noCache({ok:true,providerMessageId:sent.id});
   }
   if(action==="requestStaff"){
    requirePartner(ctx);
