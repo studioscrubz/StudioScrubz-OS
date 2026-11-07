@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
@@ -21,7 +22,8 @@ const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberF
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
 const button="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-3 py-2 text-sm font-semibold text-[#143d1a]";
-const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Contractor Companies",opportunities:"Job Opportunities",jobs:"Subcontracted Jobs",messages:"Contractor Communications",invitations:"Invitations & Access"};
+const ContractorCalendar=dynamic(()=>import("@/components/jobs/SchedulePage").then(module=>module.SchedulePage),{loading:()=> <p role="status">Loading contractor calendar…</p>});
+const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Contractors",opportunities:"Job Opportunities",jobs:"Scheduled Jobs",messages:"Contractor Communications",invitations:"Invitations & Access"};
 export function ContractorManagement({view}: {view:ContractorView}){
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
@@ -82,6 +84,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
   &&(managerFilter==="All"||(o.manager_id??companies.find(c=>c.id===o.company_id)?.assigned_manager_id)===managerFilter)
   &&(!fromDate||o.requested_date>=fromDate)&&(!toDate||o.requested_date<=toDate)
   &&(!query||[o.opportunity_number,o.property_name,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[allOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
+ const calendarJobIds=useMemo(()=>{
+  const ids=new Set<string>();
+  if(view==="jobs"){
+   for(const opportunity of filtered){
+    if(opportunity.linked_job_id)ids.add(opportunity.linked_job_id);
+   }
+  }
+  return ids;
+ },[filtered,view]);
  const selected=allOpportunities.find(x=>x.id===opportunityId);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
@@ -91,7 +102,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   ["New opportunities",count(["New Opportunity","Information Requested"])],
   ["Negotiating / awaiting reply",count(["Negotiating","Awaiting Approval"])],
   ["Awaiting crew",count(["Accepted","Crew Assignment"])],
-  ["Upcoming subcontracted jobs",data?.jobs.filter(x=>["Scheduled","Crew Assigned","Ready to Schedule"].includes(x.status)).length??0],
+  ["Upcoming contractor jobs",data?.jobs.filter(x=>["Scheduled","Crew Assigned","Ready to Schedule"].includes(x.status)).length??0],
   ["Pending quality review",count(["Pending Quality Review"])],
   ["Completed / awaiting invoicing",allOpportunities.filter(x=>x.linked_job_id&&data?.jobs.find(j=>j.id===x.linked_job_id)?.status==="Completed"
     &&!data.invoices.some(inv=>inv.job_id===x.linked_job_id)).length],
@@ -110,7 +121,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  return <main className="space-y-6 p-4 md:p-7">
   <header><p className="text-xs font-extrabold uppercase tracking-wider text-[#a08020]">Operations / Contractor Management</p>
   <h1 className="mt-1 text-3xl font-extrabold text-[#143d1a]">{titles[view]}</h1>
-  <p className="mt-2 text-sm text-neutral-600">Contractor relationships and job delivery, integrated with StudioScrubz operations.</p></header>
+  <p className="mt-2 text-sm text-neutral-600">{view==="jobs"?"View scheduled contractor work on the OS calendar and manage accepted jobs that still need scheduling.":view==="opportunities"?"Review incoming contractor requests, negotiate terms, and approve work for scheduling.":"Contractor relationships and job delivery, integrated with StudioScrubz operations."}</p></header>
   {error&&<p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-lg border border-green-200 bg-green-50 p-3 text-[#143d1a]">{notice}</p>}
   <div className="flex flex-wrap gap-2">{(Object.keys(titles) as ContractorView[]).map((v)=><Link key={v}
@@ -210,6 +221,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <Field label="From date" value={fromDate} set={setFromDate} type="date"/>
     <Field label="To date" value={toDate} set={setToDate} type="date"/>
    </div>
+   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds}/>}
    <OpportunityTable rows={view==="jobs"?filtered.filter(x=>Boolean(x.linked_job_id)):filtered} companies={companies} select={setOpportunityId}/>
    {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
