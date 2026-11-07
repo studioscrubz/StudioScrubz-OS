@@ -250,3 +250,5 @@ Contractor relation inventory (unapplied): contractor_companies, contractor_memb
 Contractor communications (unapplied): contractor_message_reads, contractor_contact_attempts, contractor_followups are defined and RLS-protected in 20261107160000_contractor_management_foundation.sql; server-only reads/writes are handled by the contractor API with company-scoped authorization. No production migration has been applied.
 
 Contractor scheduled notifications (unapplied): contractor_notification_deliveries is created and RLS-protected by 20261107160000_contractor_management_foundation.sql. The CRON_SECRET-protected /api/contractors/reminders route uses provider receipt IDs, event-key uniqueness, a weekly invoice reminder cadence and daily internal operational digests. Requires production approval before Vercel cron activation.
+
+Private contractor messaging uses the service-role-only `contractor_private_messages` table in `20261107192154_contractor_private_messages.sql`. Each row binds a contractor profile to its assigned Operations Manager, with recipient read state recorded on the row. The API keeps historical shared threads outside the private inbox.

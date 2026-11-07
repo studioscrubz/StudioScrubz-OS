@@ -265,3 +265,19 @@ do $$ begin
   raise exception 'Existing invoice failed to use the negotiated Contractor Job compensation';
  end if;
 end $$;
+
+\ir ../migrations/20261107192154_contractor_private_messages.sql
+
+do $$
+begin
+ if has_table_privilege('authenticated','public.contractor_private_messages','SELECT')
+    or has_table_privilege('authenticated','public.contractor_private_messages','INSERT')
+    or has_table_privilege('anon','public.contractor_private_messages','SELECT')
+    or has_table_privilege('authenticated','public.contractor_messages','SELECT') then
+  raise exception 'Private or historical contractor messages are reachable by browser roles';
+ end if;
+ if not has_table_privilege('service_role','public.contractor_private_messages','SELECT,INSERT,UPDATE') then
+  raise exception 'The contractor server cannot store or read private conversations';
+ end if;
+end
+$$;
