@@ -3,7 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
-type DirectoryEntry={clientId:string;companyId:string|null;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string|null};
+type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
 type Opportunity={id:string;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;partner_user_id:string;read_at:string|null;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
@@ -149,14 +149,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <Field label="Primary contact" value={companyContact} set={setCompanyContact}/>
     <button disabled={busy} className={button}>Create Company</button></form></Panel>
    <Panel title="Active contractor directory"><div className="space-y-2">
-    {data?.directory.map(entry=>{
-     const details=<><b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>
-      <small className="block text-neutral-500">Portal access: {entry.portalStatus??"Not set up"}</small></>;
-     const className="block w-full rounded-lg border bg-white p-3 text-left";
-     return entry.companyId
-      ?<button key={entry.clientId} type="button" className={`${className} hover:border-[#143d1a]`} onClick={()=>setCompanyId(entry.companyId??"")}>{details}</button>
-      :<div key={entry.clientId} className={className}>{details}</div>;
-    })}
+    {data?.directory.map(entry=><button key={entry.clientId} type="button" className="block w-full rounded-lg border bg-white p-3 text-left hover:border-[#143d1a]" onClick={()=>setCompanyId(entry.companyId)}>
+     <b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>
+     <small className="block text-neutral-500">Portal access: {entry.portalStatus}</small>
+    </button>)}
     {!data?.directory.length&&<p className="text-sm text-neutral-500">No active contractor clients found.</p>}
    </div></Panel>
    <Panel title="Manage portal access">{companySelect}</Panel>

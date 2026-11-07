@@ -117,14 +117,14 @@ async function list(ctx:ContractorContext){
   const portalByClient=new Map((companies.data??[]).map(company=>[company.client_id,company]));
   const directory=(activeClients.data??[]).flatMap(client=>{
    const portal=portalByClient.get(client.id);
-   if(portal?.status==="Archived"||portal?.status==="Suspended")return [];
+   if(!portal||portal.status==="Archived"||portal.status==="Suspended")return [];
    const contactName=[client.first_name,client.last_name].filter(Boolean).join(" ");
    return [{
-    clientId:client.id,companyId:portal?.id??null,
-    name:client.company_name?.trim()||contactName||portal?.name||"Unnamed contractor",
-    contactName:portal?.contact_name?.trim()||contactName,
-    email:portal?.contact_email?.trim()||client.email,
-    phone:portal?.phone?.trim()||client.phone,portalStatus:portal?.status??null,
+    clientId:client.id,companyId:portal.id,
+    name:client.company_name?.trim()||contactName||portal.name,
+    contactName:portal.contact_name?.trim()||contactName,
+    email:portal.contact_email?.trim()||client.email,
+    phone:portal.phone?.trim()||client.phone,portalStatus:portal.status,
    }];
   }).sort((a,b)=>a.name.localeCompare(b.name));
   return {role:ctx.role,companies:companies.data,directory,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
