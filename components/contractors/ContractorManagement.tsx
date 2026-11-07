@@ -132,6 +132,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
      className="flex w-full items-center justify-between rounded-lg border bg-white p-3 text-left hover:border-[#143d1a]"><span><b>{c.name}</b><small className="block text-neutral-500">{c.contractor_code} · {c.contact_email}</small></span><span>{c.status}</span></button>)}</div></Panel>
    {selectedCompany&&<Panel title={`Manage ${selectedCompany.name}`}><div className="space-y-3 text-sm">
     <p>Contact: {selectedCompany.contact_name||"Not supplied"}</p><p>Email: {selectedCompany.contact_email}</p><p>Terms: {selectedCompany.payment_terms||"Not specified"}</p>
+    <p><b>Company documents:</b></p>
+    {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><button key={d.id}
+      type="button" className="mr-3 text-sm text-[#143d1a] underline" onClick={()=>void openDocument(d.id)}>{d.file_name} ({d.category})</button>)}
+
     <p>Status: <b>{selectedCompany.status}</b></p>
     <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit partner terms, territory and rates</summary>
      <form className="mt-3 space-y-3" onSubmit={async e=>{
