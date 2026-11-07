@@ -142,7 +142,6 @@ export function buildVendorCapabilityDocumentModel(input: BuildCapabilityStateme
   const corporateData: CapabilityDataEntry[] = [
     ...verifiedCorporateData,
     { label: "Commercial General Liability", value: "Spinnaker Insurance Company; policy CSG-00596658-00; $1,000,000 each occurrence / $2,000,000 general aggregate." },
-    { label: "City of Los Angeles Business Tax Registration Certificate (BTRC)", value: "Registration number not provided; verify before vendor submission." },
   ];
   const overview = statement
     ? (profile && clean(profile.overview) ? [clean(profile.overview)] : [...intro])

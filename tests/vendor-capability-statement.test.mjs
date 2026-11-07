@@ -68,7 +68,7 @@ test("corporate statement omits empty and unverified identifiers and claims", ()
   const empty = capability.buildVendorCapabilityDocumentModel(baseInput(emptyProfile()));
   assert.equal(empty.documentKind, "corporate-capability-statement");
   assert.equal(empty.documentVersion, "corporate-capability-statement-v1");
-  assert.equal(empty.corporateData.length, 2);
+  assert.equal(empty.corporateData.length, 1);
   assert.equal(empty.pastPerformance.length, 0);
   assert.equal(empty.serviceAreas.length, 0);
   assert.equal(empty.business.contactName, null);
@@ -81,7 +81,7 @@ test("corporate statement omits empty and unverified identifiers and claims", ()
     cageCode: "BAD99",
     certifications: ["Unverified claim"],
   }));
-  assert.equal(invalidVersion.corporateData.length, 2);
+  assert.equal(invalidVersion.corporateData.length, 1);
   const rendered = email.renderCapabilityDocumentEmail({ model: empty, message: "Please review." });
   assert.doesNotMatch(rendered.html, /Unique Entity ID|CAGE Code|NAICS Codes|Certifications|Past Performance/);
 });
@@ -284,15 +284,16 @@ test("Send action always uses the currently previewed document", () => {
   assert.doesNotMatch(ui, />Email Packet<\/button>/);
 });
 
-test("vendor packet and capability statement retain insurance and BTRC without CSLB claims", () => {
+test("vendor packet and capability statement retain insurance while omitting BTRC and CSLB placeholders", () => {
   for (const documentKind of ["corporate-capability-statement","service-packet"]) {
     const model = capability.buildVendorCapabilityDocumentModel({ ...baseInput(emptyProfile()), documentKind });
     const facts = Object.fromEntries(model.corporateData.map(entry => [entry.label,entry.value]));
     assert.match(facts["Commercial General Liability"], /Spinnaker Insurance Company/);
     assert.doesNotMatch(facts["Commercial General Liability"], /Policy dates|Coverage subject to|certificate available on request/);
-    assert.match(facts["City of Los Angeles Business Tax Registration Certificate (BTRC)"], /Registration number not provided/);
+    assert.equal(facts["City of Los Angeles Business Tax Registration Certificate (BTRC)"], undefined);
     const rendered = email.renderCapabilityDocumentEmail({ model, message: "Vendor information" });
-    assert.match(rendered.text,/Business Tax Registration Certificate \(BTRC\)/);
+    assert.doesNotMatch(rendered.text,/Business Tax Registration Certificate|Registration number not provided/i);
+    assert.doesNotMatch(rendered.html,/Business Tax Registration Certificate|Registration number not provided/i);
     assert.match(rendered.text,/Spinnaker Insurance Company/);
     assert.doesNotMatch(rendered.text,/CSLB|contractor.s license|licensing review/i);
     assert.doesNotMatch(rendered.html,/CSLB|contractor.s license|licensing review/i);
@@ -300,7 +301,7 @@ test("vendor packet and capability statement retain insurance and BTRC without C
     if(documentKind === "service-packet") {
       const pdfText = pdf.generateServiceCapabilityPacketPdf(model).toString("ascii");
       assert.match(pdfText,/Vendor registration and insurance/i);
-      assert.match(pdfText,/Business Tax Registration Certificate/);
+      assert.doesNotMatch(pdfText,/Business Tax Registration Certificate|Registration number not provided/i);
       assert.match(pdfText,/Spinnaker Insurance Company/);
     }
   }
