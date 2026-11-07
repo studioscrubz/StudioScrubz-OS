@@ -9,7 +9,7 @@ type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;cr
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at:string|null};
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
-type Portal={role:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];members:Array<{id:string;email:string;member_role:string;is_active:boolean}>;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Portal={role:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];members:Array<{id:string;email:string;member_role:string;is_active:boolean}>;jobs:Job[];invoices:Invoice[];documents:Document[];unread:Record<string,number>};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -130,7 +130,9 @@ export function ContractorPortal(){
    </div>}
    {data&&tab==="messages"&&<div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
     <PortalPanel title="Conversation"><select className={input} value={opportunityId} onChange={e=>setOpportunityId(e.target.value)}><option value="">Company-wide messages</option>{data.opportunities.map(x=><option key={x.id} value={x.id}>{x.opportunity_number}</option>)}</select></PortalPanel>
-    <PortalPanel title="Messages"><div className="max-h-96 space-y-2 overflow-auto">{data.messages.filter(x=>x.opportunity_id===(opportunityId||null)).map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
+    <PortalPanel title="Messages"><p className="mb-2 text-sm">Unread from StudioScrubz: <b>{data.unread?.[data.company.id]??0}</b></p>
+     <button type="button" className={secondary} disabled={busy} onClick={()=>void action("markMessagesRead",{})}>Mark messages read</button>
+     <div className="mt-3 max-h-96 space-y-2 overflow-auto">{data.messages.filter(x=>x.opportunity_id===(opportunityId||null)).map(x=><div key={x.id} className="rounded-lg bg-neutral-50 p-3 text-sm"><b>{x.sender_side}</b><p className="text-xs text-neutral-500">{new Date(x.created_at).toLocaleString()}</p><p>{x.body}</p></div>)}</div>
      <label className="mt-3 block font-bold">Your message<textarea className={input} rows={3} value={message} onChange={e=>setMessage(e.target.value)}/></label>
      <button className={primary} disabled={busy||!message.trim()} onClick={async()=>{const r=await action("message",{opportunityId:opportunityId||null,message});if(r)setMessage("");}}>Send to StudioScrubz</button>
     </PortalPanel></div>}
