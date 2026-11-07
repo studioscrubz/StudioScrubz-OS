@@ -132,7 +132,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
        {!selected.quality_approved_at&&<button type="button" className={secondary} disabled={busy} onClick={()=>void run("approveQuality",{opportunityId:selected.id})}>Approve completed work</button>}
        {selected.quality_approved_at&&<button type="button" className={secondary} disabled={busy} onClick={()=>void run("invoiceJob",{opportunityId:selected.id})}>Create / reconcile existing Job invoice</button>}
      </div>}
-     {selectedInvoices.map(x=><p key={x.id}><b>Invoice:</b> {x.invoice_number}, {x.status}, {currency(x.total)} total / {currency(x.amount_paid)} paid</p>)}
+     {selectedInvoices.map(x=><div key={x.id} className="flex flex-wrap items-center gap-3">
+       <p><b>Invoice:</b> {x.invoice_number}, {x.status}, {currency(x.total)} total / {currency(x.amount_paid)} paid</p>
+       {Number(x.total)>Number(x.amount_paid)&&<button type="button" disabled={busy} className={secondary}
+        onClick={()=>void run("sendPaymentReminder",{opportunityId:selected.id,invoiceId:x.id})}>Send payment reminder</button>}
+      </div>)}
      <h3 className="font-extrabold">Negotiation history</h3>
      {data?.offers.filter(x=>x.opportunity_id===selected.id).map(x=><p key={x.id} className="rounded border p-2">{x.offered_by_side}: {currency(x.amount)} · {x.scope_text}</p>)}
     </div><div className="space-y-4">
