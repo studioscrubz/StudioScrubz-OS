@@ -24,7 +24,7 @@ export function ContractorPortal(){
  const [squareFeet,setSquareFeet]=useState(""),[bedrooms,setBedrooms]=useState(""),[bathrooms,setBathrooms]=useState("");
  const [scope,setScope]=useState(""),[condition,setCondition]=useState(""),[requestedDate,setRequestedDate]=useState(""),[requestedTime,setRequestedTime]=useState(""),[hours,setHours]=useState("");
  const [cleaners,setCleaners]=useState("2"),[amount,setAmount]=useState(""),[basis,setBasis]=useState("Flat Price"),[instructions,setInstructions]=useState(""),[access,setAccess]=useState("");
- const [file,setFile]=useState<File|null>(null),[counterAmount,setCounterAmount]=useState(""),[counterScope,setCounterScope]=useState("");
+ const [file,setFile]=useState<File|null>(null),[counterAmount,setCounterAmount]=useState(""),[counterScope,setCounterScope]=useState(""),[exceptionReason,setExceptionReason]=useState("");
  const [approvedPhotos,setApprovedPhotos]=useState<Array<{id:string;category:string;caption:string|null;url:string}>>([]);
  const reload=useCallback(async()=>{
   const res=await fetch("/api/contractors",{cache:"no-store"});const body=await res.json();
@@ -100,6 +100,15 @@ export function ContractorPortal(){
      }}>View authorized completion photos</button>
      {approvedPhotos.length>0&&<div className="mt-3 grid grid-cols-2 gap-2">{approvedPhotos.map(photo=><a href={photo.url} key={photo.id} target="_blank" rel="noreferrer" className="block rounded border p-2"><img alt={photo.caption||photo.category} src={photo.url} className="h-32 w-full object-cover"/><small>{photo.caption||photo.category}</small></a>)}</div>}</div>}
      {currentInvoices.map(inv=><p key={inv.id}><b>Invoice:</b> {inv.invoice_number} · {inv.status} · {currency(inv.total)} total · {currency(inv.amount_paid)} paid · Due {inv.due_date??"unspecified"}</p>)}
+     <div className="rounded-lg border p-3"><h3 className="mb-2 font-bold">Changes, cancellations and disputes</h3>
+      <label className="block text-sm font-semibold">Describe your request or concern<textarea className={input} rows={2} value={exceptionReason} onChange={e=>setExceptionReason(e.target.value)}/></label>
+      <div className="mt-2 flex flex-wrap gap-2">
+       <button type="button" className={secondary} disabled={busy||exceptionReason.trim().length<8} onClick={()=>void action("requestReschedule",{opportunityId:chosen.id,reason:exceptionReason})}>Request reschedule</button>
+       {!chosen.linked_job_id&&<button type="button" className={secondary} disabled={busy||exceptionReason.trim().length<8} onClick={()=>void action("cancelOpportunity",{opportunityId:chosen.id,reason:exceptionReason})}>Cancel opportunity</button>}
+       <button type="button" className={secondary} disabled={busy||exceptionReason.trim().length<8} onClick={()=>void action("disputeOpportunity",{opportunityId:chosen.id,reason:exceptionReason})}>Open dispute</button>
+      </div>
+      <p className="mt-2 text-xs text-neutral-500">Accepted Jobs can only be cancelled or rescheduled by StudioScrubz Operations.</p>
+     </div>
      <h3 className="pt-3 font-extrabold">Price negotiations</h3>
      {data.offers.filter(x=>x.opportunity_id===chosen.id).map(o=><p key={o.id} className="rounded-lg border p-3"><b>{o.offered_by_side}</b> · {currency(o.amount)}<br/>{o.scope_text}</p>)}
      {["New Opportunity","Information Requested","Negotiating"].includes(chosen.status)&&<>
