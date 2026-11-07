@@ -149,6 +149,21 @@ create table public.contractor_followups (
  completed_at timestamptz
 );
 create index contractor_followups_due_idx on public.contractor_followups(status,due_at);
+create table public.contractor_notification_deliveries (
+ id uuid primary key default gen_random_uuid(),
+ event_key text not null unique,
+ company_id uuid not null references public.contractor_companies(id) on delete restrict,
+ opportunity_id uuid references public.contractor_opportunities(id) on delete restrict,
+ invoice_id uuid references public.invoices(id) on delete restrict,
+ recipient_email text not null,
+ event_type text not null,
+ status text not null default 'Prepared' check(status in ('Prepared','Sent','Failed')),
+ provider_message_id text,
+ failure_reason text,
+ created_at timestamptz not null default now(),
+ sent_at timestamptz
+);
+create index contractor_notification_deliveries_company_idx on public.contractor_notification_deliveries(company_id,created_at desc);
 create table public.contractor_profitability (
  opportunity_id uuid primary key references public.contractor_opportunities(id) on delete restrict,
  assessed_by uuid not null references public.user_profiles(id),
@@ -197,6 +212,7 @@ alter table public.contractor_messages enable row level security;
 alter table public.contractor_message_reads enable row level security;
 alter table public.contractor_contact_attempts enable row level security;
 alter table public.contractor_followups enable row level security;
+alter table public.contractor_notification_deliveries enable row level security;
 alter table public.contractor_profitability enable row level security;
 alter table public.contractor_audit_events enable row level security;
 alter table public.contractor_documents enable row level security;
@@ -252,6 +268,8 @@ create policy contractor_contact_attempts_internal_select on public.contractor_c
  using ((select private.contractor_is_internal()));
 create policy contractor_followups_internal_select on public.contractor_followups for select to authenticated
  using ((select private.contractor_is_internal()));
+create policy contractor_notification_deliveries_internal_select on public.contractor_notification_deliveries
+ for select to authenticated using ((select private.contractor_is_internal()));
 create policy contractor_profitability_internal_select on public.contractor_profitability for select to authenticated
  using ((select private.contractor_is_internal()));
 create policy contractor_profitability_internal_write on public.contractor_profitability for insert to authenticated
@@ -274,10 +292,10 @@ revoke insert,update,delete on public.contractor_companies,public.contractor_mem
  public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
  public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
- public.contractor_followups from authenticated,anon;
+ public.contractor_followups,public.contractor_notification_deliveries from authenticated,anon;
 grant select on public.contractor_companies,public.contractor_members,
  public.contractor_invitations,public.contractor_opportunities,public.contractor_offers,
  public.contractor_messages,public.contractor_profitability,public.contractor_audit_events,
  public.contractor_documents,public.contractor_message_reads,public.contractor_contact_attempts,
- public.contractor_followups to authenticated;
+ public.contractor_followups,public.contractor_notification_deliveries to authenticated;
 
