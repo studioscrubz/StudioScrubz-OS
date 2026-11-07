@@ -43,6 +43,9 @@ test("pricing, privileged overrides, final confirmation and job idempotency are 
  assert.match(activation,/v_op\.linked_job_id is not null then return v_op\.linked_job_id/);
  assert.match(activation,/v_op\.partner_confirmed_at is null or v_op\.internal_confirmed_at is null/);
  assert.match(activation,/v_pr\.minimum_price/);
+ assert.match(activation,/v_pr\.assessed_amount<>v_op\.agreed_amount/);
+ assert.match(activation,/v_pr\.assessed_scope<>v_op\.final_scope/);
+ assert.match(api,/a\.assessed_scope!==opp\.final_scope/);
  assert.match(activation,/insert into public\.jobs/);
 });
 test("existing employee roles do not inherit contractor access, and external portal is separate",()=>{
