@@ -52,7 +52,7 @@ export function ContractorPortal(){
  if(loading)return <main className="grid min-h-screen place-items-center">Loading private contractor portal…</main>;
  return <main className="min-h-screen bg-[#f5f6f4] text-neutral-900">
   <header className="bg-[#143d1a] px-4 py-4 text-white"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
-   <div className="flex items-center gap-4"><StudioScrubzLogo size={72}/><div><h1 className="text-xl font-extrabold">Contractor Partner Portal</h1><p className="text-sm text-white/85">{data?.company.name??"StudioScrubz"}</p></div></div>
+   <div className="flex items-center gap-4"><StudioScrubzLogo size={72}/><div><h1 className="text-xl font-extrabold">Contractor Portal</h1><p className="text-sm text-white/85">{data?.company.name??"StudioScrubz"}</p></div></div>
    <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut({scope:"local"});router.replace(contractorPage("/login"))}}>Sign out</button>
   </div></header>
   <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">

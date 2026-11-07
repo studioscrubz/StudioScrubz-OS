@@ -28,7 +28,7 @@ export function ContractorLogin(){
  }
  return <main className="grid min-h-screen place-items-center bg-[#f5f6f4] p-5"><section className="w-full max-w-md rounded-2xl border bg-white p-8 shadow-sm">
   <div className="text-center"><StudioScrubzLogo size={124} className="mx-auto"/>
-  <h1 className="mt-2 text-2xl font-extrabold text-[#143d1a]">Contractor Partner Portal</h1>
+  <h1 className="mt-2 text-2xl font-extrabold text-[#143d1a]">Contractor Portal</h1>
   <p className="mt-2 text-sm text-neutral-600">Invitation-only access for authorized partner companies.</p></div>
   <form className="mt-6 space-y-4" onSubmit={signIn}><label className="block text-sm font-bold">Email<input type="email" autoComplete="email" required className="mt-1 w-full rounded-lg border p-3" value={email} onChange={e=>setEmail(e.target.value)}/></label>
    <label className="block text-sm font-bold">Password<input type="password" autoComplete="current-password" required className="mt-1 w-full rounded-lg border p-3" value={password} onChange={e=>setPassword(e.target.value)}/></label>
