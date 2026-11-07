@@ -209,6 +209,28 @@ export async function POST(request:Request){
     ctx.type==="partner"?"internal":"contractor");
    return noCache({messageId:data.id});
   }
+  if(action==="requestInformation"||action==="markNegotiating"){
+   requireInternal(ctx);
+   const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
+   if(opp.linked_job_id||["Accepted","Declined","Cancelled","Paid","Disputed"].includes(opp.status))
+    throw new ContractorAccessError("Opportunity cannot return to preacceptance workflow.",409);
+   const reason=required(input.reason,"message to partner",2000);
+   const status=action==="requestInformation"?"Information Requested":"Negotiating";
+   const {error}=await db.from("contractor_opportunities").update({
+    status,updated_at:new Date().toISOString(),
+   }).eq("id",opp.id);
+   if(error)throw error;
+   const {error:me}=await db.from("contractor_messages").insert({
+    company_id:opp.company_id,opportunity_id:opp.id,
+    sender_id:ctx.userId,sender_side:"StudioScrubz",body:reason,
+   });
+   if(me)throw me;
+   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,
+    type:status,detail:{reason}});
+   await notify(ctx,status,`StudioScrubz requested an update regarding ${opp.opportunity_number}.`,
+    opp.company_id,opp.id,"contractor");
+   return noCache({ok:true,status});
+  }
   if(action==="offer"){
    const opp=ctx.type==="internal"?await internalOpportunity(ctx,uuid(input.opportunityId)):
     await partnerOpportunity(ctx,uuid(input.opportunityId));
