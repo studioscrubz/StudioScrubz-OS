@@ -7,8 +7,9 @@ export async function GET(request:Request){
   const ctx=await contractorContext();requirePartner(ctx);
   const jobId=uuid(new URL(request.url).searchParams.get("jobId"));
   const {data:op,error:oe}=await ctx.admin.from("contractor_opportunities")
-   .select("id").eq("company_id",ctx.companyId).eq("linked_job_id",jobId).maybeSingle();
+   .select("id,quality_approved_at").eq("company_id",ctx.companyId).eq("linked_job_id",jobId).maybeSingle();
   if(oe||!op)throw new ContractorAccessError("Job is not assigned to this company.",404);
+  if(!op.quality_approved_at)throw new ContractorAccessError("Completion photos are available after StudioScrubz quality review.",403);
   const {data:invoice,error:ie}=await ctx.admin.from("invoices").select("id")
    .eq("job_id",jobId).is("archived_at",null).neq("status","Cancelled").limit(1).maybeSingle();
   if(ie)throw ie;
