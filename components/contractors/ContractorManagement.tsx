@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {useAuth} from "@/components/auth/AuthProvider";
+import {normalizeSmsPhoneNumber,openDeviceSmsApp} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
@@ -18,7 +19,7 @@ type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
-type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
+type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -39,8 +40,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [serviceFilter,setServiceFilter]=useState("All"),[managerFilter,setManagerFilter]=useState("All"),[fromDate,setFromDate]=useState(""),[toDate,setToDate]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
- useEffect(()=>{setCompanyEdit({});},[companyId]);
- const [inviteEmail,setInviteEmail]=useState("");
+ const [inviteEmail,setInviteEmail]=useState(""),[invitePhone,setInvitePhone]=useState<string|null>(null);
+ useEffect(()=>{setCompanyEdit({});setInvitePhone(null);},[companyId]);
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
  const [messagePartnerId,setMessagePartnerId]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
@@ -50,7 +51,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [contactMethod,setContactMethod]=useState("Phone"),[contactOutcome,setContactOutcome]=useState(""),[contactNotes,setContactNotes]=useState("");
  const [followupNote,setFollowupNote]=useState(""),[followupDue,setFollowupDue]=useState("");
  const refresh=useCallback(async()=>{
-  const response=await fetch("/api/contractors",{cache:"no-store"});
+  const response=await fetch(view==="dashboard"?"/api/contractors?view=dashboard":"/api/contractors",{cache:"no-store"});
   const result=await response.json();
   if(!response.ok)throw new Error(result.error??"Contractor data unavailable");
   setData(result);
@@ -72,21 +73,31 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}
   finally{setBusy(false);}
  };
- const invite=async(action:string,payload:Record<string,unknown>)=>{
+ const invite=async(action:string,payload:Record<string,unknown>,smsPhone?:string)=>{
   setBusy(true);setError("");setNotice("");
   try{
    const response=await fetch("/api/contractors/invitations",{method:"POST",headers:{"content-type":"application/json"},
     body:JSON.stringify({action,...payload})});
    const result=await response.json();
    if(!response.ok)throw new Error(result.error??"Invitation failed");
-   setNotice(result.status==="Sent"?"Email provider confirmed invitation delivery.":"Invitation updated.");
+   if(smsPhone){
+    if(typeof result.activationUrl!=="string")throw new Error("Invitation emailed. The text link was unavailable.");
+    try{
+     openDeviceSmsApp(smsPhone,`StudioScrubz invited you to the Contractor Portal. Activate your account within seven days: ${result.activationUrl}`);
+     setNotice("Invitation emailed. Send the prepared text from your messaging app.");
+    }catch{
+     setNotice("Invitation emailed. This device could not open its messaging app.");
+    }
+   }else setNotice(result.status==="Sent"?"Email provider confirmed invitation delivery.":"Invitation updated.");
    await refresh();
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
  };
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
- const directoryCompanyIds=new Set(data?.directory.map(entry=>entry.companyId));
- const dashboardCompanies=companies.filter(company=>directoryCompanyIds.has(company.id));
+ const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
+ const dashboardCompanies=companies.filter(company=>clientByCompany.has(company.id));
  const selectedCompany=companies.find(x=>x.id===companyId);
+ const invitationPhone=invitePhone??selectedCompany?.phone??"";
+ const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
  const filtered=useMemo(()=>allOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
   &&(status==="All"||o.status===status)
   &&(serviceFilter==="All"||o.service_type===serviceFilter)
@@ -115,7 +126,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   ["Pending quality review",count(["Pending Quality Review"])],
   ["Completed / awaiting invoicing",allOpportunities.filter(x=>x.linked_job_id&&data?.jobs.find(j=>j.id===x.linked_job_id)?.status==="Completed"
     &&!data.invoices.some(inv=>inv.job_id===x.linked_job_id)).length],
-  ["Outstanding receivables",currency(data?.invoices.reduce((n,x)=>n+Math.max(0,Number(x.total)-Number(x.amount_paid)),0))],
+  ["Outstanding receivables",currency(Object.values(data?.invoiceTotals??{}).reduce((sum,invoice)=>sum+invoice.balanceDue,0))],
   ["Pending follow-ups",data?.followups.filter(x=>x.status==="Pending").length??0],
   ["Overdue follow-ups",data?.followups.filter(x=>x.status==="Pending"&&Date.parse(x.due_at)<Date.now()).length??0],
  ];
@@ -147,8 +158,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
    <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[670px] text-left text-sm">
    <thead className="bg-[#143d1a] text-white"><tr>{["Contractor","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
    <tbody>{dashboardCompanies.map(c=>{
-    const opps=allOpportunities.filter(o=>o.company_id===c.id),jobIds=new Set(opps.map(o=>o.linked_job_id).filter(Boolean));
-    const linkedInvoices=data?.invoices.filter(inv=>jobIds.has(inv.job_id))??[];
+    const opps=allOpportunities.filter(o=>o.company_id===c.id);
+    const totals=data?.invoiceTotals?.[clientByCompany.get(c.id)??""];
     const completed=opps.filter(o=>data?.jobs.some(job=>job.id===o.linked_job_id&&job.status==="Completed")).length;
     const projectedGrossProfit=opps.reduce((total,op)=>{
      const profit=data?.assessments.find(a=>a.opportunity_id===op.id)?.projection.grossProfit;
@@ -156,8 +167,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
     },0);
     return <tr key={c.id} className="border-t"><td className="p-3 font-bold">{c.name}</td><td className="p-3">{opps.length}</td>
      <td className="p-3">{opps.filter(o=>Boolean(o.linked_job_id)).length}</td><td className="p-3">{completed}</td>
-     <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Number(inv.total),0))}</td>
-     <td className="p-3">{currency(linkedInvoices.reduce((t,inv)=>t+Math.max(0,Number(inv.total)-Number(inv.amount_paid)),0))}</td>
+     <td className="p-3">{currency(totals?.total??0)}</td>
+     <td className="p-3">{currency(totals?.balanceDue??0)}</td>
      <td className="p-3">{currency(projectedGrossProfit)} <span className="text-xs text-neutral-500">(estimate)</span></td></tr>;
    })}</tbody></table>
    {!dashboardCompanies.length&&<p className="p-4 text-sm text-neutral-500">No active contractors to report.</p>}</div>
@@ -181,9 +192,13 @@ export function ContractorManagement({view}: {view:ContractorView}){
       <h3 className="font-extrabold">Invitations &amp; Access</h3>
       <Panel title="Send secure seven-day invitation"><div className="grid gap-3 sm:grid-cols-2">{companySelect}
        <Field label="Invited email" value={inviteEmail} set={setInviteEmail} type="email"/>
+       <Field label="Mobile number (for text)" value={invitationPhone} set={setInvitePhone} type="tel"/>
       </div>
-       <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail})}>Send invitation</button>
-       <p className="mt-2 text-xs text-neutral-600">Invite is single-use, emailed by the configured provider, and expires after seven days. The invited contractor can invite teammates from their company profile.</p>
+       <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail})}>Email invitation</button>
+        <button type="button" className={secondary} disabled={busy||!companyId||!inviteEmail.trim()||!smsPhone} onClick={()=>{if(smsPhone)void invite("invite",{companyId,email:inviteEmail,includeText:true},smsPhone);}}>Email &amp; text invitation</button>
+       </div>
+       <p className="mt-2 text-xs text-neutral-600">Both messages use the same single-use link, which expires after seven days. Send the text from your device’s messaging app.</p>
       </Panel>
       <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
        <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>

@@ -55,6 +55,7 @@ export async function POST(request:Request){
   if(action!=="invite"&&action!=="resend")throw new ContractorAccessError("Unknown invitation action.",400);
   if(ctx.type==="partner"&&(ctx.role!=="Company Admin"||action!=="invite"))
    throw new ContractorAccessError("Only the contractor owner can invite teammates.");
+  const includeText=ctx.type==="internal"&&action==="invite"&&body.includeText===true;
   const previous=action==="resend"
    ?await ctx.admin.from("contractor_invitations").select("company_id,invited_email,member_role")
     .eq("id",uuid(body.invitationId)).eq("status","Pending").maybeSingle()
@@ -114,6 +115,8 @@ export async function POST(request:Request){
   }).eq("id",invite.id);
   if(update.error)throw new ContractorAccessError("Email provider accepted delivery; status recording needs review. Do not resend without checking.",503);
   await audited(ctx,{companyId,type:"Invitation Email Sent",detail:{invitationId:invite.id,providerId:sent.id}});
-  return noCache({invitationId:invite.id,status:"Sent",expiresAt:invite.expires_at});
+  return noCache({invitationId:invite.id,status:"Sent",expiresAt:invite.expires_at,
+   ...(includeText?{activationUrl}:{}),
+  });
  }catch(error){return handleContractorError(error);}
 }

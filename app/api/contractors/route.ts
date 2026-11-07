@@ -83,7 +83,29 @@ async function postPrivateMessage(ctx:ContractorContext,thread:Awaited<ReturnTyp
  return data.id;
 }
 
-async function list(ctx:ContractorContext){
+async function contractorInvoiceTotals(db:ContractorContext["admin"],clientIds:string[]){
+ const totals:Record<string,{total:number;balanceDue:number}>={};
+ for(let start=0;start<clientIds.length;start+=100){
+  const ids=clientIds.slice(start,start+100);
+  const pageSize=500;
+  for(let offset=0;;offset+=pageSize){
+   const {data,error}=await db.from("invoices").select("client_id,total,balance_due")
+    .in("client_id",ids).is("archived_at",null).not("status","in","(Cancelled,Archived)")
+    .order("id").range(offset,offset+pageSize-1);
+   if(error)throw error;
+   for(const invoice of data){
+    if(!invoice.client_id)continue;
+    const entry=totals[invoice.client_id]??={total:0,balanceDue:0};
+    entry.total+=Number(invoice.total);
+    entry.balanceDue+=Number(invoice.balance_due);
+   }
+   if(data.length<pageSize)break;
+  }
+ }
+ return totals;
+}
+
+async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  const db=ctx.admin;
  if(ctx.type==="internal"){
   const [companies,opportunities,offers,invitations,assessments,members,documents,managers,attempts,followups,activeClients]=await Promise.all([
@@ -128,7 +150,8 @@ async function list(ctx:ContractorContext){
     phone:portal.phone?.trim()||client.phone,portalStatus:portal.status,
    }];
   }).sort((a,b)=>a.name.localeCompare(b.name));
-  return {role:ctx.role,companies:companies.data,directory,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+  const invoiceTotals=includeInvoiceTotals?await contractorInvoiceTotals(db,directory.map(entry=>entry.clientId)):undefined;
+  return {role:ctx.role,companies:companies.data,directory,invoiceTotals,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    viewerId:ctx.userId,attempts:attempts.data,followups:followups.data,
    jobs:jobs.data,invoices:invoices.data};
@@ -176,11 +199,12 @@ function validatedSelections(value:unknown,available:readonly string[],label:str
 export async function GET(request:Request){
  try{
   const ctx=await contractorContext();
-  if(new URL(request.url).searchParams.get("view")==="job-options"){
+  const view=new URL(request.url).searchParams.get("view");
+  if(view==="job-options"){
    requirePartner(ctx);
    return noCache(await loadContractorJobOptions());
   }
-  return noCache(await list(ctx));
+  return noCache(await list(ctx,view==="dashboard"));
  }catch(error){return handleContractorError(error);}
 }
 export async function POST(request:Request){
