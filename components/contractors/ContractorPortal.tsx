@@ -1,6 +1,7 @@
 "use client";
 import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions, type ContractorPropertyAddress } from "@/lib/contractors/jobOptions";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
+import { formatTime12Hour } from "@/lib/formatTime";
 import { contractorPage } from "@/lib/contractors/host";
 import {useCallback,useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
@@ -102,7 +103,22 @@ export function ContractorPortal(){
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(data.invoices.reduce((sum,x)=>sum+Math.max(0,Number(x.total)-Number(x.amount_paid)),0))]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
-    <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(x=><button key={x.id} className="flex w-full flex-wrap items-center justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(x.id);setTab("jobs")}}><span><b>{x.property_name??x.property_address}</b><small className="block">{x.opportunity_number} · {x.service_type}</small></span><span>{x.status}</span></button>)}</PortalPanel></>}
+    <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(opportunity=>{
+     const job=data.jobs.find(job=>job.id===opportunity.linked_job_id);
+     const scheduledDate=job?.scheduled_date
+      ?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))
+      :null;
+     return <button key={opportunity.id} type="button" className="flex w-full flex-wrap items-start justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(opportunity.id);setTab("jobs")}}>
+      <span><b>{opportunity.property_name??opportunity.property_address}</b>
+       <small className="block">{opportunity.opportunity_number} · {opportunity.service_type}</small>
+       {scheduledDate&&<span className="mt-1 block text-sm">
+        <span className="block"><b>Scheduled</b> {scheduledDate} · {formatTime12Hour(job?.start_time,"Time pending")}</span>
+        <span className="block"><b>Location</b> {opportunity.property_address}</span>
+       </span>}
+      </span>
+      <span>{opportunity.status}</span>
+     </button>;
+    })}</PortalPanel></>}
    {data&&tab==="submit"&&<PortalPanel title={editing?"Edit job request":"Submit a cleaning opportunity"}>
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
     <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setTab("jobs");setOpportunityId(r.opportunity.id);}}}>

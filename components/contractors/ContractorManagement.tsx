@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
 import dynamic from "next/dynamic";
 import {useAuth} from "@/components/auth/AuthProvider";
 import {normalizeSmsPhoneNumber,openDeviceSmsApp} from "@/lib/deviceSms";
@@ -27,7 +28,12 @@ const button="rounded-lg bg-[#143d1a] px-4 py-2.5 text-sm font-bold text-white d
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-3 py-2 text-sm font-semibold text-[#143d1a]";
 const ContractorCalendar=dynamic(()=>import("@/components/jobs/SchedulePage").then(module=>module.SchedulePage),{loading:()=> <p role="status">Loading contractor calendar…</p>});
 const titles:Record<ContractorView,string>={dashboard:"Contractor Dashboard",companies:"Contractors",opportunities:"Job Opportunities",jobs:"Scheduled Jobs",messages:"Contractor Communications"};
+function matchesOpportunityView(opportunity:Opportunity,view:ContractorView){
+ const accepted=Boolean(opportunity.linked_job_id)||["Accepted","Crew Assignment"].includes(opportunity.status);
+ return view==="jobs"?accepted:view==="opportunities"?!accepted:true;
+}
 export function ContractorManagement({view}: {view:ContractorView}){
+ const router=useRouter();
  const {profile}=useAuth();
  const canManagePortalAccess=hasPermission(profile,"contractors.manage");
  const portalAccessRef=useCallback((section:HTMLDivElement|null)=>{
@@ -55,10 +61,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
   const result=await response.json();
   if(!response.ok)throw new Error(result.error??"Contractor data unavailable");
   setData(result);
-  const requestedId=view==="opportunities"?new URLSearchParams(window.location.search).get("opportunityId"):null;
-  const requested=result.opportunities?.find((opportunity:Opportunity)=>opportunity.id===requestedId);
+  const requestedId=view==="opportunities"||view==="jobs"?new URLSearchParams(window.location.search).get("opportunityId"):null;
+  const visible=(result.opportunities as Opportunity[]).filter(opportunity=>matchesOpportunityView(opportunity,view));
+  const requested=visible.find(opportunity=>opportunity.id===requestedId);
   setCompanyId(current=>current||requested?.company_id||result.companies?.[0]?.id||"");
-  setOpportunityId(current=>current||requested?.id||result.opportunities?.[0]?.id||"");
+  setOpportunityId(current=>visible.some(opportunity=>opportunity.id===current)?current:requested?.id??visible[0]?.id??"");
  },[view]);
  useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(String(e.message));}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[refresh]);
  const run=async(action:string,payload:Record<string,unknown>={})=>{
@@ -68,6 +75,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
     body:JSON.stringify({action,...payload})});
    const result=await response.json();
    if(!response.ok)throw new Error(result.error??"Request failed");
+   if(action==="accept"&&result.jobId&&typeof payload.opportunityId==="string"){
+    setOpportunityId("");
+    router.push(`/contractors/jobs?opportunityId=${encodeURIComponent(payload.opportunityId)}`);
+    return result;
+   }
    setNotice(`${action} completed.`);await refresh();
    return result;
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}
@@ -98,12 +110,13 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const selectedCompany=companies.find(x=>x.id===companyId);
  const invitationPhone=invitePhone??selectedCompany?.phone??"";
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
- const filtered=useMemo(()=>allOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
+ const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
+ const filtered=useMemo(()=>visibleOpportunities.filter(o=>(companyId?o.company_id===companyId:true)
   &&(status==="All"||o.status===status)
   &&(serviceFilter==="All"||o.service_type===serviceFilter)
   &&(managerFilter==="All"||(o.manager_id??companies.find(c=>c.id===o.company_id)?.assigned_manager_id)===managerFilter)
   &&(!fromDate||o.requested_date>=fromDate)&&(!toDate||o.requested_date<=toDate)
-  &&(!query||[o.opportunity_number,o.property_name,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[allOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
+  &&(!query||[o.opportunity_number,o.property_name,o.service_type,o.property_address,o.status].join(" ").toLowerCase().includes(query.toLowerCase()))),[visibleOpportunities,companies,companyId,status,serviceFilter,managerFilter,fromDate,toDate,query]);
  const calendarJobIds=useMemo(()=>{
   const ids=new Set<string>();
   if(view==="jobs"){
@@ -113,7 +126,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }
   return ids;
  },[filtered,view]);
- const selected=allOpportunities.find(x=>x.id===opportunityId);
+ const selected=visibleOpportunities.find(x=>x.id===opportunityId);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
  const selectedInvoices=data?.invoices.filter(x=>x.job_id===selected?.linked_job_id)??[];
@@ -257,17 +270,17 @@ export function ContractorManagement({view}: {view:ContractorView}){
   {(view==="opportunities"||view==="jobs")&&<>
    <div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3">{companySelect}
     <label className="text-sm font-semibold">Status<select className={input} value={status} onChange={e=>setStatus(e.target.value)}>
-     {["All",...new Set(allOpportunities.map(x=>x.status))].map(x=><option key={x}>{x}</option>)}</select></label>
+     {["All",...new Set(visibleOpportunities.map(x=>x.status))].map(x=><option key={x}>{x}</option>)}</select></label>
     <Field label="Search" value={query} set={setQuery}/>
     <label className="text-sm font-semibold">Service type<select className={input} value={serviceFilter} onChange={e=>setServiceFilter(e.target.value)}>
-     {["All",...new Set(allOpportunities.map(x=>x.service_type))].map(x=><option key={x}>{x}</option>)}</select></label>
+     {["All",...new Set(visibleOpportunities.map(x=>x.service_type))].map(x=><option key={x}>{x}</option>)}</select></label>
     <label className="text-sm font-semibold">Assigned manager<select className={input} value={managerFilter} onChange={e=>setManagerFilter(e.target.value)}>
      <option value="All">All managers</option>{data?.managers.map(m=><option key={m.id} value={m.id}>{m.display_name||m.email}</option>)}</select></label>
     <Field label="From date" value={fromDate} set={setFromDate} type="date"/>
     <Field label="To date" value={toDate} set={setToDate} type="date"/>
    </div>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds}/>}
-   <OpportunityTable rows={view==="jobs"?filtered.filter(x=>Boolean(x.linked_job_id)):filtered} companies={companies} select={setOpportunityId}/>
+   <OpportunityTable rows={filtered} companies={companies} select={setOpportunityId}/>
    {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
      <p><b>Company:</b> {companies.find(x=>x.id===selected.company_id)?.name}</p>
@@ -326,9 +339,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
      {data?.role==="Master Admin"&&<button className={secondary} disabled={busy||reviewReason.length<12} type="button"
       onClick={()=>void run("approveOverride",{opportunityId:selected.id,reason:reviewReason})}>Master Admin: approve override</button>}
      <div className="flex flex-wrap gap-2">
-      <button className={button} disabled={busy||!selected.partner_confirmed_at||!assessment} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>
-      <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button>
-      {selected.status==="Accepted"&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
+      {view==="opportunities"&&<><button className={button} disabled={busy||!selected.partner_confirmed_at||!assessment} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>
+      <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button></>}
+      {view==="jobs"&&["Accepted","Crew Assignment"].includes(selected.status)&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
       {!selected.linked_job_id&&<button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("cancelOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Cancel opportunity</button>}
       <button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("requestReschedule",{opportunityId:selected.id,reason:reviewReason})}>Log reschedule request</button>
       <button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("disputeOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Record dispute</button></div>

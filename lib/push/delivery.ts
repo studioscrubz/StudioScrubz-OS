@@ -61,6 +61,7 @@ export function safeAttentionUrl(value: string | null | undefined) {
 }
 
 function pushBody(item: AttentionItem) {
+  if (item.type === "Contractor Request Requires Review") return "A new contractor opportunity is ready for review.";
   if (item.type === "Overdue Invoice") return `${item.entity_label ? `Invoice #${item.entity_label}` : "An invoice"} is overdue.`;
   if (item.type === "Review Request Ready") return `Review request ready${item.description ? ` for ${item.description.split("—")[0].trim()}` : ""}.`;
   return `${item.title}${item.entity_label ? ` — ${item.entity_label}` : ""}.`;

@@ -8,8 +8,13 @@ import type { EquipmentResponsibilityAttention } from "@/lib/services/equipmentA
 import type { TimeOffNotification } from "@/lib/services/timeOff";
 
 type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+type ContractorPushRequest = NonNullable<AttentionRuleInput["contractorRequestReviews"]>[number] & {
+  manager_id: string | null;
+  company: { assigned_manager_id: string | null };
+};
 type Snapshot = Omit<AttentionRuleInput, "profile" | "states" | "jobRouteIds" | "agreementProposalIds" | "contractJobIds"> & {
   states: AttentionRuleInput["states"];
+  contractorPushRequests: ContractorPushRequest[];
   agreementProposalIds: Array<string | null>;
   contractJobIds: Set<string>;
   crewIdsByEmployee: Map<string, Set<string>>;
@@ -17,7 +22,7 @@ type Snapshot = Omit<AttentionRuleInput, "profile" | "states" | "jobRouteIds" | 
 };
 
 export async function loadAttentionServerSnapshot(db: AdminClient, now = new Date()): Promise<Snapshot> {
-  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings, crewMembers, crews, occurrences, invoiceLines, fieldDiscoveries, changeRequestDecisions, porterNotifications, laborThresholdEvents, eventAttendees, equipmentResponsibilityTasks, timeOffNotifications] = await Promise.all([
+  const [estimates, jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings, crewMembers, crews, occurrences, invoiceLines, fieldDiscoveries, changeRequestDecisions, porterNotifications, laborThresholdEvents, eventAttendees, equipmentResponsibilityTasks, timeOffNotifications, contractorPushRequests] = await Promise.all([
     query(db.from("estimates").select("*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)")),
     query(db.from("jobs").select("*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)")),
     query(db.from("walkthroughs").select("*, client:clients!walkthroughs_client_id_fkey(*), property:properties!walkthroughs_property_id_fkey(*), estimate:estimates!walkthroughs_estimate_id_fkey(*)")),
@@ -39,6 +44,9 @@ export async function loadAttentionServerSnapshot(db: AdminClient, now = new Dat
     query(db.from("internal_schedule_event_attendees").select("employee_id,invited_at,event:internal_schedule_events(id,title,starts_at,location,status)")),
     query(db.from("job_equipment_responsibility_tasks").select("id,job_id,crew_id,crew_lead_employee_id,responsible_employee_id,status,revision,assigned_at,created_at,updated_at,job:jobs!job_equipment_responsibility_tasks_job_id_fkey(job_number)")),
     query(db.from("employee_time_off_notifications").select("id,request_id,recipient_user_id,event_type,request_revision,created_at,request:employee_time_off_requests!employee_time_off_notifications_request_id_fkey(status,start_date,end_date,employee:employees!employee_time_off_requests_employee_id_fkey(first_name,last_name,preferred_name))").is("cancelled_at", null)),
+    query(db.from("contractor_opportunities").select("id,opportunity_number,property_name,service_type,request_revision,status,updated_at,manager_id,company:contractor_companies!inner(assigned_manager_id,status)")
+      .eq("company.status","Active").is("linked_job_id",null).is("internal_confirmed_at",null)
+      .eq("request_revision",0).in("status",["New Opportunity","Awaiting Approval"]).order("updated_at",{ascending:false}).limit(100)),
   ]);
   const crewIdsByEmployee = new Map<string, Set<string>>();
   for (const member of crewMembers as Array<{ crew_id: string; employee_id: string }>) addCrew(crewIdsByEmployee, member.employee_id, member.crew_id);
@@ -50,10 +58,10 @@ export async function loadAttentionServerSnapshot(db: AdminClient, now = new Dat
   ])];
   const responsibilityTasks=(equipmentResponsibilityTasks as Array<Omit<EquipmentResponsibilityAttention,"task_id"|"job_number">&{id:string;job:{job_number:string}|null}>).map(row=>({task_id:row.id,job_id:row.job_id,job_number:row.job?.job_number??"Job",crew_id:row.crew_id,crew_lead_employee_id:row.crew_lead_employee_id,responsible_employee_id:row.responsible_employee_id,status:row.status,revision:row.revision,assigned_at:row.assigned_at,created_at:row.created_at,updated_at:row.updated_at}));
   const timeOffRows=(timeOffNotifications as Array<{id:string;request_id:string;recipient_user_id:string;event_type:TimeOffNotification["event_type"];request_revision:number;created_at:string;request:{status:string;start_date:string;end_date:string;employee:{first_name:string;last_name:string;preferred_name:string|null}|null}|null}>).flatMap(row=>row.request?[{id:row.id,request_id:row.request_id,recipient_user_id:row.recipient_user_id,event_type:row.event_type,request_revision:row.request_revision,created_at:row.created_at,status:row.request.status,start_date:row.request.start_date,end_date:row.request.end_date,employee_name:row.request.employee?.preferred_name||`${row.request.employee?.first_name??""} ${row.request.employee?.last_name??""}`.trim()||"Employee"}]:[]);
-  return { equipmentResponsibilityTasks:responsibilityTasks,timeOffNotifications:timeOffRows,eventAttendees, porterNotifications: (porterNotifications as AttentionRuleInput["porterNotifications"])?.filter((event) => !event.expires_at || Date.parse(event.expires_at) > now.getTime()), laborThresholdEvents, fieldDiscoveries, changeRequestDecisions, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: (settings[0] as { timezone?: string | null } | undefined)?.timezone ?? null, agreementProposalIds: (agreements as Array<{ proposal_id: string | null }>).map((row) => row.proposal_id), contractJobIds, crewIdsByEmployee, now } as unknown as Snapshot;
+  return { contractorPushRequests, equipmentResponsibilityTasks:responsibilityTasks,timeOffNotifications:timeOffRows,eventAttendees, porterNotifications: (porterNotifications as AttentionRuleInput["porterNotifications"])?.filter((event) => !event.expires_at || Date.parse(event.expires_at) > now.getTime()), laborThresholdEvents, fieldDiscoveries, changeRequestDecisions, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: (settings[0] as { timezone?: string | null } | undefined)?.timezone ?? null, agreementProposalIds: (agreements as Array<{ proposal_id: string | null }>).map((row) => row.proposal_id), contractJobIds, crewIdsByEmployee, now } as unknown as Snapshot;
 }
 
-export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapshot) {
+export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapshot, activeOperationsManagerIds: ReadonlySet<string>) {
   if (!hasPermission(profile, "attention.view")) return [];
   const management = ["Master Admin", "Administrator", "Manager"].includes(profile.role);
   const crewIds = profile.employee_id ? snapshot.crewIdsByEmployee.get(profile.employee_id) ?? new Set<string>() : new Set<string>();
@@ -62,6 +70,12 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
   const visibleTimeEntries = hasPermission(profile, "timeClock.view") ? snapshot.timeEntries.filter((entry) => management || entry.employee_id === profile.employee_id || Boolean(entry.crew_id && crewIds.has(entry.crew_id))) : [];
   const input: AttentionRuleInput = {
     profile,
+    contractorRequestReviews: hasPermission(profile,"contractors.view")
+      ? snapshot.contractorPushRequests.filter(request=>{
+        const managerId=request.manager_id??request.company.assigned_manager_id;
+        return managerId&&activeOperationsManagerIds.has(managerId)?profile.id===managerId:profile.role==="Master Admin";
+      }).map(request=>({...request,status:"New Opportunity"}))
+      : [],
     equipmentResponsibilityTasks:(snapshot.equipmentResponsibilityTasks??[]).filter(task=>task.crew_lead_employee_id===profile.employee_id||task.responsible_employee_id===profile.employee_id),
     timeOffNotifications:(snapshot.timeOffNotifications??[]).filter(notification=>notification.recipient_user_id===profile.id),
     assignedOperationalJobIds: profile.role === "Manager"
