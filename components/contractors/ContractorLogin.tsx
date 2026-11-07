@@ -16,7 +16,7 @@ export function ContractorLogin(){
  async function recover(){
   if(!email.includes("@"))return setError("Enter your email before requesting recovery.");
   setBusy(true);setError("");
-  try{const {error}=await getSupabaseClient().auth.resetPasswordForEmail(email,{redirectTo:`${window.location.origin}/contractor/reset-password`});
+  try{const {error}=await getSupabaseClient().auth.resetPasswordForEmail(email,{redirectTo:`${process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":window.location.origin}/contractor/reset-password`});
     if(error)throw error;setNotice("If this account exists, password recovery instructions have been requested.");}
   catch(e){setError(e instanceof Error?e.message:"Recovery request failed.");}finally{setBusy(false);}
  }
