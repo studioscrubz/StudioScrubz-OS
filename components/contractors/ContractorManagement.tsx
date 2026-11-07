@@ -109,7 +109,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <p>Status: <b>{selectedCompany.status}</b></p>
     {data?.role==="Master Admin"&&<div className="flex flex-wrap gap-2">{["Active","Pending","Suspended","Archived"].map(status=><button key={status} type="button" disabled={busy||status===selectedCompany.status}
      onClick={()=>void run("updateCompany",{companyId:selectedCompany.id,status})} className={secondary}>{status}</button>)}</div>}
-    <p className="text-xs text-neutral-500">Company status and access controls require Master Admin authorization.</p></div></Panel>}
+    {data?.role==="Manager"&&selectedCompany.status==="Pending"&&<button className={secondary} disabled={busy} onClick={()=>void run("updateCompany",{companyId:selectedCompany.id,status:"Active"})}>Activate verified company</button>}
+    <p className="text-xs text-neutral-500">Operations Managers may activate pending partners. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
    <div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3">{companySelect}
