@@ -65,7 +65,7 @@ async function list(ctx:ContractorContext){
   for(const item of [companies,opportunities,offers,messages,invitations,assessments,members,documents,managers])if(item.error)throw item.error;
   const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
   const [jobs,invoices]=await Promise.all([
-   linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,completed_at,assigned_team,assigned_crew_id").in("id",linkedIds):Promise.resolve({data:[],error:null}),
+   linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,estimated_duration,completed_at,assigned_team,assigned_crew_id").in("id",linkedIds):Promise.resolve({data:[],error:null}),
    linkedIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date,archived_at").in("job_id",linkedIds):Promise.resolve({data:[],error:null}),
   ]);
   if(jobs.error||invoices.error)throw jobs.error??invoices.error;
