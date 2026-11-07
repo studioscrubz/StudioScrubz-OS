@@ -87,6 +87,8 @@ create table public.contractor_opportunities (
  decided_by uuid references public.user_profiles(id),
  decided_at timestamptz,
  linked_job_id uuid unique references public.jobs(id) on delete restrict,
+ quality_approved_at timestamptz,
+ quality_approved_by uuid references public.user_profiles(id),
  cancelled_at timestamptz,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now(),
