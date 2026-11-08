@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { calculateProfitability } from "@/lib/pricing/profitability";
 import { validateProfitabilitySettings } from "@/lib/pricing/profitabilitySettings";
 import type { TravelProjection } from "@/types/profitability";
+import { PersonalEmailSetupError, resolvePersonalEmailSenderById } from "@/lib/email/personalSender";
 import { sendResendEmail } from "@/lib/email/resend";
 import { contractorContext,requireInternal,requireMaster,requirePartner,partnerOpportunity,internalOpportunity,
  audited,required,optional,money,uuid,handleContractorError,noCache,ContractorAccessError,
@@ -706,13 +707,16 @@ export async function POST(request:Request){
     .select("contact_email,name").eq("id",opp.company_id).single();
    if(ce||!company?.contact_email)throw new ContractorAccessError("Contractor email is unavailable.",409);
    const message=`Payment follow-up for invoice ${invoice.invoice_number}. Outstanding balance: ${outstanding.toFixed(2)}. Due date: ${invoice.due_date??"not specified"}. Please contact StudioScrubz Operations with payment questions.`;
+   let sender;
+   try{sender=await resolvePersonalEmailSenderById(ctx.userId,db);}
+   catch(error){if(error instanceof PersonalEmailSetupError)throw new ContractorAccessError(error.message,error.status);throw error;}
    let sent;
    try{
     sent=await sendResendEmail({recipientEmail:company.contact_email,
       subject:`StudioScrubz payment follow-up | ${invoice.invoice_number}`,
       text:message,html:`<p>${message}</p>`,
       idempotencyKey:`contractor-invoice-reminder:${invoice.id}:${crypto.randomUUID()}`,
-      replyTo:null});
+      ...sender});
    }catch(error){
     await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,
       type:"Contractor Payment Reminder Failed",detail:{invoiceId:invoice.id}});

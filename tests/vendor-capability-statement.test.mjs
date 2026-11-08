@@ -243,7 +243,7 @@ test("send route recovers provider receipts without resending and snapshots exac
   assert.match(route, /capabilityModelFromSnapshot\(metadata\.content_snapshot\)/);
   assert.match(route, /model\.documentKind !== \(identity\.documentKind === "both"/);
   assert.match(route, /!sameStringArray\(model\.selectedModuleIds, identity\.documentKind === "both"/);
-  assert.match(route, /resolveEmailSenderProfile\("vendor"\)/);
+  assert.match(route, /resolvePersonalEmailSender\(profile, admin\)/);
 });
 
 test("combined send generates a genuine US Letter PDF attachment with branded pagination", () => {

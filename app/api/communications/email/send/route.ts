@@ -4,7 +4,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { sendResendEmail } from "@/lib/email/resend";
 import { parseEmailAttachments, sameAttachmentManifest, AttachmentError } from "@/lib/email/attachments";
 import type { EmailAttachmentManifest } from "@/lib/email/attachmentLimits";
-import { resolveEmailSenderProfile, type EmailSenderProfileKey } from "@/lib/email/senderProfiles";
+import { PersonalEmailSetupError, resolvePersonalEmailSender } from "@/lib/email/personalSender";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ClientCommunication, CommunicationMetadata, CommunicationType } from "@/types/clientCommunication";
@@ -54,8 +54,7 @@ export async function POST(request: Request) {
 
     admin = createSupabaseAdminClient();
     await validateLinks(admin, links);
-    const defaultSender = resolveEmailSenderProfile(await senderProfileForCommunication(admin, communicationType, metadata));
-    const sender = profile.role === "Sales" ? salesSenderIdentity(profile) : defaultSender;
+    const sender = await resolvePersonalEmailSender(profile, admin);
     const eventKey = `communications-email:${profile.id}:${requestId}`;
     const expected = { recipientEmail, subject, messageBody, communicationType, ...links, manifest };
     const { data: found, error: findError } = await admin.from("client_communications").select("*").eq("event_key", eventKey).maybeSingle();
@@ -100,6 +99,7 @@ export async function POST(request: Request) {
     const finalized = await finalize(admin, communicationId, providerMessageId, null);
     return acceptedResponse(finalized, providerMessageId);
   } catch (cause) {
+    if (cause instanceof PersonalEmailSetupError) return Response.json({ error: cause.message }, { status: cause.status });
     if (cause instanceof InputError || cause instanceof AttachmentError) return Response.json({ error: cause.message }, { status: cause instanceof InputError ? cause.status : 400 });
     if (cause instanceof UnconfirmedProviderStateError) return Response.json({ error: cause.message }, { status: 409 });
     if (providerMessageId) {
@@ -136,35 +136,6 @@ async function validateLinks(admin: Admin, links: Links) {
     const { data, error } = await admin.from(table).select("id,client_id,property_id,archived_at").eq("id", recordId).single();
     if (error || !data || data.archived_at || (links.clientId && data.client_id !== links.clientId) || (links.propertyId && data.property_id !== links.propertyId)) throw new InputError(`The selected ${label} is unavailable or does not match this communication.`);
   }
-}
-
-function salesSenderIdentity(profile: UserProfile): { from: string; replyTo: string } {
-  const email = profile.email?.trim().toLowerCase() ?? "";
-  if (!EMAIL_PATTERN.test(email) || !email.endsWith("@studioscrubz.com")) {
-    throw new InputError("Your Sales account must have a valid @studioscrubz.com email address to send Communications email.", 403);
-  }
-  const name = (profile.display_name?.trim() || email.split("@")[0])
-    .replace(/[\r\n<>"]/g, "")
-    .slice(0, 100)
-    .trim() || "StudioScrubz Sales";
-  return { from: `${name} <${email}>`, replyTo: email };
-}
-
-async function senderProfileForCommunication(admin: Admin, type: CommunicationType, metadata: CommunicationMetadata, retryDepth = 0): Promise<EmailSenderProfileKey> {
-  const retryOf = typeof metadata.retry_of_communication_id === "string" ? metadata.retry_of_communication_id : null;
-  if (retryDepth < 5 && retryOf && UUID_PATTERN.test(retryOf)) {
-    const { data, error } = await admin.from("client_communications").select("communication_type,metadata").eq("id", retryOf).maybeSingle();
-    if (error) throw new Error("The original communication sender identity could not be loaded.");
-    if (data) return senderProfileForCommunication(admin, data.communication_type as CommunicationType, (data.metadata ?? {}) as CommunicationMetadata, retryDepth + 1);
-  }
-  if (type === "Estimate") return "estimate";
-  if (type === "Proposal") return "proposal";
-  if (type === "Service Agreement") return "serviceAgreement";
-  if (type === "Invoice" || type === "Payment Reminder") return "billing";
-  if (type === "Service Reminder") return "scheduling";
-  const event = typeof metadata.event === "string" ? metadata.event : null;
-  if (event && ["service_scheduled", "team_arrived", "service_completed"].includes(event)) return "scheduling";
-  return "general";
 }
 
 async function finalize(admin: Admin, id: string, providerMessageId: string | null, failureReason: string | null) {

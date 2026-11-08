@@ -20,7 +20,7 @@ export const PERMISSIONS = [
   "payrollPrep.view", "agreements.view", "agreements.manage", "agreements.financialSummary",
   "invoices.view", "invoices.create", "invoices.edit", "invoices.send", "invoices.recordPayment",
   "finances.view", "customerCredits.manage", "expenses.view", "expenses.manage", "vehicles.view", "vehicles.manage",
-  "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage", "appearance.view",
+  "archives.view", "archives.restore", "archives.delete", "users.manage", "settings.manage", "appearance.view", "emailSettings.view",
   "communications.view", "communications.create", "communications.archive", "employeeEmails.send",
   "attention.view", "reports.view",
   "messages.view", "messages.send", "messages.announce",
@@ -145,6 +145,7 @@ export function hasPermission(
   profile: UserProfile | null,
   permission: Permission,
 ): boolean {
+  if (permission === "emailSettings.view") return profile?.is_active === true;
   if (["leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn"].includes(permission)) {
     return profile?.is_active === true && profile.role === "Lead Representative";
   }
@@ -267,6 +268,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/agreements", "agreements.view"],
   ["/invoices", "invoices.view"],
 
+  ["/settings/email", "emailSettings.view"],
   ["/settings/notifications", "attention.view"],
   ["/settings/services", "settings.manage"],
   ["/settings/business", "settings.manage"],

@@ -762,6 +762,13 @@ const navItems: Array<NavLink | NavGroup> = [
       },
 
       {
+        label: "Email Signature",
+        href: "/settings/email",
+        marker: "",
+        permission: "emailSettings.view",
+      },
+
+      {
 
         label: "Notifications",
 

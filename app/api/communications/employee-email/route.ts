@@ -2,7 +2,7 @@ import "server-only";
 import { sendResendEmail } from "@/lib/email/resend";
 import { parseEmailAttachments, sameAttachmentManifest, AttachmentError } from "@/lib/email/attachments";
 import type { EmailAttachmentInput, EmailAttachmentManifest } from "@/lib/email/attachmentLimits";
-import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
+import { PersonalEmailSetupError, resolvePersonalEmailSender } from "@/lib/email/personalSender";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { EMPLOYEE_DEPARTMENTS, type EmployeeDepartment } from "@/types/employee";
@@ -49,10 +49,11 @@ export async function POST(request: Request) {
     if (/[\r\n]/.test(subject)) throw new InputError("Subject must be a single line.");
     const message = requiredText(body.message, "Message", 10000);
     const { files: attachments, manifest } = parseEmailAttachments(body.attachments);
+    const sender = await resolvePersonalEmailSender(profile, admin);
     const deliveries = await prepareDeliveries(admin, profile, requestId, subject, message, preview.recipients, manifest);
     const results: DeliveryRow[] = [];
     for (let index = 0; index < deliveries.length; index += 5) {
-      results.push(...await Promise.all(deliveries.slice(index, index + 5).map((delivery) => deliverOne(admin, delivery, attachments))));
+      results.push(...await Promise.all(deliveries.slice(index, index + 5).map((delivery) => deliverOne(admin, delivery, attachments, sender))));
     }
     return Response.json({ requestId, accepted: results.filter((row) => row.status === "Accepted").length, failed: results.filter((row) => row.status === "Failed").length, pending: results.filter((row) => row.status === "Pending").length, deliveries: results.map(historyEntry) });
   } catch (cause) { return failure(cause); }
@@ -110,7 +111,7 @@ async function prepareDeliveries(admin: Admin, profile: UserProfile, requestId: 
   return output;
 }
 
-async function deliverOne(admin: Admin, delivery: DeliveryRow, attachments: EmailAttachmentInput[]): Promise<DeliveryRow> {
+async function deliverOne(admin: Admin, delivery: DeliveryRow, attachments: EmailAttachmentInput[], sender: Awaited<ReturnType<typeof resolvePersonalEmailSender>>): Promise<DeliveryRow> {
   const receipt = await providerReceipt(admin, delivery.id);
   if (receipt) return finalizeAccepted(admin, delivery.id, receipt.provider_message_id, receipt.accepted_at);
   if (delivery.status !== "Pending" || delivery.provider_submission_started_at) return delivery;
@@ -124,7 +125,6 @@ async function deliverOne(admin: Admin, delivery: DeliveryRow, attachments: Emai
   }
   let providerAccepted = false;
   try {
-    const sender = resolveEmailSenderProfile("general");
     const sent = await sendResendEmail({ recipientEmail: delivery.recipient_email, subject: delivery.subject, text: delivery.message_body, html: `<div style="white-space:pre-wrap">${escapeHtml(delivery.message_body)}</div>`, idempotencyKey: delivery.event_key, attachments, ...sender });
     const providerMessageId = uuid(sent.id, "Provider message identifier");
     providerAccepted = true;
@@ -159,4 +159,4 @@ function requiredText(value: unknown, label: string, max: number) { if (typeof v
 function uuid(value: unknown, label: string) { const text = requiredText(value, label, 36); if (!UUID_PATTERN.test(text)) throw new InputError(`${label} is invalid.`); return text; }
 function escapeHtml(value: string) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
 function providerFailure(cause: unknown) { const message = cause instanceof Error ? cause.message.trim() : ""; return (message || "Resend did not accept the employee email.").slice(0, 500); }
-function failure(cause: unknown) { if (cause instanceof InputError || cause instanceof AttachmentError) return Response.json({ error: cause.message }, { status: cause instanceof InputError ? cause.status : 400 }); console.error("Employee email operation failed", cause instanceof Error ? { name: cause.name, message: cause.message } : { name: "UnknownError" }); return Response.json({ error: "Employee email processing failed." }, { status: 500 }); }
+function failure(cause: unknown) { if (cause instanceof PersonalEmailSetupError) return Response.json({ error: cause.message }, { status: cause.status }); if (cause instanceof InputError || cause instanceof AttachmentError) return Response.json({ error: cause.message }, { status: cause instanceof InputError ? cause.status : 400 }); console.error("Employee email operation failed", cause instanceof Error ? { name: cause.name, message: cause.message } : { name: "UnknownError" }); return Response.json({ error: "Employee email processing failed." }, { status: 500 }); }

@@ -5,6 +5,7 @@ import { randomBytes,createHash } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendResendEmail } from "@/lib/email/resend";
+import { PersonalEmailSetupError, resolvePersonalEmailSenderById } from "@/lib/email/personalSender";
 import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
 import { contractorContext,requireInternal,ContractorAccessError,handleContractorError,
   uuid,required,audited,noCache } from "@/lib/contractors/server";
@@ -72,6 +73,9 @@ export async function POST(request:Request){
    .eq("id",companyId).maybeSingle();
   if(companyError||!company||(company.status!=="Active"&&(company.status!=="Pending"||role!=="Company Admin")))
    throw new ContractorAccessError("Company is unavailable for this invitation.",409);
+  const sender=!textOnly&&ctx.type==="internal"
+   ?await resolvePersonalEmailSenderById(ctx.userId,ctx.admin)
+   :resolveEmailSenderProfile("contractorInvitation");
   // Generate a fresh one-use secret every time. Never persist plaintext.
   const token=randomBytes(32).toString("hex"),tokenHash=hash(token);
   let invite:{id:string;expires_at:string};
@@ -109,7 +113,7 @@ export async function POST(request:Request){
     text:`You have been invited to join ${company.name} on the StudioScrubz Contractor Portal. Activate your account within seven days: ${activationUrl}\n\nUsing an iPhone? After activation, follow the attached guide to add the portal to your Home Screen.`,
     html:`<p>Your company has been invited to use the StudioScrubz Contractor Portal.</p><p><a href="${activationUrl}" style="display:inline-block;background:#143d1a;color:white;padding:12px 18px;text-decoration:none">Activate contractor account</a></p><p>Invitation expires in seven days. If you did not expect this invitation, ignore this message.</p><p>Using an iPhone? After activation, follow the attached guide to add the portal to your Home Screen.</p>`,
     attachments:[{filename:"StudioScrubz Contractor Portal iPhone Guide.jpg",content:iphoneGuide.toString("base64"),contentType:"image/jpeg"}],
-    idempotencyKey:`contractor-invitation:${invite.id}`,...resolveEmailSenderProfile("contractorInvitation")});
+    idempotencyKey:`contractor-invitation:${invite.id}`,...sender});
   }catch(error){
    await ctx.admin.from("contractor_invitations").update({delivery_status:"Failed"}).eq("id",invite.id);
    await audited(ctx,{companyId,type:"Invitation Delivery Failed",detail:{invitationId:invite.id}});
@@ -121,5 +125,8 @@ export async function POST(request:Request){
   if(update.error)throw new ContractorAccessError("Email provider accepted delivery; status recording needs review. Do not resend without checking.",503);
   await audited(ctx,{companyId,type:"Invitation Email Sent",detail:{invitationId:invite.id,providerId:sent.id}});
   return noCache({invitationId:invite.id,status:"Sent",expiresAt:invite.expires_at});
- }catch(error){return handleContractorError(error);}
+ }catch(error){
+  if(error instanceof PersonalEmailSetupError)return Response.json({error:error.message},{status:error.status});
+  return handleContractorError(error);
+ }
 }

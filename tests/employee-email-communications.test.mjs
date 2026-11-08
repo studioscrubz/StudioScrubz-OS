@@ -65,7 +65,7 @@ test("delivery history is server-only and immutable in identity and content", ()
 
 test("employee emails reuse the shared Resend branding and general sender profile", () => {
   assert.match(route, /sendResendEmail/);
-  assert.match(route, /resolveEmailSenderProfile\("general"\)/);
+  assert.match(route, /resolvePersonalEmailSender\(profile, admin\)/);
   assert.match(route, /text: delivery\.message_body/);
   assert.match(route, /html: `<div style="white-space:pre-wrap">/);
 });

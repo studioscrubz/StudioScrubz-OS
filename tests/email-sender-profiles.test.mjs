@@ -27,7 +27,7 @@ test("authoritative registry contains every approved sender profile", () => {
     careers: ["StudioScrubz Careers <careers@studioscrubz.com>", "careers@studioscrubz.com"],
     marketing: ["StudioScrubz <donotreply@studioscrubz.com>", "info@studioscrubz.com"],
     contractorInvitation: ["StudioScrubz Operations <operations@studioscrubz.com>", "operations@studioscrubz.com"],
-    systemNotification: ["StudioScrubz Notifications <notifications@studioscrubz.com>", "donotreply@studioscrubz.com"],
+    systemNotification: ["StudioScrubz Notifications <notifications@studioscrubz.com>", "studioscrubz@gmail.com"],
     prospectOutreach: ["StudioScrubz <info@studioscrubz.com>", "info@studioscrubz.com"],
   };
   for (const [key, [from, replyTo]] of Object.entries(expected)) {
@@ -37,29 +37,28 @@ test("authoritative registry contains every approved sender profile", () => {
   assert.match(registry, /export type EmailSenderProfileKey = keyof typeof EMAIL_SENDER_PROFILES/);
 });
 
-test("server routes resolve locked semantic profiles", () => {
-  assert.match(communications, /return "general"/);
-  assert.match(communications, /type === "Estimate".*return "estimate"/);
-  assert.match(communications, /type === "Proposal".*return "proposal"/);
-  assert.match(communications, /type === "Service Agreement".*return "serviceAgreement"/);
-  assert.match(communications, /type === "Invoice" \|\| type === "Payment Reminder".*return "billing"/);
-  assert.match(communications, /type === "Service Reminder".*return "scheduling"/);
-  assert.match(communications, /retry_of_communication_id/);
-  assert.match(transactional, /type === "Estimate" \? "estimate" : type === "Proposal" \? "proposal" : type === "Service Agreement" \? "serviceAgreement" : "billing"/);
+test("staff routes resolve authenticated personal identities without browser sender input", () => {
+  for (const route of [communications, transactional, vendor, marketing]) assert.match(route, /resolvePersonalEmailSender\(profile,\s*admin\)/);
+  assert.match(contractorInvitations, /ctx\.type==="internal"[\s\S]*?resolvePersonalEmailSenderById\(ctx\.userId,ctx\.admin\)/);
   assert.doesNotMatch(clientService, /\bfrom\s*:|senderProfile/i);
+});
+
+test("users edit their own signatures and only Master Admins can designate senders", async () => {
+  const settings = await read("app/api/settings/personal-email/route.ts");
+  assert.match(settings, /user_id: profile\.id, signature: body\.signature\.trim\(\)/);
+  assert.match(settings, /body\.action === "sender"[\s\S]*?profile\.role !== "Master Admin"[\s\S]*?sender_email: sender/);
+  assert.match(resend, /escapeEmailHtml\(signature\)/);
 });
 
 test("specialized production workflows use registry identities", () => {
   assert.match(deposit, /resolveEmailSenderProfile\("postConstructionDeposit"\)/);
   assert.match(contractorInvitations, /resolveEmailSenderProfile\("contractorInvitation"\)/);
-  assert.match(vendor, /resolveEmailSenderProfile\("vendor"\)/);
-  assert.match(marketing, /resolveEmailSenderProfile\("marketing"\)/);
   assert.match(careers, /resolveEmailSenderProfile\("careers"\),replyTo:clean\.email/);
 });
 
 test("provider omits Reply-To for restricted no-reply and keeps a defensive default", () => {
   assert.match(resend, /resolveEmailSenderProfile\("systemNotification"\)/);
-  assert.match(resend, /\.\.\.\(input\.replyTo \? \{ reply_to: input\.replyTo \} : \{\}\)/);
+  assert.match(resend, /\.\.\.\(replyTo \? \{ reply_to: replyTo \} : \{\}\)/);
 });
 
 test("production workflows do not hard-code StudioScrubz From or Reply-To identities", () => {

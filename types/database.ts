@@ -353,6 +353,12 @@ export interface Database {
           },
         ];
       };
+      personal_email_settings: {
+        Row: { user_id: string; signature: string; sender_email: string | null };
+        Insert: { user_id: string; signature?: string; sender_email?: string | null };
+        Update: { signature?: string; sender_email?: string | null };
+        Relationships: [];
+      };
       notification_preferences: {
         Row: NotificationPreferences;
         Insert: Omit<NotificationPreferences, "created_at" | "updated_at"> & {
