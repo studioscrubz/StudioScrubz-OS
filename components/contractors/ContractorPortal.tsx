@@ -14,7 +14,8 @@ type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;cr
 type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:number;amount_paid:number;due_date:string|null};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at:string|null};
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
-type Portal={upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type InvoiceHistoryEntry=Pick<Invoice,"id"|"invoice_number"|"status"|"total"|"amount_paid">&{balance_due:number;issue_date:string|null};
+type Portal={invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -98,6 +99,10 @@ export function ContractorPortal(){
   setBasis(request.pricing_basis);setInstructions(request.special_instructions??"");setAccess(request.access_arrangements??"");setTab("submit");
  };
  const currentJob=data?.jobs.find(x=>x.id===chosen?.linked_job_id);
+ const invoiceHistory=data?.invoiceHistory??[];
+ const invoiceTotals=invoiceHistory.reduce((totals,invoice)=>({
+  billed:totals.billed+Number(invoice.total),paid:totals.paid+Number(invoice.amount_paid),due:totals.due+Number(invoice.balance_due),
+ }),{billed:0,paid:0,due:0});
  const currentInvoices=data?.invoices.filter(x=>x.job_id===chosen?.linked_job_id)??[];
  if(loading)return <main className="grid min-h-screen place-items-center">Loading private contractor portal…</main>;
  return <main className="min-h-screen bg-[#f5f6f4] text-neutral-900">
@@ -120,7 +125,22 @@ export function ContractorPortal(){
    </PortalPanel>}
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
-     ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(data.invoices.reduce((sum,x)=>sum+Math.max(0,Number(x.total)-Number(x.amount_paid)),0))]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
+     ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
+    <PortalPanel title="Invoice history">
+     <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+      <div><dt>Invoices</dt><dd className="font-bold">{invoiceHistory.length}</dd></div>
+      <div><dt>Total invoiced</dt><dd className="font-bold">{currency(invoiceTotals.billed)}</dd></div>
+      <div><dt>Paid</dt><dd className="font-bold">{currency(invoiceTotals.paid)}</dd></div>
+      <div><dt>Outstanding</dt><dd className="font-bold">{currency(invoiceTotals.due)}</dd></div>
+     </dl>
+     {invoiceHistory.length>0&&<details className="mt-4">
+      <summary className="cursor-pointer font-bold">View invoices</summary>
+      <ul className="mt-2 divide-y text-sm">{invoiceHistory.map(invoice=><li key={invoice.id} className="flex flex-wrap justify-between gap-2 py-2">
+       <span>{invoice.invoice_number} · {invoice.status}{invoice.issue_date&&` · ${invoice.issue_date}`}</span>
+       <span>{currency(Number(invoice.total))} total · {currency(Number(invoice.balance_due))} due</span>
+      </li>)}</ul>
+     </details>}
+    </PortalPanel>
     <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(opportunity=>{
      const job=data.jobs.find(job=>job.id===opportunity.linked_job_id);
      const scheduledDate=job?.scheduled_date

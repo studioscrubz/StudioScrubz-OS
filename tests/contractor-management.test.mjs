@@ -213,3 +213,11 @@ test("upcoming contractor jobs use OS bookings and are scoped to the authenticat
  assert.match(management,/"Upcoming contractor jobs",data\?\.upcomingJobs\?\.length/);
  assert.match(portal,/<PortalPanel title="Upcoming jobs">[\s\S]*?data\.upcomingJobs\?\.length/);
 });
+
+test("portal invoice history is scoped by the linked Accounts client and preserves contractor quality gates",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ assert.match(api,/\.eq\("client_id",clientId\)\.is\("archived_at",null\)\.not\("status","in","\(Draft,Cancelled,Archived\)"\)/);
+ assert.match(api,/job_lines:invoice_job_lines\(job_id\)[\s\S]*?review\.company_id!==companyId\|\|!review\.quality_approved_at[\s\S]*?job_lines\?\.some/);
+ assert.match(api,/contractorInvoiceHistory\(db,companyId,clientId\)/);
+ assert.match(portal,/<PortalPanel title="Invoice history">[\s\S]*?invoiceHistory\.length/);
+});
