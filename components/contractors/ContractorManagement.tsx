@@ -22,7 +22,7 @@ type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
-type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];upcomingJobs?:ContractorScheduledJob[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
+type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];completedJobCounts?:Record<string,number>;upcomingJobs?:ContractorScheduledJob[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm text-neutral-900";
@@ -168,8 +168,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
    <thead className="bg-[#143d1a] text-white"><tr>{["Contractor","Opportunities","Accepted Jobs","Completed Jobs","Invoiced Revenue","Outstanding","Projected Gross Profit"].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
    <tbody>{dashboardCompanies.map(c=>{
     const opps=allOpportunities.filter(o=>o.company_id===c.id);
-    const totals=data?.invoiceTotals?.[clientByCompany.get(c.id)??""];
-    const completed=opps.filter(o=>data?.jobs.some(job=>job.id===o.linked_job_id&&job.status==="Completed")).length;
+    const clientId=clientByCompany.get(c.id)??"";
+    const totals=data?.invoiceTotals?.[clientId];
+    const completed=data?.completedJobCounts?.[clientId]??0;
     const projectedGrossProfit=opps.reduce((total,op)=>{
      const profit=data?.assessments.find(a=>a.opportunity_id===op.id)?.projection.grossProfit;
      return total+(typeof profit==="number"&&Number.isFinite(profit)?profit:0);

@@ -155,6 +155,19 @@ async function contractorInvoiceHistory(db:ContractorContext["admin"],companyId:
  }
 }
 
+async function completedContractorJobCounts(db:ContractorContext["admin"],clientIds:string[]){
+ const counts:Record<string,number>={};
+ for(let start=0;start<clientIds.length;start+=20){
+  await Promise.all(clientIds.slice(start,start+20).map(async clientId=>{
+   const {count,error}=await db.from("jobs").select("id",{count:"exact",head:true})
+    .eq("client_id",clientId).eq("status","Completed").is("archived_at",null);
+   if(error)throw error;
+   counts[clientId]=count??0;
+  }));
+ }
+ return counts;
+}
+
 async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  const db=ctx.admin;
  if(ctx.type==="internal"){
@@ -201,10 +214,11 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
    }];
   }).sort((a,b)=>a.name.localeCompare(b.name));
   const directoryClientIds=directory.map(entry=>entry.clientId);
-  const [invoiceTotals,upcomingJobs]=includeInvoiceTotals?await Promise.all([
+  const [invoiceTotals,upcomingJobs,completedJobCounts]=includeInvoiceTotals?await Promise.all([
    contractorInvoiceTotals(db,directoryClientIds),upcomingContractorJobs(db,directoryClientIds),
-  ]):[undefined,[]];
-  return {role:ctx.role,companies:companies.data,directory,invoiceTotals,upcomingJobs,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+   completedContractorJobCounts(db,directoryClientIds),
+  ]):[undefined,[],undefined];
+  return {role:ctx.role,companies:companies.data,directory,invoiceTotals,upcomingJobs,completedJobCounts,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    viewerId:ctx.userId,attempts:attempts.data,followups:followups.data,
    jobs:jobs.data,invoices:invoices.data};
