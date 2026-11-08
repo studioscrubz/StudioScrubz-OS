@@ -18,7 +18,8 @@
       "fix/sync-contractor-scheduled-jobs": false,
       "fix/contractor-notification-setting": false,
       "fix/contractor-invoice-history": false,
-      "fix/contractor-completed-job-totals": false
+      "fix/contractor-completed-job-totals": false,
+      "fix/empty-archives": false
     }
   },
   "crons": [

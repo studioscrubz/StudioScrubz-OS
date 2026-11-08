@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { canPermanentlyDelete } from "@/lib/auth/permissions";
-import { getArchivedRecords, permanentlyDeleteArchivedRecord, restoreAndReopenArchivedJob, restoreArchivedRecord } from "@/lib/services/archives";
+import { emptyArchives, getArchivedRecords, permanentlyDeleteArchivedRecord, restoreAndReopenArchivedJob, restoreArchivedRecord } from "@/lib/services/archives";
 import { ARCHIVE_RECORD_TYPES, type ArchivedRecord, type ArchiveRecordType } from "@/types/archive";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 
@@ -17,6 +17,9 @@ export function ArchivesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [emptyText, setEmptyText] = useState("");
+  const [retained, setRetained] = useState<Awaited<ReturnType<typeof emptyArchives>>["remaining"]>([]);
   const [confirming, setConfirming] = useState<ArchivedRecord | null>(null);
   const [confirmingReopen, setConfirmingReopen] = useState<ArchivedRecord | null>(null);
   const canRestoreAndReopen = ["Master Admin", "Administrator", "Manager"].includes(auth.profile?.role ?? "");
@@ -29,11 +32,43 @@ export function ArchivesPage() {
   async function restore(record: ArchivedRecord) { setBusy(record.id); setError(null); try { await restoreArchivedRecord(record); await load(); setNotice(`${record.label} restored.`); } catch (cause) { console.error("Archive restore failed", cause); setError(message(cause)); } finally { setBusy(null); } }
   async function reopen(record: ArchivedRecord) { setBusy(record.id); setError(null); try { await restoreAndReopenArchivedJob(record); await load(); setConfirmingReopen(null); setNotice(`${record.label} restored and reopened.`); } catch (cause) { console.error("Job restore and reopen failed", cause); setError(message(cause)); } finally { setBusy(null); } }
   async function remove(record: ArchivedRecord) { setBusy(record.id); setError(null); try { await permanentlyDeleteArchivedRecord(record); await load(); setConfirming(null); setNotice(`${record.label} permanently deleted.`); } catch (cause) { console.error("Permanent deletion failed", cause); setError(message(cause)); } finally { setBusy(null); } }
+  async function removeAll() {
+    setBusy("empty"); setError(null); setNotice(null); setRetained([]);
+    try {
+      const result = await emptyArchives(records);
+      setRetained(result.remaining);
+      setNotice(`${result.deleted} permanently deleted. ${result.remaining.length} remain in Archives.`);
+      setConfirmEmpty(false);
+      await load();
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setBusy(null);
+    }
+  }
   return <>
     <header className="border-b pb-7"><p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#9a7a17]">Records management</p><h1 className="mt-2 text-3xl font-extrabold text-[#143d1a]">Archives</h1><p className="mt-3 text-neutral-600">View, restore, or permanently delete archived StudioScrubz records.</p></header>
+    {masterAdmin && <button type="button" className={`${danger} mt-5`} disabled={loading || busy !== null || !records.length} onClick={() => { setEmptyText(""); setConfirmEmpty(true); }}>Empty Archives</button>}
     {error && <Alert text={error} />}{notice && <Alert text={notice} good />}
+    {retained.length > 0 && <details className="mt-4 rounded-xl border bg-white p-4">
+      <summary className="cursor-pointer font-bold">Why records remain in Archives</summary>
+      <ul className="mt-2 space-y-2 text-sm">{retained.map(({record,reason}) => <li key={`${record.type}-${record.id}`}><b>{record.label}</b> · {reason}</li>)}</ul>
+    </details>}
     <div className="mt-6 flex flex-wrap gap-2"><Tab active={filter === "All"} text="All" click={() => setFilter("All")} />{ARCHIVE_RECORD_TYPES.map((type) => <Tab key={type} active={filter === type} text={type} click={() => setFilter(type)} />)}</div>
-    {loading ? <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" /> : visible.length ? <div className="mt-6 overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-[#edf1eb] text-xs uppercase text-[#143d1a]"><tr>{["Record Type", "Record", "Related", "Archived Date", "Status", "Actions"].map((label) => <th className="p-4" key={label}>{label}</th>)}</tr></thead><tbody>{visible.map((record) => <tr className="border-t" key={`${record.type}-${record.id}`}><td className="p-4 font-bold">{record.type}</td><td className="p-4 font-extrabold text-[#143d1a]">{record.label}</td><td className="p-4 text-neutral-600">{record.relatedName ?? "—"}</td><td className="p-4">{date(record.archivedAt)}</td><td className="p-4">{record.status}</td><td className="p-4"><div className="flex flex-wrap gap-2"><Link href={record.href} className={secondary}>View</Link>{record.type === "Jobs" && record.canRestoreAndReopen && canRestoreAndReopen ? <button disabled={busy === record.id} className={secondary} onClick={() => setConfirmingReopen(record)}>Restore and Reopen</button> : (record.type !== "Jobs" || canUseLegacyRestore) && <button disabled={busy === record.id} className={secondary} onClick={() => void restore(record)}>Restore</button>}<PermanentDeleteAction record={record} masterAdmin={masterAdmin} busy={busy===record.id} remove={()=>setConfirming(record)}/></div></td></tr>)}</tbody></table></div> : <div className="mt-6 rounded-2xl border border-dashed bg-white p-12 text-center text-neutral-500">No archived records in this category.</div>}
+    {loading ? <div className="mt-6 h-64 animate-pulse rounded-2xl bg-neutral-200" /> : visible.length ? <div className="mt-6 overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-[#edf1eb] text-xs uppercase text-[#143d1a]"><tr>{["Record Type", "Record", "Related", "Archived Date", "Status", "Actions"].map((label) => <th className="p-4" key={label}>{label}</th>)}</tr></thead><tbody>{visible.map((record) => <tr className="border-t" key={`${record.type}-${record.id}`}><td className="p-4 font-bold">{record.type}</td><td className="p-4 font-extrabold text-[#143d1a]">{record.label}</td><td className="p-4 text-neutral-600">{record.relatedName ?? "—"}</td><td className="p-4">{date(record.archivedAt)}</td><td className="p-4">{record.status}</td><td className="p-4"><div className="flex flex-wrap gap-2"><Link href={record.href} className={secondary}>View</Link>{record.type === "Jobs" && record.canRestoreAndReopen && canRestoreAndReopen ? <button disabled={busy !== null} className={secondary} onClick={() => setConfirmingReopen(record)}>Restore and Reopen</button> : (record.type !== "Jobs" || canUseLegacyRestore) && <button disabled={busy !== null} className={secondary} onClick={() => void restore(record)}>Restore</button>}<PermanentDeleteAction record={record} masterAdmin={masterAdmin} busy={busy!==null} remove={()=>setConfirming(record)}/></div></td></tr>)}</tbody></table></div> : <div className="mt-6 rounded-2xl border border-dashed bg-white p-12 text-center text-neutral-500">No archived records in this category.</div>}
+    {confirmEmpty && <div className="fixed inset-0 z-[100] grid place-items-center bg-[#07190a]/70 p-5">
+      <section role="alertdialog" aria-modal="true" aria-labelledby="empty-archives-title" className="w-full max-w-lg rounded-2xl bg-white p-6">
+        <h2 id="empty-archives-title" className="text-xl font-extrabold text-red-800">Empty Archives?</h2>
+        <p className="mt-3 text-sm text-neutral-700">This permanently deletes eligible records across all archive categories currently loaded. Protected records stay in Archives. Deletion cannot be undone.</p>
+        <label className="mt-4 block text-sm font-bold">Type EMPTY to confirm
+          <input value={emptyText} onChange={event => setEmptyText(event.target.value)} disabled={busy === "empty"} className="mt-1 block w-full rounded-lg border p-2" />
+        </label>
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className={secondary} disabled={busy === "empty"} onClick={() => setConfirmEmpty(false)}>Cancel</button>
+          <button type="button" className={danger} disabled={emptyText.trim() !== "EMPTY" || busy !== null} onClick={() => void removeAll()}>{busy === "empty" ? "Deleting eligible records…" : "Permanently Delete Eligible Records"}</button>
+        </div>
+      </section>
+    </div>}
     {confirmingReopen && <div className="fixed inset-0 z-[100] grid place-items-center bg-[#07190a]/70 p-5"><section role="alertdialog" aria-modal="true" aria-labelledby="restore-reopen-title" className="w-full max-w-lg rounded-2xl bg-white p-6"><h2 id="restore-reopen-title" className="text-xl font-extrabold text-[#143d1a]">Restore and reopen this Cancelled Job?</h2><p className="mt-3 text-sm text-neutral-700">The Job will return to the appropriate scheduling status. All existing time entries, GPS trips, photos, notes, evidence, cancellation history, and audit records will be retained.</p><p className="mt-3 rounded-xl bg-[#edf1eb] p-3 font-bold text-[#143d1a]">{confirmingReopen.label}</p><div className="mt-6 flex justify-end gap-2"><button className={secondary} onClick={() => setConfirmingReopen(null)}>Cancel</button><button disabled={busy === confirmingReopen.id} className={primary} onClick={() => void reopen(confirmingReopen)}>Confirm Restore and Reopen</button></div></section></div>}
     {confirming && <div className="fixed inset-0 z-[100] grid place-items-center bg-[#07190a]/70 p-5"><section role="alertdialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-white p-6"><h2 className="text-xl font-extrabold text-red-800">Permanently delete this record?</h2><p className="mt-3 text-sm text-neutral-700">This action cannot be undone. Test/Sandbox invoices without payments can be permanently removed. Invoices with payment or production checkout history must remain archived.</p><p className="mt-3 rounded-xl bg-red-50 p-3 font-bold text-red-800">{confirming.type}: {confirming.label}</p><div className="mt-6 flex justify-end gap-2"><button className={secondary} onClick={() => setConfirming(null)}>Cancel</button><button disabled={busy === confirming.id} className={danger} onClick={() => void remove(confirming)}>Confirm Permanent Delete</button></div></section></div>}
   </>;
