@@ -114,12 +114,45 @@ export async function canPermanentlyDeleteRecord(record: ArchivedRecord): Promis
     : { allowed: true, dependencyCount: 0, reason: null };
 }
 
-export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): Promise<void> {
+async function requireArchiveDeleteClient() {
   const user = await getCurrentUser();
   if (!user) throw new Error("You must be signed in to permanently delete archived records.");
   const profile = await getCurrentProfile(user.id);
   if (!canPermanentlyDelete(profile)) throw new Error("Master Admin authorization is required for permanent deletion.");
-  const client = getSupabaseClient();
+  return getSupabaseClient();
+}
+
+export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): Promise<void> {
+  await deleteArchivedRecord(await requireArchiveDeleteClient(), record);
+  notifyAttentionRefresh();
+}
+
+export async function emptyArchives(records: readonly ArchivedRecord[]) {
+  const client = await requireArchiveDeleteClient();
+  let pending = records.map(record => ({ record, reason: "" }));
+  let deleted = 0;
+  try {
+    while (pending.length) {
+      const remaining: typeof pending = [];
+      for (const { record } of pending) {
+        try {
+          await deleteArchivedRecord(client, record);
+          deleted += 1;
+        } catch (cause) {
+          remaining.push({ record, reason: cause instanceof Error ? cause.message : "Permanent deletion failed." });
+        }
+      }
+      if (remaining.length === pending.length) return { deleted, remaining };
+      // Deleting a dependent archive can make a parent eligible on the next pass.
+      pending = remaining;
+    }
+    return { deleted, remaining: pending };
+  } finally {
+    if (deleted) notifyAttentionRefresh();
+  }
+}
+
+async function deleteArchivedRecord(client: ReturnType<typeof getSupabaseClient>, record: ArchivedRecord) {
   const assessmentPhotoPaths = record.type === "Clients" ? await getClientAssessmentPhotoPaths(client, record.id) : [];
   const { error } = await client.rpc("master_admin_permanently_delete_archived_record", {
     p_record_type: record.type,
@@ -130,7 +163,6 @@ export async function permanentlyDeleteArchivedRecord(record: ArchivedRecord): P
     const { error: storageError } = await client.storage.from(OPERATIONAL_PHOTO_BUCKET).remove(assessmentPhotoPaths);
     if (storageError) console.error("Deleted Client Assessment photo cleanup failed", { clientId: record.id, photoCount: assessmentPhotoPaths.length, message: storageError.message });
   }
-  notifyAttentionRefresh();
 }
 
 async function getClientAssessmentPhotoPaths(client: ReturnType<typeof getSupabaseClient>, clientId: string): Promise<string[]> {
