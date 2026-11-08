@@ -221,3 +221,11 @@ test("portal invoice history is scoped by the linked Accounts client and preserv
  assert.match(api,/contractorInvoiceHistory\(db,companyId,clientId\)/);
  assert.match(portal,/<PortalPanel title="Invoice history">[\s\S]*?invoiceHistory\.length/);
 });
+
+test("staff text invitations return a prepared link before email delivery",()=>{
+ const management=read("components/contractors/ContractorManagement.tsx");
+ assert.match(invites,/ctx\.type==="partner"&&\(ctx\.role!=="Company Admin"\|\|action!=="invite"\)/);
+ assert.match(invites,/if\(textOnly\)return noCache\(\{[^\n]*activationUrl\}\);[\s\S]*?sent=await sendResendEmail/);
+ assert.match(management,/invite\("text",\{companyId,email:inviteEmail\},smsPhone\)/);
+ assert.doesNotMatch(management,/Email &amp; text invitation/);
+});

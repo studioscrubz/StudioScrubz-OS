@@ -94,12 +94,12 @@ export function ContractorManagement({view}: {view:ContractorView}){
    const result=await response.json();
    if(!response.ok)throw new Error(result.error??"Invitation failed");
    if(smsPhone){
-    if(typeof result.activationUrl!=="string")throw new Error("Invitation emailed. The text link was unavailable.");
+    if(typeof result.activationUrl!=="string")throw new Error("The text invitation link was unavailable.");
     try{
      openDeviceSmsApp(smsPhone,`StudioScrubz invited you to the Contractor Portal. Activate your account within seven days: ${result.activationUrl}`);
-     setNotice("Invitation emailed. Send the prepared text from your messaging app.");
+     setNotice("Send the prepared invitation from your messaging app.");
     }catch{
-     setNotice("Invitation emailed. This device could not open its messaging app.");
+     setNotice("Invitation prepared. This device could not open its messaging app.");
     }
    }else setNotice(result.status==="Sent"?"Email provider confirmed invitation delivery.":"Invitation updated.");
    await refresh();
@@ -206,9 +206,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
       </div>
        <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail})}>Email invitation</button>
-        <button type="button" className={secondary} disabled={busy||!companyId||!inviteEmail.trim()||!smsPhone} onClick={()=>{if(smsPhone)void invite("invite",{companyId,email:inviteEmail,includeText:true},smsPhone);}}>Email &amp; text invitation</button>
+        <button type="button" className={secondary} disabled={busy||!companyId||!inviteEmail.trim()||!smsPhone} onClick={()=>{if(smsPhone)void invite("text",{companyId,email:inviteEmail},smsPhone);}}>Text invitation</button>
        </div>
-       <p className="mt-2 text-xs text-neutral-600">Both messages use the same single-use link, which expires after seven days. Send the text from your device’s messaging app.</p>
+       <p className="mt-2 text-xs text-neutral-600">Each invitation link is single-use and expires after seven days. A new invitation replaces any pending link for that email. To send by text, use your device’s messaging app.</p>
       </Panel>
       <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
        <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
