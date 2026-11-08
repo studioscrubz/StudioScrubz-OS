@@ -54,10 +54,10 @@ export async function POST(request:Request){
    await audited(ctx,{companyId:invite.company_id,type:"Invitation Revoked",detail:{invitationId}});
    return noCache({ok:true});
   }
-  if(action!=="invite"&&action!=="resend")throw new ContractorAccessError("Unknown invitation action.",400);
+  if(action!=="invite"&&action!=="resend"&&action!=="text")throw new ContractorAccessError("Unknown invitation action.",400);
   if(ctx.type==="partner"&&(ctx.role!=="Company Admin"||action!=="invite"))
    throw new ContractorAccessError("Only the contractor owner can invite teammates.");
-  const includeText=ctx.type==="internal"&&action==="invite"&&body.includeText===true;
+  const textOnly=action==="text";
   const previous=action==="resend"
    ?await ctx.admin.from("contractor_invitations").select("company_id,invited_email,member_role")
     .eq("id",uuid(body.invitationId)).eq("status","Pending").maybeSingle()
@@ -101,6 +101,7 @@ export async function POST(request:Request){
   const origin=process.env.NODE_ENV==="production"?"https://partners.studioscrubz.com":new URL(request.url).origin;
   const activationPath=process.env.NODE_ENV==="production"?"/activate":"/contractor/activate";
   const activationUrl=`${origin}${activationPath}?token=${token}`;
+  if(textOnly)return noCache({invitationId:invite.id,status:"Prepared",expiresAt:invite.expires_at,activationUrl});
   let sent;
   try {
    const iphoneGuide=await readFile(join(process.cwd(),"assets/email/contractor-portal-iphone-guide.jpg"));
@@ -119,8 +120,6 @@ export async function POST(request:Request){
   }).eq("id",invite.id);
   if(update.error)throw new ContractorAccessError("Email provider accepted delivery; status recording needs review. Do not resend without checking.",503);
   await audited(ctx,{companyId,type:"Invitation Email Sent",detail:{invitationId:invite.id,providerId:sent.id}});
-  return noCache({invitationId:invite.id,status:"Sent",expiresAt:invite.expires_at,
-   ...(includeText?{activationUrl}:{}),
-  });
+  return noCache({invitationId:invite.id,status:"Sent",expiresAt:invite.expires_at});
  }catch(error){return handleContractorError(error);}
 }

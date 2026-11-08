@@ -19,7 +19,8 @@
       "fix/contractor-notification-setting": false,
       "fix/contractor-invoice-history": false,
       "fix/contractor-completed-job-totals": false,
-      "fix/empty-archives": false
+      "fix/empty-archives": false,
+      "fix/separate-contractor-invitation-channels": false
     }
   },
   "crons": [
