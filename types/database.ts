@@ -2691,6 +2691,7 @@ export interface Database {
           p_employee_id: string;
           p_period_days: number;
           p_period_end?: string;
+          p_confirm_no_callbacks?: boolean;
         };
         Returns: EmployeePerformanceReview;
       };

@@ -21,7 +21,8 @@
       "fix/contractor-completed-job-totals": false,
       "fix/empty-archives": false,
       "fix/separate-contractor-invitation-channels": false,
-      "fix/personal-os-email": false
+      "fix/personal-os-email": false,
+      "fix/performance-review-evidence": false
     }
   },
   "crons": [

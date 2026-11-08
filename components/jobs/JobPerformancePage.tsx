@@ -239,7 +239,7 @@ export function JobPerformancePage() {
           Metrics use only authoritative master Job time.
         </p>
       </header>
-      {canManageQuality && <EmployeePerformanceManagement />}
+      {canManageQuality && <EmployeePerformanceManagement today={today} />}
 
       <section className="mt-6 rounded-2xl border bg-white p-4">
         <div className="flex flex-wrap gap-3">
