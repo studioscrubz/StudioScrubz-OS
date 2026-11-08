@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { hasPermission } from "@/lib/auth/permissions";
 import { sendResendEmail } from "@/lib/email/resend";
-import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
+import { PersonalEmailSetupError, resolvePersonalEmailSender } from "@/lib/email/personalSender";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -176,12 +176,13 @@ export async function POST(request: Request) {
       content: generateServiceCapabilityPacketPdf(packetModel ?? packetFromCommunication(communication, identity)).toString("base64"),
       contentType: "application/pdf",
     }] : undefined;
+    const sender = await resolvePersonalEmailSender(profile, admin);
     const sent = await sendResendEmail({
       recipientEmail,
       subject,
       ...content,
       attachments,
-      ...resolveEmailSenderProfile("vendor"),
+      ...sender,
       idempotencyKey: eventKey,
     });
     providerMessageId = confirmedProviderMessageId(sent.id);
@@ -189,6 +190,7 @@ export async function POST(request: Request) {
     const finalized = await finalize(admin, communicationId, providerMessageId, null);
     return acceptedResponse(finalized, providerMessageId);
   } catch (cause) {
+    if (cause instanceof PersonalEmailSetupError) return Response.json({ error: cause.message }, { status: cause.status });
     if (cause instanceof InputError) return Response.json({ error: cause.message }, { status: cause.status });
     if (cause instanceof UnconfirmedProviderStateError) return Response.json({ error: cause.message }, { status: 409 });
     if (providerMessageId) {

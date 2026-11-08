@@ -242,7 +242,7 @@ async function deliver(admin: Admin, delivery: Delivery): Promise<Delivery> {
 
     const content = invitationContent(delivery, token);
 
-    const sent = await sendResendEmail({ recipientEmail, subject: content.subject, text: content.text, html: content.html, idempotencyKey: delivery.event_key, ...resolveEmailSenderProfile("general"), attachments: [{ filename: "studioscrubz-event.ics", content: Buffer.from(content.ics).toString("base64"), contentType: `text/calendar; charset=utf-8; method=${delivery.method}` }] });
+    const sent = await sendResendEmail({ recipientEmail, subject: content.subject, text: content.text, html: content.html, idempotencyKey: delivery.event_key, ...resolveEmailSenderProfile("systemNotification"), attachments: [{ filename: "studioscrubz-event.ics", content: Buffer.from(content.ics).toString("base64"), contentType: `text/calendar; charset=utf-8; method=${delivery.method}` }] });
 
     const acceptedAt = new Date().toISOString();
 

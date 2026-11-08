@@ -30,8 +30,7 @@ test("route authenticates and enforces active Communications permission", () => 
 });
 
 test("route resolves sender identity server-side without accepting browser sender input", () => {
-  assert.match(route, /resolveEmailSenderProfile\(await senderProfileForCommunication/);
-  assert.match(route, /return "general"/);
+  assert.match(route, /resolvePersonalEmailSender\(profile, admin\)/);
   assert.doesNotMatch(service, /\bfrom\s*:|senderProfile/i);
 });
 

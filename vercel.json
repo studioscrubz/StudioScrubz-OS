@@ -20,7 +20,8 @@
       "fix/contractor-invoice-history": false,
       "fix/contractor-completed-job-totals": false,
       "fix/empty-archives": false,
-      "fix/separate-contractor-invitation-channels": false
+      "fix/separate-contractor-invitation-channels": false,
+      "fix/personal-os-email": false
     }
   },
   "crons": [
