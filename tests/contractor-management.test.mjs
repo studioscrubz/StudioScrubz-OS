@@ -239,3 +239,11 @@ test("completed portal jobs use the active linked client and exclude foreign ass
  const portal=read("components/contractors/ContractorPortal.tsx");
  assert.match(portal,/<PortalPanel title="Completed jobs">[\s\S]*?job\.client_name[\s\S]*?job\.job_number/);
 });
+
+test("portal request details open only after an explicit selection",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ assert.match(portal,/setOpportunityId\(current=>body\.opportunities\?\.some[^\n]+\?current:""\)/);
+ assert.match(portal,/resetJobForm\(\);setOpportunityId\(""\);setTab\("jobs"\)/);
+ assert.match(portal,/onClick=\{\(\)=>setOpportunityId\(x\.id\)\}/);
+ assert.match(portal,/chosen&&<PortalPanel title=\{chosen.opportunity_number\}/);
+});

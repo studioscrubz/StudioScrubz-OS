@@ -49,7 +49,7 @@ export function ContractorPortal(){
   if(res.status===401){router.replace(contractorPage("/login"));return;}
   if(!res.ok){setData(null);throw new Error(body.error??"Company account unavailable");}
   if(!["Member","Company Admin"].includes(body.role))throw new Error("Contractor portal access is required.");
-  setData(body);setOpportunityId(current=>body.opportunities?.some((request:Opportunity)=>request.id===current)?current:body.opportunities?.[0]?.id||"");
+  setData(body);setOpportunityId(current=>body.opportunities?.some((request:Opportunity)=>request.id===current)?current:"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
  useEffect(()=>{
@@ -112,7 +112,7 @@ export function ContractorPortal(){
    <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut({scope:"local"});router.replace(contractorPage("/login"))}}>Sign out</button>
   </div></header>
   <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
-   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>{if(t==="submit"&&editing)resetJobForm();setTab(t);}}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
+   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>{if(t==="submit"&&editing)resetJobForm();if(t==="jobs")setOpportunityId("");setTab(t);}}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
    {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
@@ -166,7 +166,7 @@ export function ContractorPortal(){
      const scheduledDate=job?.scheduled_date
       ?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))
       :null;
-     return <button key={opportunity.id} type="button" className="flex w-full flex-wrap items-start justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId(opportunity.id);setTab("jobs")}}>
+     return <button key={opportunity.id} type="button" className="flex w-full flex-wrap items-start justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId("");setTab("jobs")}}>
       <span><b>{opportunity.property_name??opportunity.property_address}</b>
        <small className="block">{opportunity.opportunity_number} · {opportunity.service_type}</small>
        {scheduledDate&&<span className="mt-1 block text-sm">
@@ -179,7 +179,7 @@ export function ContractorPortal(){
     })}</PortalPanel></>}
    {data&&tab==="submit"&&<PortalPanel title={editing?"Edit job request":"Submit a cleaning opportunity"}>
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setTab("jobs");setOpportunityId(r.opportunity.id);}}}>
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setOpportunityId("");setTab("jobs");}}}>
      <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
       {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
      </select></label>
@@ -219,11 +219,12 @@ export function ContractorPortal(){
      <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length}>{editing?"Save changes":"Submit opportunity"}</button>{editing&&<button type="button" className={`${secondary} ml-2`} onClick={()=>{resetJobForm();setTab("jobs");}}>Cancel edit</button>}</div>
     </form>
    </PortalPanel>}
-   {data&&tab==="jobs"&&<div id="contractor-requests" className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+   {data&&tab==="jobs"&&<div id="contractor-requests" className={chosen?"grid gap-4 lg:grid-cols-[1fr_2fr]":"grid gap-4"}>
     <PortalPanel title="Requests & jobs"><p className="mb-3 text-sm text-neutral-600">Track cleaning requests you’ve submitted and see the schedule, completion details, and invoice status once a job is accepted.</p>{data.opportunities.map(x=><button key={x.id} type="button" className={`mb-2 block w-full rounded-lg border p-3 text-left text-sm ${opportunityId===x.id?"border-[#143d1a] bg-green-50":"bg-white"}`} onClick={()=>setOpportunityId(x.id)}>
      <b>{x.property_name??x.property_address}</b><span className="mt-1 block">{x.opportunity_number} · {x.service_type} · {x.status}</span></button>)}
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>
-    <PortalPanel title={chosen?.opportunity_number??"Select an opportunity"}>{chosen&&<div className="space-y-3 text-sm">
+    {chosen&&<PortalPanel title={chosen.opportunity_number}><div className="space-y-3 text-sm">
+     <button type="button" className={secondary} onClick={()=>setOpportunityId("")}>Close details</button>
           {chosen.property_name&&<p><b>Name:</b> {chosen.property_name}</p>}
      {canEdit&&<div><div className="flex flex-wrap gap-2">
       <button type="button" className={secondary} disabled={busy} onClick={()=>editJob(chosen)}>Edit request</button>
@@ -271,7 +272,7 @@ export function ContractorPortal(){
      <div>{data.documents.filter(d=>d.opportunity_id===chosen.id).map(d=><a key={d.id} className="mr-3 text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}</div>
      <label className="block font-bold">Upload photo or scope PDF<input className={input} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={e=>setFile(e.target.files?.[0]??null)}/></label>
      <button className={secondary} type="button" disabled={busy||!file} onClick={()=>void upload(chosen.id)}>Upload attachment</button>
-    </div>}</PortalPanel>
+    </div></PortalPanel>}
    </div>}
    {data&&tab==="messages"&&<PortalPanel title="Private messages with Operations">
     <p className="mb-3 text-sm text-neutral-600">{data.operationsManager
