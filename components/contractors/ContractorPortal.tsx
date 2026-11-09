@@ -225,6 +225,10 @@ export function ContractorPortal(){
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>
     <PortalPanel title={chosen?.opportunity_number??"Select an opportunity"}>{chosen&&<div className="space-y-3 text-sm">
           {chosen.property_name&&<p><b>Name:</b> {chosen.property_name}</p>}
+     {chosen.submitted_by===data.viewerId&&chosen.status!=="Cancelled"&&
+      <button type="button" className={secondary} disabled={busy} onClick={async()=>{
+       if(await action("emailOpportunity",{opportunityId:chosen.id}))setNotice("Email sent to StudioScrubz Operations.");
+      }}>Email Operations</button>}
      {canEdit&&<div><div className="flex flex-wrap gap-2">
       <button type="button" className={secondary} disabled={busy} onClick={()=>editJob(chosen)}>Edit request</button>
       <button type="button" className={`${secondary} text-red-700`} disabled={busy} onClick={async()=>{

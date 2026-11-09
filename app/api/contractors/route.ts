@@ -463,7 +463,6 @@ export async function POST(request:Request){
     if(error)throw error;
     if(!data)throw new ContractorAccessError("This request changed or was approved. Reload it before editing.",409);
     await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Edited"});
-    await notify(ctx,"Contractor request updated",`Opportunity ${data.opportunity_number} was updated and needs review.`,ctx.companyId,data.id,"internal");
     return noCache({opportunity:data});
    }
    // Require a stable submission key so browser retries cannot create duplicate jobs.
@@ -474,8 +473,18 @@ export async function POST(request:Request){
    if(error){if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Submitted"});
-   await notify(ctx,"New contractor opportunity",`Opportunity ${data.opportunity_number} was submitted for review.`,ctx.companyId,data.id,"internal");
    return noCache({opportunity:data});
+  }
+  if(action==="emailOpportunity"){
+   requirePartner(ctx);
+   const opportunity=await partnerOpportunity(ctx,uuid(input.opportunityId));
+   if(opportunity.submitted_by!==ctx.userId)throw new ContractorAccessError("Only the person who submitted this request can email it.");
+   if(opportunity.status==="Cancelled")throw new ContractorAccessError("This request was withdrawn.",409);
+   const sent=await notify(ctx,"Contractor request for review",
+    `A contractor requested an email reminder for opportunity ${opportunity.opportunity_number}.`,
+    ctx.companyId,opportunity.id,"internal",`manual-request:${opportunity.id}:${opportunity.updated_at}`);
+   if(!sent)throw new ContractorAccessError("The email could not be sent. Please try again.",502);
+   return noCache({sent:true});
   }
   if(action==="message"||action==="markMessagesRead"){
    const companyId=ctx.type==="partner"?ctx.companyId:uuid(input.companyId);
@@ -839,14 +848,14 @@ async function notify(ctx:ContractorContext,subject:string,message:string,compan
  try{
   const db=ctx.admin;
   const {data:company}=await db.from("contractor_companies").select("name,contact_email,assigned_manager_id").eq("id",companyId).single();
-  if(!company)return;
+  if(!company)return false;
   let recipient=company.contact_email as string;
   if(to==="internal"){
    const {data:manager}=company.assigned_manager_id?await db.from("user_profiles").select("email").eq("id",company.assigned_manager_id).maybeSingle():{data:null};
    if(manager?.email)recipient=manager.email;
    else{
     const {data:master}=await db.from("user_profiles").select("email").eq("role","Master Admin").eq("is_active",true).limit(1).maybeSingle();
-    if(!master?.email)return;
+    if(!master?.email)return false;
     recipient=master.email;
    }
   }
@@ -856,8 +865,10 @@ async function notify(ctx:ContractorContext,subject:string,message:string,compan
    idempotencyKey:`contractor-event:${eventKey}`,replyTo:null});
   await audited(ctx,{companyId,opportunityId,type:"Email Notification Sent",
    detail:{recipient,providerId:response.id,subject}});
+  return true;
  }catch(error){
   console.error("Contractor notification delivery failed",error);
   try{await audited(ctx,{companyId,opportunityId,type:"Email Notification Failed",detail:{subject}});}catch{}
+  return false;
  }
 }
