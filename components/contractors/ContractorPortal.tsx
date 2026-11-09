@@ -27,6 +27,7 @@ export function ContractorPortal(){
  const router=useRouter();
  const [data,setData]=useState<Portal|null>(null),[tab,setTab]=useState<Tab>("dashboard");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [submittedRequestId,setSubmittedRequestId]=useState<string|null>(null);
  const [opportunityId,setOpportunityId]=useState(""),[message,setMessage]=useState("");
  const [teamInviteEmail,setTeamInviteEmail]=useState("");
  const [profileEdit,setProfileEdit]=useState<Record<string,string>>({});
@@ -82,6 +83,10 @@ export function ContractorPortal(){
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}finally{setBusy(false);}
  };
  const chosen=data?.opportunities.find(x=>x.id===opportunityId);
+ const awaitingSubmissionConfirmation=Boolean(chosen&&chosen.id===submittedRequestId&&!chosen.partner_confirmed_at);
+ useEffect(()=>{
+  if(tab==="jobs"&&awaitingSubmissionConfirmation)document.getElementById("confirm-contractor-request")?.scrollIntoView({block:"start"});
+ },[tab,awaitingSubmissionConfirmation,submittedRequestId]);
  const canEdit=Boolean(chosen&&chosen.submitted_by===data?.viewerId&&!chosen.linked_job_id&&!chosen.internal_confirmed_at&&editableContractorRequestStatuses.includes(chosen.status));
  const resetJobForm=()=>{
   setEditing(null);setPropertyName("");setPropertyType("Residential");setServiceType("");setAddress(blankAddress);
@@ -179,7 +184,7 @@ export function ContractorPortal(){
     })}</PortalPanel></>}
    {data&&tab==="submit"&&<PortalPanel title={editing?"Edit job request":"Submit a cleaning opportunity"}>
     <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setOpportunityId("");setTab("jobs");}}}>
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setSubmittedRequestId(r.opportunity.id);setOpportunityId(r.opportunity.id);setTab("jobs");}}}>
      <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
       {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
      </select></label>
@@ -224,7 +229,7 @@ export function ContractorPortal(){
      <b>{x.property_name??x.property_address}</b><span className="mt-1 block">{x.opportunity_number} · {x.service_type} · {x.status}</span></button>)}
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>
     {chosen&&<PortalPanel title={chosen.opportunity_number}><div className="space-y-3 text-sm">
-     <button type="button" className={secondary} onClick={()=>setOpportunityId("")}>Close details</button>
+     {!awaitingSubmissionConfirmation&&<button type="button" className={secondary} onClick={()=>setOpportunityId("")}>Close details</button>}
           {chosen.property_name&&<p><b>Name:</b> {chosen.property_name}</p>}
      {canEdit&&<div><div className="flex flex-wrap gap-2">
       <button type="button" className={secondary} disabled={busy} onClick={()=>editJob(chosen)}>Edit request</button>
@@ -265,9 +270,16 @@ export function ContractorPortal(){
       <label className="block font-bold">Counteroffer scope<textarea className={input} rows={3} value={counterScope} onChange={e=>setCounterScope(e.target.value)}/></label>
       <button type="button" disabled={busy||!counterAmount||!counterScope} className={secondary} onClick={()=>void action("offer",{opportunityId:chosen.id,amount:Number(counterAmount),scope:counterScope})}>Submit counteroffer</button>
      </>}
-     {["New Opportunity","Negotiating","Information Requested"].includes(chosen.status)&&!chosen.partner_confirmed_at&&<div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+     {["New Opportunity","Negotiating","Information Requested"].includes(chosen.status)&&!chosen.partner_confirmed_at&&<div id="confirm-contractor-request" className="rounded-lg border border-amber-300 bg-amber-50 p-4">
       <p className="mb-3">Confirm the latest scope and price in writing before StudioScrubz can accept this job. Confirmation does not guarantee acceptance.</p>
-      <button className={primary} disabled={busy} onClick={()=>void action("confirmOffer",{opportunityId:chosen.id,confirmed:true,amount:Number(chosen.agreed_amount??chosen.proposed_amount),scope:chosen.final_scope??chosen.scope_of_work})}>Confirm final scope and compensation</button></div>}
+      <button className={primary} disabled={busy} onClick={async()=>{
+       const result=await action("confirmOffer",{opportunityId:chosen.id,confirmed:true,amount:Number(chosen.agreed_amount??chosen.proposed_amount),scope:chosen.final_scope??chosen.scope_of_work});
+       if(result){
+        setSubmittedRequestId(null);
+        setOpportunityId(current=>current===chosen.id?"":current);
+        setNotice("Scope and price confirmed. StudioScrubz Operations can now review your request.");
+       }
+      }}>Confirm final scope and compensation</button></div>}
      <h3 className="pt-3 font-extrabold">Authorized attachments</h3>
      <div>{data.documents.filter(d=>d.opportunity_id===chosen.id).map(d=><a key={d.id} className="mr-3 text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}</div>
      <label className="block font-bold">Upload photo or scope PDF<input className={input} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={e=>setFile(e.target.files?.[0]??null)}/></label>

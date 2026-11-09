@@ -25,7 +25,8 @@
       "fix/noindex-os-login": false,
       "fix/contractor-completed-job-history": false,
       "fix/contractor-alert-recipients": false,
-      "fix/advisory-contractor-profitability": false
+      "fix/advisory-contractor-profitability": false,
+      "fix/contractor-confirm-before-collapse": false
     }
   },
   "crons": [
