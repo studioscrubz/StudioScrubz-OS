@@ -224,15 +224,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
        </div>
        <p className="mt-2 text-xs text-neutral-600">Each invitation link is single-use and expires after seven days. A new invitation replaces any pending link for that email. To send by text, use your device’s messaging app.</p>
       </Panel>
-      <Panel title="Authorized contractor users">{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
+      <CompactAccessList title="Authorized contractor users" count={data?.members.length??0}>{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
        <div><b>{member.email}</b><p>{companies.find(c=>c.id===member.company_id)?.name} · {member.member_role} · {member.is_active?"Active":"Deactivated"}</p></div>
        <button type="button" className={secondary} disabled={busy} onClick={()=>void run("setMemberAccess",{memberId:member.id,isActive:!member.is_active})}>
          {member.is_active?"Deactivate portal access":"Restore portal access"}</button>
-      </div>)}</Panel>
-      <Panel title="Invitation status">{data?.invitations.map(i=><div key={i.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-sm">
+      </div>)}</CompactAccessList>
+      <CompactAccessList title="Invitation status" count={data?.invitations.length??0}>{data?.invitations.map(i=><div key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
        <div><b>{i.invited_email}</b><p>{companies.find(c=>c.id===i.company_id)?.name} · {i.member_role} · {i.status} / {i.delivery_status}</p><small>Expires: {new Date(i.expires_at).toLocaleDateString()}</small></div>
-       {i.status==="Pending"&&<div className="flex gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{invitationId:i.id})}>Resend new token</button></div>}
-      </div>)}</Panel>
+       {i.status==="Pending"&&<div className="flex flex-wrap gap-2"><button className={secondary} disabled={busy} onClick={()=>void invite("revoke",{invitationId:i.id})}>Revoke</button><button className={secondary} disabled={busy} onClick={()=>void invite("resend",{invitationId:i.id})}>Resend new token</button></div>}
+      </div>)}</CompactAccessList>
      </div>
     </Panel>
    </div>}
@@ -397,6 +397,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
 
  </main>;
 
+}
+function CompactAccessList({title,count,children}:{title:string;count:number;children:React.ReactNode}){
+ return <details className="rounded-lg border px-3">
+  <summary className="cursor-pointer py-2 text-sm font-bold text-[#143d1a]">
+   {title} <span className="ml-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">{count}</span>
+  </summary>
+  <div className="divide-y border-t">{count?children:<p className="py-2 text-xs text-neutral-600">No records yet.</p>}</div>
+ </details>;
 }
 function Panel({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-xl border bg-white p-4 shadow-sm"><h2 className="mb-4 text-lg font-extrabold text-[#143d1a]">{title}</h2>{children}</section>}
 function Field({label,value,set,type="text",required=false}:{label:string;value:string;set:(v:string)=>void;type?:string;required?:boolean}){return <label className="block text-sm font-semibold">{label}<input required={required} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} value={value} onChange={e=>set(e.target.value)} className={input}/></label>}
