@@ -23,7 +23,8 @@
       "fix/separate-contractor-invitation-channels": false,
       "fix/personal-os-email": false,
       "fix/noindex-os-login": false,
-      "fix/contractor-completed-job-history": false
+      "fix/contractor-completed-job-history": false,
+      "fix/contractor-alert-recipients": false
     }
   },
   "crons": [

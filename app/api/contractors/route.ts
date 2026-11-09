@@ -314,12 +314,15 @@ export async function POST(request:Request){
    requireInternal(ctx);
    const name=required(input.name,"company name",200),email=required(input.email,"contact email",320).toLowerCase();
    if(!/^\S+@\S+\.\S+$/.test(email))throw new ContractorAccessError("Valid contact email required.",400);
+   const configuredManagerId=process.env.CONTRACTOR_OPERATIONS_MANAGER_ID?.trim();
+   const manager=configuredManagerId?await activeOperationsManager(ctx,uuid(configuredManagerId)):null;
+   if(configuredManagerId&&!manager)throw new ContractorAccessError("The configured Operations Manager must be an active Manager or Master Admin.",503);
    const {data,error}=await db.from("contractor_companies").insert({
     name,contact_email:email,contact_name:optional(input.contactName,160)??"",
     phone:optional(input.phone,60),business_address:optional(input.address,500),
     territories:Array.isArray(input.territories)?input.territories.filter(x=>typeof x==="string").slice(0,30):[],
     service_types:Array.isArray(input.serviceTypes)?input.serviceTypes.filter(x=>typeof x==="string").slice(0,30):[],
-    assigned_manager_id:ctx.userId,payment_terms:optional(input.paymentTerms,500),
+    assigned_manager_id:manager?.id??ctx.userId,payment_terms:optional(input.paymentTerms,500),
    }).select("id").single();
    if(error?.code==="P0001")throw new ContractorAccessError(error.message,409);
    if(error||!data)throw error??new Error("Company not saved.");

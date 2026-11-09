@@ -70,12 +70,11 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
   const visibleTimeEntries = hasPermission(profile, "timeClock.view") ? snapshot.timeEntries.filter((entry) => management || entry.employee_id === profile.employee_id || Boolean(entry.crew_id && crewIds.has(entry.crew_id))) : [];
   const input: AttentionRuleInput = {
     profile,
-    contractorRequestReviews: hasPermission(profile,"contractors.view")
-      ? snapshot.contractorPushRequests.filter(request=>{
-        const managerId=request.manager_id??request.company.assigned_manager_id;
-        return managerId&&activeOperationsManagerIds.has(managerId)?profile.id===managerId:profile.role==="Master Admin";
-      }).map(request=>({...request,status:"New Opportunity"}))
-      : [],
+    contractorRequestReviews: snapshot.contractorPushRequests.filter(request => {
+      const managerId = request.manager_id ?? request.company.assigned_manager_id;
+      return profile.role === "Master Admin" || profile.role === "Administrator"
+        || Boolean(managerId && profile.id === managerId && activeOperationsManagerIds.has(managerId));
+    }).map(request => ({ ...request, status: "New Opportunity" })),
     equipmentResponsibilityTasks:(snapshot.equipmentResponsibilityTasks??[]).filter(task=>task.crew_lead_employee_id===profile.employee_id||task.responsible_employee_id===profile.employee_id),
     timeOffNotifications:(snapshot.timeOffNotifications??[]).filter(notification=>notification.recipient_user_id===profile.id),
     assignedOperationalJobIds: profile.role === "Manager"
@@ -112,7 +111,9 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
     agreementProposalIds: hasPermission(profile, "agreements.view") ? snapshot.agreementProposalIds : [],
     contractJobIds: snapshot.contractJobIds, now: snapshot.now,
   };
-  return buildAttentionItems(input, "Active").items;
+  const items = buildAttentionItems(input, "Active").items;
+  if (hasPermission(profile, "contractors.view")) return items;
+  return items.map(item => item.category === "Contractor Requests" ? { ...item, action_url: "/attention" } : item);
 }
 
 async function query(builder: PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>) { const { data, error } = await builder; if (error) throw new Error(`Attention push source query failed: ${error.message}`); return data ?? []; }
