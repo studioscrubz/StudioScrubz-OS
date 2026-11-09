@@ -251,3 +251,11 @@ test("portal opens new requests for confirmation and keeps other details collaps
  assert.match(portal,/onClick=\{\(\)=>setOpportunityId\(x\.id\)\}/);
  assert.match(portal,/chosen&&<PortalPanel title=\{chosen.opportunity_number\}/);
 });
+
+test("OS review stays closed until a request is selected or opened from a review link",()=>{
+ const management=read("components/contractors/ContractorManagement.tsx");
+ assert.doesNotMatch(management,/visible\[0\]\?\.id/);
+ assert.match(management,/setOpportunityId\(current=>openLinkedReview&&requested\?requested.id:visible.some/);
+ assert.match(management,/onClick=\{\(\)=>select\(o.id\)\}>Review/);
+ assert.match(management,/onClick=\{\(\)=>setOpportunityId\(""\)\}>Close review/);
+});

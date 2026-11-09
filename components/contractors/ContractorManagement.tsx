@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
 import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
@@ -43,6 +43,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  },[]);
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
+ const openedReviewLink=useRef<string|null>(null);
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
@@ -65,7 +66,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
   const visible=(result.opportunities as Opportunity[]).filter(opportunity=>matchesOpportunityView(opportunity,view));
   const requested=visible.find(opportunity=>opportunity.id===requestedId);
   setCompanyId(current=>current||requested?.company_id||result.companies?.[0]?.id||"");
-  setOpportunityId(current=>visible.some(opportunity=>opportunity.id===current)?current:requested?.id??visible[0]?.id??"");
+  const reviewLink=requested?`${view}:${requested.id}`:null;
+  const openLinkedReview=Boolean(reviewLink&&reviewLink!==openedReviewLink.current);
+  openedReviewLink.current=reviewLink;
+  setOpportunityId(current=>openLinkedReview&&requested?requested.id:visible.some(opportunity=>opportunity.id===current)?current:"");
  },[view]);
  useOperationalRealtime(view==="dashboard"?["jobs"]:[],refresh);
  useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(String(e.message));}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[refresh]);
@@ -78,7 +82,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    if(!response.ok)throw new Error(result.error??"Request failed");
    if(action==="accept"&&result.jobId&&typeof payload.opportunityId==="string"){
     setOpportunityId("");
-    router.push(`/contractors/jobs?opportunityId=${encodeURIComponent(payload.opportunityId)}`);
+    router.push("/contractors/jobs");
     return result;
    }
    setNotice(`${action} completed.`);await refresh();
@@ -123,6 +127,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
  },[visibleOpportunities,view]);
  const calendarClientIds=useMemo(()=>new Set(data?.directory.map(entry=>entry.clientId)),[data?.directory]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
+ const selectedId=selected?.id;
+ useEffect(()=>{
+  if(selectedId)document.getElementById("opportunity-detail")?.scrollIntoView({block:"start"});
+ },[selectedId]);
  const assessment=data?.assessments.find(x=>x.opportunity_id===selected?.id);
  const job=data?.jobs.find(x=>x.id===selected?.linked_job_id);
  const selectedInvoices=data?.invoices.filter(x=>x.job_id===selected?.linked_job_id)??[];
@@ -182,7 +190,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <td className="p-3">{currency(projectedGrossProfit)} <span className="text-xs text-neutral-500">(estimate)</span></td></tr>;
    })}</tbody></table>
    {!dashboardCompanies.length&&<p className="p-4 text-sm text-neutral-500">No active contractors to report.</p>}</div>
-   <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies} select={setOpportunityId}/></>}
+   <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies}/></>}
   {view==="companies"&&<section className="grid gap-5 lg:grid-cols-2">
    <Panel title="Create contractor company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
     <Field label="Company name" value={companyName} set={setCompanyName} required/>
@@ -267,7 +275,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
   {(view==="opportunities"||view==="jobs")&&<>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
-   {selected&&<Panel title={`Review ${selected.opportunity_number}`}>
+   {selected&&<div id="opportunity-detail" className="scroll-mt-4"><Panel title={`Review ${selected.opportunity_number}`}>
+    <button type="button" className={`${secondary} mb-4`} onClick={()=>setOpportunityId("")}>Close review</button>
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
      <p><b>Company:</b> {companies.find(x=>x.id===selected.company_id)?.name}</p>
      {selected.property_name&&<p><b>Name:</b> {selected.property_name}</p>}
@@ -347,7 +356,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      }catch(e){setError(e instanceof Error?e.message:"Upload failed");}finally{setBusy(false);}
     }}>Upload attachment</button></div>
     {data?.documents.filter(x=>x.opportunity_id===selected.id).map(x=><a key={x.id} className="mr-2 mt-2 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${x.id}`}>{x.file_name}</a>)}
-   </Panel>}
+   </Panel></div>}
   </>}
   {view==="messages"&&<section className="grid gap-4 lg:grid-cols-[1fr_2fr]"><Panel title="Contractor">{companySelect}
    {canMessagePartner&&<label className="mt-3 block text-sm font-semibold">Contractor profile
@@ -385,8 +394,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
 function Panel({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-xl border bg-white p-4 shadow-sm"><h2 className="mb-4 text-lg font-extrabold text-[#143d1a]">{title}</h2>{children}</section>}
 function Field({label,value,set,type="text",required=false}:{label:string;value:string;set:(v:string)=>void;type?:string;required?:boolean}){return <label className="block text-sm font-semibold">{label}<input required={required} type={type} min={type==="number"?0:undefined} step={type==="number"?"any":undefined} value={value} onChange={e=>set(e.target.value)} className={input}/></label>}
 function NumberField({label,value,set}:{label:string;value:number;set:(v:number)=>void}){return <label className="text-sm font-semibold">{label}<input type="number" min="0.1" step="0.1" value={value} onChange={e=>set(Number(e.target.value))} className={input}/></label>}
-function OpportunityTable({rows,companies,select}:{rows:Opportunity[];companies:Company[];select:(id:string)=>void}){
+function OpportunityTable({rows,companies,select}:{rows:Opportunity[];companies:Company[];select?:(id:string)=>void}){
  return <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-[#143d1a] text-white"><tr>{["Opportunity","Contractor","Service","Requested","Status","Compensation"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead>
- <tbody>{rows.map(o=><tr key={o.id} className="border-t hover:bg-neutral-50"><td className="p-3"><button type="button" className="font-bold text-[#143d1a] underline" onClick={()=>{select(o.id);document.getElementById("opportunity-detail")?.scrollIntoView({behavior:"smooth"});}}>{o.opportunity_number}</button>{o.property_name&&<span className="block">{o.property_name}</span>}</td><td className="p-3">{companies.find(x=>x.id===o.company_id)?.name}</td><td className="p-3">{o.service_type}</td><td className="p-3">{o.requested_date}</td><td className="p-3">{o.status}</td><td className="p-3">{currency(o.agreed_amount??o.proposed_amount)}</td></tr>)}</tbody></table>
+ <tbody>{rows.map(o=><tr key={o.id} className="border-t hover:bg-neutral-50"><td className="p-3"><b>{o.opportunity_number}</b>{select
+   ?<button type="button" className="ml-2 font-bold text-[#143d1a] underline" aria-label={`Review ${o.opportunity_number}`} onClick={()=>select(o.id)}>Review</button>
+   :<Link className="ml-2 font-bold text-[#143d1a] underline" href={`/contractors/${matchesOpportunityView(o,"opportunities")?"opportunities":"jobs"}?opportunityId=${encodeURIComponent(o.id)}`}>Review</Link>}{o.property_name&&<span className="block">{o.property_name}</span>}</td><td className="p-3">{companies.find(x=>x.id===o.company_id)?.name}</td><td className="p-3">{o.service_type}</td><td className="p-3">{o.requested_date}</td><td className="p-3">{o.status}</td><td className="p-3">{currency(o.agreed_amount??o.proposed_amount)}</td></tr>)}</tbody></table>
  {!rows.length&&<p className="p-5 text-sm text-neutral-500">No opportunities match these filters.</p>}</div>
 }
