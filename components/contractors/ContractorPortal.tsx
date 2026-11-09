@@ -21,6 +21,7 @@ const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
 const currency=(x:number|null)=>x==null?"Pending":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(x));
+const bookingStarts=Array.from({length:96},(_,index)=>`${String(Math.floor(index/4)).padStart(2,"0")}:${String((index%4)*15).padStart(2,"0")}`);
 const blankAddress:ContractorPropertyAddress={street:"",line2:"",city:"",state:"",zip:""};
 type Tab="dashboard"|"submit"|"jobs"|"messages"|"company";
 export function ContractorPortal(){
@@ -72,13 +73,36 @@ export function ContractorPortal(){
   }).catch(error=>{if(!controller.signal.aborted){setJobOptions(null);setJobOptionsError(error instanceof Error?error.message:"Job options could not be loaded.");}});
   return()=>controller.abort();
  },[tab,jobOptionsRetry]);
+ const [bookingTimes,setBookingTimes]=useState<{key:string;unavailable:string[]}|null>(null);
+ const [bookingError,setBookingError]=useState("");
+ const [bookingRetry,setBookingRetry]=useState(0);
+ const bookingKey=`${requestedDate}:${editing?.id??""}:${bookingRetry}`;
+ const blockedTimes=bookingTimes?.key===bookingKey?bookingTimes.unavailable:null;
+ useEffect(()=>{
+  if(tab!=="submit"||!requestedDate)return;
+  const controller=new AbortController();
+  const params=new URLSearchParams({view:"booking-times",date:requestedDate});
+  if(editing?.id)params.set("editId",editing.id);
+  setBookingError("");
+  void fetch(`/api/contractors?${params}`,{cache:"no-store",signal:controller.signal}).then(async response=>{
+   const result=await response.json();
+   if(!response.ok)throw new Error(result.error??"Available times could not be loaded.");
+   if(!controller.signal.aborted)setBookingTimes({key:bookingKey,unavailable:result.unavailable});
+  }).catch(error=>{if(!controller.signal.aborted)setBookingError(error.message);});
+  return()=>controller.abort();
+ },[tab,requestedDate,editing?.id,bookingKey]);
  const availableServices=jobOptions?.services.filter(service=>service.division===propertyType)??[];
  const selectedService=availableServices.find(service=>service.name===serviceType);
  const action=async(name:string,args:Record<string,unknown>)=>{
   setBusy(true);setError("");setNotice("");
   try{const r=await fetch("/api/contractors",{method:"POST",headers:{"content-type":"application/json"},
    body:JSON.stringify({action:name,...args})});const result=await r.json();
-   if(!r.ok)throw new Error(result.error??"Request failed");
+   if(!r.ok){
+    if(result.error==="That start time is already reserved. Choose another time."){
+     setRequestedTime("");setBookingRetry(retry=>retry+1);
+    }
+    throw new Error(result.error??"Request failed");
+   }
    setNotice("Saved successfully.");await reload();return result;
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}finally{setBusy(false);}
  };
@@ -210,8 +234,15 @@ export function ContractorPortal(){
      <label className="text-sm font-bold">Property condition<select className={input} value={condition} required onChange={e=>setCondition(e.target.value)}>
       <option value="">Select property condition</option>{contractorPropertyConditions.map(option=><option key={option}>{option}</option>)}
      </select></label>
-     <PortalField label="Requested service date" value={requestedDate} set={setRequestedDate} type="date" required/>
-     <PortalField label="Requested start time" value={requestedTime} set={setRequestedTime} type="time"/>
+     <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
+     <label className="text-sm font-bold">Requested start time (Pacific time)
+      <select className={input} required disabled={!blockedTimes} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
+       <option value="">{!requestedDate?"Choose a date first":!blockedTimes?"Checking available times…":"Choose a start time"}</option>
+       {[...new Set([...bookingStarts,...(requestedTime?[requestedTime]:[])])].sort().map(time=><option key={time} value={time} disabled={blockedTimes?.includes(time)}>{formatTime12Hour(time)}{blockedTimes?.includes(time)?" · Reserved":""}</option>)}
+      </select>
+      {bookingError&&<span className="block text-red-700">{bookingError} <button type="button" className="underline" onClick={()=>setBookingRetry(retry=>retry+1)}>Retry</button></span>}
+      <span className="block text-xs font-normal text-neutral-600">Submitting holds this start time while Operations reviews the request.</span>
+     </label>
      <PortalField label="Estimated total person-hours" value={hours} set={setHours} type="number" required/>
      <PortalField label="Suggested cleaners" value={cleaners} set={setCleaners} type="number" required/>
      <PortalField label="Proposed payment amount ($)" value={amount} set={setAmount} type="number" required/>
@@ -221,7 +252,7 @@ export function ContractorPortal(){
      <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
-     <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length}>{editing?"Save changes":"Submit opportunity"}</button>{editing&&<button type="button" className={`${secondary} ml-2`} onClick={()=>{resetJobForm();setTab("jobs");}}>Cancel edit</button>}</div>
+     <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length||!requestedTime||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>{editing&&<button type="button" className={`${secondary} ml-2`} onClick={()=>{resetJobForm();setTab("jobs");}}>Cancel edit</button>}</div>
     </form>
    </PortalPanel>}
    {data&&tab==="jobs"&&<div id="contractor-requests" className={chosen?"grid gap-4 lg:grid-cols-[1fr_2fr]":"grid gap-4"}>

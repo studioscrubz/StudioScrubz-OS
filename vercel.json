@@ -27,7 +27,8 @@
       "fix/contractor-alert-recipients": false,
       "fix/advisory-contractor-profitability": false,
       "fix/contractor-confirm-before-collapse": false,
-      "fix/contractor-review-on-demand": false
+      "fix/contractor-review-on-demand": false,
+      "fix/contractor-booking-slots": false
     }
   },
   "crons": [

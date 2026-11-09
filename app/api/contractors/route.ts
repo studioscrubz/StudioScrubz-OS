@@ -298,7 +298,23 @@ function validatedSelections(value:unknown,available:readonly string[],label:str
 export async function GET(request:Request){
  try{
   const ctx=await contractorContext();
-  const view=new URL(request.url).searchParams.get("view");
+  const params=new URL(request.url).searchParams;
+  const view=params.get("view");
+  if(view==="booking-times"){
+   requirePartner(ctx);
+   const date=params.get("date");
+   if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new ContractorAccessError("Select a valid service date.",400);
+   let ownRequestId:string|null=null;
+   const editId=params.get("editId");
+   if(editId){
+    const opportunity=await partnerOpportunity(ctx,uuid(editId));
+    if(opportunity.submitted_by===ctx.userId)ownRequestId=opportunity.id;
+   }
+   const {data,error}=await ctx.admin.from("contractor_opportunities").select("id,requested_time")
+    .eq("requested_date",date).not("requested_time","is",null).not("status","in","(Declined,Cancelled)");
+   if(error)throw error;
+   return noCache({unavailable:data.filter(row=>row.id!==ownRequestId).map(row=>row.requested_time?.slice(0,5))});
+  }
   if(view==="job-options"){
    requirePartner(ctx);
    return noCache(await loadContractorJobOptions());
@@ -440,6 +456,9 @@ export async function POST(request:Request){
    if(!/^\d{5}(?:-\d{4})?$/.test(address.zip))
     throw new ContractorAccessError("Enter a valid ZIP code.",400);
    const fullAddress=[address.street,address.line2,address.city,`${address.state} ${address.zip}`].filter(Boolean).join(", ");
+   const startTime=required(input.requestedTime,"start time",5);
+   if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime))
+    throw new ContractorAccessError("Select a valid start time.",400);
    const values={
     service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address},
     property_address:fullAddress,property_type:type,
@@ -448,7 +467,7 @@ export async function POST(request:Request){
     bathrooms:type!=="Residential"||input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),
     scope_of_work:required(scope,"scope of work",10000),
     property_condition:condition,requested_date:date,
-    requested_time:optional(input.requestedTime,8),estimated_person_hours:hours,
+    requested_time:startTime,estimated_person_hours:hours,
     cleaner_count:Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1))),
     proposed_amount:proposed,pricing_basis:required(input.pricingBasis??"Flat Price","pricing basis",80),
     special_instructions:optional(input.instructions,5000),access_arrangements:optional(input.access,2500),
@@ -460,6 +479,8 @@ export async function POST(request:Request){
     }).eq("id",editing.id).eq("company_id",ctx.companyId).eq("submitted_by",ctx.userId)
      .eq("updated_at",editing.updated_at).in("status",editableContractorRequestStatuses)
      .is("linked_job_id",null).is("internal_confirmed_at",null).select("id,opportunity_number").maybeSingle();
+    if(error?.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))
+     throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);
     if(error)throw error;
     if(!data)throw new ContractorAccessError("This request changed or was approved. Reload it before editing.",409);
     await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Edited"});
@@ -471,7 +492,7 @@ export async function POST(request:Request){
    const {data,error}=await db.from("contractor_opportunities").insert({...values,
     company_id:ctx.companyId,submitted_by:ctx.userId,external_reference:externalRef,
    }).select("id,opportunity_number").single();
-   if(error){if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
+   if(error){if(error.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Submitted"});
    await notify(ctx,"New contractor opportunity",`Opportunity ${data.opportunity_number} was submitted for review.`,ctx.companyId,data.id,"internal");
