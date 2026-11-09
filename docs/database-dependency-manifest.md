@@ -262,3 +262,5 @@ New portal companies use the `link_new_contractor_client` insert trigger from `2
 `20261107210843_activate_contractor_company_on_owner_redemption.sql` updates `redeem_contractor_invitation` so a verified owner activates a pending contractor company in the same transaction. Pending companies require owner redemption, and suspended or archived companies remain blocked.
 
 `20261107211116_contractor_structured_property_addresses.sql` updates the contractor request property helper to map the portal's structured address into existing Accounts property columns. The opportunity keeps its formatted display address and legacy requests retain their previous lookup behavior.
+
+Contractor advisory pricing: `20261109165517_advisory_contractor_profitability.sql` updates the existing Job conversion RPC and adds `offer_contractor_profitability_price` for authenticated Master Admins to send an audited counteroffer.

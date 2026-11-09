@@ -35,18 +35,21 @@ test("single-use invitations expire and require matching verified auth email",()
  assert.match(activation,/for update;/i);
  assert.match(activation,/status='Redeemed'/);
 });
-test("pricing, privileged overrides, final confirmation and job idempotency are gated",()=>{
+test("confirmed terms control acceptance while sending the suggested price requires Master Admin",()=>{
+ const advisory=read("supabase/migrations/20261109165517_advisory_contractor_profitability.sql");
+ const conversion=advisory.split("-- Applying the calculated price")[0];
+ const accept=api.slice(api.indexOf('if(action==="accept"||action==="decline")'),api.indexOf('if(action==="retryJobConversion")'));
  assert.match(api,/calculateProfitability\(/);
- assert.match(api,/requireMaster\(ctx\)/);
- assert.match(api,/!opp\.partner_confirmed_at/);
- assert.match(api,/!a\.override_approved_by/);
- assert.match(activation,/v_op\.linked_job_id is not null then return v_op\.linked_job_id/);
- assert.match(activation,/v_op\.partner_confirmed_at is null or \(v_op\.status=\x27Accepted\x27 and v_op\.internal_confirmed_at is null/);
- assert.match(activation,/v_pr\.minimum_price/);
- assert.match(activation,/v_pr\.assessed_amount<>v_op\.agreed_amount/);
- assert.match(activation,/v_pr\.assessed_scope<>v_op\.final_scope/);
- assert.match(api,/a\.assessed_scope!==opp\.final_scope/);
- assert.match(activation,/insert into public\.jobs/);
+ assert.match(accept,/!opp\.partner_confirmed_at/);
+ assert.doesNotMatch(accept,/contractor_profitability|override_approved_by/);
+ assert.match(conversion,/v_op\.linked_job_id is not null then return v_op\.linked_job_id/);
+ assert.match(conversion,/v_op\.partner_confirmed_at is null/);
+ assert.match(conversion,/insert into public\.jobs/);
+ assert.doesNotMatch(conversion,/contractor_profitability/);
+ assert.match(api,/if\(action==="offerProfitabilityPrice"\)\{\s*requireMaster\(ctx\)/);
+ assert.match(advisory,/is_active and role='Master Admin'/);
+ assert.match(advisory,/p_expected_assessed_at is distinct from v_pr.updated_at/);
+ assert.match(advisory,/record_contractor_offer\(v_op.id,v_actor,v_pr.minimum_price/);
 });
 test("existing employee roles do not inherit contractor access, and external portal is separate",()=>{
  assert.match(permissions,/"contractors.view", "contractors.manage"/);
