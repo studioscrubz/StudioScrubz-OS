@@ -229,3 +229,13 @@ test("staff text invitations return a prepared link before email delivery",()=>{
  assert.match(management,/invite\("text",\{companyId,email:inviteEmail\},smsPhone\)/);
  assert.doesNotMatch(management,/Email &amp; text invitation/);
 });
+
+test("completed portal jobs use the active linked client and exclude foreign assignments",()=>{
+ const query=api.slice(api.indexOf("async function completedContractorJobs"),api.indexOf("async function completedContractorJobCounts"));
+ assert.match(query,/\.eq\("client_id",clientId\).*\.eq\("client.status","Active"\)/);
+ assert.match(query,/\.eq\("status","Completed"\)\.is\("archived_at",null\)/);
+ assert.match(query,/\.neq\("company_id",companyId\)[\s\S]*?blockedJobs\.has\(job\.id\)/);
+ assert.match(api,/completedContractorJobs\(db,companyId,clientId\),/);
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ assert.match(portal,/<PortalPanel title="Completed jobs">[\s\S]*?job\.client_name[\s\S]*?job\.job_number/);
+});

@@ -15,7 +15,8 @@ type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;completed_at:string|null};
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
 type InvoiceHistoryEntry=Pick<Invoice,"id"|"invoice_number"|"status"|"total"|"amount_paid">&{balance_due:number;issue_date:string|null};
-type Portal={invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type CompletedJob={id:string;client_name:string;job_number:string;property_name:string|null;service_name:string|null;completed_at:string|null};
+type Portal={completedJobs?:CompletedJob[];invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -123,6 +124,25 @@ export function ContractorPortal(){
      {job.location&&<p className="text-sm">{job.location}</p>}
     </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
    </PortalPanel>}
+   {data&&tab==="jobs"&&<PortalPanel title="Completed jobs">
+    {data.completedJobs?.length?<ul className="divide-y">
+     {data.completedJobs.map(job=>{
+      const request=data.opportunities.find(opportunity=>opportunity.linked_job_id===job.id);
+      const completedDate=job.completed_at
+       ?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"America/Los_Angeles"}).format(new Date(job.completed_at))
+       :null;
+      return <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+       <div>
+        <b>{job.client_name}</b>
+        <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
+        {job.property_name&&<p className="text-sm">{job.property_name}</p>}
+        {completedDate&&<p className="text-sm">Completed {completedDate}</p>}
+       </div>
+       {request&&<button type="button" className={secondary} onClick={()=>{setOpportunityId(request.id);document.getElementById("contractor-requests")?.scrollIntoView({block:"start"});}}>Open request</button>}
+      </li>;
+     })}
+    </ul>:<p className="text-sm text-neutral-600">No completed jobs are available yet.</p>}
+   </PortalPanel>}
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
@@ -199,7 +219,7 @@ export function ContractorPortal(){
      <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length}>{editing?"Save changes":"Submit opportunity"}</button>{editing&&<button type="button" className={`${secondary} ml-2`} onClick={()=>{resetJobForm();setTab("jobs");}}>Cancel edit</button>}</div>
     </form>
    </PortalPanel>}
-   {data&&tab==="jobs"&&<div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+   {data&&tab==="jobs"&&<div id="contractor-requests" className="grid gap-4 lg:grid-cols-[1fr_2fr]">
     <PortalPanel title="Requests & jobs"><p className="mb-3 text-sm text-neutral-600">Track cleaning requests you’ve submitted and see the schedule, completion details, and invoice status once a job is accepted.</p>{data.opportunities.map(x=><button key={x.id} type="button" className={`mb-2 block w-full rounded-lg border p-3 text-left text-sm ${opportunityId===x.id?"border-[#143d1a] bg-green-50":"bg-white"}`} onClick={()=>setOpportunityId(x.id)}>
      <b>{x.property_name??x.property_address}</b><span className="mt-1 block">{x.opportunity_number} · {x.service_type} · {x.status}</span></button>)}
      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted yet.</p>}</PortalPanel>

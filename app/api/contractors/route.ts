@@ -156,6 +156,33 @@ async function contractorInvoiceHistory(db:ContractorContext["admin"],companyId:
  }
 }
 
+async function completedContractorJobs(db:ContractorContext["admin"],companyId:string,clientId:string|null){
+ if(!clientId)return [];
+ const history=[];
+ const pageSize=100;
+ for(let offset=0;;offset+=pageSize){
+  const {data,error}=await db.from("jobs")
+   .select("id,job_number,property_name,service_name,completed_at,client:clients!jobs_client_id_fkey!inner(company_name,first_name,last_name)")
+   .eq("client_id",clientId).eq("client.client_type","Contractor").eq("client.status","Active").is("client.archived_at",null)
+   .eq("status","Completed").is("archived_at",null)
+   .order("completed_at",{ascending:false,nullsFirst:false}).order("scheduled_date",{ascending:false,nullsFirst:false})
+   .order("id").range(offset,offset+pageSize-1);
+  if(error)throw error;
+  if(!data.length)return history;
+  const {data:foreignLinks,error:linkError}=await db.from("contractor_opportunities")
+   .select("linked_job_id").in("linked_job_id",data.map(job=>job.id)).neq("company_id",companyId);
+  if(linkError)throw linkError;
+  const blockedJobs=new Set(foreignLinks.map(link=>link.linked_job_id));
+  for(const {client:linkedClient,...job} of data){
+   if(blockedJobs.has(job.id))continue;
+   const client=Array.isArray(linkedClient)?linkedClient[0]:linkedClient;
+   if(!client)continue;
+   history.push({...job,client_name:client.company_name?.trim()||[client.first_name,client.last_name].filter(Boolean).join(" ").trim()||"Contractor client"});
+  }
+  if(data.length<pageSize)return history;
+ }
+}
+
 async function completedContractorJobCounts(db:ContractorContext["admin"],clientIds:string[]){
  const counts:Record<string,number>={};
  for(let start=0;start<clientIds.length;start+=20){
@@ -246,14 +273,15 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  const linkedIds=(opportunities.data??[]).map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
  const approvedJobIds=(opportunities.data??[]).filter(x=>Boolean(x.quality_approved_at))
   .map(x=>x.linked_job_id).filter((x):x is string=>Boolean(x));
- const [upcomingJobs,jobs,invoices,invoiceHistory]=await Promise.all([
+ const [upcomingJobs,jobs,invoices,invoiceHistory,completedJobs]=await Promise.all([
   upcomingContractorJobs(db,clientId?[clientId]:[]),
   linkedIds.length?db.from("jobs").select("id,status,scheduled_date,start_time,completed_at").in("id",linkedIds):Promise.resolve({data:[],error:null}),
   approvedJobIds.length?db.from("invoices").select("id,job_id,invoice_number,status,total,amount_paid,due_date").in("job_id",approvedJobIds).is("archived_at",null).neq("status","Cancelled"):Promise.resolve({data:[],error:null}),
   contractorInvoiceHistory(db,companyId,clientId),
+  completedContractorJobs(db,companyId,clientId),
  ]);
  if(jobs.error||invoices.error)throw jobs.error??invoices.error;
- return {role:ctx.role,company:publicCompany,viewerId:ctx.userId,upcomingJobs,invoiceHistory,operationsManager:manager?{name:manager.display_name??"Operations Manager"}:null,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
+ return {role:ctx.role,company:publicCompany,viewerId:ctx.userId,upcomingJobs,invoiceHistory,completedJobs,operationsManager:manager?{name:manager.display_name??"Operations Manager"}:null,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
   documents:ctx.role==="Company Admin"?documents.data:(documents.data??[]).filter(x=>x.category!=="Tax"),
   jobs:jobs.data,invoices:invoices.data};
 }
