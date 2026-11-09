@@ -240,11 +240,10 @@ test("completed portal jobs use the active linked client and exclude foreign ass
  assert.match(portal,/<PortalPanel title="Completed jobs">[\s\S]*?job\.client_name[\s\S]*?job\.job_number/);
 });
 
-test("request submission and editing do not email Operations automatically",()=>{
- const requests=api.slice(api.indexOf('if(action==="submitOpportunity"'),api.indexOf('if(action==="emailOpportunity"'));
- assert.match(requests,/scheduleAttentionPushAfterResponse\(\)/);
- assert.doesNotMatch(requests,/await notify\(/);
- const manual=api.slice(api.indexOf('if(action==="emailOpportunity"'),api.indexOf('if(action==="message"'));
- assert.match(manual,/requirePartner\(ctx\)[\s\S]*partnerOpportunity\(ctx[\s\S]*opportunity.submitted_by!==ctx.userId[\s\S]*await notify\(/);
- assert.match(read("components/contractors/ContractorPortal.tsx"),/action\("emailOpportunity",\{opportunityId:chosen.id\}\)/);
+test("portal request details open only after an explicit selection",()=>{
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ assert.match(portal,/setOpportunityId\(current=>body\.opportunities\?\.some[^\n]+\?current:""\)/);
+ assert.match(portal,/resetJobForm\(\);setOpportunityId\(""\);setTab\("jobs"\)/);
+ assert.match(portal,/onClick=\{\(\)=>setOpportunityId\(x\.id\)\}/);
+ assert.match(portal,/chosen&&<PortalPanel title=\{chosen.opportunity_number\}/);
 });
