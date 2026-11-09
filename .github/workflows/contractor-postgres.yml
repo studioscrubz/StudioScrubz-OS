@@ -27,3 +27,7 @@ jobs:
         run: sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/migrations/20261027205000_fix_completed_job_addon_invoice_repair.sql
       - name: Assert tenant isolation, invitation expiry, handoff rollback, and invoice idempotency
         run: sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/tests/contractor_management_postgres.sql
+      - name: Verify advisory profitability and suggested-price authorization
+        run: |
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/migrations/20261109165517_advisory_contractor_profitability.sql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_contractor_test -f supabase/tests/contractor_advisory_profitability_postgres.sql

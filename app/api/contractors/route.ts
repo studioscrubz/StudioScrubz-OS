@@ -580,19 +580,20 @@ export async function POST(request:Request){
    if(error)throw error;
    await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Profitability Reassessed",
     detail:{belowMinimum:minimum!==null&&projection.price<minimum,complete:valid}});
-   return noCache({projection,acceptanceBlocked:!valid||(minimum!==null&&projection.price<minimum)});
+   return noCache({projection});
   }
-  if(action==="approveOverride"){
+  if(action==="offerProfitabilityPrice"){
    requireMaster(ctx);
    const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
-   const reason=required(input.reason,"override reason",2000);
-   if(reason.length<12)throw new ContractorAccessError("Provide a detailed override reason (at least 12 characters).",400);
-   const {data,error}=await db.from("contractor_profitability").update({
-    override_approved_by:ctx.userId,override_reason:reason,override_at:new Date().toISOString(),
-   }).eq("opportunity_id",opp.id).select("opportunity_id").maybeSingle();
-   if(error||!data)throw new ContractorAccessError("Complete a profitability assessment before overriding.",409);
-   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Master Profitability Override",detail:{reason}});
-   return noCache({ok:true});
+   const session=await createSupabaseServerClient();
+   const {data:offerId,error}=await session.rpc("offer_contractor_profitability_price" as never,{
+    p_opportunity_id:opp.id,p_reason:required(input.reason,"approval reason",2000),
+    p_expected_assessed_at:required(input.assessedAt,"assessment version",80),
+   } as never);
+   if(error)throw new ContractorAccessError(error.message,409);
+   await notify(ctx,"Contractor counteroffer",`A counteroffer was submitted for opportunity ${opp.opportunity_number}.`,
+    opp.company_id,opp.id,"contractor",`offer:${offerId}`);
+   return noCache({offerId});
   }
   if(action==="accept"||action==="decline"){
    requireInternal(ctx);
@@ -614,13 +615,6 @@ export async function POST(request:Request){
    }
    if(opp.status!=="Awaiting Approval"||!opp.partner_confirmed_at||!opp.final_scope||opp.agreed_amount==null)
     throw new ContractorAccessError("Contractor must confirm final scope and compensation in writing.",409);
-   const {data:a,error:ae}=await db.from("contractor_profitability").select("*").eq("opportunity_id",opp.id).maybeSingle();
-   if(ae||!a)throw new ContractorAccessError("Complete a profitability assessment first.",409);
-   if(a.request_revision!==opp.request_revision||Number(a.assessed_amount)!==Number(opp.agreed_amount)||a.assessed_scope!==opp.final_scope)
-    throw new ContractorAccessError("Final terms changed. Recalculate profitability and obtain any new override before acceptance.",409);
-   const below=a.minimum_price===null||Number(opp.agreed_amount)<Number(a.minimum_price)||!a.cost_complete;
-   if(below&&(!a.override_approved_by||!a.override_reason))
-    throw new ContractorAccessError("Below minimum or unverified costs. Master Admin override is required.",409);
    // The database locks the opportunity and rechecks the approved terms before
    // creating the Job and recording acceptance in the same transaction.
    const session=await createSupabaseServerClient();

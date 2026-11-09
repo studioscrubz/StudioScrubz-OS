@@ -14,7 +14,7 @@ type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:st
 type Opportunity={id:string;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;partner_user_id:string;read_at:string|null;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
-type Assessment={opportunity_id:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
+type Assessment={opportunity_id:string;updated_at:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
 type Invite={id:string;company_id:string;invited_email:string;status:string;delivery_status:string;expires_at:string;member_role:string};
 type ContractorMember={id:string;company_id:string;user_id:string;email:string;member_role:string;is_active:boolean;joined_at:string};
 type Job={id:string;status:string;scheduled_date:string|null;start_time:string|null;estimated_duration:number|null;assigned_crew_id:string|null};
@@ -298,7 +298,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <Field label="Counteroffer amount" value={offeredAmount} set={setOfferedAmount} type="number"/>
      <label className="block text-sm font-semibold">Proposed final scope<textarea className={input} value={offerScope} onChange={e=>setOfferScope(e.target.value)} rows={3}/></label>
      <button className={secondary} type="button" disabled={busy||!offeredAmount||!offerScope} onClick={()=>void run("offer",{opportunityId:selected.id,amount:Number(offeredAmount),scope:offerScope})}>Send counteroffer</button>
-     <h3 className="font-extrabold text-[#143d1a]">Internal profitability</h3>
+     <h3 className="font-extrabold text-[#143d1a]">Internal profitability · advisory</h3>
+     <p className="text-sm text-neutral-600">Use this estimate to inform negotiations. You can accept the contractor’s confirmed price without a profitability assessment.</p>
      <div className="grid grid-cols-2 gap-2"><NumberField label="Cleaners" value={cleaners} set={setCleaners}/><NumberField label="Hours per cleaner" value={hours} set={setHours}/>
      <Field label="Verified round-trip miles" value={roundTripMiles} set={setRoundTripMiles} type="number"/>
      <Field label="Verified travel minutes" value={roundTripMinutes} set={setRoundTripMinutes} type="number"/>
@@ -309,23 +310,26 @@ export function ContractorManagement({view}: {view:ContractorView}){
       cleaners,hoursPerCleaner:hours,travelMode:roundTripMiles!==""&&roundTripMinutes!==""?"Manual":"Unavailable",
       roundTripMiles:Number(roundTripMiles),roundTripMinutes:Number(roundTripMinutes),supplies:Number(supplies),equipment:Number(equipment),overhead:Number(overhead)})}>Calculate internal profitability</button>
      {assessment&&<div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-      <p>Minimum acceptable price: <b>{currency(assessment.minimum_price)}</b></p>
+      <p>Suggested price: <b>{currency(assessment.minimum_price)}</b></p>
       {assessment.minimum_price!==null&&Number(selected.agreed_amount??selected.proposed_amount)<Number(assessment.minimum_price)&&
-       <p role="alert" className="mt-2 font-extrabold text-red-700">UNDERBID — Contractor compensation is below the required profitability minimum. Master Admin exception approval is mandatory.</p>}
-      {!assessment.cost_complete&&<p role="alert" className="mt-2 font-bold text-red-700">Travel or other required costs remain unverified; the opportunity cannot be accepted without a documented Master Admin exception.</p>}
+       <p role="alert" className="mt-2 font-extrabold text-red-700">Contractor compensation is below the suggested price.</p>}
+      {!assessment.cost_complete&&<p role="alert" className="mt-2 font-bold text-red-700">Verify travel and other costs to calculate a suggested price.</p>}
       <p>Projected gross margin: <b>{assessment.projected_margin==null?"Unavailable":`${assessment.projected_margin}%`}</b></p>
-      <p>Cost coverage: <b>{assessment.cost_complete?"Complete":"Incomplete – cannot accept without Master Admin override"}</b></p>
-      <p>Override: {assessment.override_approved_by?"Approved with audited reason":"Not approved"}</p></div>}
-     <Field label="Decision / override reason" value={reviewReason} set={setReviewReason}/>
+      <p>Cost coverage: <b>{assessment.cost_complete?"Complete":"Incomplete"}</b></p>
+      </div>}
+     <Field label="Decision / suggested price approval reason" value={reviewReason} set={setReviewReason}/>
      {!selected.linked_job_id&&!["Accepted","Declined","Cancelled","Disputed"].includes(selected.status)&&
       <div className="flex flex-wrap gap-2">
        <button type="button" className={secondary} disabled={busy||!reviewReason.trim()} onClick={()=>void run("requestInformation",{opportunityId:selected.id,reason:reviewReason})}>Request more information</button>
        <button type="button" className={secondary} disabled={busy||!reviewReason.trim()} onClick={()=>void run("markNegotiating",{opportunityId:selected.id,reason:reviewReason})}>Mark negotiating</button>
       </div>}
-     {data?.role==="Master Admin"&&<button className={secondary} disabled={busy||reviewReason.length<12} type="button"
-      onClick={()=>void run("approveOverride",{opportunityId:selected.id,reason:reviewReason})}>Master Admin: approve override</button>}
+     {view==="opportunities"&&data?.role==="Master Admin"&&assessment?.cost_complete&&assessment.minimum_price!==null&&
+      <button className={secondary} disabled={busy||reviewReason.trim().length<12} type="button"
+       onClick={()=>void run("offerProfitabilityPrice",{opportunityId:selected.id,reason:reviewReason,assessedAt:assessment.updated_at})}>
+       Master Admin: approve & send suggested price
+      </button>}
      <div className="flex flex-wrap gap-2">
-      {view==="opportunities"&&<><button className={button} disabled={busy||!selected.partner_confirmed_at||!assessment} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>
+      {view==="opportunities"&&<><button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>
       <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button></>}
       {view==="jobs"&&["Accepted","Crew Assignment"].includes(selected.status)&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
       {!selected.linked_job_id&&<button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("cancelOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Cancel opportunity</button>}
