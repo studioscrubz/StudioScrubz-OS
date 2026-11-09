@@ -45,10 +45,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const openedReviewLink=useRef<string|null>(null);
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
+ const [managedCompanyId,setManagedCompanyId]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  const [inviteEmail,setInviteEmail]=useState(""),[invitePhone,setInvitePhone]=useState<string|null>(null);
- useEffect(()=>{setCompanyEdit({});setInvitePhone(null);},[companyId]);
+ useEffect(()=>{
+  setCompanyEdit({});
+  if(managedCompanyId)document.getElementById("contractor-manage-details")?.scrollIntoView({block:"start"});
+ },[managedCompanyId]);
+ useEffect(()=>{setInvitePhone(null);},[companyId]);
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
  const [messagePartnerId,setMessagePartnerId]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
@@ -112,7 +117,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
  const dashboardCompanies=companies.filter(company=>clientByCompany.has(company.id));
- const selectedCompany=companies.find(x=>x.id===companyId);
+ const selectedCompany=companies.find(x=>x.id===(view==="companies"?managedCompanyId:companyId));
  const invitationPhone=invitePhone??selectedCompany?.phone??"";
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
  const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
@@ -198,9 +203,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <Field label="Primary contact" value={companyContact} set={setCompanyContact}/>
     <button disabled={busy} className={button}>Create Company</button><p className="text-xs text-neutral-600">Saves the company under Accounts → Clients. Portal access is managed separately.</p></form></Panel>
    <Panel title="Active contractor directory"><div className="space-y-2">
-    {data?.directory.map(entry=><button key={entry.clientId} type="button" className="block w-full rounded-lg border bg-white p-3 text-left hover:border-[#143d1a]" onClick={()=>setCompanyId(entry.companyId)}>
+    {data?.directory.map(entry=><button key={entry.clientId} type="button" className="block w-full rounded-lg border bg-white p-3 text-left hover:border-[#143d1a]" onClick={()=>{setManagedCompanyId(entry.companyId);setCompanyId(entry.companyId);}}>
      <b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>
      <small className="block text-neutral-500">Portal access: {entry.portalStatus}</small>
+     <span className="mt-1 block text-sm font-bold text-[#143d1a]">Manage</span>
     </button>)}
     {!data?.directory.length&&<p className="text-sm text-neutral-500">No active contractor clients found.</p>}
    </div></Panel>
@@ -230,7 +236,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
      </div>
     </Panel>
    </div>}
-   {selectedCompany&&<Panel title={`Manage ${selectedCompany.name}`}><div className="space-y-3 text-sm">
+   {selectedCompany&&<Panel title={`Manage ${selectedCompany.name}`}><div id="contractor-manage-details" className="scroll-mt-16 space-y-3 text-sm">
+    <button type="button" className={secondary} onClick={()=>setManagedCompanyId("")}>Close manage panel</button>
     <p>Contact: {selectedCompany.contact_name||"Not supplied"}</p><p>Email: {selectedCompany.contact_email}</p><p>Terms: {selectedCompany.payment_terms||"Not specified"}</p>
     <p><b>Company documents:</b></p>
     {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><a key={d.id} className="mr-3 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}
