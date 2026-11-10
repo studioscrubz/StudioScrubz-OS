@@ -6,6 +6,7 @@ import {
   createStandaloneInvoice,
   previewInvoiceAmounts,
 } from "@/lib/services/invoices";
+import { invoiceDepositCents } from "@/lib/invoiceDeposit";
 import { getProperties } from "@/lib/services/properties";
 import { getActiveServices } from "@/lib/services/serviceCatalog";
 import type { Client } from "@/types/client";
@@ -75,6 +76,7 @@ export function CreateInvoiceModal({
     [notes, setNotes] = useState(""),
     [customerNotes, setCustomerNotes] = useState(""),
     [terms, setTerms] = useState("");
+  const [depositRequested, setDepositRequested] = useState(false);
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export function CreateInvoiceModal({
     () => previewInvoiceAmounts(draftItems(items), discount, tax),
     [discount, items, tax],
   );
+  const depositCents = invoiceDepositCents(totals.total);
   function chooseClient(id: string) {
     setClientId(id);
     setPropertyId("");
@@ -164,6 +167,7 @@ export function CreateInvoiceModal({
     setSaving(true);
     try {
       const created = await createStandaloneInvoice({
+        deposit_requested: depositRequested && depositCents > 0,
         client_id: clientId,
         property_id: propertyId,
         client_name: clientName,
@@ -395,6 +399,16 @@ export function CreateInvoiceModal({
                   <Total label="Tax" value={totals.tax} />
                   <Total label="Total" value={totals.total} strong />
                 </dl>
+                {depositCents > 0 && (
+                  <label className="mt-4 flex items-center gap-2 text-sm font-bold">
+                    <input
+                      type="checkbox"
+                      checked={depositRequested}
+                      onChange={(event) => setDepositRequested(event.target.checked)}
+                    />
+                    Request 25% Zelle deposit ({money(depositCents / 100)})
+                  </label>
+                )}
               </section>
             </div>
             <div className="flex gap-3">

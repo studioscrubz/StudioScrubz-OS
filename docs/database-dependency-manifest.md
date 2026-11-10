@@ -1,5 +1,7 @@
 ﻿# Database dependency manifest
 
+One-time Proposal deposits use `prepare_proposal_deposit_agreement_email` (service role only) from `20261110173044_one_time_proposal_deposit_agreement.sql`. It creates or reuses the linked Agreement and Zelle deposit record using the approved delivery snapshot. Apply this migration and `20261110171401_invoice_deposit_checkout.sql` before releasing the matching application.
+
 2026-11-01 Expired Proposal renewal: the authenticated, role-guarded `renew_expired_proposal` RPC is defined by `20261101090000_renew_expired_proposal_as_draft_revision.sql`. It creates a new unapproved Draft revision with a future expiration date while preserving the expired approved source and its history; it does not reopen the source proposal.
 
 

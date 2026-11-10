@@ -12,6 +12,8 @@ export type PublicInvoicePayment = {
 export type PublicInvoicePhoto = { id: string; caption: string | null; originalFilename: string; uploadedAt: string; url: string };
 
 export type PublicInvoice = {
+  deposit_requested?: boolean;
+  zelle_deposit_recipient?: { name: string | null; phone: string | null } | null;
   invoice_number: string;
   status: InvoiceStatus;
   issue_date: string;

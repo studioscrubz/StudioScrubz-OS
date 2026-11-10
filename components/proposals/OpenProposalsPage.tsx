@@ -1,4 +1,6 @@
 "use client";
+import { invoiceDepositCents } from "@/lib/invoiceDeposit";
+import { sendProposalDepositAgreement } from "@/lib/services/transactionalEmails";
 import { useEffect, useMemo, useState } from "react";
 import { ProposalBuilder } from "./ProposalBuilder";
 import {
@@ -626,6 +628,9 @@ function Card({
         {actionable && (p.status === "Sent" || p.status === "Viewed") && (
           <>
             {canSend && <Action t="Resend Proposal" f={openSend} />}
+            {p.client_delivery_snapshot?.automatic_deposit_agreement === true &&
+              <ProposalAgreementAction proposalId={p.id} depositEmail={canSend ? p.customer_email : null} proposalNumber={p.proposal_number} />}
+
             <Action
               t="Viewed"
               f={() => mutate(() => markProposalViewed(p.id), "Marked viewed.")}
@@ -641,7 +646,9 @@ function Card({
         {!actionable && <span className="text-xs font-bold text-neutral-500">Superseded · read-only</span>}
         {actionable && p.status === "Accepted" && (
           <>
-            {isRecurringFrequency(p.frequency) ||
+            {p.client_delivery_snapshot?.automatic_deposit_agreement === true ? (
+              <ProposalAgreementAction proposalId={p.id} depositEmail={canSend ? p.customer_email : null} proposalNumber={p.proposal_number} />
+            ) : isRecurringFrequency(p.frequency) ||
             (p.frequency === "One-Time" &&
               /post[- ]construction/i.test(p.result.serviceName)) ? (
               <ProposalAgreementAction proposalId={p.id} autoDraft={p.frequency === "One-Time"} />
@@ -744,7 +751,15 @@ function SendProposalModal({
     [proposal.id],
   );
   const reviewUrl = `${getPublicSiteUrl()}/proposal/${token}`;
+  const depositCents = proposal.frequency === "One-Time" ? invoiceDepositCents(proposal.result.perVisitTotal) : 0;
+  const depositNotice = depositCents > 0
+    ? `A 25% Zelle deposit of ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(depositCents / 100)} is due before service begins. Your Service Agreement email includes payment instructions.`
+    : "";
+
   async function submit() {
+    if (depositCents > 0 && !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      return setError("Add a valid customer email before sending the proposal and Service Agreement.");
+    }
     if (!email && !phone)
       return setError(
         "Customer does not have an email address or phone number on file.",
@@ -762,7 +777,7 @@ function SendProposalModal({
         email,
         phone,
         subject: subject.trim(),
-        messageBody: body.trim(),
+        messageBody: [body.trim(), depositNotice].filter(Boolean).join("\n\n"),
         publicUrl: reviewUrl,
         publicLinkLabel: "Review Proposal",
         requestId: deliveryRequestId,
@@ -778,7 +793,19 @@ function SendProposalModal({
           await markProposalSent(proposal.id, channel, {recipient,sender,token,expiresAt,snapshot});
         },
       });
-      sent(result.message);
+      if (depositCents > 0) {
+        try {
+          const agreementSent = await sendProposalDepositAgreement(proposal.id, proposal.proposal_number, email.trim());
+          if (!agreementSent) throw new Error("Agreement delivery was skipped.");
+          sent(`${result.message} Service Agreement email sent.`);
+        } catch (cause) {
+          console.error("Proposal sent but Service Agreement email failed", cause);
+          setError("The proposal was sent. The Service Agreement email did not complete. Retry Send to finish the handoff.");
+          setBusy(false);
+        }
+      } else {
+        sent(result.message);
+      }
     } catch (caught) {
       console.error("Proposal delivery failed", caught);
       setError(msg(caught, "Proposal delivery could not be completed."));

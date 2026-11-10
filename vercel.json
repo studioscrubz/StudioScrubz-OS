@@ -32,7 +32,8 @@
       "fix/airbnb-turnover-page": false,
       "fix/airbnb-service-area": false,
       "fix/operations-opportunity-badge": false,
-      "fix/contractor-opportunity-email": false
+      "fix/contractor-opportunity-email": false,
+      "fix/os-invoice-deposits": false
     }
   },
   "crons": [
