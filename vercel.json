@@ -36,7 +36,8 @@
       "fix/os-invoice-deposits": false,
       "fix/contractor-welcome-email": false,
       "fix/contractor-invitation-sender": false,
-      "fix/contractor-text-invitation": false
+      "fix/contractor-text-invitation": false,
+      "fix/contractor-open-messages": false
     }
   },
   "crons": [
