@@ -1,8 +1,10 @@
 import "server-only";
 import { sendWithResend } from "@/lib/email/resend";
 import { PersonalEmailSetupError, resolvePersonalEmailSender } from "@/lib/email/personalSender";
+import { clientTokenExpiration, generateSecureClientToken } from "@/lib/secureClientToken";
 import { randomInt } from "node:crypto";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
+import { invoiceDepositCents } from "@/lib/invoiceDeposit";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -13,6 +15,7 @@ type DocumentType = "Estimate" | "Proposal" | "Service Agreement" | "Invoice";
 type DocumentContext = {
   id: string; number: string; clientId: string | null; propertyId: string | null;
   token: string | null; tokenExpiresAt: string | null; publicPath: string;
+  depositInstructions?: string;
 };
 
 
@@ -33,21 +36,37 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const documentType = documentTypeValue(body.documentType);
     if (!hasPermission(profile, permissionFor(documentType))) return Response.json({ error: "You do not have permission to send this document." }, { status: 403 });
+    const automaticAgreement = documentType === "Proposal" && body.sendDepositAgreement === true;
+    const deliveryType = automaticAgreement ? "Service Agreement" : documentType;
     const documentId = requiredText(body.documentId, "Document");
     const recipientEmail = requiredText(body.recipientEmail, "Recipient email", 320).toLowerCase();
     if (!EMAIL_PATTERN.test(recipientEmail)) return Response.json({ error: "A valid customer email address is required." }, { status: 400 });
     const subject = requiredText(body.subject, "Subject", 200);
-    const messageBody = requiredText(body.messageBody, "Message", 10000);
+    const editableMessage = requiredText(body.messageBody, "Message", 10000);
     const requestId = requiredText(body.requestId, "Request identifier", 100);
     if (!/^[a-zA-Z0-9-]{16,100}$/.test(requestId)) return Response.json({ error: "The email request identifier is invalid." }, { status: 400 });
 
-    const document = await loadDocument(admin, documentType, documentId);
-    assertUsableToken(document);
     const sender = await resolvePersonalEmailSender(profile, admin);
-    const eventKey = `resend:${documentType.toLowerCase().replaceAll(" ", "-")}:${document.id}:${requestId}`;
+    let deliveryId = documentId;
+    if (automaticAgreement) {
+      const { data, error } = await admin.rpc("prepare_proposal_deposit_agreement_email", {
+        p_proposal_id: documentId,
+        p_recipient: recipientEmail,
+        p_sender: profile.display_name || profile.email || profile.role,
+        p_token: generateSecureClientToken(),
+        p_expires_at: clientTokenExpiration(),
+      });
+      if (error) throw error;
+      if (!data) return Response.json({ skipped: true });
+      deliveryId = data;
+    }
+    const document = await loadDocument(admin, deliveryType, deliveryId);
+    assertUsableToken(document);
+    const messageBody = [editableMessage, document.depositInstructions].filter(Boolean).join("\n\n");
+    const eventKey = automaticAgreement ? `resend:deposit-agreement:${document.id}` : `resend:${deliveryType.toLowerCase().replaceAll(" ", "-")}:${document.id}:${requestId}`;
     const { data: existing, error: existingError } = await admin.from("client_communications").select("id,status,provider_message_id").eq("event_key", eventKey).maybeSingle();
     if (existingError) throw existingError;
-    if (existing?.status === "Sent" && existing.provider_message_id) {
+    if (existing && ["Sent", "Delivered", "Opened"].includes(existing.status) && existing.provider_message_id) {
       return Response.json({ providerMessageId: existing.provider_message_id, duplicate: true });
     }
 
@@ -55,11 +74,11 @@ export async function POST(request: Request) {
     else {
       const { data: communication, error: communicationError } = await admin.from("client_communications").insert({
         communication_number: communicationNumber(), client_id: document.clientId, property_id: document.propertyId,
-        estimate_id: documentType === "Estimate" ? document.id : null,
-        proposal_id: documentType === "Proposal" ? document.id : null,
-        agreement_id: documentType === "Service Agreement" ? document.id : null,
-        invoice_id: documentType === "Invoice" ? document.id : null,
-        communication_type: documentType, channel: "Email", direction: "Outbound", status: "Prepared",
+        estimate_id: deliveryType === "Estimate" ? document.id : null,
+        proposal_id: automaticAgreement ? documentId : deliveryType === "Proposal" ? document.id : null,
+        agreement_id: deliveryType === "Service Agreement" ? document.id : null,
+        invoice_id: deliveryType === "Invoice" ? document.id : null,
+        communication_type: deliveryType, channel: "Email", direction: "Outbound", status: "Prepared",
         provider: "resend", recipient_email: recipientEmail, subject, message_body: messageBody,
         sent_by_user_id: profile.id, sent_by_name: profile.display_name || profile.email || profile.role,
         metadata: { document_number: document.number, public_path: document.publicPath }, event_key: eventKey,
@@ -69,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     const publicUrl = `${getPublicSiteUrl()}${document.publicPath}/${document.token}`;
-    const resend = await sendWithResend({ recipientEmail, subject, messageBody, publicUrl, documentType, idempotencyKey: eventKey, ...sender });
+    const resend = await sendWithResend({ recipientEmail, subject, messageBody, publicUrl, documentType: deliveryType, idempotencyKey: eventKey, ...sender });
     const sentAt = new Date().toISOString();
     const { error: sentError } = await admin.from("client_communications").update({ status: "Sent", sent_at: sentAt, failure_reason: null, provider_message_id: resend.id }).eq("id", communicationId).select("id").single();
     if (sentError) throw sentError;
@@ -99,13 +118,45 @@ async function loadDocument(admin: ReturnType<typeof createSupabaseAdminClient>,
     return { id: data.id, number: data.proposal_number, clientId: data.client_id, propertyId: data.property_id, token: data.client_access_token, tokenExpiresAt: data.client_access_token_expires_at, publicPath: "/proposal" };
   }
   if (type === "Service Agreement") {
-    const { data, error } = await admin.from("service_agreements").select("id,agreement_number,client_id,property_id,client_access_token,client_access_token_expires_at,archived_at,status").eq("id", id).single();
+    const { data, error } = await admin.from("service_agreements").select("id,agreement_number,client_id,property_id,proposal_id,frequency,billing_amount,client_access_token,client_access_token_expires_at,archived_at,status").eq("id", id).single();
     if (error || !data || data.archived_at || data.status !== "Sent") throw new Error("This Service Agreement is unavailable for email delivery.");
-    return { id: data.id, number: data.agreement_number, clientId: data.client_id, propertyId: data.property_id, token: data.client_access_token, tokenExpiresAt: data.client_access_token_expires_at, publicPath: "/agreement" };
+    return { id: data.id, number: data.agreement_number, clientId: data.client_id, propertyId: data.property_id, token: data.client_access_token, tokenExpiresAt: data.client_access_token_expires_at, publicPath: "/agreement",
+      depositInstructions: data.frequency === "One-Time" && invoiceDepositCents(Number(data.billing_amount)) > 0
+        ? await loadAgreementDepositInstructions(admin, data.proposal_id)
+        : undefined,
+    };
   }
   const { data, error } = await admin.from("invoices").select("id,invoice_number,client_id,property_id,client_access_token,client_access_token_expires_at,archived_at,status").eq("id", id).single();
   if (error || !data || data.archived_at || ["Cancelled", "Archived"].includes(data.status)) throw new Error("This Invoice is unavailable for email delivery.");
   return { id: data.id, number: data.invoice_number, clientId: data.client_id, propertyId: data.property_id, token: data.client_access_token, tokenExpiresAt: data.client_access_token_expires_at, publicPath: "/invoice" };
+}
+
+async function loadAgreementDepositInstructions(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  proposalId: string | null,
+) {
+  if (!proposalId) return undefined;
+  const { data: deposit, error } = await admin.from("proposal_deposit_requirements")
+    .select("status,required_amount,remaining_balance,currency,recipient_name,recipient_phone,rendered_memo")
+    .eq("proposal_id", proposalId).maybeSingle();
+  if (error) throw error;
+  if (!deposit) return undefined;
+
+  const amount = formatDepositAmount(Number(deposit.required_amount), deposit.currency);
+  if (["Received", "Applied To Invoice"].includes(deposit.status)) {
+    return `StudioScrubz has recorded your ${amount} Zelle deposit. It is applied to your service total.`;
+  }
+  if (deposit.status !== "Required") return undefined;
+  return [
+    `Your ${amount} deposit is due before service begins.`,
+    `Send it via Zelle to ${deposit.recipient_name} at ${deposit.recipient_phone}.`,
+    `Include this memo: ${deposit.rendered_memo}`,
+    `Your balance after the deposit will be ${formatDepositAmount(Number(deposit.remaining_balance), deposit.currency)}.`,
+  ].join("\n");
+}
+
+function formatDepositAmount(amount: number, currency: string) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 }
 
 function assertUsableToken(document: DocumentContext) {

@@ -5,13 +5,14 @@ import { sendResendEmail } from "@/lib/email/resend";
 import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
 import { getPublicSiteUrl } from "@/lib/publicSiteUrl";
 
-type DepositRow={instruction_version:number;payment_method:string;recipient_name:string;recipient_phone:string;required_amount:number;currency:string;rendered_memo:string};
+type DepositRow={sent_with_proposal:boolean;instruction_version:number;payment_method:string;recipient_name:string;recipient_phone:string;required_amount:number;currency:string;rendered_memo:string};
 export async function sendPostConstructionDepositInstructions(input:{proposalToken?:string;proposalId?:string}) {
   const admin=createSupabaseAdminClient();
-  let proposalQuery=admin.from("proposals").select("id,proposal_number,client_id,property_id,client_name,customer_email,client_access_token,status").eq("status","Accepted");
+  let proposalQuery=admin.from("proposals").select("id,proposal_number,client_id,property_id,client_name,customer_email,client_access_token,client_delivery_snapshot,status").eq("status","Accepted");
   proposalQuery=input.proposalId?proposalQuery.eq("id",input.proposalId):proposalQuery.eq("client_access_token",input.proposalToken??"");
   const{data:proposal,error:proposalError}=await proposalQuery.maybeSingle();if(proposalError)throw proposalError;if(!proposal)return{sent:false,reason:"Proposal not found"};
-  const{data:deposit,error:depositError}=await admin.from("proposal_deposit_requirements").select("instruction_version,payment_method,recipient_name,recipient_phone,required_amount,currency,rendered_memo").eq("proposal_id",proposal.id).single();if(depositError)throw depositError;
+  const{data:deposit,error:depositError}=await admin.from("proposal_deposit_requirements").select("sent_with_proposal,instruction_version,payment_method,recipient_name,recipient_phone,required_amount,currency,rendered_memo").eq("proposal_id",proposal.id).maybeSingle();if(depositError)throw depositError;if(!deposit)return{sent:false,reason:"No deposit requirement"};
+  if(input.proposalToken&&(deposit.sent_with_proposal||proposal.client_delivery_snapshot?.automatic_deposit_agreement===true))return{sent:false,reason:"Instructions included with Agreement delivery"};
   const d=deposit as DepositRow,eventKey=`proposal:${proposal.id}:deposit-instructions:${d.instruction_version}`,recipient=proposal.customer_email?.trim();
   if(!recipient||!/^\S+@\S+\.\S+$/.test(recipient))return{sent:false,reason:"No valid client email"};
   const{data:existing}=await admin.from("client_communications").select("id,status").eq("event_key",eventKey).maybeSingle();

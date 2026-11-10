@@ -25,11 +25,13 @@ export type Invoice = {
   status:InvoiceStatus; issue_date:string; due_date:string|null; line_items:InvoiceLineItem[]; subtotal:number; discount:number; tax:number;
   total:number; amount_paid:number; balance_due:number; notes:string|null; customer_notes:string|null; terms:string|null; sent_at:string|null; paid_at:string|null;
   client_access_token:string|null; client_access_token_expires_at:string|null;
+  deposit_requested:boolean;
   is_consolidated:boolean; job_lines:InvoiceJobLine[];
   created_at:string; updated_at:string; archived_at:string|null;
 };
-export type InvoiceUpdate = Partial<Pick<Invoice,"issue_date"|"due_date"|"line_items"|"discount"|"tax"|"subtotal"|"total"|"amount_paid"|"balance_due"|"notes"|"customer_notes"|"terms"|"status"|"sent_at"|"paid_at"|"archived_at"|"client_access_token"|"client_access_token_expires_at">>;
+export type InvoiceUpdate = Partial<Pick<Invoice,"issue_date"|"due_date"|"line_items"|"discount"|"tax"|"subtotal"|"total"|"amount_paid"|"balance_due"|"notes"|"customer_notes"|"terms"|"status"|"sent_at"|"paid_at"|"archived_at"|"client_access_token"|"client_access_token_expires_at"|"deposit_requested">>;
 export type StandaloneInvoiceInput = {
+  deposit_requested?:boolean;
   client_id:string; property_id:string; client_name:string; property_name:string;
   customer_phone:string|null; customer_email:string|null; service_name:string;
   issue_date:string; due_date:string|null; line_items:InvoiceLineItem[];

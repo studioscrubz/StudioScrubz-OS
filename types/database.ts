@@ -1141,6 +1141,7 @@ export interface Database {
           | "client_access_token_expires_at"
           | "customer_notes"
           | "is_consolidated"
+          | "deposit_requested"
         > & {
           id?: string;
           created_at?: string;
@@ -1152,6 +1153,7 @@ export interface Database {
           client_access_token_expires_at?: string | null;
           customer_notes?: string | null;
           is_consolidated?: boolean;
+          deposit_requested?: boolean;
         };
         Update: InvoiceUpdate;
         Relationships: [
@@ -3531,6 +3533,10 @@ export interface Database {
           p_snapshot: Record<string, unknown>;
         };
         Returns: { sent_at: string };
+      };
+      prepare_proposal_deposit_agreement_email: {
+        Args: { p_proposal_id: string; p_recipient: string; p_sender: string; p_token: string; p_expires_at: string };
+        Returns: string | null;
       };
       prepare_proposal_delivery: {
         Args: {
