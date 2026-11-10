@@ -65,13 +65,14 @@ export async function POST(request:Request){
   if(previous?.error)throw previous.error;
   if(previous&&!previous.data)throw new ContractorAccessError("Pending invitation not found.",404);
   const companyId=ctx.type==="partner"?ctx.companyId:previous?.data?.company_id??uuid(body.companyId);
-  const email=required(previous?.data?.invited_email??body.email,"invitation email",320).toLowerCase();
-  if(!/^\S+@\S+\.\S+$/.test(email))throw new ContractorAccessError("Valid invitation email required.",400);
   const role=ctx.type==="partner"?"Member":previous?.data?.member_role??"Company Admin";
-  const {data:company,error:companyError}=await ctx.admin.from("contractor_companies").select("id,name,status")
+  const {data:company,error:companyError}=await ctx.admin.from("contractor_companies").select("id,name,status,contact_email")
    .eq("id",companyId).maybeSingle();
   if(companyError||!company||(company.status!=="Active"&&(company.status!=="Pending"||role!=="Company Admin")))
    throw new ContractorAccessError("Company is unavailable for this invitation.",409);
+  const requestedEmail=previous?.data?.invited_email??body.email;
+  const email=required(textOnly&&(requestedEmail==null||requestedEmail==="")?company.contact_email:requestedEmail,"invitation email",320).toLowerCase();
+  if(!/^\S+@\S+\.\S+$/.test(email))throw new ContractorAccessError("Valid invitation email required.",400);
   const sender=resolveEmailSenderProfile("contractorInvitation");
   // Generate a fresh one-use secret every time. Never persist plaintext.
   const token=randomBytes(32).toString("hex"),tokenHash=hash(token);

@@ -50,12 +50,12 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  const [preparedText,setPreparedText]=useState<{companyId:string;email:string;phone:string;body:string;url:string}|null>(null);
- const [inviteEmail,setInviteEmail]=useState(""),[invitePhone,setInvitePhone]=useState<string|null>(null);
+ const [inviteEmailInput,setInviteEmail]=useState<string|null>(null),[invitePhone,setInvitePhone]=useState<string|null>(null);
  useEffect(()=>{
   setCompanyEdit({});
   if(managedCompanyId)document.getElementById("contractor-manage-details")?.scrollIntoView({block:"start"});
  },[managedCompanyId]);
- useEffect(()=>{setInvitePhone(null);},[companyId]);
+ useEffect(()=>{setInviteEmail(null);setInvitePhone(null);setPreparedText(null);},[companyId]);
  const [offeredAmount,setOfferedAmount]=useState(""),[offerScope,setOfferScope]=useState(""),[message,setMessage]=useState("");
  const [messagePartnerId,setMessagePartnerId]=useState("");
  const [reviewReason,setReviewReason]=useState(""),[cleaners,setCleaners]=useState(2),[hours,setHours]=useState(4);
@@ -125,7 +125,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
  const dashboardCompanies=companies.filter(company=>clientByCompany.has(company.id));
  const selectedCompany=companies.find(x=>x.id===(view==="companies"?managedCompanyId:companyId));
- const invitationPhone=invitePhone??selectedCompany?.phone??"";
+ const invitationCompany=companies.find(company=>company.id===companyId);
+ const inviteEmail=inviteEmailInput??invitationCompany?.contact_email??"";
+ const invitationPhone=invitePhone??invitationCompany?.phone??"";
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
  const currentPreparedText=preparedText?.companyId===companyId&&preparedText.email===inviteEmail&&preparedText.phone===smsPhone?preparedText:null;
  const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
