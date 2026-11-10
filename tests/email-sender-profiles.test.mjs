@@ -39,7 +39,6 @@ test("authoritative registry contains every approved sender profile", () => {
 
 test("staff routes resolve authenticated personal identities without browser sender input", () => {
   for (const route of [communications, transactional, vendor, marketing]) assert.match(route, /resolvePersonalEmailSender\(profile,\s*admin\)/);
-  assert.match(contractorInvitations, /ctx\.type==="internal"[\s\S]*?resolvePersonalEmailSenderById\(ctx\.userId,ctx\.admin\)/);
   assert.doesNotMatch(clientService, /\bfrom\s*:|senderProfile/i);
 });
 
@@ -52,7 +51,8 @@ test("users edit their own signatures and only Master Admins can designate sende
 
 test("specialized production workflows use registry identities", () => {
   assert.match(deposit, /resolveEmailSenderProfile\("postConstructionDeposit"\)/);
-  assert.match(contractorInvitations, /resolveEmailSenderProfile\("contractorInvitation"\)/);
+  assert.match(contractorInvitations, /const sender=resolveEmailSenderProfile\("contractorInvitation"\)/);
+  assert.doesNotMatch(contractorInvitations, /resolvePersonalEmailSender|PersonalEmailSetupError/);
   assert.match(careers, /resolveEmailSenderProfile\("careers"\),replyTo:clean\.email/);
 });
 
