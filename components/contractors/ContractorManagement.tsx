@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
+import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
 import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
 import {useRouter} from "next/navigation";
@@ -85,6 +86,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     body:JSON.stringify({action,...payload})});
    const result=await response.json();
    if(!response.ok)throw new Error(result.error??"Request failed");
+   if(["accept","decline","cancelOpportunity","requestInformation","markNegotiating","offer","offerProfitabilityPrice"].includes(action))notifyAttentionRefresh();
    if(action==="accept"&&result.jobId&&typeof payload.opportunityId==="string"){
     setOpportunityId("");
     router.push("/contractors/jobs");
