@@ -7,7 +7,7 @@ import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
 import {useRouter} from "next/navigation";
 import dynamic from "next/dynamic";
 import {useAuth} from "@/components/auth/AuthProvider";
-import {normalizeSmsPhoneNumber,buildDeviceSmsUrl} from "@/lib/deviceSms";
+import {normalizeSmsPhoneNumber,buildDeviceSmsUrl,openDeviceSmsApp} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
@@ -114,7 +114,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
     const body=`StudioScrubz invited you to the Contractor Portal. Activate your account within seven days: ${result.activationUrl}`;
     setPreparedText({companyId:String(payload.companyId),email:String(payload.email),phone:smsPhone,
      body,url:buildDeviceSmsUrl(smsPhone,body)});
-    setNotice("Invitation prepared. Tap Open Messages, then send the text from your messaging app.");
+    setNotice("Your invitation is ready. If Messages does not open, tap Open Messages beside Email invitation.");
+    try { openDeviceSmsApp(smsPhone,body); }
+    catch { setNotice("Tap Open Messages beside Email invitation to review and send your text."); }
    }else setNotice(result.status==="Sent"?"Email provider confirmed invitation delivery.":"Invitation updated.");
    await refresh();
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
@@ -226,11 +228,12 @@ export function ContractorManagement({view}: {view:ContractorView}){
       </div>
        <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail})}>Email invitation</button>
-        <button type="button" className={secondary} disabled={busy||!companyId||!inviteEmail.trim()||!smsPhone} onClick={()=>{if(smsPhone)void invite("text",{companyId,email:inviteEmail},smsPhone);}}>Text invitation</button>
+        {currentPreparedText
+         ? <a href={currentPreparedText.url} className={`inline-flex items-center ${secondary}`}>Open Messages</a>
+         : <button type="button" className={secondary} disabled={busy||!companyId||!inviteEmail.trim()||!smsPhone} onClick={()=>{if(smsPhone)void invite("text",{companyId,email:inviteEmail},smsPhone);}}>Text invitation</button>}
        </div>
        {currentPreparedText&&<div className="mt-3 space-y-3 rounded-lg border border-[#143d1a]/30 bg-neutral-50 p-3">
         <p className="text-sm">Your invitation is ready. Open Messages to review and send it.</p>
-        <a href={currentPreparedText.url} className={`inline-flex ${button}`}>Open Messages</a>
         <label className="block text-sm font-semibold">Invitation message
          <textarea readOnly className={input} rows={4} value={currentPreparedText.body} onFocus={event=>event.currentTarget.select()}/>
         </label>
