@@ -37,7 +37,8 @@
       "fix/contractor-welcome-email": false,
       "fix/contractor-invitation-sender": false,
       "fix/contractor-text-invitation": false,
-      "fix/contractor-open-messages": false
+      "fix/contractor-open-messages": false,
+      "fix/contractor-invitation-contact": false
     }
   },
   "crons": [
