@@ -479,7 +479,15 @@ export function shouldRetainAttentionItem(entry: AttentionItem, now: Date): bool
   return !Number.isFinite(created) || created >= now.getTime() - 5 * 24 * 60 * 60 * 1000;
 }
 
-export async function getAttentionSummary(): Promise<AttentionSummary> { const all = await getAttentionItems("All"), active = all.filter((item) => !item.attention_state); return { ...summarizeAttention(active), snoozed: all.filter((item) => item.attention_state?.state === "Snoozed").length }; }
+export async function getAttentionSummary(): Promise<AttentionSummary & { contractorRequests: number }> {
+  const all = await getAttentionItems("All");
+  const active = all.filter((item) => !item.attention_state);
+  return {
+    ...summarizeAttention(active),
+    snoozed: all.filter((item) => item.attention_state?.state === "Snoozed").length,
+    contractorRequests: active.filter((item) => item.type === "Contractor Request Requires Review").length,
+  };
+}
 export function summarizeAttention(items: AttentionItem[]): AttentionSummary { return { urgent: items.filter((x) => x.severity === "Urgent").length, attention: items.filter((x) => x.severity === "Attention").length, info: items.filter((x) => x.severity === "Info").length, total: items.length, snoozed: items.filter((x) => x.attention_state?.state === "Snoozed").length }; }
 export async function getAttentionItemStates(): Promise<AttentionStateRecord[]> { const { data, error } = await getSupabaseClient().from("attention_item_states").select("*").order("updated_at", { ascending: false }); if (error) throw new Error(`Attention state could not be loaded: ${error.message}`); return data as AttentionStateRecord[]; }
 export async function snoozeAttentionItem(attentionKey: string, until: string): Promise<void> { if (Date.parse(until) <= Date.now()) throw new Error("Choose a future snooze time."); await saveState(attentionKey, "Snoozed", until); }

@@ -832,7 +832,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
-  const [attentionCount, setAttentionCount] = useState(0);
+  const [{ total: attentionCount, contractorRequests }, setAttentionCounts] = useState({ total: 0, contractorRequests: 0 });
 
   const [messageCount, setMessageCount] = useState(0);
 
@@ -848,7 +848,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
 
 
-    setAttentionCount((await getAttentionSummary()).total);
+    setAttentionCounts(await getAttentionSummary());
 
   }
 
@@ -868,7 +868,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
       .then((summary) => {
 
-        if (active) setAttentionCount(summary.total);
+        if (active) setAttentionCounts(summary);
 
       })
 
@@ -886,7 +886,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
     };
 
-  }, [auth.profile]);
+  }, [auth.profile, pathname]);
 
 
 
@@ -1299,6 +1299,11 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                     <NavMarker value={item.marker} />
 
                     <span className="flex-1">{item.label}</span>
+                    {item.label === "Operations" && hasPermission(auth.profile, "contractors.view") && contractorRequests > 0 && (
+                      <span aria-label={`${contractorRequests} job opportunities need review`} className="min-w-5 rounded-full bg-red-700 px-1.5 text-center text-xs font-bold leading-5 text-white">
+                        {contractorRequests}
+                      </span>
+                    )}
 
 
 
