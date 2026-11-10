@@ -31,7 +31,8 @@
       "fix/contractor-booking-slots": false,
       "fix/airbnb-turnover-page": false,
       "fix/airbnb-service-area": false,
-      "fix/operations-opportunity-badge": false
+      "fix/operations-opportunity-badge": false,
+      "fix/contractor-opportunity-email": false
     }
   },
   "crons": [

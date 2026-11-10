@@ -495,7 +495,14 @@ export async function POST(request:Request){
    if(error){if(error.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Submitted"});
-   await notify(ctx,"New contractor opportunity",`Opportunity ${data.opportunity_number} was submitted for review.`,ctx.companyId,data.id,"internal");
+   await notify(ctx,"New contractor opportunity",companyName=>[
+    `Opportunity ${data.opportunity_number} was submitted for review.`,
+    `Contractor: ${companyName}`,
+    `Service type: ${values.service_type}`,
+    ...(values.bedrooms===null?[]:[`Bedrooms: ${values.bedrooms}`]),
+    ...(values.bathrooms===null?[]:[`Bathrooms: ${values.bathrooms}`]),
+    `Proposed price: ${new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(values.proposed_amount)}`,
+   ].join("\n"),ctx.companyId,data.id,"internal");
    return noCache({opportunity:data});
   }
   if(action==="message"||action==="markMessagesRead"){
@@ -850,7 +857,7 @@ export async function POST(request:Request){
  } catch(error){return handleContractorError(error);}
 }
 
-async function notify(ctx:ContractorContext,subject:string,message:string,companyId:string,opportunityId:string|undefined,to:"internal"|"contractor",eventKey:string=crypto.randomUUID()){
+async function notify(ctx:ContractorContext,subject:string,message:string|((companyName:string)=>string),companyId:string,opportunityId:string|undefined,to:"internal"|"contractor",eventKey:string=crypto.randomUUID()){
  try{
   const db=ctx.admin;
   const {data:company}=await db.from("contractor_companies").select("name,contact_email,assigned_manager_id").eq("id",companyId).single();
@@ -865,9 +872,11 @@ async function notify(ctx:ContractorContext,subject:string,message:string,compan
     recipient=master.email;
    }
   }
-  const safeMessage=message.replaceAll("<","&lt;").replaceAll(">","&gt;");
+  const messageText=typeof message==="function"?message(company.name):message;
+  const instruction="Sign in to your authorized StudioScrubz dashboard for details.";
+  const safeMessage=messageText.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\n","<br/>");
   const response=await sendResendEmail({recipientEmail:recipient,subject:`StudioScrubz | ${subject}`,
-   text:message,html:`<p>${safeMessage}</p><p>Sign in to your authorized StudioScrubz dashboard for details.</p>`,
+   text:`${messageText}\n\n${instruction}`,html:`<p>${safeMessage}</p><p>${instruction}</p>`,
    idempotencyKey:`contractor-event:${eventKey}`,replyTo:null});
   await audited(ctx,{companyId,opportunityId,type:"Email Notification Sent",
    detail:{recipient,providerId:response.id,subject}});
