@@ -9,6 +9,7 @@ import { calculateProfitability } from "@/lib/pricing/profitability";
 import { validateProfitabilitySettings } from "@/lib/pricing/profitabilitySettings";
 import type { TravelProjection } from "@/types/profitability";
 import { PersonalEmailSetupError, resolvePersonalEmailSenderById } from "@/lib/email/personalSender";
+import { sendContractorWelcome } from "@/lib/email/contractorWelcome";
 import { sendResendEmail } from "@/lib/email/resend";
 import { contractorContext,requireInternal,requireMaster,requirePartner,partnerOpportunity,internalOpportunity,
  audited,required,optional,money,uuid,handleContractorError,noCache,ContractorAccessError,
@@ -333,8 +334,9 @@ export async function POST(request:Request){
    const configuredManagerId=process.env.CONTRACTOR_OPERATIONS_MANAGER_ID?.trim();
    const manager=configuredManagerId?await activeOperationsManager(ctx,uuid(configuredManagerId)):null;
    if(configuredManagerId&&!manager)throw new ContractorAccessError("The configured Operations Manager must be an active Manager or Master Admin.",503);
+   const contactName=optional(input.contactName,160)??"";
    const {data,error}=await db.from("contractor_companies").insert({
-    name,contact_email:email,contact_name:optional(input.contactName,160)??"",
+    name,contact_email:email,contact_name:contactName,
     phone:optional(input.phone,60),business_address:optional(input.address,500),
     territories:Array.isArray(input.territories)?input.territories.filter(x=>typeof x==="string").slice(0,30):[],
     service_types:Array.isArray(input.serviceTypes)?input.serviceTypes.filter(x=>typeof x==="string").slice(0,30):[],
@@ -343,7 +345,18 @@ export async function POST(request:Request){
    if(error?.code==="P0001")throw new ContractorAccessError(error.message,409);
    if(error||!data)throw error??new Error("Company not saved.");
    await audited(ctx,{companyId:data.id,type:"Company Created"});
-   return noCache({companyId:data.id});
+   let welcomeEmailSent=false;
+   let providerId:string|undefined;
+   try {
+    const delivery=await sendContractorWelcome({id:data.id,name,contactName,email});
+    providerId=delivery.id;
+    welcomeEmailSent=true;
+   } catch(error) {
+    console.error("Contractor welcome email failed",error);
+   }
+   await audited(ctx,{companyId:data.id,type:welcomeEmailSent?"Welcome Email Sent":"Welcome Email Failed",
+    detail:providerId?{providerId}:{}}).catch(error=>console.error("Contractor welcome email audit failed",error));
+   return noCache({companyId:data.id,welcomeEmailSent});
   }
   if(action==="updateCompany"){
    const companyId=ctx.type==="internal"?uuid(input.companyId):ctx.companyId;
