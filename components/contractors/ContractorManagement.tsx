@@ -7,7 +7,7 @@ import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
 import {useRouter} from "next/navigation";
 import dynamic from "next/dynamic";
 import {useAuth} from "@/components/auth/AuthProvider";
-import {normalizeSmsPhoneNumber,openDeviceSmsApp} from "@/lib/deviceSms";
+import {normalizeSmsPhoneNumber,buildDeviceSmsUrl} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
@@ -49,6 +49,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [managedCompanyId,setManagedCompanyId]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
+ const [preparedText,setPreparedText]=useState<{companyId:string;email:string;phone:string;body:string;url:string}|null>(null);
  const [inviteEmail,setInviteEmail]=useState(""),[invitePhone,setInvitePhone]=useState<string|null>(null);
  useEffect(()=>{
   setCompanyEdit({});
@@ -102,7 +103,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   finally{setBusy(false);}
  };
  const invite=async(action:string,payload:Record<string,unknown>,smsPhone?:string)=>{
-  setBusy(true);setError("");setNotice("");
+  setBusy(true);setError("");setNotice("");setPreparedText(null);
   try{
    const response=await fetch("/api/contractors/invitations",{method:"POST",headers:{"content-type":"application/json"},
     body:JSON.stringify({action,...payload})});
@@ -110,12 +111,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
    if(!response.ok)throw new Error(result.error??"Invitation failed");
    if(smsPhone){
     if(typeof result.activationUrl!=="string")throw new Error("The text invitation link was unavailable.");
-    try{
-     openDeviceSmsApp(smsPhone,`StudioScrubz invited you to the Contractor Portal. Activate your account within seven days: ${result.activationUrl}`);
-     setNotice("Send the prepared invitation from your messaging app.");
-    }catch{
-     setNotice("Invitation prepared. This device could not open its messaging app.");
-    }
+    const body=`StudioScrubz invited you to the Contractor Portal. Activate your account within seven days: ${result.activationUrl}`;
+    setPreparedText({companyId:String(payload.companyId),email:String(payload.email),phone:smsPhone,
+     body,url:buildDeviceSmsUrl(smsPhone,body)});
+    setNotice("Invitation prepared. Tap Open Messages, then send the text from your messaging app.");
    }else setNotice(result.status==="Sent"?"Email provider confirmed invitation delivery.":"Invitation updated.");
    await refresh();
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
@@ -126,6 +125,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const selectedCompany=companies.find(x=>x.id===(view==="companies"?managedCompanyId:companyId));
  const invitationPhone=invitePhone??selectedCompany?.phone??"";
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
+ const currentPreparedText=preparedText?.companyId===companyId&&preparedText.email===inviteEmail&&preparedText.phone===smsPhone?preparedText:null;
  const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
  const calendarJobIds=useMemo(()=>{
   const ids=new Set<string>();
@@ -228,6 +228,16 @@ export function ContractorManagement({view}: {view:ContractorView}){
         <button type="button" className={button} disabled={busy||!companyId||!inviteEmail.trim()} onClick={()=>void invite("invite",{companyId,email:inviteEmail})}>Email invitation</button>
         <button type="button" className={secondary} disabled={busy||!companyId||!inviteEmail.trim()||!smsPhone} onClick={()=>{if(smsPhone)void invite("text",{companyId,email:inviteEmail},smsPhone);}}>Text invitation</button>
        </div>
+       {currentPreparedText&&<div className="mt-3 space-y-3 rounded-lg border border-[#143d1a]/30 bg-neutral-50 p-3">
+        <p className="text-sm">Your invitation is ready. Open Messages to review and send it.</p>
+        <a href={currentPreparedText.url} className={`inline-flex ${button}`}>Open Messages</a>
+        <label className="block text-sm font-semibold">Invitation message
+         <textarea readOnly className={input} rows={4} value={currentPreparedText.body} onFocus={event=>event.currentTarget.select()}/>
+        </label>
+        <button type="button" className={secondary} onClick={()=>void (navigator.clipboard?.writeText(currentPreparedText.body)??Promise.reject(new Error("Clipboard unavailable")))
+         .then(()=>setNotice("Invitation message copied. Paste it into your messaging app."))
+         .catch(()=>setNotice("Select the invitation message above and copy it into your messaging app."))}>Copy invitation message</button>
+       </div>}
        <p className="mt-2 text-xs text-neutral-600">Each invitation link is single-use and expires after seven days. A new invitation replaces any pending link for that email. To send by text, use your device’s messaging app.</p>
       </Panel>
       <CompactAccessList title="Authorized contractor users" count={data?.members.length??0}>{data?.members.map(member=><div key={member.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
