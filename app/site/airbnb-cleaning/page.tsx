@@ -3,12 +3,12 @@ import { ContactBand, EstimateCta, FeatureList, PageHero, RelatedServices, Secti
 import { ServicePageJsonLd } from "@/components/site/SeoJsonLd";
 
 export const metadata: Metadata = {
-  title: { absolute: "Airbnb Turnover Cleaning in Los Angeles | StudioScrubz" },
-  description: "Get a quote for Airbnb and short-term rental turnover cleaning in Los Angeles and the San Fernando Valley. Kitchen, bathroom, and guest-room resets.",
+  title: { absolute: "Airbnb & Short-Term Rental Turnover Cleaning | StudioScrubz" },
+  description: "Get a quote for Airbnb and short-term rental turnover cleaning across Los Angeles County, including the San Fernando Valley. Ask about nearby areas.",
   alternates: { canonical: "https://studioscrubz.com/airbnb-cleaning" },
   openGraph: {
-    title: "Airbnb Turnover Cleaning in Los Angeles | StudioScrubz",
-    description: "Get a quote for Airbnb and short-term rental turnover cleaning in Los Angeles and the San Fernando Valley. Kitchen, bathroom, and guest-room resets.",
+    title: "Airbnb & Short-Term Rental Turnover Cleaning | StudioScrubz",
+    description: "Get a quote for Airbnb and short-term rental turnover cleaning across Los Angeles County, including the San Fernando Valley. Ask about nearby areas.",
     url: "https://studioscrubz.com/airbnb-cleaning",
     siteName: "StudioScrubz",
     type: "website",
@@ -16,8 +16,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Airbnb Turnover Cleaning in Los Angeles | StudioScrubz",
-    description: "Get a quote for Airbnb and short-term rental turnover cleaning in Los Angeles and the San Fernando Valley. Kitchen, bathroom, and guest-room resets.",
+    title: "Airbnb & Short-Term Rental Turnover Cleaning | StudioScrubz",
+    description: "Get a quote for Airbnb and short-term rental turnover cleaning across Los Angeles County, including the San Fernando Valley. Ask about nearby areas.",
     images: ["/branding/studioscrubz-logo.png"],
   },
 };
@@ -33,8 +33,8 @@ const turnoverSteps = [
 
 export default function AirbnbCleaningPage() {
   return <>
-    <ServicePageJsonLd name="Airbnb and Short-Term Rental Cleaning" path="/airbnb-cleaning" description="Get a quote for Airbnb and short-term rental turnover cleaning in Los Angeles and the San Fernando Valley. Kitchen, bathroom, and guest-room resets."/>
-    <PageHero eyebrow="Airbnb & turnover cleaning" title="Airbnb & Short-Term Rental Cleaning in Los Angeles" copy="Get your Airbnb or short-term rental ready for the next guest. StudioScrubz cleans kitchens, bathrooms, bedrooms, and living areas between stays across Los Angeles County and the San Fernando Valley. Share your checkout and check-in times so we can confirm the scope and availability." cta="Request a Turnover Quote"/>
+    <ServicePageJsonLd name="Airbnb and Short-Term Rental Cleaning" path="/airbnb-cleaning" description="Get a quote for Airbnb and short-term rental turnover cleaning across Los Angeles County, including the San Fernando Valley. Ask about nearby areas."/>
+    <PageHero eyebrow="Airbnb & turnover cleaning" title="Airbnb & Short-Term Rental Turnover Cleaning" copy="Get your Airbnb or short-term rental ready for the next guest. StudioScrubz cleans kitchens, bathrooms, bedrooms, and living areas between stays across Los Angeles County, including the San Fernando Valley. Hosting in a nearby area? Share your city and turnover window so we can confirm availability." cta="Request a Turnover Quote"/>
     <section className="px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Between every stay" title="A repeatable turnover clean for the next guest." copy="Short-term-rental turnover cleaning is coordinated around the property, checkout condition, access window, guest-facing priorities, and confirmed checklist. The service prepares the agreed kitchens, bathrooms, bedrooms, living areas, floors, and surfaces for the next stay without taking on reservation or rental-management responsibilities."/><div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{turnoverSteps.map(([title,copy])=><article key={title} className="rounded-[1.6rem] border border-[#143d1a]/10 bg-[#f4f7f1] p-7"><h2 className="text-2xl font-extrabold text-[#143d1a]">{title}</h2><p className="mt-3 leading-7 text-neutral-600">{copy}</p></article>)}</div></div></section>
     <section className="border-y border-[#143d1a]/10 bg-[#f4f7f1] px-5 py-12 sm:px-8">
       <div className="mx-auto max-w-7xl">
@@ -47,7 +47,7 @@ export default function AirbnbCleaningPage() {
       </div>
     </section>
     <section className="bg-[#eef3ea] px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2"><SectionHeading eyebrow="A plan for your rental" title="Turnover service and deeper cleaning serve different needs." copy="Recurring turnovers focus on the agreed between-guest reset. Deep cleaning can be scheduled separately when the rental needs additional detail, buildup removal, or attention beyond the standard turnover checklist."/><div><FeatureList items={["Between-guest turnover cleaning","Kitchen and bathroom reset","Bedroom and guest-area reset","Laundry when included in the service","Host-provided restocking when included","Separate deep-cleaning options"]}/><p className="mt-6 text-sm leading-6 text-neutral-500">Timing, access, laundry and linen handling, restocking, and special turnover requirements must be confirmed in the service plan. Laundry and restocking are included only when agreed; restocking uses host-provided supplies.</p></div></div></section>
-    <section className="px-5 py-20 sm:px-8 sm:py-24"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Service area" title="Short-term-rental cleaning across Los Angeles and the San Fernando Valley." copy="StudioScrubz serves Airbnb, vacation-rental, and short-term-rental properties across Los Angeles County, with a strong focus on the San Fernando Valley, including Winnetka, Canoga Park, Woodland Hills, Reseda, Chatsworth, Northridge, Van Nuys, Encino, and Tarzana. Availability in surrounding areas depends on the property, turnover scope, access window, location, and scheduling."/></div></section>
+    <section className="px-5 py-20 sm:px-8 sm:py-24"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Service area" title="Serving Los Angeles County, including the San Fernando Valley" copy="StudioScrubz serves Airbnb, vacation-rental, and short-term-rental properties across Los Angeles County, with a strong focus on the San Fernando Valley, including Winnetka, Canoga Park, Woodland Hills, Reseda, Chatsworth, Northridge, Van Nuys, Encino, and Tarzana. If your rental is outside the areas listed, include its city or ZIP code in your quote request so we can check availability."/></div></section>
     <section className="bg-[#143d1a] px-5 py-20 text-white sm:px-8 sm:py-24"><div className="mx-auto max-w-7xl"><p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e5cd7d]">For hosts and rental managers</p><h2 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-.045em] sm:text-5xl">Coordinate cleaning around the property and booking rhythm.</h2><p className="mt-6 max-w-3xl text-lg leading-8 text-white/70">Share the rental layout, access process, turnover window, linen or laundry arrangement, host-provided supplies, and property checklist. We confirm the cleaning scope and provide a professional estimate before coordinating the schedule. StudioScrubz supports the turnover and property presentation but does not manage listings, reservations, guests, pricing, check-in, maintenance, or the rental business itself.</p><div className="mt-8"><EstimateCta label="Request a Turnover Quote" className="bg-[#d4af37] text-[#143d1a] hover:bg-[#e5cd7d]"/></div><p className="mt-5 max-w-3xl text-sm leading-6 text-white/60">Turnover cleaning supports the confirmed guest-ready presentation of the rental; it does not guarantee guest satisfaction, reviews, ratings, bookings, occupancy, or property condition.</p></div></section>
     <section className="px-5 py-16 sm:px-8"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Host checklist" title="What to prepare before your next guest turnover." copy="Share checkout and check-in windows, approved access instructions, the cleaning checklist, and any special attention areas. Confirm whether linen changes, laundry, or host-provided supply restocking are included before service."/><p className="mt-6 max-w-3xl leading-7 text-neutral-600">For recurring vacation-rental cleaning, tell us the property layout and expected turnover pattern. We will review whether the requested cleaning scope and timing are workable before confirming a schedule.</p></div></section>
     <RelatedServices links={[["Residential Cleaning", "/residential"], ["Property Management Cleaning", "/property-management"], ["Contact StudioScrubz", "/contact"]]}/>

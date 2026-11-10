@@ -29,7 +29,8 @@
       "fix/contractor-confirm-before-collapse": false,
       "fix/contractor-review-on-demand": false,
       "fix/contractor-booking-slots": false,
-      "fix/airbnb-turnover-page": false
+      "fix/airbnb-turnover-page": false,
+      "fix/airbnb-service-area": false
     }
   },
   "crons": [
