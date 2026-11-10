@@ -842,7 +842,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
     if (!hasPermission(auth.profile, "attention.view")) {
 
-      return setAttentionCount(0);
+      return setAttentionCounts({ total: 0, contractorRequests: 0 });
 
     }
 
