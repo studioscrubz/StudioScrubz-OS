@@ -5,7 +5,6 @@ import { randomBytes,createHash } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendResendEmail } from "@/lib/email/resend";
-import { PersonalEmailSetupError, resolvePersonalEmailSenderById } from "@/lib/email/personalSender";
 import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
 import { contractorContext,requireInternal,ContractorAccessError,handleContractorError,
   uuid,required,audited,noCache } from "@/lib/contractors/server";
@@ -73,9 +72,7 @@ export async function POST(request:Request){
    .eq("id",companyId).maybeSingle();
   if(companyError||!company||(company.status!=="Active"&&(company.status!=="Pending"||role!=="Company Admin")))
    throw new ContractorAccessError("Company is unavailable for this invitation.",409);
-  const sender=!textOnly&&ctx.type==="internal"
-   ?await resolvePersonalEmailSenderById(ctx.userId,ctx.admin)
-   :resolveEmailSenderProfile("contractorInvitation");
+  const sender=resolveEmailSenderProfile("contractorInvitation");
   // Generate a fresh one-use secret every time. Never persist plaintext.
   const token=randomBytes(32).toString("hex"),tokenHash=hash(token);
   let invite:{id:string;expires_at:string};
@@ -126,7 +123,6 @@ export async function POST(request:Request){
   await audited(ctx,{companyId,type:"Invitation Email Sent",detail:{invitationId:invite.id,providerId:sent.id}});
   return noCache({invitationId:invite.id,status:"Sent",expiresAt:invite.expires_at});
  }catch(error){
-  if(error instanceof PersonalEmailSetupError)return Response.json({error:error.message},{status:error.status});
   return handleContractorError(error);
  }
 }
