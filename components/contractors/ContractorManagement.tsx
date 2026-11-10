@@ -92,7 +92,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
     router.push("/contractors/jobs");
     return result;
    }
-   setNotice(`${action} completed.`);await refresh();
+   if(action==="createCompany"){
+    if(result.welcomeEmailSent)setNotice("Company created and welcome email sent. You can send the portal invitation separately.");
+    else setError("Company created, but the welcome email could not be sent.");
+   }else setNotice(`${action} completed.`);
+   await refresh();
    return result;
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}
   finally{setBusy(false);}
