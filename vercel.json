@@ -41,7 +41,8 @@
       "fix/contractor-invitation-contact": false,
       "fix/marketing-representative-position": false,
       "fix/rose-booking-import": false,
-      "fix/rose-booking-format": false
+      "fix/rose-booking-format": false,
+      "fix/collapse-rose-import": false
     }
   },
   "crons": [
