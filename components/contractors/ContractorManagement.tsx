@@ -305,7 +305,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
-   {view==="opportunities"&&canManagePortalAccess&&<Panel title="Import Rose Company booking">
+   {view==="opportunities"&&canManagePortalAccess&&<details className="rounded-xl border bg-white p-4 shadow-sm">
+    <summary className="cursor-pointer text-lg font-extrabold text-[#143d1a]">Import Rose Company booking</summary>
+    <div className="mt-4 space-y-3">
     <label className="block text-sm font-semibold">Rose booking text
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
     </label>
@@ -337,7 +339,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
      </label>
      <button className={button} disabled={busy}>Create Rose opportunity</button>
     </form>}
-   </Panel>}
+    </div>
+   </details>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<div id="opportunity-detail" className="scroll-mt-4"><Panel title={`Review ${selected.opportunity_number}`}>
     <button type="button" className={`${secondary} mb-4`} onClick={()=>setOpportunityId("")}>Close review</button>
