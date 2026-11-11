@@ -1,4 +1,5 @@
 import "server-only";
+import {createHash} from "node:crypto";
 import { contractorScheduledJobStatuses, type ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
 import { US_STATE_OPTIONS } from "@/components/forms/UsStateSelect";
@@ -63,6 +64,15 @@ async function activeOperationsManager(ctx:ContractorContext,managerId:string|nu
  return data;
 }
 
+async function opportunityPartner(ctx:ContractorContext,opportunity:{company_id:string;submitted_by:string|null}){
+ if(opportunity.submitted_by)return opportunity.submitted_by;
+ const {data,error}=await ctx.admin.from("contractor_members").select("user_id")
+  .eq("company_id",opportunity.company_id).eq("member_role","Company Admin").eq("is_active",true)
+  .order("joined_at",{ascending:true}).order("id").limit(1).maybeSingle();
+ if(error)throw error;
+ if(!data)throw new ContractorAccessError("The contractor needs an active portal owner to receive this message.",409);
+ return data.user_id;
+}
 async function privateThread(ctx:ContractorContext,companyId:string,partnerUserId:string){
  const {data:company,error}=await ctx.admin.from("contractor_companies").select("assigned_manager_id,status")
   .eq("id",companyId).maybeSingle();
@@ -422,8 +432,24 @@ export async function POST(request:Request){
    await audited(ctx,{companyId,type:"Company Updated",detail:{fields:Object.keys(changes)}});
    return noCache({ok:true});
   }
-  if(action==="submitOpportunity"||action==="editOpportunity"){
-   requirePartner(ctx);
+  if(action==="submitOpportunity"||action==="editOpportunity"||action==="importRoseBooking"){
+   let companyId:string;
+   let submitterId:string|null=ctx.userId;
+   const importing=action==="importRoseBooking";
+   if(importing){
+    requireInternal(ctx);
+    companyId=uuid(input.companyId);
+    const {data:company,error}=await db.from("contractor_companies").select("name,status").eq("id",companyId).maybeSingle();
+    if(error)throw error;
+    if(company?.name.trim().toLowerCase()!=="rose company"||!["Active","Pending"].includes(company.status))
+     throw new ContractorAccessError("Select the Rose Company record.",409);
+    submitterId=null;
+    if(typeof input.amount!=="string"||!input.amount.trim())
+     throw new ContractorAccessError("Enter the price from Rose Company's booking.",400);
+   }else{
+    requirePartner(ctx);
+    companyId=ctx.companyId;
+   }
    const editing=action==="editOpportunity"?await partnerOpportunity(ctx,uuid(input.opportunityId)):null;
    if(editing&&editing.submitted_by!==ctx.userId)throw new ContractorAccessError("Only the contractor who submitted this request can edit it.");
    if(editing&&(editing.linked_job_id||editing.internal_confirmed_at||!editableContractorRequestStatuses.includes(editing.status)))
@@ -489,25 +515,29 @@ export async function POST(request:Request){
     const {data,error}=await db.from("contractor_opportunities").update({...values,
      request_revision:editing.request_revision+1,updated_at:new Date().toISOString(),status:"New Opportunity",
      final_scope:null,agreed_amount:null,partner_confirmed_at:null,internal_confirmed_at:null,
-    }).eq("id",editing.id).eq("company_id",ctx.companyId).eq("submitted_by",ctx.userId)
+    }).eq("id",editing.id).eq("company_id",companyId).eq("submitted_by",ctx.userId)
      .eq("updated_at",editing.updated_at).in("status",editableContractorRequestStatuses)
      .is("linked_job_id",null).is("internal_confirmed_at",null).select("id,opportunity_number").maybeSingle();
     if(error?.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))
      throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);
     if(error)throw error;
     if(!data)throw new ContractorAccessError("This request changed or was approved. Reload it before editing.",409);
-    await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Edited"});
-    await notify(ctx,"Contractor request updated",`Opportunity ${data.opportunity_number} was updated and needs review.`,ctx.companyId,data.id,"internal");
+    await audited(ctx,{companyId,opportunityId:data.id,type:"Opportunity Edited"});
+    await notify(ctx,"Contractor request updated",`Opportunity ${data.opportunity_number} was updated and needs review.`,companyId,data.id,"internal");
     return noCache({opportunity:data});
    }
    // Require a stable submission key so browser retries cannot create duplicate jobs.
-   const externalRef=uuid(input.externalReference);
+   const externalRef=importing
+    ?`rose:${createHash("sha256").update(JSON.stringify([
+     values.requested_date,values.requested_time,values.property_address.toLowerCase(),values.property_name?.toLowerCase(),
+    ])).digest("hex")}`
+    :uuid(input.externalReference);
    const {data,error}=await db.from("contractor_opportunities").insert({...values,
-    company_id:ctx.companyId,submitted_by:ctx.userId,external_reference:externalRef,
+    company_id:companyId,submitted_by:submitterId,external_reference:externalRef,
    }).select("id,opportunity_number").single();
    if(error){if(error.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
-   await audited(ctx,{companyId:ctx.companyId,opportunityId:data.id,type:"Opportunity Submitted"});
+   await audited(ctx,{companyId,opportunityId:data.id,type:importing?"Rose Booking Imported":"Opportunity Submitted"});
    await notify(ctx,"New contractor opportunity",companyName=>[
     `Opportunity ${data.opportunity_number} was submitted for review.`,
     `Contractor: ${companyName}`,
@@ -515,7 +545,7 @@ export async function POST(request:Request){
     ...(values.bedrooms===null?[]:[`Bedrooms: ${values.bedrooms}`]),
     ...(values.bathrooms===null?[]:[`Bathrooms: ${values.bathrooms}`]),
     `Proposed price: ${new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(values.proposed_amount)}`,
-   ].join("\n"),ctx.companyId,data.id,"internal");
+   ].join("\n"),companyId,data.id,"internal");
    return noCache({opportunity:data});
   }
   if(action==="message"||action==="markMessagesRead"){
@@ -537,7 +567,7 @@ export async function POST(request:Request){
    if(opp.linked_job_id||["Accepted","Declined","Cancelled","Paid","Disputed"].includes(opp.status))
     throw new ContractorAccessError("Opportunity cannot return to preacceptance workflow.",409);
    const reason=required(input.reason,"message to partner",2000);
-   const thread=await privateThread(ctx,opp.company_id,uuid(opp.submitted_by));
+   const thread=await privateThread(ctx,opp.company_id,await opportunityPartner(ctx,opp));
    const status=action==="requestInformation"?"Information Requested":"Negotiating";
    const {data:updated,error}=await db.from("contractor_opportunities").update({
     status,updated_at:new Date().toISOString(),
@@ -741,7 +771,7 @@ export async function POST(request:Request){
     throw new ContractorAccessError("Accepted Jobs must be cancelled through the protected StudioScrubz Job workflow.",409);
    if(action==="cancelOpportunity"&&["Declined","Paid","Cancelled"].includes(opp.status))
     throw new ContractorAccessError("This opportunity can no longer be cancelled.",409);
-   const thread=await privateThread(ctx,opp.company_id,ctx.type==="partner"?ctx.userId:uuid(opp.submitted_by));
+   const thread=await privateThread(ctx,opp.company_id,ctx.type==="partner"?ctx.userId:await opportunityPartner(ctx,opp));
    const nextStatus=action==="cancelOpportunity"?"Cancelled":action==="disputeOpportunity"?"Disputed":null;
    if(nextStatus){
     const {data:updated,error}=await db.from("contractor_opportunities").update({
