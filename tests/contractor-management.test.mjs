@@ -89,7 +89,7 @@ test("contractor opportunities are idempotent and use existing guarded crew assi
  const portal=read("components/contractors/ContractorPortal.tsx");
  const assignment=read("components/contractors/ContractorJobAssignment.tsx");
  assert.match(portal,/externalReference:submissionKey/);
- assert.match(api,/const externalRef=uuid\(input\.externalReference\)/);
+ assert.match(api,/const externalRef=importing[\s\S]*?:uuid\(input\.externalReference\)/);
  assert.match(assignment,/assignJobWorker\(/);
  assert.match(assignment,/findCrewConflicts/);
  assert.match(assignment,/findIndividualTechConflicts/);

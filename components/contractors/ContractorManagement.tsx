@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
+import {parseRoseBooking} from "@/lib/contractors/roseBooking";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
 import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
@@ -43,6 +44,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
   if(section&&window.location.hash==="#manage-portal-access")section.scrollIntoView();
  },[]);
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
+ const [roseText,setRoseText]=useState("");
+ const [rosePreview,setRosePreview]=useState<ReturnType<typeof parseRoseBooking>|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const openedReviewLink=useRef<string|null>(null);
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
@@ -96,7 +99,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    if(action==="createCompany"){
     if(result.welcomeEmailSent)setNotice("Company created and welcome email sent. You can send the portal invitation separately.");
     else setError("Company created, but the welcome email could not be sent.");
-   }else setNotice(`${action} completed.`);
+   }else setNotice(action==="importRoseBooking"?"Rose booking added to Job Opportunities.":`${action} completed.`);
    await refresh();
    return result;
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}
@@ -302,6 +305,39 @@ export function ContractorManagement({view}: {view:ContractorView}){
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
+   {view==="opportunities"&&canManagePortalAccess&&<Panel title="Import Rose Company booking">
+    <label className="block text-sm font-semibold">Rose booking text
+     <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
+    </label>
+    <button type="button" className={secondary} disabled={busy||!roseText.trim()} onClick={()=>{
+     try{setRosePreview(parseRoseBooking(roseText));setError("");}
+     catch(cause){setError(cause instanceof Error?cause.message:"The booking could not be read.");}
+    }}>Preview booking</button>
+    {rosePreview&&<form className="mt-4 space-y-3" onSubmit={async event=>{
+     event.preventDefault();
+     const rose=companies.find(company=>company.name.trim().toLowerCase()==="rose company"&&["Active","Pending"].includes(company.status));
+     if(!rose){setError("A Rose Company record is required.");return;}
+     const result=await run("importRoseBooking",{...rosePreview,companyId:rose.id,propertyType:"Residential"});
+     if(result){setRoseText("");setRosePreview(null);setOpportunityId(result.opportunity.id);}
+    }}>
+     <div className="grid gap-3 sm:grid-cols-2">
+      {([
+       ["propertyName","Customer","text",true],["address","Street address","text",true],
+       ["addressLine2","Unit","text",false],["city","City","text",true],["state","State (two letters)","text",true],
+       ["zip","ZIP code","text",true],["requestedDate","Service date","date",true],["requestedTime","Start time","time",true],
+       ["serviceType","Service","text",true],["bedrooms","Bedrooms","number",false],["bathrooms","Bathrooms","number",false],
+       ["amount","Proposed pay","number",true],["estimatedHours","Estimated person-hours","number",true],
+      ] as const).map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
+       <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
+        value={rosePreview[key]} onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
+      </label>)}
+     </div>
+     <label className="block text-sm font-semibold">Scope, frequency and add-ons
+      <textarea required className={input} rows={3} value={rosePreview.scope} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
+     </label>
+     <button className={button} disabled={busy}>Create Rose opportunity</button>
+    </form>}
+   </Panel>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<div id="opportunity-detail" className="scroll-mt-4"><Panel title={`Review ${selected.opportunity_number}`}>
     <button type="button" className={`${secondary} mb-4`} onClick={()=>setOpportunityId("")}>Close review</button>

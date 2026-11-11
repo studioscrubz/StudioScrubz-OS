@@ -39,7 +39,8 @@
       "fix/contractor-text-invitation": false,
       "fix/contractor-open-messages": false,
       "fix/contractor-invitation-contact": false,
-      "fix/marketing-representative-position": false
+      "fix/marketing-representative-position": false,
+      "fix/rose-booking-import": false
     }
   },
   "crons": [
