@@ -44,6 +44,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   if(section&&window.location.hash==="#manage-portal-access")section.scrollIntoView();
  },[]);
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
+ const [submissionClientId,setSubmissionClientId]=useState("");
  const [roseText,setRoseText]=useState("");
  const [rosePreview,setRosePreview]=useState<ReturnType<typeof parseRoseBooking>|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
@@ -125,6 +126,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
  };
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
+ const submissionClients=companies.filter(company=>company.name.trim().toLowerCase()==="rose company"&&["Active","Pending"].includes(company.status));
+ const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
  const dashboardCompanies=companies.filter(company=>clientByCompany.has(company.id));
  const selectedCompany=companies.find(x=>x.id===(view==="companies"?managedCompanyId:companyId));
@@ -306,8 +309,19 @@ export function ContractorManagement({view}: {view:ContractorView}){
   {(view==="opportunities"||view==="jobs")&&<>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
    {view==="opportunities"&&canManagePortalAccess&&<details className="rounded-xl border bg-white p-4 shadow-sm">
-    <summary className="cursor-pointer text-lg font-extrabold text-[#143d1a]">Import Rose Company booking</summary>
+    <summary className="cursor-pointer text-lg font-extrabold text-[#143d1a]">Submit Job Details</summary>
     <div className="mt-4 space-y-3">
+    <label className="block text-sm font-semibold">Client
+     <select className={input} value={submissionClientId} disabled={busy} onChange={event=>{
+      setSubmissionClientId(event.target.value);
+      setRoseText("");
+      setRosePreview(null);
+     }}>
+      <option value="">Select client</option>
+      {submissionClients.map(company=><option key={company.id} value={company.id}>{company.name}</option>)}
+     </select>
+    </label>
+    {submissionClient&&<>
     <label className="block text-sm font-semibold">Rose booking text
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
     </label>
@@ -317,9 +331,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     }}>Preview booking</button>
     {rosePreview&&<form className="mt-4 space-y-3" onSubmit={async event=>{
      event.preventDefault();
-     const rose=companies.find(company=>company.name.trim().toLowerCase()==="rose company"&&["Active","Pending"].includes(company.status));
-     if(!rose){setError("A Rose Company record is required.");return;}
-     const result=await run("importRoseBooking",{...rosePreview,companyId:rose.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
+     const result=await run("importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
      if(result){setRoseText("");setRosePreview(null);setOpportunityId(result.opportunity.id);}
     }}>
      <div className="grid gap-3 sm:grid-cols-2">
@@ -339,6 +351,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      </label>
      <button className={button} disabled={busy}>Create Rose opportunity</button>
     </form>}
+    </>}
     </div>
    </details>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
