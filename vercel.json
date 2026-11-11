@@ -42,7 +42,8 @@
       "fix/marketing-representative-position": false,
       "fix/rose-booking-import": false,
       "fix/rose-booking-format": false,
-      "fix/collapse-rose-import": false
+      "fix/collapse-rose-import": false,
+      "fix/submit-job-details": false
     }
   },
   "crons": [
