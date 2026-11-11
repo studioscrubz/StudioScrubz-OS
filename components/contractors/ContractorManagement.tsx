@@ -317,7 +317,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      event.preventDefault();
      const rose=companies.find(company=>company.name.trim().toLowerCase()==="rose company"&&["Active","Pending"].includes(company.status));
      if(!rose){setError("A Rose Company record is required.");return;}
-     const result=await run("importRoseBooking",{...rosePreview,companyId:rose.id,propertyType:"Residential"});
+     const result=await run("importRoseBooking",{...rosePreview,companyId:rose.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
      if(result){setRoseText("");setRosePreview(null);setOpportunityId(result.opportunity.id);}
     }}>
      <div className="grid gap-3 sm:grid-cols-2">
@@ -326,13 +326,13 @@ export function ContractorManagement({view}: {view:ContractorView}){
        ["addressLine2","Unit","text",false],["city","City","text",true],["state","State (two letters)","text",true],
        ["zip","ZIP code","text",true],["requestedDate","Service date","date",true],["requestedTime","Start time","time",true],
        ["serviceType","Service","text",true],["bedrooms","Bedrooms","number",false],["bathrooms","Bathrooms","number",false],
-       ["amount","Proposed pay","number",true],["estimatedHours","Estimated person-hours","number",true],
+       ["pets","Pets","text",false],["amount","Proposed pay","number",true],["estimatedHours","Estimated person-hours","number",true],
       ] as const).map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
        <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
         value={rosePreview[key]} onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
       </label>)}
      </div>
-     <label className="block text-sm font-semibold">Scope, frequency and add-ons
+     <label className="block text-sm font-semibold">Scope and add-ons
       <textarea required className={input} rows={3} value={rosePreview.scope} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
      </label>
      <button className={button} disabled={busy}>Create Rose opportunity</button>

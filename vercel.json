@@ -40,7 +40,8 @@
       "fix/contractor-open-messages": false,
       "fix/contractor-invitation-contact": false,
       "fix/marketing-representative-position": false,
-      "fix/rose-booking-import": false
+      "fix/rose-booking-import": false,
+      "fix/rose-booking-format": false
     }
   },
   "crons": [
