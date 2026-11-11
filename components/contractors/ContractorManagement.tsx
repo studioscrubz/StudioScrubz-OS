@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
+import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import {parseRoseBooking} from "@/lib/contractors/roseBooking";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
@@ -100,7 +101,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    if(action==="createCompany"){
     if(result.welcomeEmailSent)setNotice("Company created and welcome email sent. You can send the portal invitation separately.");
     else setError("Company created, but the welcome email could not be sent.");
-   }else setNotice(action==="importRoseBooking"?"Rose booking added to Job Opportunities.":`${action} completed.`);
+   }else setNotice((action==="importRoseBooking"||action==="importBravaBooking")?"Booking added to Job Opportunities.":`${action} completed.`);
    await refresh();
    return result;
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}
@@ -126,8 +127,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
  };
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
- const submissionClients=companies.filter(company=>company.name.trim().toLowerCase()==="rose company"&&["Active","Pending"].includes(company.status));
+ const submissionClients=companies.filter(company=>bookingClientKind(company.name)&&["Active","Pending"].includes(company.status));
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
+ const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
+ const listedPayout=isBrava&&rosePreview
+  ?bravaPayout(rosePreview.serviceType,rosePreview.bedrooms,rosePreview.bathrooms,rosePreview.addOns):null;
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
  const dashboardCompanies=companies.filter(company=>clientByCompany.has(company.id));
  const selectedCompany=companies.find(x=>x.id===(view==="companies"?managedCompanyId:companyId));
@@ -322,16 +326,16 @@ export function ContractorManagement({view}: {view:ContractorView}){
      </select>
     </label>
     {submissionClient&&<>
-    <label className="block text-sm font-semibold">Rose booking text
+    <label className="block text-sm font-semibold">{isBrava?"BRAVA":"Rose"} booking text
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
     </label>
     <button type="button" className={secondary} disabled={busy||!roseText.trim()} onClick={()=>{
-     try{setRosePreview(parseRoseBooking(roseText));setError("");}
+     try{setRosePreview(parseRoseBooking(roseText,isBrava?"brava":"rose"));setError("");}
      catch(cause){setError(cause instanceof Error?cause.message:"The booking could not be read.");}
     }}>Preview booking</button>
     {rosePreview&&<form className="mt-4 space-y-3" onSubmit={async event=>{
      event.preventDefault();
-     const result=await run("importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
+     const result=await run(isBrava?"importBravaBooking":"importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
      if(result){setRoseText("");setRosePreview(null);setOpportunityId(result.opportunity.id);}
     }}>
      <div className="grid gap-3 sm:grid-cols-2">
@@ -339,17 +343,23 @@ export function ContractorManagement({view}: {view:ContractorView}){
        ["propertyName","Customer","text",true],["address","Street address","text",true],
        ["addressLine2","Unit","text",false],["city","City","text",true],["state","State (two letters)","text",true],
        ["zip","ZIP code","text",true],["requestedDate","Service date","date",true],["requestedTime","Start time","time",true],
-       ["serviceType","Service","text",true],["bedrooms","Bedrooms","number",false],["bathrooms","Bathrooms","number",false],
-       ["pets","Pets","text",false],["amount","Proposed pay","number",true],["estimatedHours","Estimated person-hours","number",true],
+       ["serviceType","Service","text",true],["bedrooms","Bedrooms",isBrava?"text":"number",false],["bathrooms","Bathrooms","number",false],
+       ["pets","Pets","text",false],["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Exhibit B payout"):"Proposed pay","number",true],["estimatedHours","Estimated person-hours","number",true],
       ] as const).map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
        <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
-        value={rosePreview[key]} onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
+        readOnly={key==="amount"&&listedPayout!==null}
+        value={key==="amount"&&isBrava?(listedPayout?.toFixed(2)??rosePreview.amount):rosePreview[key]}
+        onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
       </label>)}
      </div>
+     {isBrava&&listedPayout===null&&<p className="text-sm">Automatic pricing is unavailable for this booking. Verify the payout with BRAVA before entering it.</p>}
+     {isBrava&&<label className="block text-sm font-semibold">Instructions / access
+      <textarea className={input} rows={2} value={rosePreview.access} onChange={event=>setRosePreview({...rosePreview,access:event.target.value})}/>
+     </label>}
      <label className="block text-sm font-semibold">Scope and add-ons
       <textarea required className={input} rows={3} value={rosePreview.scope} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
      </label>
-     <button className={button} disabled={busy}>Create Rose opportunity</button>
+     <button className={button} disabled={busy}>Create {isBrava?"BRAVA":"Rose"} opportunity</button>
     </form>}
     </>}
     </div>

@@ -1,11 +1,12 @@
-export function parseRoseBooking(message: string) {
+export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose") {
   const allLines = message.trim().split(/\r?\n/);
   const heading = allLines[0] ?? "";
-  const hasHeading = /^Rose Company New Booking\b/i.test(heading);
+  const hasHeading = (kind === "brava" ? /^BRAVA NEW BOOKING\b/i : /^Rose Company New Booking\b/i).test(heading);
   if (!hasHeading && !/^Customer\s*:/i.test(heading)) {
-    throw new Error("Paste a Rose booking beginning with Customer:.");
+    throw new Error(`Paste a ${kind === "brava" ? "BRAVA" : "Rose"} booking beginning with Customer:.`);
   }
-  const lines = hasHeading ? allLines.slice(1) : allLines;
+  const lines = (hasHeading ? allLines.slice(1) : allLines).join("\n")
+    .replace(/^(\s*Bedrooms?\s*:[^\n]+?)[ \t]+(Bathrooms?\s*:)/gim, "$1\n$2").split("\n");
   const fields = new Map<string, string>();
   for (const line of lines) {
     const field = line.match(/^\s*([^:]+):\s*(.*)$/);
@@ -38,7 +39,9 @@ export function parseRoseBooking(message: string) {
     bedrooms: read("bedroom") || read("bedrooms"),
     bathrooms: read("bathrooms") || read("bathroom"),
     pets: read("pets"),
-    amount: /^\d+(\.\d{1,2})?$/.test(price) ? price : "",
+    addOns: read("add-ons"),
+    access: read("instructions / access"),
+    amount: kind === "rose" && /^\d+(\.\d{1,2})?$/.test(price) ? price : "",
     scope: [read("service"), read("frequency") && `Frequency: ${read("frequency")}`,
       read("add-ons") && `Add-ons: ${read("add-ons")}`].filter(Boolean).join("\n"),
     estimatedHours: "",
