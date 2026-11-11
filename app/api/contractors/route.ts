@@ -1,3 +1,4 @@
+import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import "server-only";
 import {createHash} from "node:crypto";
 import { contractorScheduledJobStatuses, type ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
@@ -432,19 +433,20 @@ export async function POST(request:Request){
    await audited(ctx,{companyId,type:"Company Updated",detail:{fields:Object.keys(changes)}});
    return noCache({ok:true});
   }
-  if(action==="submitOpportunity"||action==="editOpportunity"||action==="importRoseBooking"){
+  if(action==="submitOpportunity"||action==="editOpportunity"||action==="importRoseBooking"||action==="importBravaBooking"){
    let companyId:string;
    let submitterId:string|null=ctx.userId;
-   const importing=action==="importRoseBooking";
+   const brava=action==="importBravaBooking";
+   const importing=brava||action==="importRoseBooking";
    if(importing){
     requireInternal(ctx);
     companyId=uuid(input.companyId);
     const {data:company,error}=await db.from("contractor_companies").select("name,status").eq("id",companyId).maybeSingle();
     if(error)throw error;
-    if(company?.name.trim().toLowerCase()!=="rose company"||!["Active","Pending"].includes(company.status))
-     throw new ContractorAccessError("Select the Rose Company record.",409);
+    if(!company||bookingClientKind(company.name)!==(brava?"brava":"rose")||!["Active","Pending"].includes(company.status))
+     throw new ContractorAccessError(brava?"Select the BRAVA Home Cleaning record.":"Select the Rose Company record.",409);
     submitterId=null;
-    if(typeof input.amount!=="string"||!input.amount.trim())
+    if(!brava&&(typeof input.amount!=="string"||!input.amount.trim()))
      throw new ContractorAccessError("Enter the price from Rose Company's booking.",400);
    }else{
     requirePartner(ctx);
@@ -482,7 +484,11 @@ export async function POST(request:Request){
    }
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
-   const proposed=money(input.amount,"proposed payment");
+   const listedPayout=brava&&type==="Residential"
+    ?bravaPayout(serviceType,input.bedrooms,input.bathrooms,optional(input.addOns,500)??""):null;
+   if(brava&&listedPayout===null&&(typeof input.amount!=="string"||!input.amount.trim()))
+    throw new ContractorAccessError("Enter the confirmed BRAVA payout for this booking.",400);
+   const proposed=money(listedPayout??input.amount,"proposed payment");
    const address={
     street:required(input.address,"street address",250),
     line2:optional(input.addressLine2,100)??"",
@@ -502,7 +508,7 @@ export async function POST(request:Request){
     service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address},
     property_address:fullAddress,property_type:type,
     square_feet:input.squareFeet===null||input.squareFeet===""?null:money(input.squareFeet,"square footage"),
-    bedrooms:type!=="Residential"||input.bedrooms===null||input.bedrooms===""?null:money(input.bedrooms,"bedrooms"),
+    bedrooms:type!=="Residential"||input.bedrooms===null||input.bedrooms===""?null:money(brava&&String(input.bedrooms).trim().toLowerCase()==="studio"?0:input.bedrooms,"bedrooms"),
     bathrooms:type!=="Residential"||input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),
     scope_of_work:required(scope,"scope of work",10000),
     property_condition:condition,requested_date:date,
@@ -528,7 +534,7 @@ export async function POST(request:Request){
    }
    // Require a stable submission key so browser retries cannot create duplicate jobs.
    const externalRef=importing
-    ?`rose:${createHash("sha256").update(JSON.stringify([
+    ?`${brava?"brava":"rose"}:${createHash("sha256").update(JSON.stringify([
      values.requested_date,values.requested_time,values.property_address.toLowerCase(),values.property_name?.toLowerCase(),
     ])).digest("hex")}`
     :uuid(input.externalReference);
@@ -537,7 +543,7 @@ export async function POST(request:Request){
    }).select("id,opportunity_number").single();
    if(error){if(error.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
-   await audited(ctx,{companyId,opportunityId:data.id,type:importing?"Rose Booking Imported":"Opportunity Submitted"});
+   await audited(ctx,{companyId,opportunityId:data.id,type:brava?"BRAVA Booking Imported":importing?"Rose Booking Imported":"Opportunity Submitted"});
    await notify(ctx,"New contractor opportunity",companyName=>[
     `Opportunity ${data.opportunity_number} was submitted for review.`,
     `Contractor: ${companyName}`,
