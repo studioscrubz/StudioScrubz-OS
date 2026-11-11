@@ -1,8 +1,11 @@
 export function parseRoseBooking(message: string) {
-  const [heading, ...lines] = message.trim().split(/\r?\n/);
-  if (!/^Rose Company New Booking\b/i.test(heading)) {
-    throw new Error("Paste a Rose Company New Booking message.");
+  const allLines = message.trim().split(/\r?\n/);
+  const heading = allLines[0] ?? "";
+  const hasHeading = /^Rose Company New Booking\b/i.test(heading);
+  if (!hasHeading && !/^Customer\s*:/i.test(heading)) {
+    throw new Error("Paste a Rose booking beginning with Customer:.");
   }
+  const lines = hasHeading ? allLines.slice(1) : allLines;
   const fields = new Map<string, string>();
   for (const line of lines) {
     const field = line.match(/^\s*([^:]+):\s*(.*)$/);
@@ -34,6 +37,7 @@ export function parseRoseBooking(message: string) {
     serviceType: read("service"),
     bedrooms: read("bedroom") || read("bedrooms"),
     bathrooms: read("bathrooms") || read("bathroom"),
+    pets: read("pets"),
     amount: /^\d+(\.\d{1,2})?$/.test(price) ? price : "",
     scope: [read("service"), read("frequency") && `Frequency: ${read("frequency")}`,
       read("add-ons") && `Add-ons: ${read("add-ons")}`].filter(Boolean).join("\n"),
