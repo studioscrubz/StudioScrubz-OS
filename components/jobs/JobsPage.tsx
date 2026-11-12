@@ -720,6 +720,10 @@ function JobModal({
       {(!canSchedule || ["Completed", "Cancelled", "Archived"].includes(job.status)) && <p className="text-sm">{scheduleSummary}</p>}
       </CompactJobSection>
       <CompactJobSection title={job.assigned_crew_id ? "Assigned Crew" : "Worker Assignment"} subtitle={assignmentSummary} actionLabel={canSchedule ? "Edit Assignment" : "Details"}>
+      {assignedCrew?.technician_capacity != null && (
+        <p className="mb-2 text-xs text-neutral-600"><strong>Technician slots:</strong> {assignedCrew.technician_capacity}</p>
+      )}
+      {job.assigned_crew_id && employeeId && employeeId === activeCrewLeadId && ['Ready to Schedule','Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker key={job.id} jobId={job.id} leadEmployeeId={employeeId} capacity={assignedCrew?.technician_capacity ?? 4} onSaved={()=>mutate(async()=>{},"Job technicians saved.")} />}
       <p className="mb-2 text-xs text-neutral-600"><strong>Assigned Team:</strong> {assignedTeam}</p>
       {canSchedule && (job.status === "Ready to Schedule" ||
         job.status === "Scheduled" ||
@@ -793,7 +797,6 @@ function JobModal({
         {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       </JobTimeSummary>
       <JobCalendarStatus jobId={job.id} />
-      {job.assigned_crew_id && employeeId && employeeId === activeCrewLeadId && ['Ready to Schedule','Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker key={job.id} jobId={job.id} leadEmployeeId={employeeId} capacity={assignedCrew?.technician_capacity ?? 4} onSaved={()=>mutate(async()=>{},"Job technicians saved.")} />}
       {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-2"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
       <JobEquipmentActions jobId={job.id} />
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-2"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
