@@ -87,4 +87,22 @@ revoke all on function public.set_operational_crew_capacity(uuid,integer)
   from public,anon,authenticated;
 grant execute on function public.set_operational_crew_capacity(uuid,integer)
   to authenticated;
+create or replace function public.get_job_crew_technicians(p_job_id uuid)
+returns table(employee_id uuid)
+language sql stable security definer set search_path = ''
+as $
+  select t.employee_id
+  from public.job_crew_technicians t
+  join public.jobs j on j.id=t.job_id and j.assigned_crew_id=t.crew_id
+  where t.job_id=p_job_id
+    and auth.uid() is not null
+    and (public.has_any_role(array['Master Admin','Administrator','Manager'])
+      or exists(select 1 from public.crews c where c.id=t.crew_id
+        and c.crew_lead_id=public.current_employee_id())
+      or t.employee_id=public.current_employee_id())
+  order by t.assigned_at,t.employee_id
+$;
+revoke all on function public.get_job_crew_technicians(uuid)
+  from public,anon,authenticated;
+grant execute on function public.get_job_crew_technicians(uuid) to authenticated;
 notify pgrst, 'reload schema';
