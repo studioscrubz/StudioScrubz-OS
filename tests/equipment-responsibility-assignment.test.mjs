@@ -100,7 +100,8 @@ test("responsible employees can save, reopen, submit and report missing or damag
 
 test("job UI uses only the assigned crew roster and exposes the workflow in job details",()=>{
   assert.match(jobs,/equipmentCrewOptions\(activeCrews\.find/);
-  assert.match(jobs,/crew\.members/);
+  assert.match(jobs,/job\.job_technicians/);
+  assert.doesNotMatch(jobs,/crew\.members/);
   assert.match(jobs,/EquipmentAssignmentControl jobId=\{job\.id\}/);
 });
 

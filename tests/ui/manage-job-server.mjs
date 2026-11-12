@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 
-const realComponents = /\/(JobsPage|CompactJobSection|JobsiteGpsVerification|JobTimeSummary|JobCalendarStatus|JobMileageSummary|JobLaborSummary|PhotoUploader|PhotoCaptureQueue|PhotoGallery|PhotoViewerModal)$/;
+const realComponents = /\/(CrewManager|JobCrewTechnicianPicker|JobsPage|CompactJobSection|JobsiteGpsVerification|JobTimeSummary|JobCalendarStatus|JobMileageSummary|JobLaborSummary|PhotoUploader|PhotoCaptureQueue|PhotoGallery|PhotoViewerModal)$/;
 const plugin = { name: 'isolated-services', setup(bundler) {
   bundler.onLoad({ filter: /[\\/]components[\\/]jobs[\\/]JobsPage\.tsx$/ }, async args => ({ contents: (await readFile(args.path,'utf8')).replace('function JobModal({','export function JobModal({').replace('function JobCard({','export function JobCard({'), loader:'tsx', resolveDir:resolve('components/jobs') }));
   bundler.onResolve({ filter: /^@\/(lib\/services\/|components\/|lib\/geo\/currentPosition)/ }, async args => {

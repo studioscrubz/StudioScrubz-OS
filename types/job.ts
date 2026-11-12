@@ -30,6 +30,8 @@ export type JobChecklistItem = {
 export type JobPhoto = OperationalPhoto;
 
 export type Job = {
+  job_technicians?: EligibleJobTech[];
+  assigned_crew_lead_id?: string | null;
   lead_representative_id?: string | null;
   id: string;
   job_number: string;

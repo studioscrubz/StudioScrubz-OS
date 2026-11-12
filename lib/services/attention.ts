@@ -1,3 +1,4 @@
+import type { JobAssignmentEvent } from "@/types/jobAssignmentEvent";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/services/auth";
 import { getJobProposalIds, getJobs } from "@/lib/services/jobs";
@@ -41,6 +42,8 @@ export const ATTENTION_REALTIME_TABLES = [
   "client_communications",
   "time_entries",
   "porter_notification_events",
+  "job_assignment_events",
+  "job_crew_technicians",
   "job_labor_threshold_events",
   "internal_schedule_events",
   "internal_schedule_event_attendees",
@@ -102,8 +105,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
   // Their broader management job list must not generate personal alerts for everyone.
   const managerCrewIds = profile.role === "Manager" && profile.employee_id
     ? new Set((await getActiveCrews()).filter(crew =>
-        crew.crew_lead_id === profile.employee_id ||
-        crew.members.some(member => member.employee_id === profile.employee_id),
+        crew.crew_lead_id === profile.employee_id,
       ).map(crew => crew.id))
     : new Set<string>();
   const assignedOperationalJobIds = profile.role === "Manager"
@@ -131,7 +133,9 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
     const event = Array.isArray(row.event) ? row.event[0] : row.event;
     return event && event.status === "Scheduled" ? [{ id: event.id, title: event.title, startsAt: event.starts_at, location: event.location, invitedAt: row.invited_at }] : [];
   });
-  const input: AttentionRuleInput = { equipmentResponsibilityTasks, timeOffNotifications, contractorRequestReviews, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
+  const {data:jobAssignmentEvents,error:assignmentEventError}=await getSupabaseClient().from("job_assignment_events").select("*").eq("recipient_user_id",profile.id).order("created_at",{ascending:false}).limit(200);
+  if(assignmentEventError)throw assignmentEventError;
+  const input: AttentionRuleInput = { jobAssignmentEvents:jobAssignmentEvents??[], equipmentResponsibilityTasks, timeOffNotifications, contractorRequestReviews, assignedOperationalJobIds, assignedEvents, porterNotifications, laborThresholdEvents: laborThresholdRows as JobLaborThresholdEvent[], fieldDiscoveries: discoveries.data ?? [], changeRequestDecisions: decisions.data ?? [], assignedWalkthroughs, profile, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: settings?.timezone ?? null, jobRouteIds, agreementProposalIds: (agreementRoutes.data ?? []).map((row) => row.proposal_id), contractJobIds };
   const result = buildAttentionItems(input, view);
   const actionableKeys = new Set(result.allKeys);
   await removeResolvedAttentionStates(profile.id, states.filter((state) => !actionableKeys.has(state.attention_key)));
@@ -142,6 +146,7 @@ export async function getAttentionItems(view: AttentionView = "Active"): Promise
 export type AssignedWalkthroughAttention = { id: string; employeeId: string; date: string; time: string | null };
 
 export type AttentionRuleInput = {
+  jobAssignmentEvents?: JobAssignmentEvent[];
   equipmentResponsibilityTasks?: EquipmentResponsibilityAttention[];
   timeOffNotifications?: TimeOffNotification[];
   contractorRequestReviews?: Awaited<ReturnType<typeof getContractorRequestReviews>>;
@@ -179,6 +184,15 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
 
+  for(const event of input.jobAssignmentEvents??[]){
+    if(event.recipient_user_id!==profile.id)continue;
+    const schedule=[event.scheduled_date,event.start_time?.slice(0,5)].filter(Boolean).join(" ")||"Schedule pending";
+    items.push(item('job-assignment:'+event.id,"Job Assigned","Attention","Jobs",
+      'Job Assignment '+event.event_type,
+      event.job_number+' · '+schedule+' · '+event.assignment_label+' · '+event.event_type,
+      "Job",event.job_id,null,event.job_number,null,event.scheduled_date,event.created_at,
+      '/jobs?jobId='+event.job_id,"View Job"));
+  }
   for(const request of input.contractorRequestReviews??[]){
     const label=request.property_name??request.service_type;
     items.push(item(

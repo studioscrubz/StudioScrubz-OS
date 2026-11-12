@@ -81,7 +81,7 @@ export async function getJobs(): Promise<JobWithRelations[]> {
     }
   }
   const visibleIds = new Set(visible.map(job => job.id));
-  return [...visible, ...actionJobs.filter(job => !visibleIds.has(job.id))];
+  return attachJobRosters([...visible, ...actionJobs.filter(job => !visibleIds.has(job.id))]);
 }
 export async function getCalendarJobs(): Promise<JobWithRelations[]> {
   const [current, historyResult] = await Promise.all([
@@ -163,7 +163,7 @@ export async function getJobById(id: string): Promise<JobWithRelations> {
     .eq("id", id)
     .single();
   if (error) throw error;
-  return attachOccurrenceBilling(data as JobWithRelations);
+  return attachOccurrenceBilling((await attachJobRosters([data as JobWithRelations]))[0]);
 }
 async function attachOccurrenceBilling(job:JobWithRelations){if(!job.service_occurrence_id)return job;const{data,error}=await getSupabaseClient().from("service_occurrences").select("agreement:service_agreements!service_occurrences_agreement_id_fkey(billing_type,agreement_number)").eq("id",job.service_occurrence_id).maybeSingle();if(error)throw error;return{...job,service_occurrence:data as JobWithRelations["service_occurrence"]}}
 export async function getJobForProposal(
@@ -651,4 +651,11 @@ function safeDatabaseMessage(cause:unknown,fallback:string){const detail=errorMe
 function minutes(value: string) {
   const [h, m] = value.slice(0, 5).split(":").map(Number);
   return h * 60 + m;
+}
+
+async function attachJobRosters(jobs:JobWithRelations[]):Promise<JobWithRelations[]>{
+ if(!jobs.length)return jobs;
+ const {data,error}=await getSupabaseClient().rpc("get_visible_job_roster",{p_job_ids:jobs.map(j=>j.id)});
+ if(error)throw error;
+ return jobs.map(job=>({...job,job_technicians:(data??[]).filter(row=>row.job_id===job.id).map(row=>({employee_id:row.employee_id,display_name:row.display_name,operational_role:row.operational_role as EligibleJobTech['operational_role']}))}));
 }

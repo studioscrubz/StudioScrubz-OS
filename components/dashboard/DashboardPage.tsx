@@ -290,7 +290,7 @@ function CrewStatus({ data }: { data: DashboardData }) {
                 {x.crew.crew_lead ? employee(x.crew.crew_lead) : "Unassigned"}
               </p>
               <p className="text-xs text-neutral-500">
-                {x.crew.members.length} members
+                {x.crew.technician_capacity} technician slots
               </p>
             </div>
           ))}

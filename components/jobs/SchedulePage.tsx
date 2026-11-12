@@ -968,7 +968,7 @@ function ScheduleModal({
       const assignedEmployeeIds = kind === "individual" && employeeId
         ? [employeeId]
         : kind === "crew" && selected
-          ? [selected.crew_lead_id, ...selected.members.map((member) => member.employee_id)].filter((id): id is string => Boolean(id))
+          ? [selected.crew_lead_id].filter((id): id is string => Boolean(id))
           : [];
       const foundAbsences = approvedAbsences.filter((absence) => assignedEmployeeIds.includes(absence.employee_id) && absenceOverlapsSchedule(absence, date, time, duration));
       if ((found.length || foundAbsences.length) && overrideReason === undefined) {
@@ -1070,8 +1070,8 @@ function ScheduleModal({
             {selected.crew_lead ? name(selected.crew_lead) : "Unassigned"}
           </p>
           <p>
-            <b>Crew Members:</b>{" "}
-            {selected.members.map((m) => name(m.employee)).join(", ") || "None"}
+            <b>Technician capacity:</b>{" "}
+            {selected.technician_capacity} (selected for each job by the Crew Lead)
           </p>
         </div>
       )}

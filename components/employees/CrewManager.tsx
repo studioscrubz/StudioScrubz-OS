@@ -1,17 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  addCrewMember,
   archiveCrew,
+  deleteCrew,
   createCrew,
   getCrews,
-  removeCrewMember,
   setCrewLead,
   updateCrew,
 } from "@/lib/services/crews";
 import { employeeName, type Employee } from "@/types/employee";
 import type { CrewWithRelations } from "@/types/crew";
-import { CrewLaborSummary } from "@/components/time/CrewLaborSummary";
 export function CrewManager({
   employees,
   close,
@@ -23,9 +21,11 @@ export function CrewManager({
 }) {
   const [rows, setRows] = useState<CrewWithRelations[]>([]);
   const [name, setName] = useState("");
+  const [capacity, setCapacity] = useState(4);
   const [selected, setSelected] = useState<CrewWithRelations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   async function load() {
     setRows(await getCrews());
     await changed();
@@ -76,8 +76,9 @@ export function CrewManager({
             onChange={(e) => setName(e.target.value)}
             placeholder="Crew name"
           />
+          <label className="text-xs font-semibold">Technician slots<input type="number" min={0} max={50} className={input} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} /></label>
           <button
-            disabled={busy || !name.trim()}
+            disabled={busy || !name.trim() || !Number.isInteger(capacity) || capacity < 0 || capacity > 50}
             className={primary}
             onClick={() =>
               void run(async () => {
@@ -86,16 +87,25 @@ export function CrewManager({
                   crew_lead_id: null,
                   status: "Active",
                   notes: null,
+                  technician_capacity: capacity,
                 });
                 setName("");
+                setCapacity(4);
               })
             }
           >
             Create Crew
           </button>
         </div>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <p className="text-sm text-neutral-600">Only crew leads are permanently assigned. Technicians will be selected for each job by its crew lead.</p>
+          <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            Show archived
+          </label>
+        </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {rows.map((c) => (
+          {rows.filter((c) => showArchived || (c.status !== "Archived" && !c.archived_at)).map((c) => (
             <article key={c.id} className="rounded-xl border p-4">
               <button
                 className="w-full text-left"
@@ -105,13 +115,7 @@ export function CrewManager({
                 <p className="mt-1 text-sm">
                   Lead: {c.crew_lead ? employeeName(c.crew_lead) : "Unassigned"}
                 </p>
-                <p className="text-xs text-neutral-500">
-                  {c.members.map((m) => employeeName(m.employee)).join(", ") ||
-                    "No members"}
-                </p>
-                <p className="mt-2 text-xs font-bold">
-                  {c.members.length} members · {c.status}
-                </p>
+                <p className="mt-2 text-xs font-bold">Technician slots: {c.technician_capacity ?? 4} · {c.status}</p>
               </button>
             </article>
           ))}
@@ -128,27 +132,32 @@ export function CrewManager({
               />
               <button
                 className={primary}
-                disabled={busy}
+                disabled={busy || !selected.crew_name.trim() || !Number.isInteger(selected.technician_capacity) || selected.technician_capacity < 0 || selected.technician_capacity > 50}
                 onClick={() =>
                   void run(() =>
                     updateCrew(selected.id, {
                       crew_name: selected.crew_name,
                       status: selected.status,
                       notes: selected.notes,
+                      technician_capacity: selected.technician_capacity,
                     }),
                   )
                 }
               >
                 Save Crew
               </button>
-              <button
-                className={secondary}
-                disabled={busy}
-                onClick={() => void run(() => archiveCrew(selected.id))}
-              >
-                Archive
-              </button>
+              <button className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700" disabled={busy} onClick={()=>{if(window.confirm("Permanently delete this unused crew? Crews with job or historical records must be archived instead."))void run(()=>deleteCrew(selected.id));}}>Delete Crew</button>
+              {selected.status === "Archived" ? (
+                <button className={secondary} disabled={busy} onClick={() => void run(() => updateCrew(selected.id, { status: "Active", archived_at: null }))}>
+                  Restore
+                </button>
+              ) : (
+                <button className={secondary} disabled={busy} onClick={() => void run(() => archiveCrew(selected.id))}>
+                  Archive
+                </button>
+              )}
             </div>
+            <label className="mt-4 block text-sm font-bold">Technician slots<input type="number" min={0} max={50} className={`${input} mt-2`} value={selected.technician_capacity ?? 4} onChange={(e) => setSelected({ ...selected, technician_capacity: Number(e.target.value) })} /></label>
             <label className="mt-4 block text-sm font-bold">
               Crew Lead
               <select
@@ -168,47 +177,6 @@ export function CrewManager({
                 ))}
               </select>
             </label>
-            <label className="mt-4 block text-sm font-bold">
-              Add Crew Member
-              <select
-                className={`${input} mt-2`}
-                value=""
-                onChange={(e) => {
-                  if (e.target.value)
-                    void run(() => addCrewMember(selected.id, e.target.value));
-                }}
-              >
-                <option value="">Select employee</option>
-                {sorted
-                  .filter(
-                    (e) =>
-                      !selected.members.some((m) => m.employee_id === e.id),
-                  )
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {employeeName(e)} — {e.department}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <div className="mt-4 space-y-2">
-              {selected.members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex justify-between rounded-lg bg-white p-3 text-sm"
-                >
-                  <span>{employeeName(m.employee)}</span>
-                  <button
-                    disabled={busy}
-                    onClick={() => void run(() => removeCrewMember(m.id))}
-                    className="font-bold text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-            <CrewLaborSummary crewId={selected.id} />
           </div>
         )}
       </section>
@@ -216,7 +184,7 @@ export function CrewManager({
   );
 }
 function msg(x: unknown) {
-  return x instanceof Error ? x.message : "Crew operation failed.";
+  return x instanceof Error ? x.message : x && typeof x === "object" && "message" in x ? String(x.message) : "Crew operation failed.";
 }
 const input =
   "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm";
