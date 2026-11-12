@@ -68,4 +68,23 @@ revoke all on function public.set_job_crew_technicians(uuid,uuid[])
   from public,anon,authenticated;
 grant execute on function public.set_job_crew_technicians(uuid,uuid[])
   to authenticated;
+create or replace function public.set_operational_crew_capacity(
+  p_crew_id uuid, p_capacity integer
+) returns void language plpgsql security definer set search_path = ''
+as $
+begin
+  if auth.uid() is null
+    or not public.has_any_role(array['Master Admin','Administrator','Manager']) then
+    raise exception 'Crew management permission denied.' using errcode = '42501';
+  end if;
+  if p_capacity is null or p_capacity < 0 or p_capacity > 50 then
+    raise exception 'Technician slots must be between 0 and 50.';
+  end if;
+  update public.crews set technician_capacity = p_capacity where id = p_crew_id;
+  if not found then raise exception 'Crew not found.'; end if;
+end $;
+revoke all on function public.set_operational_crew_capacity(uuid,integer)
+  from public,anon,authenticated;
+grant execute on function public.set_operational_crew_capacity(uuid,integer)
+  to authenticated;
 notify pgrst, 'reload schema';
