@@ -507,7 +507,7 @@ export async function POST(request:Request){
    const values={
     service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address},
     property_address:fullAddress,property_type:type,
-    square_feet:input.squareFeet===null||input.squareFeet===""?null:money(input.squareFeet,"square footage"),
+    square_feet:input.squareFeet==null||(typeof input.squareFeet==="string"&&!input.squareFeet.trim())?null:money(input.squareFeet,"square footage"),
     bedrooms:type!=="Residential"||input.bedrooms===null||input.bedrooms===""?null:money(brava&&String(input.bedrooms).trim().toLowerCase()==="studio"?0:input.bedrooms,"bedrooms"),
     bathrooms:type!=="Residential"||input.bathrooms===null||input.bathrooms===""?null:money(input.bathrooms,"bathrooms"),
     scope_of_work:required(scope,"scope of work",10000),
