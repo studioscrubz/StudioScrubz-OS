@@ -26,6 +26,8 @@ export function CrewManager({
   const [selected, setSelected] = useState<CrewWithRelations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [showLaborSummary, setShowLaborSummary] = useState(false);
   async function load() {
     setRows(await getCrews());
     await changed();
@@ -94,8 +96,15 @@ export function CrewManager({
             Create Crew
           </button>
         </div>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <p className="text-sm text-neutral-600">Crew leads coordinate assignments. Job-specific technician selection will replace permanent membership once the server-side assignment workflow is ready.</p>
+          <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            Show archived
+          </label>
+        </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {rows.map((c) => (
+          {rows.filter((c) => showArchived || (c.status !== "Archived" && !c.archived_at)).map((c) => (
             <article key={c.id} className="rounded-xl border p-4">
               <button
                 className="w-full text-left"
@@ -141,13 +150,15 @@ export function CrewManager({
               >
                 Save Crew
               </button>
-              <button
-                className={secondary}
-                disabled={busy}
-                onClick={() => void run(() => archiveCrew(selected.id))}
-              >
-                Archive
-              </button>
+              {selected.status === "Archived" ? (
+                <button className={secondary} disabled={busy} onClick={() => void run(() => updateCrew(selected.id, { status: "Active", archived_at: null }))}>
+                  Restore
+                </button>
+              ) : (
+                <button className={secondary} disabled={busy} onClick={() => void run(() => archiveCrew(selected.id))}>
+                  Archive
+                </button>
+              )}
             </div>
             <label className="mt-4 block text-sm font-bold">
               Crew Lead
@@ -208,7 +219,12 @@ export function CrewManager({
                 </div>
               ))}
             </div>
-            <CrewLaborSummary crewId={selected.id} />
+            <div className="mt-5">
+              <button type="button" className={secondary} onClick={() => setShowLaborSummary((value) => !value)}>
+                {showLaborSummary ? "Hide crew labor summary" : "View crew labor summary"}
+              </button>
+              {showLaborSummary && <CrewLaborSummary crewId={selected.id} />}
+            </div>
           </div>
         )}
       </section>
