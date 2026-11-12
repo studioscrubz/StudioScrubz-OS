@@ -42,7 +42,9 @@ export async function createCrew(input: CrewInput): Promise<Crew> {
     if (error) throw error;
     return data;
   }
-  return manageCrew(null, input, false);
+  const created = await manageCrew(null, input, false);
+  await setCrewCapacity(created.id, input.technician_capacity);
+  return created;
 }
 export async function updateCrew(id: string, input: CrewUpdate): Promise<Crew> {
   if (await master()) {
@@ -51,7 +53,9 @@ export async function updateCrew(id: string, input: CrewUpdate): Promise<Crew> {
     return data;
   }
   const current = await getCrewById(id);
-  return manageCrew(id, { ...current, ...input }, false);
+  const updated = await manageCrew(id, { ...current, ...input }, false);
+  if (input.technician_capacity !== undefined) await setCrewCapacity(id, input.technician_capacity);
+  return updated;
 }
 export const setCrewLead = (id: string, employeeId: string | null) => updateCrew(id, { crew_lead_id: employeeId });
 export async function archiveCrew(id: string) {
@@ -93,3 +97,14 @@ async function manageCrew(id: string | null, input: CrewInput | Crew, archive: b
   return data;
 }
 async function master() { return isMasterAdmin(await getCurrentProfile()); }
+
+async function setCrewCapacity(id: string, capacity: number): Promise<void> {
+  const { error } = await getSupabaseClient().rpc("set_operational_crew_capacity", { p_crew_id: id, p_capacity: capacity });
+  if (error) throw error;
+}
+
+export async function setJobCrewTechnicians(jobId: string, employeeIds: string[]): Promise<number> {
+  const { data, error } = await getSupabaseClient().rpc("set_job_crew_technicians", { p_job_id: jobId, p_employee_ids: employeeIds });
+  if (error) throw error;
+  return data as number;
+}
