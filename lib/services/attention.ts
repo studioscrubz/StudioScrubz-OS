@@ -184,12 +184,13 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const routedProposalIds = new Set([...input.jobRouteIds, ...input.agreementProposalIds].filter((id): id is string => Boolean(id)));
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
 
+  const clientNamesByJob = new Map(jobs.map(job => [job.id, job.client_name?.trim()]));
   for(const event of input.jobAssignmentEvents??[]){
     if(event.recipient_user_id!==profile.id)continue;
     const schedule=[event.scheduled_date,event.start_time?.slice(0,5)].filter(Boolean).join(" ")||"Schedule pending";
     items.push(item('job-assignment:'+event.id,"Job Assigned","Attention","Jobs",
       'Job Assignment '+event.event_type,
-      event.job_number+' · '+schedule+' · '+event.assignment_label+' · '+event.event_type,
+      [clientNamesByJob.get(event.job_id), event.job_number, schedule, event.assignment_label, event.event_type].filter(Boolean).join(" · "),
       "Job",event.job_id,null,event.job_number,null,event.scheduled_date,event.created_at,
       '/jobs?jobId='+event.job_id,"View Job"));
   }
@@ -349,10 +350,10 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
       if (!mayReceiveEmployeeJobAlert(job.id) || (!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Cancelled", "Archived"].includes(job.status)) continue;
       const label = job.job_number || "Job";
       if (job.status === "In Progress" && job.operational_started_at) {
-        items.push(item(`job:${job.id}:started:${profile.employee_id}`, "Job Started", "Attention", "Jobs", "Job Started", "The Job has started.", "Job", job.id, null, label, null, null, job.operational_started_at, `/jobs?jobId=${job.id}`, "Open Job"));
+        items.push(item(`job:${job.id}:started:${profile.employee_id}`, "Job Started", "Attention", "Jobs", "Job Started", job.client_name ? `${job.client_name} · The Job has started.` : "The Job has started.", "Job", job.id, null, label, null, null, job.operational_started_at, `/jobs?jobId=${job.id}`, "Open Job"));
       }
       if (job.status === "Completed" && job.completed_at) {
-        items.push(item(`job:${job.id}:completed:${profile.employee_id}`, "Job Completed", "Info", "Jobs", "Job Completed", "The Job has been completed.", "Job", job.id, null, label, null, null, job.completed_at, `/jobs?jobId=${job.id}`, "Open Job"));
+        items.push(item(`job:${job.id}:completed:${profile.employee_id}`, "Job Completed", "Info", "Jobs", "Job Completed", job.client_name ? `${job.client_name} · The Job has been completed.` : "The Job has been completed.", "Job", job.id, null, label, null, null, job.completed_at, `/jobs?jobId=${job.id}`, "Open Job"));
       }
     }
   }
@@ -362,7 +363,7 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     for (const job of jobs) {
       if (!mayReceiveEmployeeJobAlert(job.id) || (!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || (job.scheduled_date && job.scheduled_date < today)) continue;
       const label = job.job_number || "Job";
-      const description = `${label}${job.service_name ? ` - ${job.service_name}` : ""}${job.scheduled_date ? ` - ${friendlyDate(job.scheduled_date)}${job.start_time ? ` at ${friendlyTime(job.start_time)}` : ""}` : ""}`;
+      const description = `${job.client_name ? `${job.client_name} · ` : ""}${label}${job.service_name ? ` - ${job.service_name}` : ""}${job.scheduled_date ? ` - ${friendlyDate(job.scheduled_date)}${job.start_time ? ` at ${friendlyTime(job.start_time)}` : ""}` : ""}`;
       items.push(item(`job:${job.id}:assigned:${profile.employee_id}:${job.assigned_employee_id||job.assigned_crew_id}`, "Job Assigned", "Attention", "Jobs", "Job Assigned", description, "Job", job.id, null, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
     }
   }

@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/job-notification-client-name": false,
       "fix/crew-picker-placement": false,
       "fix/jobs-show-service-address": false,
       "fix/dispatch-written-confirmation": false,
