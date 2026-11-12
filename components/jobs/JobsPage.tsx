@@ -33,6 +33,7 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
+import { JobCrewTechnicianPicker } from "@/components/jobs/JobCrewTechnicianPicker";
 import { JobCardGpsRegistration } from "@/components/jobs/JobCardGpsRegistration";
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
 import { JobEquipmentActions } from "@/components/jobs/JobEquipmentActions";
@@ -787,6 +788,7 @@ function JobModal({
         {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       </JobTimeSummary>
       <JobCalendarStatus jobId={job.id} />
+      {job.assigned_crew_id && employeeId === activeCrewLeadId && ['Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker jobId={job.id} capacity={assignedCrew?.technician_capacity ?? 4} />}
       {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-2"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
       <JobEquipmentActions jobId={job.id} />
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-2"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
