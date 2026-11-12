@@ -49,6 +49,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [roseText,setRoseText]=useState("");
  const [rosePreview,setRosePreview]=useState<ReturnType<typeof parseRoseBooking>|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
+ const submissionDialog=useRef<HTMLDialogElement>(null);
  const openedReviewLink=useRef<string|null>(null);
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
  const [managedCompanyId,setManagedCompanyId]=useState("");
@@ -312,9 +313,18 @@ export function ContractorManagement({view}: {view:ContractorView}){
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
    {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
-   {view==="opportunities"&&canManagePortalAccess&&<details className="rounded-xl border bg-white p-4 shadow-sm">
-    <summary className="cursor-pointer text-lg font-extrabold text-[#143d1a]">Submit Job Details</summary>
-    <div className="mt-4 space-y-3">
+   {view==="opportunities"&&canManagePortalAccess&&<>
+    <button type="button" className={button} onClick={()=>{setError("");submissionDialog.current?.showModal();}}>Submit Job Details</button>
+    <dialog ref={submissionDialog} aria-labelledby="opportunity-submission-title"
+     className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto rounded-2xl bg-white text-neutral-800 shadow-2xl backdrop:bg-[#07190a]/65">
+     <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4 sm:px-6">
+      <h2 id="opportunity-submission-title" className="text-xl font-extrabold text-[#143d1a]">Create Job Opportunity</h2>
+      <button type="button" className={secondary} aria-label="Close Create Job Opportunity" onClick={()=>submissionDialog.current?.close()}>×</button>
+     </header>
+     <div className="space-y-5 p-4 sm:p-6">
+     {error&&<p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
+     <Panel title="Contractor and Booking Text">
+     <div className="space-y-3">
     <label className="block text-sm font-semibold">Client
      <select className={input} value={submissionClientId} disabled={busy} onChange={event=>{
       setSubmissionClientId(event.target.value);
@@ -333,38 +343,52 @@ export function ContractorManagement({view}: {view:ContractorView}){
      try{setRosePreview(parseRoseBooking(roseText,isBrava?"brava":"rose"));setError("");}
      catch(cause){setError(cause instanceof Error?cause.message:"The booking could not be read.");}
     }}>Preview booking</button>
-    {rosePreview&&<form className="mt-4 space-y-3" onSubmit={async event=>{
+    </>}
+    </div>
+    </Panel>
+    {submissionClient&&rosePreview&&<form className="space-y-5" onSubmit={async event=>{
      event.preventDefault();
      const result=await run(isBrava?"importBravaBooking":"importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
-     if(result){setRoseText("");setRosePreview(null);setOpportunityId(result.opportunity.id);}
+     if(result){setRoseText("");setRosePreview(null);submissionDialog.current?.close();setOpportunityId(result.opportunity.id);}
     }}>
-     <div className="grid gap-3 sm:grid-cols-2">
-      {([
+     {([
+      ["Client and Service Location", [
        ["propertyName","Customer","text",true],["address","Street address","text",true],
        ["addressLine2","Unit","text",false],["city","City","text",true],["state","State (two letters)","text",true],
-       ["zip","ZIP code","text",true],["requestedDate","Service date","date",true],["requestedTime","Start time","time",true],
-       ["serviceType","Service","text",true],["bedrooms","Bedrooms",isBrava?"text":"number",false],["bathrooms","Bathrooms","number",false],
-       ["pets","Pets","text",false],["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Exhibit B payout"):"Proposed pay","number",true],["estimatedHours","Estimated person-hours","number",true],
-      ] as const).map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
-       <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
-        readOnly={key==="amount"&&listedPayout!==null}
-        value={key==="amount"&&isBrava?(listedPayout?.toFixed(2)??rosePreview.amount):rosePreview[key]}
-        onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
-      </label>)}
-     </div>
-     {isBrava&&listedPayout===null&&<p className="text-sm">Automatic pricing is unavailable for this booking. Verify the payout with BRAVA before entering it.</p>}
-     {isBrava&&<label className="block text-sm font-semibold">Instructions / access
-      <textarea className={input} rows={2} value={rosePreview.access} onChange={event=>setRosePreview({...rosePreview,access:event.target.value})}/>
-     </label>}
-     <label className="block text-sm font-semibold">Scope and add-ons
-      <textarea required className={input} rows={3} value={rosePreview.scope} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
-     </label>
+       ["zip","ZIP code","text",true],["bedrooms","Bedrooms",isBrava?"text":"number",false],
+       ["bathrooms","Bathrooms","number",false],["pets","Pets","text",false],
+      ]],
+      ["Service and Add-Ons", [["serviceType","Service","text",true]]],
+      ["Requested Schedule", [
+       ["requestedDate","Service date","date",true],["requestedTime","Start time","time",true],
+       ["estimatedHours","Estimated person-hours","number",true],
+      ]],
+      ["Proposed Compensation", [["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Exhibit B payout"):"Proposed pay","number",true]]],
+     ] as const).map(([title,fields])=><Panel key={title} title={title}>
+      <div className="grid gap-3 sm:grid-cols-2">
+       {fields.map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
+        <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
+         readOnly={key==="amount"&&listedPayout!==null}
+         value={key==="amount"&&isBrava?(listedPayout?.toFixed(2)??rosePreview.amount):rosePreview[key]}
+         onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
+       </label>)}
+      </div>
+      {title==="Service and Add-Ons"&&<>
+       <label className="mt-3 block text-sm font-semibold">Scope and add-ons
+        <textarea required className={input} rows={3} value={rosePreview.scope} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
+       </label>
+       {isBrava&&<label className="mt-3 block text-sm font-semibold">Instructions / access
+        <textarea className={input} rows={2} value={rosePreview.access} onChange={event=>setRosePreview({...rosePreview,access:event.target.value})}/>
+       </label>}
+      </>}
+      {title==="Proposed Compensation"&&isBrava&&listedPayout===null&&<p className="mt-3 text-sm">Automatic pricing is unavailable for this booking. Verify the payout with BRAVA before entering it.</p>}
+     </Panel>)}
      <p className="text-sm">Creating this opportunity records the contractor’s text as written confirmation of the scope and payout above.</p>
      <button className={button} disabled={busy}>Create {isBrava?"BRAVA":"Rose"} opportunity</button>
     </form>}
-    </>}
     </div>
-   </details>}
+    </dialog>
+   </>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<div id="opportunity-detail" className="scroll-mt-4"><Panel title={`Review ${selected.opportunity_number}`}>
     <button type="button" className={`${secondary} mb-4`} onClick={()=>setOpportunityId("")}>Close review</button>
