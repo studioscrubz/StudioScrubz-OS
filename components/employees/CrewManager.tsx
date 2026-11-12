@@ -20,6 +20,7 @@ export function CrewManager({
 }) {
   const [rows, setRows] = useState<CrewWithRelations[]>([]);
   const [name, setName] = useState("");
+  const [capacity, setCapacity] = useState(4);
   const [selected, setSelected] = useState<CrewWithRelations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -74,8 +75,9 @@ export function CrewManager({
             onChange={(e) => setName(e.target.value)}
             placeholder="Crew name"
           />
+          <label className="text-xs font-semibold">Technician slots<input type="number" min={0} max={50} className={input} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} /></label>
           <button
-            disabled={busy || !name.trim()}
+            disabled={busy || !name.trim() || !Number.isInteger(capacity) || capacity < 0 || capacity > 50}
             className={primary}
             onClick={() =>
               void run(async () => {
@@ -84,8 +86,10 @@ export function CrewManager({
                   crew_lead_id: null,
                   status: "Active",
                   notes: null,
+                  technician_capacity: capacity,
                 });
                 setName("");
+                setCapacity(4);
               })
             }
           >
@@ -110,7 +114,7 @@ export function CrewManager({
                 <p className="mt-1 text-sm">
                   Lead: {c.crew_lead ? employeeName(c.crew_lead) : "Unassigned"}
                 </p>
-                <p className="mt-2 text-xs font-bold">Technician slots: pending capacity configuration · {c.status}</p>
+                <p className="mt-2 text-xs font-bold">Technician slots: {c.technician_capacity ?? 4} · {c.status}</p>
               </button>
             </article>
           ))}
@@ -134,6 +138,7 @@ export function CrewManager({
                       crew_name: selected.crew_name,
                       status: selected.status,
                       notes: selected.notes,
+                      technician_capacity: selected.technician_capacity,
                     }),
                   )
                 }
@@ -150,6 +155,7 @@ export function CrewManager({
                 </button>
               )}
             </div>
+            <label className="mt-4 block text-sm font-bold">Technician slots<input type="number" min={0} max={50} className={`${input} mt-2`} value={selected.technician_capacity ?? 4} onChange={(e) => setSelected({ ...selected, technician_capacity: Number(e.target.value) })} /></label>
             <label className="mt-4 block text-sm font-bold">
               Crew Lead
               <select
