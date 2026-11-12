@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/portal-request-layout": false,
       "fix/opportunity-form-layout": false,
       "fix/job-notification-client-name": false,
       "fix/crew-picker-placement": false,
