@@ -1,3 +1,4 @@
+import { formatJobServiceAddress } from "@/types/job";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type {
   CrewConflict,
@@ -81,7 +82,7 @@ export async function getJobs(): Promise<JobWithRelations[]> {
     }
   }
   const visibleIds = new Set(visible.map(job => job.id));
-  return attachJobRosters([...visible, ...actionJobs.filter(job => !visibleIds.has(job.id))]);
+  return attachJobRosters(await attachJobServiceAddresses([...visible, ...actionJobs.filter(job => !visibleIds.has(job.id))]));
 }
 export async function getCalendarJobs(): Promise<JobWithRelations[]> {
   const [current, historyResult] = await Promise.all([
@@ -658,4 +659,21 @@ async function attachJobRosters(jobs:JobWithRelations[]):Promise<JobWithRelation
  const {data,error}=await getSupabaseClient().rpc("get_visible_job_roster",{p_job_ids:jobs.map(j=>j.id)});
  if(error)throw error;
  return jobs.map(job=>({...job,job_technicians:(data??[]).filter(row=>row.job_id===job.id).map(row=>({employee_id:row.employee_id,display_name:row.display_name,operational_role:row.operational_role as EligibleJobTech['operational_role']}))}));
+}
+
+async function attachJobServiceAddresses(jobs: JobWithRelations[]): Promise<JobWithRelations[]> {
+  const propertyIds = [...new Set(jobs.filter(job => job.property_id && !job.property).map(job => job.property_id!))];
+  if (!propertyIds.length) return jobs;
+
+  const { data, error } = await getSupabaseClient().from("properties")
+    .select("id,address,address_line_2,city,state,zip").in("id", propertyIds);
+  if (error) {
+    console.warn("Job service addresses could not be loaded.", error.code);
+    return jobs;
+  }
+  const addresses = new Map(data.map(property => [property.id, formatJobServiceAddress(property)]));
+  return jobs.map(job => ({
+    ...job,
+    service_address: job.property_id ? addresses.get(job.property_id) : undefined,
+  }));
 }
