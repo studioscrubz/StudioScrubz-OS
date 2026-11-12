@@ -4,7 +4,7 @@ import type { ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
 import { formatTime12Hour } from "@/lib/formatTime";
 import { contractorPage } from "@/lib/contractors/host";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
@@ -134,6 +134,17 @@ export function ContractorPortal(){
   billed:totals.billed+Number(invoice.total),paid:totals.paid+Number(invoice.amount_paid),due:totals.due+Number(invoice.balance_due),
  }),{billed:0,paid:0,due:0});
  const currentInvoices=data?.invoices.filter(x=>x.job_id===chosen?.linked_job_id)??[];
+ const requestDialog=useRef<HTMLDialogElement>(null);
+ const requestOpen=Boolean(data)&&tab==="submit"&&!loading;
+ useEffect(()=>{
+  const dialog=requestDialog.current;
+  if(requestOpen&&dialog&&!dialog.open)dialog.showModal();
+ },[requestOpen]);
+ const closeRequest=()=>{
+  if(editing)resetJobForm();
+  setError("");
+  setTab("jobs");
+ };
  if(loading)return <main className="grid min-h-screen place-items-center">Loading private contractor portal…</main>;
  return <main className="min-h-screen bg-[#f5f6f4] text-neutral-900">
   <header className="bg-[#143d1a] px-4 py-4 text-white"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
@@ -206,18 +217,21 @@ export function ContractorPortal(){
       <span>{opportunity.status}</span>
      </button>;
     })}</PortalPanel></>}
-   {data&&tab==="submit"&&<PortalPanel title={editing?"Edit job request":"Submit a cleaning opportunity"}>
-    <p className="mb-4 text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setSubmittedRequestId(r.opportunity.id);setOpportunityId(r.opportunity.id);setTab("jobs");}}}>
+   {requestOpen&&<dialog ref={requestDialog} aria-labelledby="portal-request-title"
+    onCancel={event=>{event.preventDefault();if(!busy)closeRequest();}}
+    className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto rounded-2xl bg-white text-neutral-900 shadow-2xl backdrop:bg-[#07190a]/65">
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4 sm:px-6">
+     <h2 id="portal-request-title" className="text-xl font-extrabold text-[#143d1a]">{editing?"Edit Job Request":"Create Job Opportunity"}</h2>
+     <button type="button" className={secondary} disabled={busy} aria-label="Close job request" onClick={closeRequest}>×</button>
+    </header>
+    <div className="space-y-4 p-4 sm:p-6">
+     {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+     <p className="text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
+    <form className="space-y-5" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setSubmittedRequestId(r.opportunity.id);setOpportunityId(r.opportunity.id);setTab("jobs");}}}>
+     <PortalPanel title="Client and Service Location"><div className="grid gap-4 md:grid-cols-2">
      <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
       {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
      </select></label>
-     <label className="text-sm font-bold">Service type<select className={input} value={serviceType} required disabled={!jobOptions} onChange={e=>{setServiceType(e.target.value);setAddons([]);}}>
-      <option value="">{jobOptions?"Select service type":"Loading service types…"}</option>
-      {availableServices.map(service=><option key={service.name}>{service.name}</option>)}
-     </select></label>
-     {jobOptionsError&&<div className="md:col-span-2"><p role="alert" className="mb-2 text-sm text-red-700">{jobOptionsError}</p><button type="button" className={secondary} onClick={()=>{setJobOptionsError("");setJobOptionsRetry(value=>value+1);}}>Retry loading options</button></div>}
-     {jobOptions&&!availableServices.length&&<p className="text-sm text-neutral-600 md:col-span-2">No services are currently available for this property type.</p>}
      <PortalField label={propertyType==="Residential"?"Residential customer or property name":"Property name"} value={propertyName} set={setPropertyName} required={propertyType==="Residential"}/>
      <fieldset className="grid gap-4 md:col-span-2 md:grid-cols-2">
       <legend className="mb-2 font-extrabold">Property address</legend>
@@ -234,6 +248,19 @@ export function ContractorPortal(){
      <label className="text-sm font-bold">Property condition<select className={input} value={condition} required onChange={e=>setCondition(e.target.value)}>
       <option value="">Select property condition</option>{contractorPropertyConditions.map(option=><option key={option}>{option}</option>)}
      </select></label>
+     </div></PortalPanel>
+     <PortalPanel title="Service and Add-Ons"><div className="grid gap-4 md:grid-cols-2">
+     <label className="text-sm font-bold">Service type<select className={input} value={serviceType} required disabled={!jobOptions} onChange={e=>{setServiceType(e.target.value);setAddons([]);}}>
+      <option value="">{jobOptions?"Select service type":"Loading service types…"}</option>
+      {availableServices.map(service=><option key={service.name}>{service.name}</option>)}
+     </select></label>
+     {jobOptionsError&&<div className="md:col-span-2"><p role="alert" className="mb-2 text-sm text-red-700">{jobOptionsError}</p><button type="button" className={secondary} onClick={()=>{setJobOptionsError("");setJobOptionsRetry(value=>value+1);}}>Retry loading options</button></div>}
+     {jobOptions&&!availableServices.length&&<p className="text-sm text-neutral-600 md:col-span-2">No services are currently available for this property type.</p>}
+     <JobCheckboxes label="Scope of work" help="Select at least one area or task." options={contractorScopeOptions[propertyType]} value={scopeItems} set={setScopeItems}/>
+     {scopeItems.includes("Other")&&<label className="block text-sm font-bold md:col-span-2">Other scope details<textarea className={input} rows={2} required maxLength={2000} value={scopeDetails} onChange={e=>setScopeDetails(e.target.value)}/></label>}
+     <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
+     </div></PortalPanel>
+     <PortalPanel title="Requested Schedule"><div className="grid gap-4 md:grid-cols-2">
      <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
      <label className="text-sm font-bold">Requested start time (Pacific time)
       <select className={input} required disabled={!blockedTimes} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
@@ -245,16 +272,19 @@ export function ContractorPortal(){
      </label>
      <PortalField label="Estimated total person-hours" value={hours} set={setHours} type="number" required/>
      <PortalField label="Suggested cleaners" value={cleaners} set={setCleaners} type="number" required/>
+     </div></PortalPanel>
+     <PortalPanel title="Proposed Compensation"><div className="grid gap-4 md:grid-cols-2">
      <PortalField label="Proposed payment amount ($)" value={amount} set={setAmount} type="number" required/>
      <PortalField label="Pricing basis" value={basis} set={setBasis} required/>
-     <JobCheckboxes label="Scope of work" help="Select at least one area or task." options={contractorScopeOptions[propertyType]} value={scopeItems} set={setScopeItems}/>
-     {scopeItems.includes("Other")&&<label className="block text-sm font-bold md:col-span-2">Other scope details<textarea className={input} rows={2} required maxLength={2000} value={scopeDetails} onChange={e=>setScopeDetails(e.target.value)}/></label>}
-     <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
+     </div></PortalPanel>
+     <PortalPanel title="Job Instructions"><div className="grid gap-4 md:grid-cols-2">
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
-     <div className="md:col-span-2"><button className={primary} disabled={busy||!selectedService||!scopeItems.length||!requestedTime||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>{editing&&<button type="button" className={`${secondary} ml-2`} onClick={()=>{resetJobForm();setTab("jobs");}}>Cancel edit</button>}</div>
+     </div></PortalPanel>
+     <button className={primary} disabled={busy||!selectedService||!scopeItems.length||!requestedTime||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
     </form>
-   </PortalPanel>}
+    </div>
+   </dialog>}
    {data&&tab==="jobs"&&<div id="contractor-requests" className={chosen?"grid gap-4 lg:grid-cols-[1fr_2fr]":"grid gap-4"}>
     <PortalPanel title="Requests & jobs"><p className="mb-3 text-sm text-neutral-600">Track cleaning requests you’ve submitted and see the schedule, completion details, and invoice status once a job is accepted.</p>{data.opportunities.map(x=><button key={x.id} type="button" className={`mb-2 block w-full rounded-lg border p-3 text-left text-sm ${opportunityId===x.id?"border-[#143d1a] bg-green-50":"bg-white"}`} onClick={()=>setOpportunityId(x.id)}>
      <b>{x.property_name??x.property_address}</b><span className="mt-1 block">{x.opportunity_number} · {x.service_type} · {x.status}</span></button>)}
