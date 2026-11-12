@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/contractor-import-active-status": false,
       "fix/optional-opportunity-square-feet": false,
       "feature/contractor-management-portal-20261107": false,
       "fix/contractor-auto-activation": false,

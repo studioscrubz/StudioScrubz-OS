@@ -322,7 +322,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       setRosePreview(null);
      }}>
       <option value="">Select client</option>
-      {submissionClients.map(company=><option key={company.id} value={company.id}>{company.name}</option>)}
+      {submissionClients.map(company=><option key={company.id} value={company.id} disabled={company.status!=="Active"}>{company.name}{company.status!=="Active"?" (activate in Contractors)":""}</option>)}
      </select>
     </label>
     {submissionClient&&<>

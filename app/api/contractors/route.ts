@@ -443,8 +443,10 @@ export async function POST(request:Request){
     companyId=uuid(input.companyId);
     const {data:company,error}=await db.from("contractor_companies").select("name,status").eq("id",companyId).maybeSingle();
     if(error)throw error;
-    if(!company||bookingClientKind(company.name)!==(brava?"brava":"rose")||!["Active","Pending"].includes(company.status))
+    if(!company||bookingClientKind(company.name)!==(brava?"brava":"rose"))
      throw new ContractorAccessError(brava?"Select the BRAVA Home Cleaning record.":"Select the Rose Company record.",409);
+    if(company.status!=="Active")
+     throw new ContractorAccessError("Activate this contractor company in Contractors before importing a booking.",409);
     submitterId=null;
     if(!brava&&(typeof input.amount!=="string"||!input.amount.trim()))
      throw new ContractorAccessError("Enter the price from Rose Company's booking.",400);
