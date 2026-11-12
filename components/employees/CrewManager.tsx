@@ -1,17 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  addCrewMember,
   archiveCrew,
   createCrew,
   getCrews,
-  removeCrewMember,
   setCrewLead,
   updateCrew,
 } from "@/lib/services/crews";
 import { employeeName, type Employee } from "@/types/employee";
 import type { CrewWithRelations } from "@/types/crew";
-import { CrewLaborSummary } from "@/components/time/CrewLaborSummary";
 export function CrewManager({
   employees,
   close,
@@ -27,7 +24,6 @@ export function CrewManager({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [showLaborSummary, setShowLaborSummary] = useState(false);
   async function load() {
     setRows(await getCrews());
     await changed();
@@ -97,7 +93,7 @@ export function CrewManager({
           </button>
         </div>
         <div className="mt-5 flex items-center justify-between gap-3">
-          <p className="text-sm text-neutral-600">Crew leads coordinate assignments. Job-specific technician selection will replace permanent membership once the server-side assignment workflow is ready.</p>
+          <p className="text-sm text-neutral-600">Only crew leads are permanently assigned. Technicians will be selected for each job by its crew lead.</p>
           <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
             Show archived
@@ -114,13 +110,7 @@ export function CrewManager({
                 <p className="mt-1 text-sm">
                   Lead: {c.crew_lead ? employeeName(c.crew_lead) : "Unassigned"}
                 </p>
-                <p className="text-xs text-neutral-500">
-                  {c.members.map((m) => employeeName(m.employee)).join(", ") ||
-                    "No members"}
-                </p>
-                <p className="mt-2 text-xs font-bold">
-                  {c.members.length} members · {c.status}
-                </p>
+                <p className="mt-2 text-xs font-bold">Technician slots: pending capacity configuration · {c.status}</p>
               </button>
             </article>
           ))}
@@ -179,52 +169,6 @@ export function CrewManager({
                 ))}
               </select>
             </label>
-            <label className="mt-4 block text-sm font-bold">
-              Add Crew Member
-              <select
-                className={`${input} mt-2`}
-                value=""
-                onChange={(e) => {
-                  if (e.target.value)
-                    void run(() => addCrewMember(selected.id, e.target.value));
-                }}
-              >
-                <option value="">Select employee</option>
-                {sorted
-                  .filter(
-                    (e) =>
-                      !selected.members.some((m) => m.employee_id === e.id),
-                  )
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {employeeName(e)} — {e.department}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <div className="mt-4 space-y-2">
-              {selected.members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex justify-between rounded-lg bg-white p-3 text-sm"
-                >
-                  <span>{employeeName(m.employee)}</span>
-                  <button
-                    disabled={busy}
-                    onClick={() => void run(() => removeCrewMember(m.id))}
-                    className="font-bold text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-5">
-              <button type="button" className={secondary} onClick={() => setShowLaborSummary((value) => !value)}>
-                {showLaborSummary ? "Hide crew labor summary" : "View crew labor summary"}
-              </button>
-              {showLaborSummary && <CrewLaborSummary crewId={selected.id} />}
-            </div>
           </div>
         )}
       </section>
