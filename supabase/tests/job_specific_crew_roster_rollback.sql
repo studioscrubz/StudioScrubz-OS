@@ -38,6 +38,8 @@ begin
  failed:=false; begin perform public.delete_operational_crew(crew); exception when others then failed:=true; end;
  if not failed then raise exception 'Upcoming crew deletion allowed'; end if;
  update public.jobs set start_time='10:00' where id=job_a;
+ perform public.schedule_job_with_time_off_protection(job_a,current_date+90,'10:30',2,'crew',null,crew,null);
+ if (select jsonb_array_length(assigned_team) from public.jobs where id=job_a)<>1 then raise exception 'Rescheduling erased job roster names'; end if;
  if not exists(select 1 from public.job_assignment_events where job_id=job_a and recipient_user_id=tech_user and event_type='Changed') then raise exception 'Technician schedule notification missing'; end if;
  perform public.set_job_crew_technicians(job_a,'{}');
  if not exists(select 1 from public.job_assignment_events where job_id=job_a and recipient_user_id=tech_user and event_type='Removed') then raise exception 'Technician removal notification missing'; end if;

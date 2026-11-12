@@ -1998,6 +1998,11 @@ declare c public.crews; target uuid; event text; begin
    perform private.notify_job_assignment(new,target,event,'Technician');
   end loop;
  end if;
+ if tg_op='UPDATE' and new.assigned_crew_id=old.assigned_crew_id
+  and old.status in ('Ready to Schedule','Scheduled','Crew Assigned','In Progress') then
+  new.assigned_team:=(select coalesce(jsonb_agg(coalesce(nullif(btrim(e.preferred_name),''),btrim(e.first_name||' '||e.last_name)) order by e.id),'[]'::jsonb)
+   from public.job_crew_technicians t join public.employees e on e.id=t.employee_id where t.job_id=new.id);
+ end if;
  return new;
 end $$;
 revoke all on function private.guard_job_assignment() from public,anon,authenticated;

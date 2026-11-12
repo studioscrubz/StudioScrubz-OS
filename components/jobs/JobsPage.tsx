@@ -627,7 +627,7 @@ function JobModal({
   const assignmentSummary = job.assigned_crew_id
     ? [assignedCrew?.crew_name || job.assigned_crew_name || "Assigned crew", assignedLeadName ? assignedLeadName + " (Lead)" : "Lead not assigned"].join(" · ")
     : job.assigned_employee_name || "Unassigned";
-  const assignedTeam = assignedCrew
+  const assignedTeam = job.assigned_crew_id
     ? Array.from(new Set([assignedLeadName ? assignedLeadName + " (Lead)" : "", ...(job.job_technicians??[]).map(tech => tech.display_name)].filter(Boolean))).join(" · ")
     : job.assigned_team.join(" · ") || job.assigned_employee_name || "Unassigned";
   const notes = [["Access instructions", job.access_instructions], ["Internal notes", job.internal_notes]].filter((row): row is [string, string] => Boolean(row[1]?.trim()));
