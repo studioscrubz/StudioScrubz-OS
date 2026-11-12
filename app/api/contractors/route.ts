@@ -542,10 +542,13 @@ export async function POST(request:Request){
     :uuid(input.externalReference);
    const {data,error}=await db.from("contractor_opportunities").insert({...values,
     company_id:companyId,submitted_by:submitterId,external_reference:externalRef,
+    ...(importing?{status:"Awaiting Approval",agreed_amount:proposed,final_scope:values.scope_of_work,
+     partner_confirmed_at:new Date().toISOString()}:{}),
    }).select("id,opportunity_number").single();
    if(error){if(error.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
-   await audited(ctx,{companyId,opportunityId:data.id,type:brava?"BRAVA Booking Imported":importing?"Rose Booking Imported":"Opportunity Submitted"});
+   await audited(ctx,{companyId,opportunityId:data.id,type:brava?"BRAVA Booking Imported":importing?"Rose Booking Imported":"Opportunity Submitted",
+    ...(importing?{detail:{confirmationSource:"Contractor text dispatch",amount:proposed}}:{})});
    await notify(ctx,"New contractor opportunity",companyName=>[
     `Opportunity ${data.opportunity_number} was submitted for review.`,
     `Contractor: ${companyName}`,
@@ -599,9 +602,13 @@ export async function POST(request:Request){
     ctx.type==="partner"?"internal":"contractor");
    return noCache({offerId});
   }
-  if(action==="confirmOffer"){
-   requirePartner(ctx);
-   const opp=await partnerOpportunity(ctx,uuid(input.opportunityId));
+  if(action==="confirmOffer"||action==="confirmImportedDispatch"){
+   const imported=action==="confirmImportedDispatch";
+   if(!imported)requirePartner(ctx);
+   const id=uuid(input.opportunityId);
+   const opp=imported?await internalOpportunity(ctx,id):await partnerOpportunity(ctx,id);
+   if(imported&&(opp.submitted_by!==null||!/^(brava|rose):[a-f0-9]{64}$/.test(opp.external_reference??"")))
+    throw new ContractorAccessError("Only imported text bookings support this confirmation.",409);
    if(opp.linked_job_id||!["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(opp.status))
     throw new ContractorAccessError("Opportunity is already closed.",409);
    const amount=Number(opp.agreed_amount??opp.proposed_amount),scope=opp.final_scope??opp.scope_of_work;
@@ -614,8 +621,8 @@ export async function POST(request:Request){
    }).eq("id",opp.id).eq("status",opp.status).eq("updated_at",opp.updated_at).select("id").maybeSingle();
    if(error)throw error;
    if(!confirmed)throw new ContractorAccessError("Opportunity changed. Reload and confirm the current terms.",409);
-   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:"Partner Confirmed Scope and Price",detail:{amount}});
-   await notify(ctx,"Contractor acceptance confirmation",`Partner confirmed scope and compensation for ${opp.opportunity_number}.`,opp.company_id,opp.id,"internal");
+   await audited(ctx,{companyId:opp.company_id,opportunityId:opp.id,type:imported?"Staff Recorded Contractor Text Confirmation":"Partner Confirmed Scope and Price",detail:{amount}});
+   await notify(ctx,"Contractor acceptance confirmation",`Written scope and compensation confirmation was recorded for ${opp.opportunity_number}.`,opp.company_id,opp.id,"internal");
    return noCache({ok:true});
   }
   if(action==="assess"){
