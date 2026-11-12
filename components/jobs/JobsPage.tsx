@@ -33,6 +33,7 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
+import { formatJobServiceAddress } from "@/types/job";
 import { JobCrewTechnicianPicker } from "@/components/jobs/JobCrewTechnicianPicker";
 import { JobCardGpsRegistration } from "@/components/jobs/JobCardGpsRegistration";
 import { EquipmentClearanceChecklist } from "@/components/jobs/EquipmentClearanceChecklist";
@@ -420,6 +421,9 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
         <h3 className="text-lg font-extrabold leading-tight text-[#143d1a]">{job.client_name || "Unnamed client"}</h3>
         <p className="mt-1 text-[10px] font-medium tracking-wide text-neutral-500">{job.job_number}</p>
         <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
+        {(job.service_address || job.property) && (
+          <p className="mt-0.5 text-sm text-neutral-600">{job.service_address || formatJobServiceAddress(job.property)}</p>
+        )}
         <p className="mt-1 text-xs font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
       </div>
       <div className="text-sm text-neutral-600">
@@ -658,6 +662,7 @@ function JobModal({
           rows={[
             ["Client", job.client_name || "—"],
             ["Property", job.property_name || "—"],
+            ["Service address", job.service_address || formatJobServiceAddress(job.property) || "—"],
             ["Proposal", job.proposal?.proposal_number ?? "—"],
             ["Estimate", job.estimate_id || "—"],
             ["Walkthrough", job.walkthrough_id || "—"],

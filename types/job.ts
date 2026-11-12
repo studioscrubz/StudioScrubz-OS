@@ -118,6 +118,7 @@ type JobRelations = {
   proposal: Proposal | null;
   client: Client | null;
   property: Property | null;
+  service_address?: string;
   service_occurrence?: { agreement: { billing_type: AgreementBillingType; agreement_number: string } } | null;
 };
 type RestrictedOperationalJob = Omit<Job, "price" | "deposit" | "balance" | "labor_hours" | "recommended_crew_size" | "photos"> & {
@@ -172,3 +173,10 @@ export type CrewConflict = Pick<
   | "start_time"
   | "estimated_duration"
 >;
+
+
+export function formatJobServiceAddress(property: Pick<Property, "address" | "address_line_2" | "city" | "state" | "zip"> | null) {
+  if (!property) return "";
+  const stateZip = [property.state, property.zip].filter(Boolean).join(" ");
+  return [property.address, property.address_line_2, property.city, stateZip].filter(Boolean).join(", ");
+}
