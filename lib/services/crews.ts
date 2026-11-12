@@ -108,3 +108,9 @@ export async function setJobCrewTechnicians(jobId: string, employeeIds: string[]
   if (error) throw error;
   return data as number;
 }
+
+export async function getJobCrewTechnicians(jobId: string): Promise<string[]> {
+  const { data, error } = await getSupabaseClient().rpc("get_job_crew_technicians", { p_job_id: jobId });
+  if (error) throw error;
+  return (data as { employee_id: string }[]).map(row => row.employee_id);
+}
