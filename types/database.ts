@@ -191,6 +191,20 @@ import type { ProfitabilityProjection, ProfitabilitySettings, TravelProjection }
 export interface Database {
   public: {
     Tables: {
+      job_crew_technicians: {
+        Row: {job_id:string;crew_id:string;employee_id:string;assigned_by_employee_id:string;assigned_at:string};
+        Insert: {job_id:string;crew_id:string;employee_id:string;assigned_by_employee_id:string;assigned_at?:string};
+        Update: {employee_id?:string};
+        Relationships: [{foreignKeyName:"job_crew_technicians_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}];
+      };
+
+      job_assignment_events: {
+        Row: import("@/types/jobAssignmentEvent").JobAssignmentEvent;
+        Insert: Omit<import("@/types/jobAssignmentEvent").JobAssignmentEvent,'id'|'created_at'>;
+        Update: Partial<import("@/types/jobAssignmentEvent").JobAssignmentEvent>;
+        Relationships: [];
+      };
+
       internal_schedule_events: {
         Row: Omit<InternalScheduleEvent, "attendees" | "prospect">;
         Insert: Omit<
@@ -2225,6 +2239,12 @@ export interface Database {
     };
 
     Functions: {
+      set_operational_crew_capacity: { Args: {p_crew_id:string;p_capacity:number}; Returns: undefined };
+      delete_operational_crew: { Args: {p_crew_id:string}; Returns: undefined };
+      set_job_crew_technicians: { Args: {p_job_id:string;p_employee_ids:string[]}; Returns:number };
+      get_job_crew_technicians: { Args: {p_job_id:string}; Returns:{employee_id:string}[] };
+      get_visible_job_roster: { Args: {p_job_ids:string[]}; Returns:{job_id:string;employee_id:string;display_name:string;operational_role:string}[] };
+
       prepare_contractor_team_invitation: {
         Args: { p_actor: string; p_email: string; p_token_hash: string };
         Returns: { id: string; expires_at: string }[];
@@ -3395,6 +3415,7 @@ export interface Database {
           p_hire_date: string | null;
           p_notes: string | null;
           p_archive?: boolean;
+          p_technician_capacity?:number;
         };
         Returns: Omit<
           Employee,

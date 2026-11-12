@@ -47,7 +47,8 @@
       "fix/rose-booking-format": false,
       "fix/collapse-rose-import": false,
       "fix/submit-job-details": false,
-      "fix/brava-payout-import": false
+      "fix/brava-payout-import": false,
+      "feature/crew-manager-job-based-foundation-20261111": false
     }
   },
   "crons": [

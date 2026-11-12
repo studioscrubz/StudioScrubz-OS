@@ -1080,11 +1080,7 @@ function EmployeeDetail({
 
       .filter((c) =>
 
-        c.members.some(
-
-          (m) => m.employee_id === employee.id,
-
-        ),
+        c.crew_lead_id === employee.id,
 
       )
 

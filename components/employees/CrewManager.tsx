@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   archiveCrew,
+  deleteCrew,
   createCrew,
   getCrews,
   setCrewLead,
@@ -131,7 +132,7 @@ export function CrewManager({
               />
               <button
                 className={primary}
-                disabled={busy}
+                disabled={busy || !selected.crew_name.trim() || !Number.isInteger(selected.technician_capacity) || selected.technician_capacity < 0 || selected.technician_capacity > 50}
                 onClick={() =>
                   void run(() =>
                     updateCrew(selected.id, {
@@ -145,6 +146,7 @@ export function CrewManager({
               >
                 Save Crew
               </button>
+              <button className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700" disabled={busy} onClick={()=>{if(window.confirm("Permanently delete this unused crew? Crews with job or historical records must be archived instead."))void run(()=>deleteCrew(selected.id));}}>Delete Crew</button>
               {selected.status === "Archived" ? (
                 <button className={secondary} disabled={busy} onClick={() => void run(() => updateCrew(selected.id, { status: "Active", archived_at: null }))}>
                   Restore
@@ -182,7 +184,7 @@ export function CrewManager({
   );
 }
 function msg(x: unknown) {
-  return x instanceof Error ? x.message : "Crew operation failed.";
+  return x instanceof Error ? x.message : x && typeof x === "object" && "message" in x ? String(x.message) : "Crew operation failed.";
 }
 const input =
   "h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm";

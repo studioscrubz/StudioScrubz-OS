@@ -1,6 +1,36 @@
 import { test, expect } from '@playwright/test';
 declare global { interface Window { fixture: { calls: Array<{name:string;args:unknown[]}> } } }
 
+test('job roster picker loads job selections and enforces capacity without permanent membership controls',async({page})=>{
+ await page.goto('/');
+ const picker=page.locator('section').filter({has:page.getByRole('heading',{name:'Assign technicians to this job'})});
+ await expect(picker.getByLabel('Kris Greer',{exact:true})).toBeChecked();
+ await expect(picker.getByLabel('Other Technician',{exact:true})).toBeDisabled();
+ await picker.getByLabel('Kris Greer',{exact:true}).uncheck();
+ await picker.getByLabel('Other Technician',{exact:true}).check();
+ await picker.getByRole('button',{name:'Save job technicians'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.fixture.calls.some(c=>c.name==='setJobCrewTechnicians'&&c.args[0]==='job'&&JSON.stringify(c.args[1])==='["other"]'))).toBe(true);
+ await page.goto('/?active=1');
+ await expect(page.getByRole('heading',{name:'Assign technicians to this job'})).toHaveCount(0);
+});
+
+test('crew directory supports archive, restore and confirmed unused deletion with capacity and lead only',async({page})=>{
+ await page.goto('/?crews=1');
+ await expect(page.getByText('Archived Crew',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Kris Greer',{exact:true})).toHaveCount(0);
+ await page.getByRole('button').filter({hasText:'Crew B'}).click();
+ await page.getByRole('button',{name:'Archive',exact:true}).click();
+ await expect(page.getByRole('button').filter({hasText:'Crew B'})).toHaveCount(0);
+ await page.getByLabel('Show archived').check();
+ await page.getByRole('button').filter({hasText:'Crew B'}).click();
+ await page.getByRole('button',{name:'Restore',exact:true}).click();
+ await page.getByLabel('Show archived').uncheck();
+ await expect(page.getByRole('button').filter({hasText:'Crew B'})).toBeVisible();
+ page.on('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'Delete Crew',exact:true}).click();
+ await expect(page.getByRole('button').filter({hasText:'Crew B'})).toHaveCount(0);
+});
+
 test('service and property stay visible while other sections toggle without overflow',async({page},testInfo)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');

@@ -126,7 +126,7 @@ export function JobsPage() {
     setRows(next);
     setSelected(current => {
       const refreshed = current && [...next, ...nextArchived].find(job => job.id === current.id);
-      return current && refreshed ? { ...current, on_my_way_initiated_at: refreshed.on_my_way_initiated_at } : current;
+      return current && refreshed ? { ...current, job_technicians:refreshed.job_technicians, assigned_crew_lead_id:refreshed.assigned_crew_lead_id, on_my_way_initiated_at: refreshed.on_my_way_initiated_at } : current;
     });
     setArchivedRows(nextArchived);
     setTimeEntries(entries);
@@ -298,7 +298,7 @@ export function JobsPage() {
       employeeId={profile?.employee_id ?? null}
       role={profile?.role ?? null}
       activeCrew={activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null}
-      activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null)}
+      activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === job.assigned_crew_id) ?? null, job)}
       canComplete={hasPermission(profile, "jobs.complete")}
       canDelete={job.status === "Cancelled" && canPermanentlyDelete(profile)}
       busy={busy === job.id}
@@ -377,7 +377,7 @@ export function JobsPage() {
           employeeId={profile?.employee_id ?? null}
           role={profile?.role ?? null}
           activeCrew={activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null}
-          activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null)}
+          activeTechs={equipmentCrewOptions(activeCrews.find((crew) => crew.id === selected.assigned_crew_id) ?? null, selected)}
           canDeletePhotos={Boolean(profile && ["Master Admin", "Administrator", "Manager"].includes(profile.role))}
         />
       )}
@@ -402,7 +402,7 @@ type JobAction = (fn: () => Promise<unknown>, text: string | ((result: unknown) 
 function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeTechs, canComplete, canDelete, busy, requestDelete, act }: { job: JobWithRelations; open: () => void; timeEntries: TimeEntryWithRelations[]; employeeId: string | null; role: string | null; activeCrew: CrewWithRelations | null; activeTechs: EligibleJobTech[]; canComplete: boolean; canDelete: boolean; busy: boolean; requestDelete: () => void; act: JobAction }) {
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [showPresence, setShowPresence] = useState(false);
-  const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
+  const activeCrewLeadId = job.assigned_crew_lead_id ?? activeCrew?.crew_lead_id ?? null;
   const activeEntries = timeEntries.filter((entry) => entry.status === "Open" && !entry.clock_out);
   const currentEntry = employeeId ? activeEntries.find((entry) => entry.employee_id === employeeId) ?? null : null;
   const eligibility = jobLifecycleEligibility(job, employeeId, role, activeCrewLeadId);
@@ -477,11 +477,11 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
   </>;
 }
 
-function equipmentCrewOptions(crew:CrewWithRelations|null):EligibleJobTech[]{
+function equipmentCrewOptions(crew:CrewWithRelations|null,job:JobWithRelations):EligibleJobTech[]{
   if(!crew)return [];
   const rows=new Map<string,EligibleJobTech>();
   if(crew.crew_lead)rows.set(crew.crew_lead.id,{employee_id:crew.crew_lead.id,display_name:crew.crew_lead.preferred_name||`${crew.crew_lead.first_name} ${crew.crew_lead.last_name}`.trim(),operational_role:"Crew Lead"});
-  for(const member of crew.members){if(member.employee.employment_status==='Active')rows.set(member.employee.id,{employee_id:member.employee.id,display_name:member.employee.preferred_name||`${member.employee.first_name} ${member.employee.last_name}`.trim(),operational_role:member.employee.id===crew.crew_lead_id?"Crew Lead":"Scrub Technician"})}
+  for(const tech of job.job_technicians??[]) rows.set(tech.employee_id,tech);
   return [...rows.values()];
 }
 function JobCardActiveTime({ job, entries }: { job: JobWithRelations; entries: TimeEntryWithRelations[] }) {
@@ -564,7 +564,7 @@ function JobModal({
   const [hasFinishedPhoto, setHasFinishedPhoto] = useState<boolean | null>(null);
   const [showPresence, setShowPresence] = useState(false);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
-  const activeCrewLeadId = activeCrew?.crew_lead_id ?? null;
+  const activeCrewLeadId = job.assigned_crew_lead_id ?? activeCrew?.crew_lead_id ?? null;
   const [tab, setTab] = useState<"Overview" | "Scope" | "Discoveries" | "Changes" | "Timeline">("Overview");
   const [changePrefill, setChangePrefill] = useState<VisibleFieldDiscovery | null>(null);
   const [discoveryPrefill, setDiscoveryPrefill] = useState<string | null>(null);
@@ -623,12 +623,12 @@ function JobModal({
     }
   }
   const assignedCrew = crews.find(crew => crew.id === job.assigned_crew_id) ?? activeCrew;
-  const assignedLeadName = assignedCrew?.crew_lead ? employeeName(assignedCrew.crew_lead) : job.crew_lead_name;
+  const assignedLeadName = job.crew_lead_name || (assignedCrew?.crew_lead ? employeeName(assignedCrew.crew_lead) : null);
   const assignmentSummary = job.assigned_crew_id
     ? [assignedCrew?.crew_name || job.assigned_crew_name || "Assigned crew", assignedLeadName ? assignedLeadName + " (Lead)" : "Lead not assigned"].join(" · ")
     : job.assigned_employee_name || "Unassigned";
   const assignedTeam = assignedCrew
-    ? Array.from(new Set([assignedLeadName ? assignedLeadName + " (Lead)" : "", ...assignedCrew.members.filter(member => member.employee_id !== assignedCrew.crew_lead_id).map(member => employeeName(member.employee))].filter(Boolean))).join(" · ")
+    ? Array.from(new Set([assignedLeadName ? assignedLeadName + " (Lead)" : "", ...(job.job_technicians??[]).map(tech => tech.display_name)].filter(Boolean))).join(" · ")
     : job.assigned_team.join(" · ") || job.assigned_employee_name || "Unassigned";
   const notes = [["Access instructions", job.access_instructions], ["Internal notes", job.internal_notes]].filter((row): row is [string, string] => Boolean(row[1]?.trim()));
   const scheduleSummary = [job.scheduled_date ? new Date(job.scheduled_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Not scheduled", job.start_time ? new Date("2000-01-01T" + job.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "", job.estimated_duration ? job.estimated_duration + (job.estimated_duration === 1 ? " hour" : " hours") : ""].filter(Boolean).join(" · ");
@@ -773,13 +773,13 @@ function JobModal({
         assigned={Boolean(employeeId && (job.assigned_employee_id === employeeId
           || (job.assigned_crew_id && (
             (crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id ?? activeCrew?.crew_lead_id) === employeeId
-            || crews.find(c => c.id === job.assigned_crew_id)?.members.some(m => m.employee_id === employeeId)
+            || job.job_technicians?.some(m => m.employee_id === employeeId)
           ))))}
         assignedEmployees={Array.from(new Set([
           ...(job.assigned_employee_id ? [job.assigned_employee_id] : []),
           ...(job.assigned_crew_id ? [
             ...[crews.find(c => c.id === job.assigned_crew_id)?.crew_lead_id].filter((id): id is string => Boolean(id)),
-            ...(crews.find(c => c.id === job.assigned_crew_id)?.members.map(m => m.employee_id) ?? []),
+            ...(job.job_technicians?.map(m => m.employee_id) ?? []),
           ] : []),
         ])).map(id => ({ id, name: activeTechs.find(e => e.employee_id === id)?.display_name ?? id }))}
       />
@@ -788,7 +788,7 @@ function JobModal({
         {job.financials_available !== false && <JobLaborSummary jobId={job.id} estimatedHours={job.labor_hours} estimatedCost={Math.max(0, job.price - (job.proposal?.result.estimatedProfit ?? 0))} price={job.price} />}
       </JobTimeSummary>
       <JobCalendarStatus jobId={job.id} />
-      {job.assigned_crew_id && employeeId === activeCrewLeadId && ['Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker jobId={job.id} capacity={assignedCrew?.technician_capacity ?? 4} />}
+      {job.assigned_crew_id && employeeId && employeeId === activeCrewLeadId && ['Ready to Schedule','Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker key={job.id} jobId={job.id} leadEmployeeId={employeeId} capacity={assignedCrew?.technician_capacity ?? 4} onSaved={()=>mutate(async()=>{},"Job technicians saved.")} />}
       {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-2"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
       <JobEquipmentActions jobId={job.id} />
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-2"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
@@ -924,10 +924,10 @@ function CrewPresenceModal({ job, crew, techs, busy, close, start }: {
 }) {
   const rosterIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const member of crew.members ?? []) ids.add(member.employee_id);
+    for (const tech of job.job_technicians ?? []) ids.add(tech.employee_id);
     if (crew.crew_lead_id) ids.add(crew.crew_lead_id);
     return [...ids];
-  }, [crew]);
+  }, [crew, job.job_technicians]);
   const roster = rosterIds.map((id) => techs.find((tech) => tech.employee_id === id)).filter((tech): tech is EligibleJobTech => Boolean(tech));
   const [drafts, setDrafts] = useState<Record<string, PresenceDraft>>(() => Object.fromEntries(rosterIds.map((id) => [id, { status: "", expectedArrivalAt: "", reasonCode: "", reasonDetail: "" }])));
   const [validation, setValidation] = useState<string | null>(null);
@@ -1451,7 +1451,7 @@ function jobLifecycleEligibility(job: JobWithRelations, employeeId: string | nul
     && (management || eligibleIndividual || assignedCrewLead);
   return {
     showStart,
-    canJoin: job.status === "In Progress" && assigned && Boolean(employeeId) && canParticipate,
+    canJoin: job.status === "In Progress" && assigned && Boolean(employeeId) && canParticipate && (job.assigned_employee_id===employeeId || activeCrewLeadId===employeeId || Boolean(job.job_technicians?.some(t=>t.employee_id===employeeId))),
   };
 }
 function displayTime(value: string) { return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }

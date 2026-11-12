@@ -266,3 +266,5 @@ New portal companies use the `link_new_contractor_client` insert trigger from `2
 `20261107211116_contractor_structured_property_addresses.sql` updates the contractor request property helper to map the portal's structured address into existing Accounts property columns. The opportunity keeps its formatted display address and legacy requests retain their previous lookup behavior.
 
 Contractor advisory pricing: `20261109165517_advisory_contractor_profitability.sql` updates the existing Job conversion RPC and adds `offer_contractor_profitability_price` for authenticated Master Admins to send an audited counteroffer.
+
+Job-specific crew roster integration: job_crew_technicians, job_assignment_events, set_job_crew_technicians, get_job_crew_technicians, get_visible_job_roster, set_operational_crew_capacity, delete_operational_crew, and the capacity-aware manage_operational_crew overload are defined by 20261111090000_job_specific_crew_roster_foundation.sql. Job identity gates visibility, attendance, GPS, equipment and payroll. Assignment events feed existing Attention and push infrastructure.
