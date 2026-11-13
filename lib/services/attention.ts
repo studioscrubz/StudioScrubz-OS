@@ -185,8 +185,10 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
   const financiallyResolvedJobs = new Set(input.financiallyResolvedJobIds);
 
   const clientNamesByJob = new Map(jobs.map(job => [job.id, job.client_name?.trim()]));
+  const jobsWithAssignmentEvents = new Set<string>();
   for(const event of input.jobAssignmentEvents??[]){
     if(event.recipient_user_id!==profile.id)continue;
+    jobsWithAssignmentEvents.add(event.job_id);
     const schedule=[event.scheduled_date,event.start_time?.slice(0,5)].filter(Boolean).join(" ")||"Schedule pending";
     items.push(item('job-assignment:'+event.id,"Job Assigned","Attention","Jobs",
       'Job Assignment '+event.event_type,
@@ -363,6 +365,7 @@ export function buildAttentionItems(input: AttentionRuleInput, view: AttentionVi
     for (const job of jobs) {
       if (!mayReceiveEmployeeJobAlert(job.id) || (!job.assigned_crew_id && !job.assigned_employee_id) || job.archived_at || ["Completed", "Cancelled", "Archived"].includes(job.status) || (job.scheduled_date && job.scheduled_date < today)) continue;
       const label = job.job_number || "Job";
+      if (jobsWithAssignmentEvents.has(job.id)) continue;
       const description = `${job.client_name ? `${job.client_name} · ` : ""}${label}${job.service_name ? ` - ${job.service_name}` : ""}${job.scheduled_date ? ` - ${friendlyDate(job.scheduled_date)}${job.start_time ? ` at ${friendlyTime(job.start_time)}` : ""}` : ""}`;
       items.push(item(`job:${job.id}:assigned:${profile.employee_id}:${job.assigned_employee_id||job.assigned_crew_id}`, "Job Assigned", "Attention", "Jobs", "Job Assigned", description, "Job", job.id, null, label, null, job.scheduled_date, job.created_at, `/jobs?jobId=${job.id}`, "Open Job"));
     }

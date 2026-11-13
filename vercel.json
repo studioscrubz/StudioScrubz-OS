@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/deduplicate-job-assignment-alerts": false,
       "fix/vendor-recipient-fields": false,
       "fix/vendor-packet-new-recipient": false,
       "fix/vendor-packet-btrc": false,
