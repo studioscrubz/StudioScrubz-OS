@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/vendor-recipient-fields": false,
       "fix/vendor-packet-new-recipient": false,
       "fix/vendor-packet-btrc": false,
       "fix/brava-text-format": false,

@@ -44,6 +44,7 @@ type RequestIdentity = {
   clientId: string | null;
   propertyId: string | null;
   recipientEmail: string;
+  recipientName?: string;
   subject: string;
   messageBody: string;
   documentKind: VendorDocumentKind | "both";
@@ -100,8 +101,11 @@ export async function POST(request: Request) {
       if (cause instanceof CapabilityModelError) throw new InputError(cause.message);
       throw cause;
     }
-    const fingerprint = requestFingerprint({ clientId, propertyId, recipientEmail, subject, messageBody, documentKind, moduleIds });
-    const identity: RequestIdentity = { clientId, propertyId, recipientEmail, subject, messageBody, documentKind, moduleIds, fingerprint };
+    const directName = !clientId && body.recipientName != null
+      ? { recipientName: text(body.recipientName, "Recipient name", 160) }
+      : {};
+    const details = { clientId, propertyId, recipientEmail, subject, messageBody, documentKind, moduleIds, ...directName };
+    const identity: RequestIdentity = { ...details, fingerprint: requestFingerprint(details) };
     const eventKey = `vendor-document:${profile.id}:${requestId}`;
 
     admin = createSupabaseAdminClient();
@@ -208,7 +212,7 @@ export async function POST(request: Request) {
 }
 
 async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity): Promise<CapabilityStatementModel> {
-  let recipientName = "Prospective client";
+  let recipientName = identity.recipientName ?? "Prospective client";
   if (identity.clientId) {
     const { data: client, error } = await admin.from("clients")
       .select("first_name,last_name,company_name")

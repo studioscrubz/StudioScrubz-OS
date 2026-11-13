@@ -29,6 +29,8 @@ export function VendorPacketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewKind, setPreviewKind] = useState<VendorDocumentKind>("corporate-capability-statement");
+  const [newRecipientName, setNewRecipientName] = useState("");
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
   const [clientId, setClientId] = useState("");
   const [propertyId, setPropertyId] = useState("");
   const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
@@ -59,7 +61,7 @@ export function VendorPacketsPage() {
 
   const client = clients.find((item) => item.id === clientId);
   const directRecipient = clientId === "new-email";
-  const recipientName = client ? clientName(client) : "Prospective client";
+  const recipientName = client ? clientName(client) : newRecipientName.trim() || "Prospective client";
   const availableProperties = properties.filter((item) => item.client_id === clientId);
   const property = availableProperties.find((item) => item.id === propertyId);
   const documentModel = (() => {
@@ -104,7 +106,7 @@ export function VendorPacketsPage() {
     setEmailDraft({
       kind,
       sendBoth,
-      recipientEmail: client?.email ?? "",
+      recipientEmail: directRecipient ? newRecipientEmail.trim() : client?.email ?? "",
       requestId: crypto.randomUUID(),
       subject: sendBoth
         ? `StudioScrubz Corporate Capability Statement & Service Packet — ${target}`.slice(0, 200)
@@ -112,10 +114,10 @@ export function VendorPacketsPage() {
         ? `StudioScrubz Corporate Capability Statement — ${target}`.slice(0, 200)
         : `StudioScrubz Cleaning & Property Service Capabilities — ${target}`.slice(0, 200),
       messageBody: sendBoth
-        ? `Hello ${client ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz. Our corporate capability statement appears below, and a detailed Service Capability Packet is attached as a PDF.\n\nPlease reach out if you would like to discuss your property, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
+        ? `Hello ${client || newRecipientName.trim() ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz. Our corporate capability statement appears below, and a detailed Service Capability Packet is attached as a PDF.\n\nPlease reach out if you would like to discuss your property, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
         : statement
-        ? `Hello ${client ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a corporate capability statement summarizing our company, selected core competencies, and verified business information.\n\nPlease review the statement below, and contact us if you would like to discuss your facility, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
-        : `Hello ${client ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a service capability packet highlighting the StudioScrubz services that may be relevant to your property or project.\n\nPlease review the information below, and feel free to contact us if you would like to schedule an assessment or discuss a customized service plan.\n\nNo mess. No stress.\n\nStudioScrubz`,
+        ? `Hello ${client || newRecipientName.trim() ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a corporate capability statement summarizing our company, selected core competencies, and verified business information.\n\nPlease review the statement below, and contact us if you would like to discuss your facility, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
+        : `Hello ${client || newRecipientName.trim() ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a service capability packet highlighting the StudioScrubz services that may be relevant to your property or project.\n\nPlease review the information below, and feel free to contact us if you would like to schedule an assessment or discuss a customized service plan.\n\nNo mess. No stress.\n\nStudioScrubz`,
     });
   }
 
@@ -128,7 +130,7 @@ export function VendorPacketsPage() {
       const response = await fetch("/api/vendor-packets/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : emailDraft.kind, clientId: client?.id ?? null, propertyId: propertyId || null, moduleIds: !emailDraft.sendBoth && emailDraft.kind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds }),
+        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : emailDraft.kind, clientId: client?.id ?? null, recipientName: directRecipient ? newRecipientName.trim() || undefined : undefined, propertyId: propertyId || null, moduleIds: !emailDraft.sendBoth && emailDraft.kind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds }),
       });
       const result = await response.json() as { error?: string; providerMessageId?: string; warning?: string };
       if (!response.ok || !result.providerMessageId) throw new Error(result.error || "The email could not be sent.");
@@ -166,6 +168,14 @@ export function VendorPacketsPage() {
           </label>
         </div>
 
+        {directRecipient && <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-bold">Recipient name
+            <input className={fieldClass} maxLength={160} autoComplete="off" value={newRecipientName} onChange={event => setNewRecipientName(event.target.value)} />
+          </label>
+          <label className="text-sm font-bold">Recipient email
+            <input className={fieldClass} type="email" maxLength={320} autoComplete="off" value={newRecipientEmail} onChange={event => setNewRecipientEmail(event.target.value)} />
+          </label>
+        </div>}
         <fieldset className="mt-6" aria-describedby="module-guidance">
           <legend className="font-bold text-[#143d1a]">Services to highlight</legend>
           <p id="module-guidance" className="mt-1 text-sm text-neutral-600">Select relevant services once. The statement highlights up to four; the detailed packet includes all selections.</p>
