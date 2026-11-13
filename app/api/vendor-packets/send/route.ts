@@ -41,7 +41,7 @@ type CommunicationRow = {
 };
 type ProviderSubmission = { communication_id: string; event_key: string; provider: string; provider_message_id: string };
 type RequestIdentity = {
-  clientId: string;
+  clientId: string | null;
   propertyId: string | null;
   recipientEmail: string;
   subject: string;
@@ -83,8 +83,9 @@ export async function POST(request: Request) {
 
     const body = await readBody(request);
     const requestId = uuid(body.requestId, "Request identifier");
-    const clientId = uuid(body.clientId, "Client");
+    const clientId = optionalUuid(body.clientId, "Client");
     const propertyId = optionalUuid(body.propertyId, "Property");
+    if (propertyId && !clientId) throw new InputError("Select a client before selecting a property.");
     const recipientEmail = text(body.recipientEmail, "Recipient email", 320).toLowerCase();
     if (!EMAIL_PATTERN.test(recipientEmail)) throw new InputError("Enter a valid recipient email.");
     const subject = text(body.subject, "Subject", 200);
@@ -207,14 +208,18 @@ export async function POST(request: Request) {
 }
 
 async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity): Promise<CapabilityStatementModel> {
-  const { data: client, error: clientError } = await admin.from("clients")
-    .select("id,first_name,last_name,company_name")
-    .eq("id", identity.clientId)
-    .is("archived_at", null)
-    .single();
-  if (clientError || !client) throw new InputError("The selected client is unavailable.");
+  let recipientName = "Prospective client";
+  if (identity.clientId) {
+    const { data: client, error } = await admin.from("clients")
+      .select("first_name,last_name,company_name")
+      .eq("id", identity.clientId)
+      .is("archived_at", null)
+      .single();
+    if (error || !client) throw new InputError("The selected client is unavailable.");
+    recipientName = clean(client.company_name) || joinText([client.first_name, client.last_name]) || "Unnamed client";
+  }
   let propertyLabel: string | null = null;
-  if (identity.propertyId) {
+  if (identity.propertyId && identity.clientId) {
     const { data: property, error } = await admin.from("properties")
       .select("property_name,address,address_line_2,city,state,zip")
       .eq("id", identity.propertyId)
@@ -238,7 +243,7 @@ async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity):
   try {
     return buildVendorCapabilityDocumentModel({
       documentKind: identity.documentKind === "both" ? "corporate-capability-statement" : identity.documentKind,
-      clientName: clean(client.company_name) || joinText([client.first_name, client.last_name]) || "Unnamed client",
+      clientName: recipientName,
       propertyLabel,
       business: {
         name: stringValue(business.business_name),

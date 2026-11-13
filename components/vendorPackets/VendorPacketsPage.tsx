@@ -58,13 +58,15 @@ export function VendorPacketsPage() {
   }, []);
 
   const client = clients.find((item) => item.id === clientId);
+  const directRecipient = clientId === "new-email";
+  const recipientName = client ? clientName(client) : "Prospective client";
   const availableProperties = properties.filter((item) => item.client_id === clientId);
   const property = availableProperties.find((item) => item.id === propertyId);
   const documentModel = (() => {
-    if (!client || !business || selectedModuleIds.length === 0) return null;
+    if ((!client && !directRecipient) || !business || selectedModuleIds.length === 0) return null;
     return buildVendorCapabilityDocumentModel({
       documentKind: previewKind,
-      clientName: clientName(client),
+      clientName: recipientName,
       propertyLabel: property ? propertyLabel(property) : null,
       business: {
         name: business.business_name,
@@ -94,15 +96,15 @@ export function VendorPacketsPage() {
   }
 
   function openEmail(kind: VendorDocumentKind, sendBoth = false) {
-    if (!client || !documentModel) return;
+    if (!documentModel) return;
     setEmailError(null);
     setEmailNotice(null);
-    const target = property?.property_name || clientName(client);
+    const target = property?.property_name || recipientName;
     const statement = sendBoth || kind === "corporate-capability-statement";
     setEmailDraft({
       kind,
       sendBoth,
-      recipientEmail: client.email ?? "",
+      recipientEmail: client?.email ?? "",
       requestId: crypto.randomUUID(),
       subject: sendBoth
         ? `StudioScrubz Corporate Capability Statement & Service Packet — ${target}`.slice(0, 200)
@@ -110,10 +112,10 @@ export function VendorPacketsPage() {
         ? `StudioScrubz Corporate Capability Statement — ${target}`.slice(0, 200)
         : `StudioScrubz Cleaning & Property Service Capabilities — ${target}`.slice(0, 200),
       messageBody: sendBoth
-        ? `Hello ${clientName(client)},\n\nThank you for the opportunity to introduce StudioScrubz. Our corporate capability statement appears below, and a detailed Service Capability Packet is attached as a PDF.\n\nPlease reach out if you would like to discuss your property, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
+        ? `Hello ${client ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz. Our corporate capability statement appears below, and a detailed Service Capability Packet is attached as a PDF.\n\nPlease reach out if you would like to discuss your property, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
         : statement
-        ? `Hello ${clientName(client)},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a corporate capability statement summarizing our company, selected core competencies, and verified business information.\n\nPlease review the statement below, and contact us if you would like to discuss your facility, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
-        : `Hello ${clientName(client)},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a service capability packet highlighting the StudioScrubz services that may be relevant to your property or project.\n\nPlease review the information below, and feel free to contact us if you would like to schedule an assessment or discuss a customized service plan.\n\nNo mess. No stress.\n\nStudioScrubz`,
+        ? `Hello ${client ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a corporate capability statement summarizing our company, selected core competencies, and verified business information.\n\nPlease review the statement below, and contact us if you would like to discuss your facility, project, or vendor requirements.\n\nNo mess. No stress.\n\nStudioScrubz`
+        : `Hello ${client ? recipientName : "there"},\n\nThank you for the opportunity to introduce StudioScrubz.\n\nWe've prepared a service capability packet highlighting the StudioScrubz services that may be relevant to your property or project.\n\nPlease review the information below, and feel free to contact us if you would like to schedule an assessment or discuss a customized service plan.\n\nNo mess. No stress.\n\nStudioScrubz`,
     });
   }
 
@@ -126,12 +128,12 @@ export function VendorPacketsPage() {
       const response = await fetch("/api/vendor-packets/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : emailDraft.kind, clientId, propertyId: propertyId || null, moduleIds: !emailDraft.sendBoth && emailDraft.kind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds }),
+        body: JSON.stringify({ ...emailDraft, documentKind: emailDraft.sendBoth ? "both" : emailDraft.kind, clientId: client?.id ?? null, propertyId: propertyId || null, moduleIds: !emailDraft.sendBoth && emailDraft.kind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds }),
       });
       const result = await response.json() as { error?: string; providerMessageId?: string; warning?: string };
       if (!response.ok || !result.providerMessageId) throw new Error(result.error || "The email could not be sent.");
       setEmailDraft(null);
-      setEmailNotice(result.warning || `${emailDraft.sendBoth ? "Both documents" : emailDraft.kind === "corporate-capability-statement" ? "Capability Statement" : "Service Packet"} emailed and recorded in client history.`);
+      setEmailNotice(result.warning || `${emailDraft.sendBoth ? "Both documents" : emailDraft.kind === "corporate-capability-statement" ? "Capability Statement" : "Service Packet"} emailed and recorded in ${directRecipient ? "Communications" : "client history"}.`);
     } catch (cause) {
       setEmailError(cause instanceof Error ? cause.message : "The email could not be confirmed as sent. Please try again.");
     } finally {
@@ -152,6 +154,7 @@ export function VendorPacketsPage() {
           <label className="text-sm font-bold">Prospect / Client
             <select className={fieldClass} value={clientId} onChange={(event) => { setClientId(event.target.value); setPropertyId(""); setEmailNotice(null); }}>
               <option value="">Select a client</option>
+              <option value="new-email">Send to a new email address</option>
               {clients.map((item) => <option key={item.id} value={item.id}>{clientName(item)}</option>)}
             </select>
           </label>
@@ -162,7 +165,6 @@ export function VendorPacketsPage() {
             </select>
           </label>
         </div>
-        {!clients.length && <p className="mt-3 text-sm text-neutral-600">No unarchived clients are available. Add a prospect through Clients first.</p>}
 
         <fieldset className="mt-6" aria-describedby="module-guidance">
           <legend className="font-bold text-[#143d1a]">Services to highlight</legend>
@@ -184,8 +186,8 @@ export function VendorPacketsPage() {
           <div>
             <p className="mb-2 text-sm font-bold text-[#143d1a]">Preview & print</p>
             <div className="flex flex-wrap gap-3">
-              <button type="button" disabled={!client || !selectedModuleIds.length} onClick={() => { setPreviewKind("corporate-capability-statement"); setEmailNotice(null); }} aria-pressed={previewKind === "corporate-capability-statement"} className={`rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40 ${previewKind === "corporate-capability-statement" ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>Preview Statement</button>
-              <button type="button" disabled={!client || !selectedModuleIds.length} onClick={() => { setPreviewKind("service-packet"); setEmailNotice(null); }} aria-pressed={previewKind === "service-packet"} className={`rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40 ${previewKind === "service-packet" ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>Preview Packet</button>
+              <button type="button" disabled={!documentModel} onClick={() => { setPreviewKind("corporate-capability-statement"); setEmailNotice(null); }} aria-pressed={previewKind === "corporate-capability-statement"} className={`rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40 ${previewKind === "corporate-capability-statement" ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>Preview Statement</button>
+              <button type="button" disabled={!documentModel} onClick={() => { setPreviewKind("service-packet"); setEmailNotice(null); }} aria-pressed={previewKind === "service-packet"} className={`rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-40 ${previewKind === "service-packet" ? "border-[#143d1a] bg-[#143d1a] text-white" : "border-neutral-300 bg-white text-[#143d1a]"}`}>Preview Packet</button>
               <button type="button" disabled={!documentModel} onClick={() => window.print()} className="rounded-lg border border-[#143d1a] px-5 py-3 text-sm font-bold text-[#143d1a] disabled:opacity-40">Print / Save Preview as PDF</button>
             </div>
           </div>
@@ -207,7 +209,7 @@ export function VendorPacketsPage() {
     {emailDraft && <dialog ref={(element) => { if (element && !element.open) element.showModal(); }} onCancel={(event) => { event.preventDefault(); if (!sending) setEmailDraft(null); }} aria-labelledby="vendor-email-title" className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-2xl p-5 backdrop:bg-black/40 sm:p-6">
       <form onSubmit={sendEmail}>
         <h2 id="vendor-email-title" className="text-xl font-bold text-[#143d1a]">{emailDraft.sendBoth ? "Send Both Documents" : emailDraft.kind === "corporate-capability-statement" ? "Email Capability Statement" : "Email Service Packet"}</h2>
-        <p className="mt-2 text-sm text-neutral-600">{emailDraft.sendBoth ? "The Corporate Capability Statement appears in the branded email, with a generated Service Capability Packet PDF attached. One delivery is recorded in client history." : "The generated document will appear in the branded email body and the exact content snapshot will be recorded in client history."}</p>
+        <p className="mt-2 text-sm text-neutral-600">{emailDraft.sendBoth ? "The Corporate Capability Statement appears in the branded email, with a generated Service Capability Packet PDF attached. One delivery is recorded in Communications." : "The generated document will appear in the branded email body and the exact content snapshot will be recorded in Communications."}</p>
         <fieldset disabled={sending} className="mt-4 space-y-4">
           <label className="block text-sm font-bold">Recipient<input autoFocus required type="email" maxLength={320} className={fieldClass} value={emailDraft.recipientEmail} onChange={(event) => setEmailDraft({ ...emailDraft, recipientEmail: event.target.value })} /></label>
           <label className="block text-sm font-bold">Subject<input required maxLength={200} className={fieldClass} value={emailDraft.subject} onChange={(event) => setEmailDraft({ ...emailDraft, subject: event.target.value })} /></label>
