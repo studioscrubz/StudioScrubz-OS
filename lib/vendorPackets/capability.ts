@@ -141,6 +141,7 @@ export function buildVendorCapabilityDocumentModel(input: BuildCapabilityStateme
   // actually supplied. Never invent a BTRC number, insurer, or policy limits.
   const corporateData: CapabilityDataEntry[] = [
     ...verifiedCorporateData,
+    ...(!statement ? [{ label: "City of Los Angeles Business Tax Registration (BTRC)", value: "0003575712-0001-1" }] : []),
     { label: "Commercial General Liability", value: "Spinnaker Insurance Company; policy CSG-00596658-00; $1,000,000 each occurrence / $2,000,000 general aggregate." },
   ];
   const overview = statement
