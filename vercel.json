@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/vendor-packet-btrc": false,
       "fix/brava-text-format": false,
       "fix/portal-request-layout": false,
       "fix/opportunity-form-layout": false,
