@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/on-my-way-mileage-without-phone": false,
       "fix/deduplicate-job-assignment-alerts": false,
       "fix/vendor-recipient-fields": false,
       "fix/vendor-packet-new-recipient": false,

@@ -1342,8 +1342,8 @@ function OnMyWayButton({ job, employeeId, role, compact = false }: { job: JobWit
   const supported = ["Master Admin", "Administrator", "Manager", "Crew Lead", "Scrub Technician"].includes(role ?? "");
   const management = ["Master Admin", "Administrator", "Manager"].includes(role ?? "");
   // Field roles use only contact fields from the assignment-authorized RPC.
-  const clientPhone = management ? job.client?.phone : job.client_phone;
-  const firstName = management ? job.client?.first_name : job.client_first_name;
+  const clientPhone = management ? (job.client?.phone ?? job.client_phone) : job.client_phone;
+  const firstName = management ? (job.client?.first_name ?? job.client_first_name) : job.client_first_name;
   const phone = clientPhone ? normalizeSmsPhoneNumber(clientPhone) : null;
   if (!supported || !profile) return null;
   return <GpsOnMyWay key={`${job.id}:${profile.id}`} job={job} userId={profile.id} employeeId={employeeId} management={management} phone={phone} firstName={firstName} compact={compact}/>;
@@ -1382,7 +1382,7 @@ function GpsOnMyWay({ job, userId, employeeId, management, phone, firstName, com
   }, [job.id, userId, employeeId, management]);
   const active = trip?.status === "Active";
   const completed = trip?.status === "Completed";
-  const eligible = Boolean(phone && job.scheduled_date && job.start_time && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status));
+  const eligible = Boolean(job.scheduled_date && job.start_time && !job.archived_at && !["Completed", "Cancelled", "Archived"].includes(job.status));
   async function act(cancel = false) {
     if (busy) return;
     setBusy(true); setError(null); setNotice(null);
@@ -1411,7 +1411,7 @@ No mess. No stress.`;
   if (compact) return <div className="relative shrink-0 text-right">
     {completed ? <span className="text-xs font-bold text-[#143d1a]">Mileage saved</span> : <button type="button"
       disabled={busy || !loaded || (!active && (!eligible || vehicles.length === 0))}
-      title={!active && !eligible ? "Requires a scheduled job and valid client phone number" : !active && !vehicles.length ? "No eligible active vehicle available" : undefined}
+      title={!active && !eligible ? "Requires an eligible scheduled job" : !active && !vehicles.length ? "No eligible active vehicle available" : undefined}
       className="min-h-10 rounded-lg bg-[#143d1a] px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
       onClick={() => { if (!active && !vehicleId) { setChoosingVehicle(true); return; } void act(); }}>
       {busy ? "Locating…" : active ? "ARRIVED" : "ON MY WAY"}
@@ -1429,7 +1429,8 @@ No mess. No stress.`;
     {!compact && <p className="text-[11px] leading-snug text-neutral-600">{GPS_DISTANCE_NOTICE} Only departure and arrival locations are captured.</p>}
     {!active && !completed && <>
       {vehicles.length > 0 ? <label className={compact ? "min-w-0 max-w-full text-xs" : "block text-xs"}>Vehicle<select aria-label="Mileage vehicle" className={compact ? `${input} max-w-48` : input} disabled={busy} value={vehicleId} onChange={event => setVehicleId(event.target.value)}><option value="">{management ? "Select active vehicle" : "Select assigned vehicle"}</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)}</option>)}</select></label> : <p className="text-sm">{management ? "No active vehicle is available. Add or reactivate a vehicle before starting GPS mileage." : "No eligible active assigned vehicle. Contact management; manual mileage remains available separately."}</p>}
-      {!eligible && <p className="text-sm">On My Way requires an eligible scheduled Job and a valid client phone number.</p>}
+      {!eligible && <p className="text-sm">On My Way requires an eligible scheduled job.</p>}
+      {eligible && !phone && <p className="text-sm">Mileage tracking is available. A client phone number is needed to open a text message.</p>}
     </>}
     {!completed && <button type="button" disabled={busy || !loaded || (!active && (!eligible || !vehicleId))} className={primary} onClick={() => void act()}>{busy ? "Saving / locating…" : active ? "ARRIVED" : "ON MY WAY"}</button>}
     {active && <button type="button" disabled={busy} className={`${secondary} ml-2`} onClick={() => { if (window.confirm("Cancel this GPS trip without creating mileage?")) void act(true); }}>Cancel GPS Trip</button>}
