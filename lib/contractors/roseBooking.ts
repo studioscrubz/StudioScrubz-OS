@@ -1,3 +1,5 @@
+import { bravaScopeHeading } from "./bravaScope";
+
 export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose") {
   const allLines = message.trim().split(/\r?\n/);
   const heading = allLines[0] ?? "";
@@ -43,7 +45,7 @@ export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose
     addOns: read("add-ons"),
     access: read("instructions / access") || read("instructions/access"),
     amount: kind === "rose" && /^\d+(\.\d{1,2})?$/.test(price) ? price : "",
-    scope: [read("service"), read("frequency") && `Frequency: ${read("frequency")}`,
+    scope: [kind === "brava" ? bravaScopeHeading(read("service")) : read("service"), read("frequency") && `Frequency: ${read("frequency")}`,
       read("add-ons") && `Add-ons: ${read("add-ons")}`].filter(Boolean).join("\n"),
     estimatedHours: "",
   };

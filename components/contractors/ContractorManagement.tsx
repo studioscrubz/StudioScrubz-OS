@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
+import {bravaScopeHeading} from "@/lib/contractors/bravaScope";
 import {parseRoseBooking} from "@/lib/contractors/roseBooking";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
@@ -400,7 +401,17 @@ export function ContractorManagement({view}: {view:ContractorView}){
         <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
          readOnly={key==="amount"&&listedPayout!==null}
          value={key==="amount"&&isBrava?(listedPayout?.toFixed(2)??rosePreview.amount):rosePreview[key]}
-         onChange={event=>setRosePreview({...rosePreview,[key]:event.target.value})}/>
+         onChange={event=>{
+          const value=event.target.value;
+          if(isBrava&&key==="serviceType"){
+           const previous=bravaScopeHeading(rosePreview.serviceType);
+           const scope=rosePreview.scope;
+           const next=bravaScopeHeading(value);
+           const notes=previous&&(scope===previous||scope.startsWith(previous+"\n"))
+            ?scope.slice(previous.length).trimStart():scope;
+           setRosePreview({...rosePreview,serviceType:value,scope:[next,notes].filter(Boolean).join("\n")});
+          }else setRosePreview({...rosePreview,[key]:value});
+         }}/>
        </label>)}
       </div>
       {title==="Service and Add-Ons"&&<>
