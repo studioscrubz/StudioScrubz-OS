@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/agreement-print": false,
       "fix/brava-standard-scopes": false,
       "fix/brava-booking-frequency": false,
       "fix/on-my-way-mileage-without-phone": false,
