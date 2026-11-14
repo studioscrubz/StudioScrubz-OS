@@ -14,7 +14,7 @@ import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
-type Opportunity={id:string;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
+type Opportunity={id:string;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;partner_user_id:string;read_at:string|null;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;updated_at:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
@@ -47,6 +47,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [submissionClientId,setSubmissionClientId]=useState("");
  const [roseText,setRoseText]=useState("");
+ const [manualBrava,setManualBrava]=useState(false);
  const [rosePreview,setRosePreview]=useState<ReturnType<typeof parseRoseBooking>|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const submissionDialog=useRef<HTMLDialogElement>(null);
@@ -131,6 +132,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const submissionClients=companies.filter(company=>bookingClientKind(company.name)&&["Active","Pending"].includes(company.status));
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
+ const savedBravaCustomers=Array.from(new Map(
+  (data?.opportunities??[]).filter(row=>row.company_id===submissionClientId&&row.property_name&&row.request_options?.address)
+   .map(row=>[`${row.property_name?.toLowerCase()}|${row.property_address.toLowerCase()}`,row] as const).reverse(),
+ ).values());
  const listedPayout=isBrava&&rosePreview
   ?bravaPayout(rosePreview.serviceType,rosePreview.bedrooms,rosePreview.bathrooms,rosePreview.addOns):null;
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
@@ -328,6 +333,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <label className="block text-sm font-semibold">Client
      <select className={input} value={submissionClientId} disabled={busy} onChange={event=>{
       setSubmissionClientId(event.target.value);
+      setManualBrava(false);
       setRoseText("");
       setRosePreview(null);
      }}>
@@ -335,7 +341,25 @@ export function ContractorManagement({view}: {view:ContractorView}){
       {submissionClients.map(company=><option key={company.id} value={company.id} disabled={company.status!=="Active"}>{company.name}{company.status!=="Active"?" (activate in Contractors)":""}</option>)}
      </select>
     </label>
-    {submissionClient&&<>
+    {isBrava&&<div className="flex flex-wrap gap-2">
+     <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);}}>Paste dispatch</button>
+     <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview(parseRoseBooking("Customer:","brava"));}}>Enter manually</button>
+    </div>}
+    {isBrava&&manualBrava&&<label className="block text-sm font-semibold">Saved BRAVA customer and location
+     <select className={input} defaultValue="" key={submissionClientId} onChange={event=>{
+      const saved=savedBravaCustomers.find(row=>row.id===event.target.value);
+      const address=saved?.request_options?.address;
+      const blank=parseRoseBooking("Customer:","brava");
+      setRosePreview(saved&&address?{...blank,propertyName:saved.property_name??"",address:address.street,
+       addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,
+       bedrooms:String(saved.bedrooms??""),bathrooms:String(saved.bathrooms??""),
+       frequency:saved.request_options?.bookingFrequency?.replace(/^(bi[ -]?weekly|every other week)$/i,"Biweekly").replace(/^weekly$/i,"Weekly").replace(/^monthly$/i,"Monthly")??""}:blank);
+     }}>
+      <option value="">Enter a new customer or location</option>
+      {savedBravaCustomers.map(row=><option key={row.id} value={row.id}>{row.property_name} · {row.property_address}</option>)}
+     </select>
+    </label>}
+    {submissionClient&&!manualBrava&&<>
     <label className="block text-sm font-semibold">{isBrava?"BRAVA":"Rose"} booking text
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
     </label>
@@ -348,7 +372,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     </Panel>
     {submissionClient&&rosePreview&&<form className="space-y-5" onSubmit={async event=>{
      event.preventDefault();
-     const result=await run(isBrava?"importBravaBooking":"importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
+     const result=await run(manualBrava?"createBravaOpportunity":isBrava?"importBravaBooking":"importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
      if(result){setRoseText("");setRosePreview(null);submissionDialog.current?.close();setOpportunityId(result.opportunity.id);}
     }}>
      {([
@@ -360,13 +384,19 @@ export function ContractorManagement({view}: {view:ContractorView}){
       ]],
       ["Service and Add-Ons", [["serviceType","Service","text",true]]],
       ["Requested Schedule", [
-       ["requestedDate","Service date","date",true],["requestedTime","Start time","time",true],
+       ["requestedDate","Service date","date",true],
+       ...(isBrava ? [["frequency","Booking frequency","text",false] as const] : []),["requestedTime","Start time","time",true],
        ["estimatedHours","Estimated person-hours","number",true],
       ]],
       ["Proposed Compensation", [["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Exhibit B payout"):"Proposed pay","number",true]]],
      ] as const).map(([title,fields])=><Panel key={title} title={title}>
       <div className="grid gap-3 sm:grid-cols-2">
-       {fields.map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
+       {title==="Requested Schedule"&&manualBrava&&<label className="block text-sm font-semibold">Booking frequency
+        <select className={input} value={["Weekly","Biweekly","Monthly"].includes(rosePreview.frequency)?rosePreview.frequency:"One-Time"} onChange={event=>setRosePreview({...rosePreview,frequency:event.target.value})}>
+         {["One-Time","Weekly","Biweekly","Monthly"].map(frequency=><option key={frequency}>{frequency}</option>)}
+        </select>
+       </label>}
+       {fields.filter(([key])=>!manualBrava||key!=="frequency").map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
         <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
          readOnly={key==="amount"&&listedPayout!==null}
          value={key==="amount"&&isBrava?(listedPayout?.toFixed(2)??rosePreview.amount):rosePreview[key]}
@@ -383,7 +413,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       </>}
       {title==="Proposed Compensation"&&isBrava&&listedPayout===null&&<p className="mt-3 text-sm">Automatic pricing is unavailable for this booking. Verify the payout with BRAVA before entering it.</p>}
      </Panel>)}
-     <p className="text-sm">Creating this opportunity records the contractor’s text as written confirmation of the scope and payout above.</p>
+     {!manualBrava&&<p className="text-sm">Creating this opportunity records the contractor’s text as written confirmation of the scope and payout above.</p>}
      <button className={button} disabled={busy}>Create {isBrava?"BRAVA":"Rose"} opportunity</button>
     </form>}
     </div>

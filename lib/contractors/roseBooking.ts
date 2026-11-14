@@ -38,6 +38,7 @@ export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose
     serviceType: read("service"),
     bedrooms: read("bedroom") || read("bedrooms"),
     bathrooms: read("bathrooms") || read("bathroom"),
+    frequency: read("frequency"),
     pets: read("pets"),
     addOns: read("add-ons"),
     access: read("instructions / access") || read("instructions/access"),
