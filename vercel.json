@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/brava-standard-scopes": false,
       "fix/brava-booking-frequency": false,
       "fix/on-my-way-mileage-without-phone": false,
       "fix/deduplicate-job-assignment-alerts": false,
