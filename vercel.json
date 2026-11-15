@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/mobile-home-hero": false,
       "fix/badge-build": false,
       "fix/local-business-badge": false,
       "fix/agreement-print": false,
