@@ -112,32 +112,27 @@ export default function MarketingHome() {
   return (
     <>
       <FaqJsonLd items={faqItems} />
-      <section className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-24 lg:py-28">
+      <section className="relative overflow-hidden px-5 py-9 sm:px-8 sm:py-24 lg:py-28">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_30%,rgba(212,175,55,.16),transparent_30%),radial-gradient(circle_at_80%_75%,rgba(20,61,26,.10),transparent_35%)]" />
 
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-7 lg:grid-cols-[1.05fr_.95fr] lg:gap-16">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[.24em] text-[#9a7a17]">
-              PROFESSIONAL CLEANING · LOS ANGELES
+              No Mess. No Stress.
             </p>
 
-            <h1 className="mt-6 max-w-4xl text-5xl font-extrabold tracking-[-.06em] text-[#143d1a] sm:text-7xl lg:text-[5.2rem] lg:leading-[.98]">
+            <h1 className="mt-3 max-w-4xl text-4xl leading-[1.03] sm:mt-6 font-extrabold tracking-[-.06em] text-[#143d1a] sm:text-7xl lg:text-[5.2rem] lg:leading-[.98]">
               Cleaning Built Around{" "}
               <span className="text-[#9a7a17]">Your Space.</span>
             </h1>
 
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-neutral-600 sm:text-xl">
+            <p className="mt-4 max-w-2xl text-base leading-6 sm:mt-7 sm:leading-8 text-neutral-600 sm:text-xl">
               Professional cleaning and property care for homes, businesses,
               managed properties, private residences, and construction projects
               across Los Angeles and the San Fernando Valley.
             </p>
 
-            <p className="mt-5 max-w-2xl text-sm font-bold leading-7 text-[#143d1a]/70 sm:text-base">
-              Commercial Cleaning · Property Management · Luxury Property Care ·
-              Post-Construction · Residential · Pressure Washing
-            </p>
-
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-5 flex flex-col gap-2 sm:mt-9 sm:flex-row sm:flex-wrap">
               <EstimateCta label="Get My Free Estimate" />
 
               <a
@@ -148,10 +143,8 @@ export default function MarketingHome() {
               </a>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <span className="text-sm font-extrabold uppercase tracking-[.2em] text-[#143d1a]/55">
-                No Mess. No Stress.
-              </span>
+            <div className="mt-5 flex flex-wrap items-center gap-3 sm:mt-8">
+              <Image src="/branding/american-operator-badge.png" alt="Locally Owned & Operated, certified by American Operator" width={42} height={48} />
               <span className="inline-flex items-center gap-2 rounded-full border border-[#143d1a]/15 bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[.12em] text-[#143d1a] shadow-sm">
                 <span aria-hidden="true" className="text-[#9a7a17]">✓</span>
                 Registered &amp; Insured
@@ -171,15 +164,9 @@ export default function MarketingHome() {
               />
             </div>
 
-            <div className="absolute -bottom-5 left-5 right-5 rounded-2xl border border-white/30 bg-white/95 px-5 py-4 shadow-xl backdrop-blur sm:left-8 sm:right-auto sm:max-w-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#9a7a17]">
-                Real StudioScrubz Work
-              </p>
-
-              <p className="mt-1 font-extrabold text-[#143d1a]">
-                Professional results from a space we actually cleaned.
-              </p>
-            </div>
+            <p className="mt-3 text-center text-xs font-semibold text-[#143d1a]">
+              Kitchen cleaned by StudioScrubz
+            </p>
           </div>
         </div>
       </section>
