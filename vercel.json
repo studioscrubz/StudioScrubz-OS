@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/badge-build": false,
       "fix/local-business-badge": false,
       "fix/agreement-print": false,
       "fix/brava-standard-scopes": false,
