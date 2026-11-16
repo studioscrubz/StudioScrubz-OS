@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/public-estimate-pet-fee": false,
       "fix/blank-estimate-numbers": false,
       "fix/quote-addon-list": false,
       "fix/quote-property-type-first": false,

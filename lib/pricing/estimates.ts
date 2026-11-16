@@ -230,11 +230,39 @@ export function calculatePostConstructionCatalogEstimate(
   };
 }
 
+export const PET_HAIR_FEE_LABEL = "Pet hair cleaning fee";
+
 export function calculateResidentialEstimate(
   input: ResidentialCalculatorInput,
   catalog: ServiceCatalogBundle,
   upkeepAdjustmentPercent = 30,
 ): EstimateResult {
+  if (input.applyPetHairFee && input.pets) {
+    const base = calculateResidentialEstimate(
+      { ...input, applyPetHairFee: false },
+      catalog,
+      upkeepAdjustmentPercent,
+    );
+    const fee = 25;
+    const upkeepPlan = base.upkeepPlan;
+    const charge = upkeepPlan ? fee * upkeepPlan.visitsIncluded : fee;
+    return {
+      ...base,
+      adjustments: [...base.adjustments, { label: PET_HAIR_FEE_LABEL, amount: charge }],
+      oneTimePrice: money(base.oneTimePrice + fee),
+      calculatedFinalPrice: money((base.calculatedFinalPrice ?? base.finalPrice) + charge),
+      finalPrice: money(base.finalPrice + charge),
+      monthlyPrice: base.monthlyPrice === null ? null : money(base.monthlyPrice + fee * base.visitsPerMonth),
+      estimatedProfit: money(base.estimatedProfit + charge),
+      upkeepPlan: upkeepPlan ? {
+        ...upkeepPlan,
+        upkeepVisitValue: money(upkeepPlan.upkeepVisitValue + fee),
+        monthlyPackage: money(upkeepPlan.monthlyPackage + charge),
+      } : upkeepPlan,
+      calculatorInput: { ...base.calculatorInput, applyPetHairFee: true } as ResidentialCalculatorInput,
+    };
+  }
+
   if (input.serviceType === "StudioScrubz Upkeep Plan") {
     const standard = calculateResidentialEstimate(
       {
