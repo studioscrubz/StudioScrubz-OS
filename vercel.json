@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/quote-addon-list": false,
       "fix/quote-property-type-first": false,
       "fix/quote-frequency-first": false,
       "fix/estimate-pet-details": false,
