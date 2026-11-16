@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/public-square-footage-ranges": false,
       "fix/mobile-home-hero": false,
       "fix/badge-build": false,
       "fix/local-business-badge": false,
