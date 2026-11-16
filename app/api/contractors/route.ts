@@ -13,6 +13,7 @@ import type { TravelProjection } from "@/types/profitability";
 import { PersonalEmailSetupError, resolvePersonalEmailSenderById } from "@/lib/email/personalSender";
 import { sendContractorWelcome } from "@/lib/email/contractorWelcome";
 import { sendResendEmail } from "@/lib/email/resend";
+import { escapeEmailHtml } from "@/lib/email/studioScrubzTemplate";
 import { contractorContext,requireInternal,requireMaster,requirePartner,partnerOpportunity,internalOpportunity,
  audited,required,optional,money,uuid,handleContractorError,noCache,ContractorAccessError,
  type ContractorContext } from "@/lib/contractors/server";
@@ -916,10 +917,50 @@ export async function POST(request:Request){
  } catch(error){return handleContractorError(error);}
 }
 
+async function contractorAppointmentDetails(
+ db:ContractorContext["admin"],companyId:string,opportunityId:string,clientId:string|null,
+){
+ const {data:opp,error}=await db.from("contractor_opportunities")
+  .select("opportunity_number,property_name,property_address,service_type,requested_date,requested_time,linked_job_id")
+  .eq("id",opportunityId).eq("company_id",companyId).maybeSingle();
+ if(error)throw error;
+ if(!opp)return [];
+
+ const {data:job,error:jobError}=opp.linked_job_id&&clientId
+  ?await db.from("jobs")
+   .select("job_number,property_name,service_name,scheduled_date,start_time,property:properties!jobs_property_id_fkey(client_id,address,address_line_2,city,state,zip)")
+   .eq("id",opp.linked_job_id).eq("client_id",clientId).maybeSingle()
+  :{data:null,error:null};
+ if(jobError)throw jobError;
+
+ const linkedProperty=Array.isArray(job?.property)?job.property[0]:job?.property;
+ const property=linkedProperty&&linkedProperty.client_id===clientId?linkedProperty:null;
+ const address=property?[property.address,property.address_line_2,property.city,
+  [property.state,property.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "):null;
+ const date=job?job.scheduled_date:opp.requested_date;
+ const time=job?job.start_time:opp.requested_time;
+ const dateValue=date?new Date(`${date}T12:00:00Z`):null;
+ const timeValue=time?new Date(`2000-01-01T${time}Z`):null;
+ const dateText=dateValue&&Number.isFinite(dateValue.getTime())
+  ?new Intl.DateTimeFormat("en-US",{dateStyle:"full",timeZone:"UTC"}).format(dateValue):null;
+ const timeText=timeValue&&Number.isFinite(timeValue.getTime())
+  ?`${new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZone:"UTC"}).format(timeValue)} Pacific time`:null;
+ const fields=[
+  ["Opportunity",opp.opportunity_number],
+  ["Job",job?.job_number],
+  ["Customer / property",job?.property_name||opp.property_name],
+  ["Service",job?.service_name||opp.service_type],
+  [job?"Appointment date":"Requested date",dateText],
+  [job?"Appointment time":"Requested time",timeText],
+  ["Service address",address||opp.property_address],
+ ];
+ return fields.flatMap(([label,value])=>value?[`${label}: ${value}`]:[]);
+}
+
 async function notify(ctx:ContractorContext,subject:string,message:string|((companyName:string)=>string),companyId:string,opportunityId:string|undefined,to:"internal"|"contractor",eventKey:string=crypto.randomUUID()){
  try{
   const db=ctx.admin;
-  const {data:company}=await db.from("contractor_companies").select("name,contact_email,assigned_manager_id").eq("id",companyId).single();
+  const {data:company}=await db.from("contractor_companies").select("name,contact_email,assigned_manager_id,client_id").eq("id",companyId).single();
   if(!company)return;
   let recipient=company.contact_email as string;
   if(to==="internal"){
@@ -932,10 +973,15 @@ async function notify(ctx:ContractorContext,subject:string,message:string|((comp
    }
   }
   const messageText=typeof message==="function"?message(company.name):message;
-  const instruction="Sign in to your authorized StudioScrubz dashboard for details.";
-  const safeMessage=messageText.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\n","<br/>");
+  const details=to==="contractor"&&opportunityId
+   ?await contractorAppointmentDetails(db,companyId,opportunityId,company.client_id):[];
+  const instruction=to==="contractor"
+   ?"View the appointment in your StudioScrubz Contractor Portal: https://partners.studioscrubz.com"
+   :"Sign in to your authorized StudioScrubz dashboard for details.";
+  const body=[messageText,details.join("\n")].filter(Boolean).join("\n\n");
+  const safeMessage=escapeEmailHtml(body).replaceAll("\n","<br/>");
   const response=await sendResendEmail({recipientEmail:recipient,subject:`StudioScrubz | ${subject}`,
-   text:`${messageText}\n\n${instruction}`,html:`<p>${safeMessage}</p><p>${instruction}</p>`,
+   text:`${body}\n\n${instruction}`,html:`<p>${safeMessage}</p><p>${escapeEmailHtml(instruction)}</p>`,
    idempotencyKey:`contractor-event:${eventKey}`,replyTo:null});
   await audited(ctx,{companyId,opportunityId,type:"Email Notification Sent",
    detail:{recipient,providerId:response.id,subject}});
