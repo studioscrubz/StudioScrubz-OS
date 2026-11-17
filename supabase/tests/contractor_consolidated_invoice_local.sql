@@ -35,8 +35,14 @@ declare
   result jsonb;
   v_invoice_id uuid;
   single_result jsonb;
+  source_invoice_id uuid;
   one_job_result jsonb;
 begin
+  single_result := public.create_completed_job_invoice('c7100000-0000-0000-0000-000000000021');
+  source_invoice_id := (single_result->>'invoice_id')::uuid;
+  if not exists(select 1 from public.invoices where id=source_invoice_id and status='Open') then
+    raise exception 'Expected an open source Invoice.';
+  end if;
   if (select count(*) from public.get_contractor_invoice_eligible_jobs('c7100000-0000-0000-0000-000000000001')) <> 3 then
     raise exception 'Expected three eligible Contractor Jobs.';
   end if;
@@ -48,6 +54,13 @@ begin
     current_date + 15
   );
   v_invoice_id := (result->>'invoice_id')::uuid;
+
+  if not exists(select 1 from public.invoices where id=source_invoice_id and status='Cancelled' and notes like '%Consolidated into%') then
+    raise exception 'Source Invoice was not cancelled and linked to its replacement.';
+  end if;
+  if (select status from public.invoices where id=v_invoice_id) <> 'Draft' then
+    raise exception 'Consolidated Invoice must be saved for manual review.';
+  end if;
 
   if (select total from public.invoices where id=v_invoice_id) <> 710 then raise exception 'Expected $710 Invoice.'; end if;
   if (select count(*) from public.invoice_job_lines where invoice_job_lines.invoice_id=v_invoice_id) <> 3 then raise exception 'Expected three Job lines.'; end if;
