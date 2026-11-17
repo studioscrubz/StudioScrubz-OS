@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/contractor-open-invoice-consolidation": false,
       "fix/contractor-appointment-emails": false,
       "fix/public-estimate-pet-fee": false,
       "fix/blank-estimate-numbers": false,
