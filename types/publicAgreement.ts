@@ -9,6 +9,7 @@ export type PublicAgreement = {
   service_description: string | null;
   scope: string;
   frequency: AgreementFrequency;
+  monthly_week_ordinals?: number[] | null;
   days_of_week: Weekday[];
   day_of_month?: number | null;
   second_day_of_month?: number | null;

@@ -71,8 +71,8 @@ for (const path of [
 }
 
 const authoritativeSource = readFileSync(resolve("lib/pricing/authoritativePrice.ts"), "utf8");
-assert.match(authoritativeSource, /estimatedMonthlyTotal\(finalPrice, result\.calculatorInput\.frequency\)/);
-assert.match(authoritativeSource, /estimatedMonthlyTotal\(perVisitTotal, frequency\)/);
+assert.match(authoritativeSource, /estimatedMonthlyTotal\(finalPrice, result\.calculatorInput\.frequency,/);
+assert.match(authoritativeSource, /estimatedMonthlyTotal\(perVisitTotal, frequency,/);
 
 const migration = readFileSync(resolve("supabase/migrations/20260901002039_add_twice_monthly_service_frequency.sql"), "utf8");
 assert.match(migration, /frequency = 'Twice Monthly'/);

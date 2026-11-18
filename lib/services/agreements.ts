@@ -1,3 +1,4 @@
+import { validateMonthlyWeekdays } from "@/lib/scheduling/monthlyWeekdays";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { addProposalHistory, getProposalById } from "@/lib/services/proposals";
 import { agreementPricingWithAdditionalDiscount, catalogAgreementPricing, proposalAgreementPricing } from "@/lib/pricing/agreementPricing";
@@ -128,6 +129,7 @@ export type ProposalAgreementReview = {
   intervalWeeks: number;
   dayOfMonth: number | null;
   secondDayOfMonth: number | null;
+  monthlyWeekOrdinals?: number[] | null;
   thirdDayOfMonth?: number | null;
   customIntervalDays: number | null;
   billingType: AgreementBillingType;
@@ -187,6 +189,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     interval_weeks: review.intervalWeeks,
     day_of_month: review.dayOfMonth,
     second_day_of_month: review.secondDayOfMonth,
+    monthly_week_ordinals: review.monthlyWeekOrdinals ?? null,
     third_day_of_month: review.thirdDayOfMonth ?? null,
     custom_interval_days: review.customIntervalDays,
     start_date: review.startDate,
@@ -206,6 +209,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
     interval_weeks: review.intervalWeeks,
     day_of_month: review.dayOfMonth,
     second_day_of_month: review.secondDayOfMonth,
+    monthly_week_ordinals: review.monthlyWeekOrdinals ?? null,
     third_day_of_month: review.thirdDayOfMonth ?? null,
     custom_interval_days: review.customIntervalDays,
     start_date: review.startDate,
@@ -227,7 +231,7 @@ export async function createAgreementFromProposal(proposalId: string, review: Pr
   });
 }
 
-function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_week" | "interval_weeks" | "day_of_month" | "second_day_of_month" | "custom_interval_days" | "start_date" | "end_date">) {
+function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_week" | "interval_weeks" | "day_of_month" | "second_day_of_month" | "custom_interval_days" | "start_date" | "end_date" | "monthly_week_ordinals">) {
   if (input.end_date && input.end_date < input.start_date) return "End date must be on or after the start date.";
   if (["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(input.frequency) && !input.days_of_week.length)
     return `Select at least one service day for ${input.frequency}.`;
@@ -235,6 +239,7 @@ function validateSchedule(input: Pick<AgreementInput, "frequency" | "days_of_wee
     return "Select at least two distinct service days each week.";
   if (input.frequency === "Monthly" && (!input.day_of_month || input.day_of_month < 1 || input.day_of_month > 31))
     return "Select a monthly service day from 1 through 31.";
+  if (input.frequency === "Twice Monthly" && input.monthly_week_ordinals != null) return validateMonthlyWeekdays(input);
   if (input.frequency === "Twice Monthly" && (!input.day_of_month || !input.second_day_of_month || input.day_of_month < 1 || input.day_of_month > 28 || input.second_day_of_month < 1 || input.second_day_of_month > 28 || input.day_of_month === input.second_day_of_month))
     return "Select two distinct monthly service days from 1 through 28.";
   if (input.frequency === "Custom" && (!Number.isInteger(input.custom_interval_days) || !input.custom_interval_days || input.custom_interval_days < 1))
@@ -405,7 +410,11 @@ export function validateAgreementConfiguration(
   if (agreement.frequency === "Multiple Days Per Week" && (agreement.days_of_week.length < 2 || new Set(agreement.days_of_week).size !== agreement.days_of_week.length)) return "Select at least two distinct service days each week.";
   if (agreement.frequency === "Multiple Days Per Week" && (!Number.isInteger(agreement.interval_weeks) || agreement.interval_weeks < 1)) return "Interval weeks must be at least 1.";
   if (agreement.frequency === "Monthly" && (!agreement.day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 31)) return "Select a monthly service day from 1 through 31.";
-  if (agreement.frequency === "Twice Monthly" && (!agreement.day_of_month || !agreement.second_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.day_of_month === agreement.second_day_of_month)) return "Select two distinct monthly service days from 1 through 28.";
+  if (agreement.frequency === "Twice Monthly" && agreement.monthly_week_ordinals != null) {
+    const scheduleError = validateMonthlyWeekdays(agreement);
+    if (scheduleError) return scheduleError;
+  }
+  if (agreement.frequency === "Twice Monthly" && agreement.monthly_week_ordinals == null && (!agreement.day_of_month || !agreement.second_day_of_month || agreement.day_of_month < 1 || agreement.day_of_month > 28 || agreement.second_day_of_month < 1 || agreement.second_day_of_month > 28 || agreement.day_of_month === agreement.second_day_of_month)) return "Select two distinct monthly service days from 1 through 28.";
   if (agreement.frequency === "Custom" && (!Number.isInteger(agreement.custom_interval_days) || !agreement.custom_interval_days || agreement.custom_interval_days < 1)) return "Custom interval days must be a whole number of at least 1.";
   if (activation && !agreement.default_start_time) return "A default service start time is required before activation.";
   if (activation && agreement.division === "Commercial" && !agreement.assigned_crew_id) return "Assign a crew before activating a Commercial agreement.";

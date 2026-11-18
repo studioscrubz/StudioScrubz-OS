@@ -80,6 +80,7 @@ export async function reconcileFutureOccurrences(
             end,
             agreement.frequency,
             {
+              monthlyWeekOrdinals: agreement.monthly_week_ordinals,
               daysOfWeek: agreement.days_of_week,
               intervalWeeks: agreement.interval_weeks,
               dayOfMonth: agreement.day_of_month,
