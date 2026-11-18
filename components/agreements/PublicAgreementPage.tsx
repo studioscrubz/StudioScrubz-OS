@@ -1,5 +1,6 @@
 "use client";
 
+import { monthlyWeekdayLabel } from "@/lib/scheduling/monthlyWeekdays";
 import { useEffect, useRef, useState } from "react";
 import { AgreementPricingBreakdown } from "@/components/agreements/AgreementPricingBreakdown";
 import { SignaturePad } from "@/components/agreements/SignaturePad";
@@ -52,11 +53,11 @@ export function PublicAgreementPage({ token }: { token: string }) {
   if (error && !agreement) return <PublicShell><h1 className="text-2xl font-bold text-[#143d1a]">Agreement unavailable</h1><p className="mt-3 text-neutral-600">{error}</p></PublicShell>;
   if (!agreement) return null;
 
-  const schedule = ["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(agreement.frequency) && agreement.days_of_week.length
+  const schedule = (agreement.frequency === "Twice Monthly" && monthlyWeekdayLabel(agreement)) || (["Weekly", "Biweekly", "Every 4 Weeks", "Multiple Days Per Week"].includes(agreement.frequency) && agreement.days_of_week.length
     ? agreement.days_of_week.map((day) => ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][day]).join(", ")
     : agreement.frequency === "Twice Monthly" && agreement.day_of_month && agreement.second_day_of_month ? `Days ${agreement.day_of_month} and ${agreement.second_day_of_month} of each month`
       : agreement.frequency === "Monthly" && agreement.day_of_month ? `Day ${agreement.day_of_month} of each month`
-        : agreement.frequency === "Custom" && agreement.custom_interval_days ? `Every ${agreement.custom_interval_days} days` : agreement.frequency;
+        : agreement.frequency === "Custom" && agreement.custom_interval_days ? `Every ${agreement.custom_interval_days} days` : agreement.frequency);
   const included = includedServiceDetails(agreement.scope.split(/\r?\n/), agreement.service_name, agreement.pricing_snapshot?.catalog_addons ?? []);
   const signed = Boolean(agreement.client_signed_at);
   const canSign = agreement.status === "Sent" && !signed;

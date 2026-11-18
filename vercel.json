@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "feature/twice-monthly-weekdays": false,
       "fix/brava-crew-reminder-format": false,
       "feature/brava-building-units": false,
       "fix/contractor-open-invoice-consolidation": false,

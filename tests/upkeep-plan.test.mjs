@@ -64,8 +64,8 @@ assert.match(agreementPage, /const upkeep=Boolean\(proposal\.result\.upkeepPlan\
 assert.match(agreementPage, /frequency:upkeep\?"Monthly":proposal\.frequency/);
 assert.match(agreementPage, /day_of_month:upkeep\?null/);
 assert.match(agreementPage, /second_day_of_month:null,third_day_of_month:null/);
-assert.match(agreementPage, /billing_type:upkeep\?"Monthly":"Per Visit"/);
-assert.match(agreementPage, /billing_amount:upkeep\?proposal\.result\.upkeepPlan!\.monthlyPackage:proposal\.result\.perVisitTotal/);
+assert.match(agreementPage, /billing_type:upkeep\?"Monthly":proposal\.result\.weeklyMixedVisits/);
+assert.match(agreementPage, /billing_amount:upkeep\?proposal\.result\.upkeepPlan!\.monthlyPackage:proposal\.result\.weeklyContractTotal\?\?proposal\.result\.perVisitTotal/);
 assert.match(agreementPage, /thirdDayOfMonth:nextDraft\.third_day_of_month\?\?null/);
 assert.match(agreementPage, /disabled=\{operationalEdit\|\|Boolean\(proposal\?\.result\.upkeepPlan\)\}/);
 const publicAgreement = readFileSync(resolve("types/publicAgreement.ts"), "utf8");

@@ -29,7 +29,7 @@ assert.notEqual(frequency.estimatedVisitsPerMonth("Custom", 21), frequency.estim
 const rule = { daysOfWeek: [], intervalWeeks: 1, dayOfMonth: null, secondDayOfMonth: null, customIntervalDays: 21 };
 assert.deepEqual(
   recurrence.generateServiceDates("2024-01-31", "2024-04-30", "Custom", rule, "2024-04-30", false),
-  ["2024-01-31", "2024-02-21", "2024-03-14", "2024-04-04", "2024-04-25"],
+  ["2024-01-31", "2024-02-21", "2024-03-13", "2024-04-03", "2024-04-24"],
 );
 assert.deepEqual(
   recurrence.generateServiceDates("2023-12-25", "2024-02-15", "Custom", { ...rule, customIntervalDays: 10 }, "2024-02-15", false),
@@ -37,7 +37,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   recurrence.generateServiceDates("2024-02-28", "2024-03-31", "Custom", { ...rule, customIntervalDays: 30 }, "2024-03-31", false),
-  ["2024-02-28", "2024-03-30"],
+  ["2024-02-28", "2024-03-29"],
 );
 
 const agreementService = readFileSync(resolve("lib/services/agreements.ts"), "utf8");
