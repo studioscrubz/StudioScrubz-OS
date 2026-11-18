@@ -4,11 +4,10 @@ import type { Property, PropertyInput, PropertyWithClient } from "@/types/proper
 
 const propertySelect = "*, client:clients!properties_client_id_fkey(*)";
 
-export async function getProperties(): Promise<PropertyWithClient[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("properties")
-    .select(propertySelect)
-    .order("created_at", { ascending: false });
+export async function getProperties(clientId?: string): Promise<PropertyWithClient[]> {
+  let query = getSupabaseClient().from("properties").select(propertySelect);
+  if (clientId) query = query.eq("client_id", clientId).is("archived_at", null);
+  const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
   return data as PropertyWithClient[];
 }
