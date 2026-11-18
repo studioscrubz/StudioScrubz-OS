@@ -34,7 +34,8 @@ test("finger, stylus, and mouse use pointer input with clear, undo, and redo", (
 
 test("server rejects blank or malformed signatures and requires review and consent", () => {
   assert.match(publicRoute, /validateDrawnPngSignature/);
-  assert.match(signatureValidator, /sharp\(Buffer\.from/);
+  assert.match(signatureValidator, /Buffer\.from\(match\[1\], "base64"\)/);
+  assert.match(signatureValidator, /sharp\(bytes, \{ failOn: "error" \}\)/);
   assert.match(signatureValidator, /inkPixels < 40/);
   assert.match(migration, /p_consent is distinct from true or p_reviewed is distinct from true/);
   assert.match(migration, /data:image\/png;base64/);
