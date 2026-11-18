@@ -35,6 +35,7 @@ export async function updateSession(request: NextRequest, { partnerEntry = false
   const isLogin = request.nextUrl.pathname === "/login";
   const isPublicDocument = request.nextUrl.pathname === "/request-estimate"
     || request.nextUrl.pathname === "/api/webhooks/square"
+    || request.nextUrl.pathname === "/api/public/agreements/accept"
     || request.nextUrl.pathname.startsWith("/api/public/request-estimate")
     || request.nextUrl.pathname.startsWith("/api/public/assessments/")
     || request.nextUrl.pathname.startsWith("/api/public/change-requests/")
