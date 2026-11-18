@@ -3,7 +3,7 @@ import { bravaScopeHeading } from "./bravaScope";
 export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose") {
   const allLines = message.trim().split(/\r?\n/);
   const heading = allLines[0] ?? "";
-  const hasHeading = (kind === "brava" ? /^(?:BRAVA NEW BOOKING|(?:🚨\s*)?New BRAVA cleaning job)\b/i : /^Rose Company New Booking\b/i).test(heading);
+  const hasHeading = (kind === "brava" ? /^(?:BRAVA NEW BOOKING|BRAVA CREW REMINDER|(?:🚨\s*)?New BRAVA cleaning job)\b/i : /^Rose Company New Booking\b/i).test(heading);
   if (!hasHeading && !/^Customer\s*:/i.test(heading)) {
     throw new Error(`Paste a ${kind === "brava" ? "BRAVA" : "Rose"} booking beginning with Customer:.`);
   }
@@ -21,7 +21,8 @@ export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose
   const requestedDate = Number.isNaN(parsedDate.getTime()) ? "" :
     /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate :
     [parsedDate.getFullYear(), String(parsedDate.getMonth() + 1).padStart(2, "0"), String(parsedDate.getDate()).padStart(2, "0")].join("-");
-  const time = read("time").match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  const appointmentTime = read("time") || (kind === "brava" && /^BRAVA CREW REMINDER\b/i.test(heading) ? read("team") : "");
+  const time = appointmentTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
   const hour = time ? Number(time[1]) : -1;
   const requestedTime = time && Number(time[2]) < 60 && (time[3] ? hour >= 1 && hour <= 12 : hour < 24)
     ? `${String(time[3] ? hour % 12 + (time[3].toLowerCase() === "pm" ? 12 : 0) : hour).padStart(2, "0")}:${time[2]}`
