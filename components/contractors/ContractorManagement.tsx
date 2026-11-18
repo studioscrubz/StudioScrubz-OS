@@ -1,6 +1,8 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
+import {getProperties} from "@/lib/services/properties";
+import type {PropertyWithClient} from "@/types/property";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import {bravaScopeHeading} from "@/lib/contractors/bravaScope";
 import {parseRoseBooking} from "@/lib/contractors/roseBooking";
@@ -49,6 +51,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [submissionClientId,setSubmissionClientId]=useState("");
  const [roseText,setRoseText]=useState("");
  const [manualBrava,setManualBrava]=useState(false);
+ const [savedProperties,setSavedProperties]=useState<PropertyWithClient[]>([]);
+ const [savedBuilding,setSavedBuilding]=useState("");
  const [rosePreview,setRosePreview]=useState<ReturnType<typeof parseRoseBooking>|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const submissionDialog=useRef<HTMLDialogElement>(null);
@@ -133,10 +137,22 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const submissionClients=companies.filter(company=>bookingClientKind(company.name)&&["Active","Pending"].includes(company.status));
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
- const savedBravaCustomers=Array.from(new Map(
-  (data?.opportunities??[]).filter(row=>row.company_id===submissionClientId&&row.property_name&&row.request_options?.address)
-   .map(row=>[`${row.property_name?.toLowerCase()}|${row.property_address.toLowerCase()}`,row] as const).reverse(),
- ).values());
+ const savedClientId=data?.directory.find(entry=>entry.companyId===submissionClientId)?.clientId;
+ useEffect(()=>{
+  let active=true;
+  setSavedProperties([]);
+  setSavedBuilding("");
+  if(isBrava&&manualBrava&&savedClientId){
+   void getProperties(savedClientId).then(rows=>{if(active)setSavedProperties(rows);})
+    .catch(cause=>{if(active)setError(cause instanceof Error?cause.message:"Saved properties could not be loaded.");});
+  }
+  return()=>{active=false;};
+ },[isBrava,manualBrava,savedClientId]);
+ const buildingKey=(property:PropertyWithClient)=>JSON.stringify(
+  [property.address,property.city,property.state,property.zip].map(value=>(value??"").trim().toLowerCase()),
+ );
+ const buildings=Array.from(new Map(savedProperties.map(property=>[buildingKey(property),property])).entries());
+ const savedUnits=savedProperties.filter(property=>buildingKey(property)===savedBuilding);
  const listedPayout=isBrava&&rosePreview
   ?bravaPayout(rosePreview.serviceType,rosePreview.bedrooms,rosePreview.bathrooms,rosePreview.addOns):null;
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
@@ -346,20 +362,33 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);}}>Paste dispatch</button>
      <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview(parseRoseBooking("Customer:","brava"));}}>Enter manually</button>
     </div>}
-    {isBrava&&manualBrava&&<label className="block text-sm font-semibold">Saved BRAVA customer and location
-     <select className={input} defaultValue="" key={submissionClientId} onChange={event=>{
-      const saved=savedBravaCustomers.find(row=>row.id===event.target.value);
-      const address=saved?.request_options?.address;
-      const blank=parseRoseBooking("Customer:","brava");
-      setRosePreview(saved&&address?{...blank,propertyName:saved.property_name??"",address:address.street,
-       addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,
-       bedrooms:String(saved.bedrooms??""),bathrooms:String(saved.bathrooms??""),
-       frequency:saved.request_options?.bookingFrequency?.replace(/^(bi[ -]?weekly|every other week)$/i,"Biweekly").replace(/^weekly$/i,"Weekly").replace(/^monthly$/i,"Monthly")??""}:blank);
-     }}>
-      <option value="">Enter a new customer or location</option>
-      {savedBravaCustomers.map(row=><option key={row.id} value={row.id}>{row.property_name} · {row.property_address}</option>)}
-     </select>
-    </label>}
+    {isBrava&&manualBrava&&<div className="grid gap-3 sm:grid-cols-2">
+     <label className="block text-sm font-semibold">Saved building
+      <select className={input} value={savedBuilding} onChange={event=>{
+       setSavedBuilding(event.target.value);
+       const property=savedProperties.find(row=>buildingKey(row)===event.target.value);
+       setRosePreview({...parseRoseBooking("Customer:","brava"),address:property?.address??"",
+        city:property?.city??"",state:property?.state??"",zip:property?.zip??""});
+      }}>
+       <option value="">Enter a new building or address</option>
+       {buildings.map(([key,property])=><option key={key} value={key}>{[property.address,property.city,property.state,property.zip].filter(Boolean).join(", ")}</option>)}
+      </select>
+     </label>
+     {savedBuilding&&<label className="block text-sm font-semibold">Unit / customer
+      <select className={input} value={savedUnits.find(property=>property.address_line_2===rosePreview?.addressLine2&&property.property_name===rosePreview?.propertyName)?.id??""} onChange={event=>{
+       const property=savedUnits.find(row=>row.id===event.target.value);
+       const building=savedUnits[0];
+       if(!building)return;
+       setRosePreview({...parseRoseBooking("Customer:","brava"),propertyName:property?.property_name??"",
+        address:building.address,addressLine2:property?.address_line_2??"",city:building.city??"",
+        state:building.state??"",zip:building.zip??"",bedrooms:String(property?.bedrooms??""),
+        bathrooms:String(property?.bathrooms??""),access:property?.access_instructions??""});
+      }}>
+       <option value="">Add a new unit at this building</option>
+       {savedUnits.map(property=><option key={property.id} value={property.id}>{property.address_line_2||"Main property"} · {property.property_name||"Customer"}</option>)}
+      </select>
+     </label>}
+    </div>}
     {submissionClient&&!manualBrava&&<>
     <label className="block text-sm font-semibold">{isBrava?"BRAVA":"Rose"} booking text
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
