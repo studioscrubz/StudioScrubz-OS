@@ -78,11 +78,25 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [attachment,setAttachment]=useState<File|null>(null);
  const [contactMethod,setContactMethod]=useState("Phone"),[contactOutcome,setContactOutcome]=useState(""),[contactNotes,setContactNotes]=useState("");
  const [followupNote,setFollowupNote]=useState(""),[followupDue,setFollowupDue]=useState("");
+ const refreshSequence=useRef(0);
  const refresh=useCallback(async()=>{
-  const response=await fetch(view==="dashboard"?"/api/contractors?view=dashboard":"/api/contractors",{cache:"no-store"});
+  const sequence=++refreshSequence.current;
+  const response=await fetch(view==="dashboard"?"/api/contractors?view=dashboard-core":"/api/contractors",{cache:"no-store"});
   const result=await response.json();
   if(!response.ok)throw new Error(result.error??"Contractor data unavailable");
+  if(sequence!==refreshSequence.current)return;
   setData(result);
+  if(view==="dashboard"){
+   // Summary aggregates arrive after the actionable dashboard content.
+   void fetch("/api/contractors?view=dashboard-summary",{cache:"no-store"})
+    .then(async response=>{
+      const summary=await response.json();
+      if(!response.ok)throw new Error(summary.error??"Contractor dashboard totals unavailable");
+      if(sequence===refreshSequence.current)
+       setData(current=>current?{...current,...summary}:current);
+    }).catch(error=>{if(sequence===refreshSequence.current)
+      console.error("Contractor dashboard summary load failed",error);});
+  }
   const requestedId=view==="opportunities"||view==="jobs"?new URLSearchParams(window.location.search).get("opportunityId"):null;
   const visible=(result.opportunities as Opportunity[]).filter(opportunity=>matchesOpportunityView(opportunity,view));
   const requested=visible.find(opportunity=>opportunity.id===requestedId);
