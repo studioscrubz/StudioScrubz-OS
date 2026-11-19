@@ -23,7 +23,7 @@ export function JobCrewTechnicianPicker({ jobId, capacity, leadEmployeeId, onSav
   }, [jobId,leadEmployeeId]);
   return <section className="mt-3 rounded-xl border border-neutral-200 bg-white p-4">
     <h3 className="font-bold text-[#143d1a]">Assign technicians to this job</h3>
-    <p className="mt-1 text-xs text-neutral-600">Only this job&apos;s Crew Lead can save the roster. {chosen.length} of {capacity} technician slots selected, excluding the Crew Lead.</p>
+    <p className="mt-1 text-xs text-neutral-600">The assigned Crew Lead or Master Admin can save this job&apos;s technician roster. {chosen.length} of {capacity} technician slots selected, excluding the Crew Lead.</p>
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
       {people.map(p => <label key={p.employee_id} className="flex items-center gap-2 text-sm">

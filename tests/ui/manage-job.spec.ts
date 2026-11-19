@@ -3,6 +3,7 @@ declare global { interface Window { fixture: { calls: Array<{name:string;args:un
 
 test('job roster picker loads job selections and enforces capacity without permanent membership controls',async({page})=>{
  await page.goto('/');
+ await page.locator('summary').filter({hasText:'Assigned Crew'}).click();
  const picker=page.locator('section').filter({has:page.getByRole('heading',{name:'Assign technicians to this job'})});
  await expect(picker.getByLabel('Kris Greer',{exact:true})).toBeChecked();
  await expect(picker.getByLabel('Other Technician',{exact:true})).toBeDisabled();
