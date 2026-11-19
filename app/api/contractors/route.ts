@@ -368,7 +368,14 @@ export async function GET(request:Request){
   }
   if(view==="dashboard-summary")return noCache(await contractorDashboardSummary(ctx));
   if(view==="availability-month"){
-   requirePartner(ctx);
+   if(ctx.type==="internal"){
+    requireMaster(ctx);
+    const previewCompanyId=uuid(params.get("previewCompanyId"));
+    const {data:company,error}=await ctx.admin.from("contractor_companies")
+     .select("status").eq("id",previewCompanyId).maybeSingle();
+    if(error)throw error;
+    if(company?.status!=="Active")throw new ContractorAccessError("Contractor preview unavailable.",404);
+   }else requirePartner(ctx);
    try{return noCache(await getContractorMonthlyAvailability(params.get("month")??""));}
    catch(error){
     if(error instanceof Error&&/Select a valid calendar month|supports this month/.test(error.message))
