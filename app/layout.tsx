@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { PwaRegistration } from "@/components/pwa/PwaRegistration";
-import { Analytics } from "@vercel/analytics/next";
 import { OsWebVitals } from "@/components/performance/OsWebVitals";
 import "./globals.css";
 
@@ -37,7 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning className="h-full antialiased">
       <head><script dangerouslySetInnerHTML={{__html:`try{var theme=localStorage.getItem("studioscrubz-theme");document.documentElement.dataset.theme=theme==="dark"?"dark":"light"}catch{document.documentElement.dataset.theme="light"}`}} /></head>
-      <body className="min-h-full"><PwaRegistration /><Analytics /><OsWebVitals />{children}</body>
+      <body className="min-h-full"><PwaRegistration /><OsWebVitals />{children}</body>
     </html>
   );
 }
