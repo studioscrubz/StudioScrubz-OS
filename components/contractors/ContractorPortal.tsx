@@ -287,8 +287,9 @@ export function ContractorPortal(){
       {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential bookings: Monday–Saturday, starts 8:00 AM–6:00 PM Pacific, finish by 8:00 PM. Sundays unavailable.</p>}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
      <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
+     {requestedDate&&contractorDivision==="Residential"&&!contractorDateAllowed(contractorDivision,requestedDate)&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-900 md:col-span-2">Sundays are unavailable for residential bookings. Please choose Monday through Saturday.</p>}
      <label className="text-sm font-bold">Requested start time (Pacific time)
-      <select className={input} required disabled={!blockedTimes} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
+      <select className={input} required disabled={!blockedTimes||!contractorDateAllowed(contractorDivision,requestedDate)} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
        <option value="">{!requestedDate?"Choose a date first":!blockedTimes?"Checking available times…":"Choose a start time"}</option>
        {[...new Set([...bookingStarts,...(requestedTime?[requestedTime]:[])])].filter(time=>contractorStartAllowed(contractorDivision,time,estimatedDurationMinutes)).sort().map(time=><option key={time} value={time} disabled={blockedTimes?.includes(time)}>{formatTime12Hour(time)}{blockedTimes?.includes(time)?" · Reserved":""}</option>)}
       </select>
