@@ -2,10 +2,11 @@
 import {useEffect,useMemo,useState} from "react";
 import {formatTime12Hour} from "@/lib/formatTime";
 import type {BuildingAddress} from "@/lib/scheduling/travelBuffer";
+import {contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
 
 type Status="available"|"limited"|"busy";
 type Day={date:string;status:Status;times:Array<{time:string;status:Status}>};
-type CalendarResponse={month:string;timezone:string;indicative:true;days:Day[]};
+type CalendarResponse={month:string;timezone:string;division:ContractorDivision;indicative:true;days:Day[]};
 const classFor:Record<Status,string>={
  available:"border-green-300 bg-green-50 text-green-900",
  limited:"border-amber-300 bg-amber-50 text-amber-950",
@@ -23,8 +24,8 @@ function shiftMonth(month:string,amount:number){
  const d=new Date(Date.UTC(year,m-1+amount,1));
  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
 }
-export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompanyId,building}:{
- onChoose?:(date:string,time:string)=>void;chosenDate?:string;previewCompanyId?:string;building?:BuildingAddress;
+export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompanyId,building,requestDurationMinutes=120}:{
+ onChoose?:(date:string,time:string)=>void;chosenDate?:string;previewCompanyId?:string;building?:BuildingAddress;requestDurationMinutes?:number;
 }){
  const [month,setMonth]=useState(()=>chosenDate?.slice(0,7)||pacificMonth());
  const [selected,setSelected]=useState(chosenDate||"");
@@ -90,13 +91,13 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompa
   {chosen&&<div className="mt-4 border-t pt-4">
    <p className="font-bold">Choose a requested start time · {chosen.date}</p>
    <div className="mt-3 grid max-h-56 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4 md:grid-cols-6">
-    {chosen.times.filter(slot=>slot.status!=="busy").map(slot=><button type="button"
+    {chosen.times.filter(slot=>slot.status!=="busy"&&contractorStartAllowed(data?.division??"Residential",slot.time,requestDurationMinutes)).map(slot=><button type="button"
      key={slot.time} disabled={!onChoose} onClick={()=>onChoose?.(chosen.date,slot.time)}
      className={`rounded-lg border px-2 py-2 text-xs font-semibold ${classFor[slot.status]}`}
      title={slot.status==="limited"?"Other work may overlap; Operations will confirm.":"Request this time"}
     >{formatTime12Hour(slot.time)}{slot.status==="limited"?" · Limited":""}</button>)}
    </div>
-   {!chosen.times.some(slot=>slot.status!=="busy")&&<p className="text-sm text-neutral-600">No requestable start times shown for this date.</p>}
+   {!chosen.times.some(slot=>slot.status!=="busy"&&contractorStartAllowed(data?.division??"Residential",slot.time,requestDurationMinutes))&&<p className="text-sm text-neutral-600">No requestable start times shown for this date.</p>}
   </div>}
   <p className="mt-4 text-xs text-neutral-600">Availability is indicative, not a reservation or a crew guarantee. A 60-minute travel buffer follows jobs at other locations. Different units in the same verified building are exempt from that travel buffer, but jobs cannot overlap for an assigned crew. Operations reviews every submitted request. Private calendar event details are never shown.</p>
  </section>;
