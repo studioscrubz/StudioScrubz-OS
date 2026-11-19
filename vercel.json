@@ -81,7 +81,8 @@
       "fix/public-agreement-signing": false,
       "fix/consolidate-sent-open-invoices": false,
       "fix/consolidation-sent-status": false,
-      "fix/all-contractors-opportunity-dropdown": false
+      "fix/all-contractors-opportunity-dropdown": false,
+      "fix/contractor-saved-property-selection": false
     }
   },
   "crons": [

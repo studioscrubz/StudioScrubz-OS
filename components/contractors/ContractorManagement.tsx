@@ -143,12 +143,12 @@ export function ContractorManagement({view}: {view:ContractorView}){
   let active=true;
   setSavedProperties([]);
   setSavedBuilding("");
-  if(isBrava&&manualBrava&&savedClientId){
+  if(manualBrava&&savedClientId){
    void getProperties(savedClientId).then(rows=>{if(active)setSavedProperties(rows);})
     .catch(cause=>{if(active)setError(cause instanceof Error?cause.message:"Saved properties could not be loaded.");});
   }
   return()=>{active=false;};
- },[isBrava,manualBrava,savedClientId]);
+ },[manualBrava,savedClientId]);
  const buildingKey=(property:PropertyWithClient)=>JSON.stringify(
   [property.address,property.city,property.state,property.zip].map(value=>(value??"").trim().toLowerCase()),
  );
@@ -365,6 +365,22 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);}}>Paste dispatch</button>
      <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview(parseRoseBooking("Customer:","brava"));}}>Enter manually</button>
     </div>}
+    {submissionClient&&!isBrava&&manualBrava&&<label className="block text-sm font-semibold">Saved property / service address
+     <select className={input} value={savedBuilding} onChange={event=>{
+      const property=savedProperties.find(row=>row.id===event.target.value);
+      setSavedBuilding(event.target.value);
+      if(property)setSubmissionPropertyType(property.property_type);
+      setRosePreview(current=>({...current??parseRoseBooking("Customer:"),
+       propertyName:property?.property_name??"",address:property?.address??"",
+       addressLine2:property?.address_line_2??"",city:property?.city??"",state:property?.state??"",
+       zip:property?.zip??"",bedrooms:String(property?.bedrooms??""),bathrooms:String(property?.bathrooms??""),
+       access:property?.access_instructions??""}));
+     }}>
+      <option value="">Enter a new address</option>
+      {savedProperties.map(property=><option key={property.id} value={property.id}>{[property.property_name,property.address,property.address_line_2,property.city,property.state,property.zip].filter(Boolean).join(" · ")}</option>)}
+     </select>
+     <span className="mt-1 block text-xs font-normal text-neutral-500">Choose a saved location or enter a new address in the fields below.</span>
+    </label>}
     {isBrava&&manualBrava&&<div className="grid gap-3 sm:grid-cols-2">
      <label className="block text-sm font-semibold">Saved building
       <select className={input} value={savedBuilding} onChange={event=>{
