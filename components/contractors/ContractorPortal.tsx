@@ -162,6 +162,7 @@ export function ContractorPortal(){
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
    {data&&tab==="calendar"&&<ContractorAvailabilityCalendar
+    requestDurationMinutes={estimatedDurationMinutes}
     onChoose={(date,time)=>{
      setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
      setTab("submit");
@@ -280,7 +281,7 @@ export function ContractorPortal(){
      <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      </div></PortalPanel>
      <PortalPanel title="Requested Schedule">
-      <ContractorAvailabilityCalendar building={{address:address.street,city:address.city,state:address.state,zip:address.zip}} chosenDate={requestedDate} onChoose={(date,time)=>{
+      <ContractorAvailabilityCalendar requestDurationMinutes={estimatedDurationMinutes} building={{address:address.street,city:address.city,state:address.state,zip:address.zip}} chosenDate={requestedDate} onChoose={(date,time)=>{
        setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
       }}/>
       {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential bookings may start 8:00 AM–6:00 PM Pacific, but must finish by 8:00 PM.</p>}
