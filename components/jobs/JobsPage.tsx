@@ -723,7 +723,7 @@ function JobModal({
       {assignedCrew?.technician_capacity != null && (
         <p className="mb-2 text-xs text-neutral-600"><strong>Technician slots:</strong> {assignedCrew.technician_capacity}</p>
       )}
-      {job.assigned_crew_id && (role === "Master Admin" || (employeeId && employeeId === activeCrewLeadId)) && ['Ready to Schedule','Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker key={job.id} jobId={job.id} leadEmployeeId={employeeId} capacity={assignedCrew?.technician_capacity ?? 4} onSaved={()=>mutate(async()=>{},"Job technicians saved.")} />}
+      {job.assigned_crew_id && (role === "Master Admin" || (employeeId && employeeId === activeCrewLeadId)) && ['Ready to Schedule','Scheduled','Crew Assigned'].includes(job.status) && <JobCrewTechnicianPicker key={job.id} jobId={job.id} leadEmployeeId={activeCrewLeadId ?? ""} capacity={assignedCrew?.technician_capacity ?? 4} onSaved={()=>mutate(async()=>{},"Job technicians saved.")} />}
       <p className="mb-2 text-xs text-neutral-600"><strong>Assigned Team:</strong> {assignedTeam}</p>
       {canSchedule && (job.status === "Ready to Schedule" ||
         job.status === "Scheduled" ||
