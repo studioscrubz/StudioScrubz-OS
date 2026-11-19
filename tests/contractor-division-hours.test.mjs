@@ -38,6 +38,6 @@ test("Booking requests, imported bookings, and calendar enforce company division
  assert.match(ui,/contractorStartAllowed\(contractorDivision,time,estimatedDurationMinutes\)/);
  assert.match(ui,/value=\{contractorDivision\} disabled/);
  const management=read("components/contractors/ContractorManagement.tsx");
- assert.match(management,/Residential Contractors/);
+ assert.match(management,/{division} Contractors/);
  assert.match(management,/contractor_division:companyEdit\.contractor_division/);
 });
