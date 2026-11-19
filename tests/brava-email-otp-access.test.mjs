@@ -1,0 +1,31 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=(p)=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+test("Brava OTP sign-in uses a fixed approved email and Supabase Auth OTP, not a static bypass",()=>{
+ const route=read("app/api/contractors/brava-otp/route.ts");
+ const component=read("components/contractors/BravaEmailCodeLogin.tsx");
+ assert.match(route,/management@bravahomecleaning\.com/);
+ assert.match(route,/generateLink\(\{type:"magiclink",email:EMAIL\}\)/);
+ assert.match(route,/email_otp/);
+ assert.match(route,/reserve_brava_email_otp/);
+ assert.match(route,/sendResendEmail/);
+ assert.match(component,/verifyOtp\(\{email:EMAIL,token:code,type:"email"\}\)/);
+ assert.match(component,/activate_brava_email_invitation/);
+ assert.match(component,/\/api\/contractors\/session/);
+ assert.doesNotMatch(component,/signUp\(/);
+});
+test("Brava's email-code setup requires existing verified company invite and rate limits code requests",()=>{
+ const sql=read("supabase/migrations/20261119054500_brava_email_otp_access.sql");
+ assert.match(sql,/email_confirmed_at is not null/);
+ assert.match(sql,/status='Pending' and expires_at>now\(\)/);
+ assert.match(sql,/revoke all on function public\.reserve_brava_email_otp\(\) from public, anon, authenticated/);
+ assert.match(sql,/grant execute on function public\.reserve_brava_email_otp\(\) to service_role/);
+ assert.match(sql,/v_email is distinct from 'management@bravahomecleaning\.com'/);
+ assert.match(sql,/v_company_id uuid := 'a1b0e01c-3990-47e8-9c4f-40c772ce35fd'/);
+ assert.match(sql,/interval '60 seconds'/);
+ assert.match(sql,/interval '24 hours'/);
+ const proxy=read("proxy.ts");
+ assert.match(proxy,/\\"\/brava\\"/);
+ assert.match(proxy,/\\"\/api\/contractors\/brava-otp\\"/);
+});
