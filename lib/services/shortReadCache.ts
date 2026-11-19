@@ -6,13 +6,15 @@ const MAX_AGE_MS=5_000;
 type Entry={until:number;value:unknown};
 const saved=new Map<string,Entry>();
 const pending=new Map<string,Promise<unknown>>();
-const revisions=new Map<string,number>();
+const revisions=new Map<string,number>([["clients:",0],["properties:",0],["property-clients",0]]);
 let subscribed=false;
+let sessionGeneration=0;
 function ensureAuthInvalidation(){
  if(subscribed||typeof window==="undefined")return;
  subscribed=true;
  getSupabaseClient().auth.onAuthStateChange((event)=>{
   if(event==="SIGNED_OUT"||event==="SIGNED_IN"||event==="USER_UPDATED"){
+   sessionGeneration++;
    saved.clear();pending.clear();
   }
  });
@@ -33,8 +35,11 @@ export async function shortCachedRead<T>(key:string,load:()=>Promise<T>):Promise
  if(hit&&hit.until>Date.now())return hit.value as T;
  const existing=pending.get(cacheKey);
  if(existing)return existing as Promise<T>;
+ const generation=sessionGeneration;
+ const prefixVersions=[...revisions].filter(([prefix])=>key.startsWith(prefix));
  const promise=load().then(value=>{
-  saved.set(cacheKey,{until:Date.now()+MAX_AGE_MS,value});
+  if(sessionGeneration===generation && prefixVersions.every(([prefix,version])=>revisions.get(prefix)===version))
+   saved.set(cacheKey,{until:Date.now()+MAX_AGE_MS,value});
   return value;
  }).finally(()=>{
   if(pending.get(cacheKey)===promise)pending.delete(cacheKey);
