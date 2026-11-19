@@ -8,14 +8,14 @@ export async function proxy(request: NextRequest) {
   if (isPartnerHost(hostname)) {
     const destination = request.nextUrl.clone();
     if (pathname === "/") return updateSession(request, { partnerEntry: true });
-    if (["/login", "/activate", "/reset-password"].includes(pathname)) {
+    if (["/login", "/activate", "/reset-password", "/brava"].includes(pathname)) {
       destination.pathname = `/contractor${pathname}`;
       const response = NextResponse.rewrite(destination);
       response.headers.set("Referrer-Policy", "no-referrer");
       return response;
     }
-    if (["/contractor", "/contractor/", "/contractor/login", "/contractor/activate", "/contractor/reset-password",
-      "/api/contractors", "/api/contractors/session", "/api/contractors/invitations", "/api/contractors/files", "/api/contractors/completion-photos"].includes(pathname)) {
+    if (["/contractor", "/contractor/", "/contractor/login", "/contractor/activate", "/contractor/reset-password", "/contractor/brava",
+      "/api/contractors", "/api/contractors/session", "/api/contractors/invitations", "/api/contractors/brava-otp", "/api/contractors/files", "/api/contractors/completion-photos"].includes(pathname)) {
       const response = NextResponse.next();
       response.headers.set("Referrer-Policy", "no-referrer");
       return response;
