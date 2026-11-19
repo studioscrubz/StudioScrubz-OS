@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
 import {formatTime12Hour} from "@/lib/formatTime";
+import type {BuildingAddress} from "@/lib/scheduling/travelBuffer";
 
 type Status="available"|"limited"|"busy";
 type Day={date:string;status:Status;times:Array<{time:string;status:Status}>};
@@ -22,8 +23,8 @@ function shiftMonth(month:string,amount:number){
  const d=new Date(Date.UTC(year,m-1+amount,1));
  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
 }
-export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompanyId}:{
- onChoose?:(date:string,time:string)=>void;chosenDate?:string;previewCompanyId?:string;
+export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompanyId,building}:{
+ onChoose?:(date:string,time:string)=>void;chosenDate?:string;previewCompanyId?:string;building?:BuildingAddress;
 }){
  const [month,setMonth]=useState(()=>chosenDate?.slice(0,7)||pacificMonth());
  const [selected,setSelected]=useState(chosenDate||"");
@@ -37,7 +38,7 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompa
  const maxMonth=useMemo(()=>shiftMonth(pacificMonth(),12),[]);
  useEffect(()=>{
   const controller=new AbortController();
-  void fetch("/api/contractors?"+new URLSearchParams({view:"availability-month",month,...(previewCompanyId?{previewCompanyId}:{})}),{
+  void fetch("/api/contractors?"+new URLSearchParams({view:"availability-month",month,...(previewCompanyId?{previewCompanyId}:{}),...(building?.address&&(building.city||building.zip)?{street:building.address,city:building.city??"",state:building.state??"",zip:building.zip??""}:{})}),{
    cache:"no-store",signal:controller.signal,
   }).then(async response=>{
    const payload=await response.json();
@@ -47,7 +48,7 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompa
    if(!controller.signal.aborted){setData(null);setError(cause instanceof Error?cause.message:"Availability unavailable.");}
   }).finally(()=>{if(!controller.signal.aborted)setLoading(false)});
   return()=>controller.abort();
- },[month,refresh,previewCompanyId]);
+ },[month,refresh,previewCompanyId,building?.address,building?.city,building?.state,building?.zip]);
  const days=data?.month===month?data.days:[];
  const chosen=days.find(day=>day.date===selected);
  const dates=Array.from({length:firstWeekday},(_,index)=>`empty-${index}`);
@@ -97,6 +98,6 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompa
    </div>
    {!chosen.times.some(slot=>slot.status!=="busy")&&<p className="text-sm text-neutral-600">No requestable start times shown for this date.</p>}
   </div>}
-  <p className="mt-4 text-xs text-neutral-600">Availability is indicative, not a reservation or a crew guarantee. Existing work and pending requests may limit capacity. Operations reviews every submitted request. Private calendar event details are never shown.</p>
+  <p className="mt-4 text-xs text-neutral-600">Availability is indicative, not a reservation or a crew guarantee. A 60-minute travel buffer follows jobs at other locations. Different units in the same verified building are exempt from that travel buffer, but jobs cannot overlap for an assigned crew. Operations reviews every submitted request. Private calendar event details are never shown.</p>
  </section>;
 }
