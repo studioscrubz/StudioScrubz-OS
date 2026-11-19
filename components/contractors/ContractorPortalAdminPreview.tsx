@@ -83,7 +83,6 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
         <span>{invoice.invoice_number} · {invoice.status}{invoice.issue_date?` · ${invoice.issue_date}`:""}</span><span>{money(invoice.total)} total · {money(invoice.balance_due)} due</span>
        </div>)}</div></details>}
      </section>
-    {tab==="calendar"&&<ContractorAvailabilityCalendar previewCompanyId={companyId}/>}
     {tab==="dashboard"&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
      {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
       <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>
@@ -100,6 +99,7 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
       {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted.</p>}
      </section>
     </>}
+    {tab==="calendar"&&<ContractorAvailabilityCalendar previewCompanyId={companyId}/>}
     {tab==="jobs"&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
      {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
       <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>
