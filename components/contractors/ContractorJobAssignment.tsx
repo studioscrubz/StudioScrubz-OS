@@ -7,9 +7,9 @@ import type {EligibleJobTech} from "@/types/job";
 
 const select="mt-2 w-full rounded-lg border bg-white p-2 text-sm text-neutral-900";
 const button="rounded-lg bg-[#143d1a] px-3 py-2 text-sm font-bold text-white disabled:opacity-50";
-type JobAssignmentProps={jobId:string;date:string|null;startTime:string|null;duration:number|null;onAssigned:()=>Promise<void>};
+type JobAssignmentProps={minimumCrewSize?:number;jobId:string;date:string|null;startTime:string|null;duration:number|null;onAssigned:()=>Promise<void>};
 
-export function ContractorJobAssignment({jobId,date,startTime,duration,onAssigned}:JobAssignmentProps){
+export function ContractorJobAssignment({minimumCrewSize=1,jobId,date,startTime,duration,onAssigned}:JobAssignmentProps){
  const [crews,setCrews]=useState<CrewWithRelations[]>([]),[people,setPeople]=useState<EligibleJobTech[]>([]);
  const [worker,setWorker]=useState(""),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  useEffect(()=>{let alive=true;void Promise.all([getActiveCrews(),getEligibleJobTechs()]).then(([c,p])=>{
@@ -20,6 +20,7 @@ export function ContractorJobAssignment({jobId,date,startTime,duration,onAssigne
   if(!worker)return;setBusy(true);setError("");setMessage("");
   try{
    const [kind,id]=worker.split(":");
+   if(minimumCrewSize>1&&kind==="individual")throw new Error(`This contractor requires at least ${minimumCrewSize} crew members.`);
    if((kind!=="crew"&&kind!=="individual")||!id)throw new Error("Select a valid technician or crew.");
    if(date&&startTime&&duration&&duration>0){
     const conflicts=kind==="crew"
@@ -35,10 +36,11 @@ export function ContractorJobAssignment({jobId,date,startTime,duration,onAssigne
  return <div className="rounded-lg border bg-neutral-50 p-3 text-sm">
   <h3 className="font-extrabold text-[#143d1a]">Assign technicians through StudioScrubz Jobs</h3>
   <p className="mt-1 text-xs text-neutral-600">Uses the existing assignment RPC, availability protections and operational notifications.</p>
+  {minimumCrewSize>1&&<p className="mt-2 font-bold">Requires {minimumCrewSize} people total. The crew lead must choose at least {minimumCrewSize-1} technician(s) before starting.</p>}
   <select className={select} value={worker} onChange={e=>setWorker(e.target.value)} disabled={loading||busy}>
    <option value="">{loading?"Loading available workers…":"Select crew or individual"}</option>
-   <optgroup label="Active crews with crew leads">{crews.filter(c=>Boolean(c.crew_lead_id)).map(c=><option key={c.id} value={`crew:${c.id}`}>{c.crew_name}</option>)}</optgroup>
-   <optgroup label="Individual technicians">{people.map(p=><option key={p.employee_id} value={`individual:${p.employee_id}`}>{p.display_name} ({p.operational_role})</option>)}</optgroup>
+   <optgroup label="Active crews with crew leads">{crews.filter(c=>Boolean(c.crew_lead_id)&&c.technician_capacity+1>=minimumCrewSize).map(c=><option key={c.id} value={`crew:${c.id}`}>{c.crew_name}</option>)}</optgroup>
+   {minimumCrewSize<=1&&<optgroup label="Individual technicians">{people.map(p=><option key={p.employee_id} value={`individual:${p.employee_id}`}>{p.display_name} ({p.operational_role})</option>)}</optgroup>}
   </select>
   <button type="button" className={button} disabled={loading||busy||!worker} onClick={()=>void assign()}>{busy?"Assigning…":"Assign to Job"}</button>
   {error&&<p role="alert" className="mt-2 text-red-700">{error}</p>}{message&&<p role="status" className="mt-2 text-[#143d1a]">{message}</p>}

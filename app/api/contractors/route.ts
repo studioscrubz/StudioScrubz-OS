@@ -1,3 +1,4 @@
+import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import "server-only";
 import {createHash} from "node:crypto";
@@ -434,6 +435,25 @@ export async function POST(request:Request){
    await audited(ctx,{companyId,type:"Company Updated",detail:{fields:Object.keys(changes)}});
    return noCache({ok:true});
   }
+  if(action==="agreementSource"){
+   requireInternal(ctx);
+   const opportunity=await internalOpportunity(ctx,uuid(input.opportunityId));
+   const {data:company,error:companyError}=await db.from("contractor_companies").select("client_id,status").eq("id",opportunity.company_id).single();
+   if(companyError)throw companyError;
+   if(company.status!=="Active"||!company.client_id||!opportunity.request_property_id)throw new ContractorAccessError("An active contractor and saved property are required.",409);
+   const {data:existing,error:agreementError}=await db.from("service_agreements").select("id,status")
+    .eq("source_contractor_opportunity_id",opportunity.id).is("archived_at",null).not("status","in","(Cancelled,Archived)").maybeSingle();
+   if(agreementError)throw agreementError;
+   let agreementId=existing?.id??null;
+   if(!agreementId){
+    const {data:active,error:activeError}=await db.from("service_agreements").select("id").eq("client_id",company.client_id).eq("property_id",opportunity.request_property_id)
+     .ilike("service_name",opportunity.service_type.replace(/[\\%_]/g,"\\$&")).eq("status","Active").is("archived_at",null).neq("frequency","One-Time").limit(2);
+    if(activeError)throw activeError;
+    if(active&&active.length>1)throw new ContractorAccessError("Multiple active agreements cover this service location. Review Service Agreements before creating another.",409);
+    agreementId=active?.[0]?.id??null;
+   }
+   return noCache({opportunity,clientId:company.client_id,propertyId:opportunity.request_property_id,agreementId});
+  }
   if(action==="submitOpportunity"||action==="editOpportunity"||action==="importRoseBooking"||action==="importBravaBooking"||action==="createBravaOpportunity"||action==="importContractorBooking"||action==="createContractorOpportunity"){
    let companyId:string;
    let submitterId:string|null=ctx.userId;
@@ -511,7 +531,7 @@ export async function POST(request:Request){
    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime))
     throw new ContractorAccessError("Select a valid start time.",400);
    const values={
-    service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address,...(brava?{bookingFrequency:optional(input.frequency,80)}:{})},
+    service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address,bookingFrequency:contractorBookingFrequency(input.frequency)},
     property_address:fullAddress,property_type:type,
     square_feet:input.squareFeet==null||(typeof input.squareFeet==="string"&&!input.squareFeet.trim())?null:money(input.squareFeet,"square footage"),
     bedrooms:type!=="Residential"||input.bedrooms===null||input.bedrooms===""?null:money(brava&&String(input.bedrooms).trim().toLowerCase()==="studio"?0:input.bedrooms,"bedrooms"),
@@ -561,7 +581,25 @@ export async function POST(request:Request){
     ...(values.bathrooms===null?[]:[`Bathrooms: ${values.bathrooms}`]),
     `Proposed price: ${new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(values.proposed_amount)}`,
    ].join("\n"),companyId,data.id,"internal");
-   return noCache({opportunity:data});
+   let agreementRequired=contractorBookingFrequency(input.frequency)!=="One-Time";
+   if(!agreementRequired){
+    const {data:source,error:sourceError}=await db.from("contractor_opportunities").select("request_property_id").eq("id",data.id).single();
+    if(sourceError)throw sourceError;
+    const {data:owner,error:ownerError}=await db.from("contractor_companies").select("client_id").eq("id",companyId).single();
+    if(ownerError)throw ownerError;
+    if(source.request_property_id&&owner.client_id){
+     const {data:existing,error:existingError}=await db.from("service_agreements").select("frequency").eq("client_id",owner.client_id)
+      .eq("property_id",source.request_property_id).ilike("service_name",serviceType.replace(/[\\%_]/g,"\\$&"))
+      .eq("status","Active").is("archived_at",null).neq("frequency","One-Time").limit(1);
+     if(existingError)throw existingError;
+     if(existing?.length){
+      agreementRequired=true;
+      const {error:updateError}=await db.from("contractor_opportunities").update({request_options:{...values.request_options,bookingFrequency:existing[0].frequency},updated_at:new Date().toISOString()}).eq("id",data.id);
+      if(updateError)throw updateError;
+     }
+    }
+   }
+   return noCache({opportunity:data,agreementRequired});
   }
   if(action==="message"||action==="markMessagesRead"){
    const companyId=ctx.type==="partner"?ctx.companyId:uuid(input.companyId);

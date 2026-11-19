@@ -1,4 +1,5 @@
 "use client";
+import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
 import {getProperties} from "@/lib/services/properties";
@@ -15,7 +16,7 @@ import {useAuth} from "@/components/auth/AuthProvider";
 import {normalizeSmsPhoneNumber,buildDeviceSmsUrl,openDeviceSmsApp} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
-type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
+type Company={id:string;minimum_crew_size?:number;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
 type Opportunity={id:string;request_property_id?:string|null;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
@@ -422,7 +423,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {submissionClient&&rosePreview&&<form className="space-y-5" onSubmit={async event=>{
      event.preventDefault();
      const result=await run(manualBrava?(isBrava?"createBravaOpportunity":"createContractorOpportunity"):isBrava?"importBravaBooking":bookingClientKind(submissionClient.name)==="rose"?"importRoseBooking":"importContractorBooking",{...rosePreview,companyId:submissionClient.id,propertyType:isBrava?"Residential":submissionPropertyType,instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
-     if(result){setRoseText("");setRosePreview(null);submissionDialog.current?.close();setOpportunityId(result.opportunity.id);}
+     if(result){setRoseText("");setRosePreview(null);submissionDialog.current?.close();setOpportunityId(result.opportunity.id);if(result.agreementRequired)router.push(`/agreements?contractorOpportunityId=${encodeURIComponent(result.opportunity.id)}`);}
     }}>
      {([
       ["Client and Service Location", [
@@ -434,15 +435,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
       ["Service and Add-Ons", [["serviceType","Service","text",true]]],
       ["Requested Schedule", [
        ["requestedDate","Service date","date",true],
-       ...(isBrava ? [["frequency","Booking frequency","text",false] as const] : []),["requestedTime","Start time","time",true],
+       ...(!manualBrava ? [["frequency","Booking frequency","text",false] as const] : []),["requestedTime","Start time","time",true],
        ["estimatedHours","Estimated person-hours","number",true],
       ]],
       ["Proposed Compensation", [["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Exhibit B payout"):"Proposed pay","number",true]]],
      ] as const).map(([title,fields])=><Panel key={title} title={title}>
       <div className="grid gap-3 sm:grid-cols-2">
        {title==="Requested Schedule"&&manualBrava&&<label className="block text-sm font-semibold">Booking frequency
-        <select className={input} value={["Weekly","Biweekly","Monthly"].includes(rosePreview.frequency)?rosePreview.frequency:"One-Time"} onChange={event=>setRosePreview({...rosePreview,frequency:event.target.value})}>
-         {["One-Time","Weekly","Biweekly","Monthly"].map(frequency=><option key={frequency}>{frequency}</option>)}
+        <select className={input} value={["Weekly","Biweekly","Monthly","Multiple Days Per Week","Twice Monthly","Every 4 Weeks"].includes(rosePreview.frequency)?rosePreview.frequency:"One-Time"} onChange={event=>setRosePreview({...rosePreview,frequency:event.target.value})}>
+         {["One-Time","Weekly","Biweekly","Monthly","Multiple Days Per Week","Twice Monthly","Every 4 Weeks"].map(frequency=><option key={frequency}>{frequency}</option>)}
         </select>
        </label>}
        {fields.filter(([key])=>!manualBrava||key!=="frequency").map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
@@ -473,7 +474,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       {title==="Proposed Compensation"&&isBrava&&listedPayout===null&&<p className="mt-3 text-sm">Automatic pricing is unavailable for this booking. Verify the payout with BRAVA before entering it.</p>}
      </Panel>)}
      {!manualBrava&&<p className="text-sm">Creating this opportunity records the contractor’s text as written confirmation of the scope and payout above.</p>}
-     <button className={button} disabled={busy}>Create {submissionClient.name} opportunity</button>
+     <button className={button} disabled={busy}>{contractorBookingFrequency(rosePreview.frequency)!=="One-Time"?"Create request & review service agreement":`Create ${submissionClient.name} opportunity`}</button>
     </form>}
     </div>
     </dialog>
@@ -488,7 +489,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Requested:</b> {selected.requested_date}</p><p><b>Status:</b> {selected.status}</p>
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
      <p><b>Agreed compensation:</b> {currency(selected.agreed_amount)}</p>
-     {hasPermission(profile,"agreements.manage")&&selected.request_property_id&&clientByCompany.get(selected.company_id)&&<Link className={secondary} href={`/agreements?create=1&clientId=${encodeURIComponent(clientByCompany.get(selected.company_id)!)}&propertyId=${encodeURIComponent(selected.request_property_id)}`}>Create recurring service agreement</Link>}
+     {hasPermission(profile,"agreements.manage")&&selected.request_property_id&&clientByCompany.get(selected.company_id)&&<Link className={secondary} href={`/agreements?contractorOpportunityId=${encodeURIComponent(selected.id)}`}>Create recurring service agreement</Link>}
+     {(companies.find(company=>company.id===selected.company_id)?.minimum_crew_size??1)>1&&<p className="font-bold">Minimum crew: {companies.find(company=>company.id===selected.company_id)?.minimum_crew_size} people total (including crew lead).</p>}
      <p><b>Contractor written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      {view==="opportunities"&&!selected.linked_job_id&&!selected.partner_confirmed_at&&
       selected.submitted_by===null&&/^(brava|rose|brava-manual|contractor|contractor-manual):[a-f0-9]{64}$/.test(selected.external_reference??"")&&
@@ -503,7 +505,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p className="whitespace-pre-line"><b>Scope:</b> {selected.final_scope??selected.scope_of_work}</p>
      {job&&<p><b>Linked operational job:</b> {job.status} · {job.scheduled_date||"Schedule pending"} <Link className="text-[#143d1a] underline" href="/jobs">Open Jobs</Link></p>}
      {job&&!["Completed","Cancelled","Archived"].includes(job.status)&&
-      <ContractorJobAssignment key={job.id} jobId={job.id} date={job.scheduled_date}
+      <ContractorJobAssignment minimumCrewSize={companies.find(company=>company.id===selected.company_id)?.minimum_crew_size??1} key={job.id} jobId={job.id} date={job.scheduled_date}
         startTime={job.start_time} duration={job.estimated_duration} onAssigned={refresh}/>}
      {job?.status==="Completed"&&<div className="flex flex-wrap gap-2">
        {!selected.quality_approved_at&&<button type="button" className={secondary} disabled={busy} onClick={()=>void run("approveQuality",{opportunityId:selected.id})}>Approve completed work</button>}
@@ -552,7 +554,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
        Master Admin: approve & send suggested price
       </button>}
      <div className="flex flex-wrap gap-2">
-      {view==="opportunities"&&<><button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>
+      {view==="opportunities"&&<>{contractorBookingFrequency(selected.request_options?.bookingFrequency)!=="One-Time"?<Link className={button} href={`/agreements?contractorOpportunityId=${encodeURIComponent(selected.id)}`}>Review recurring agreement & schedule</Link>:<button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>}
       <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button></>}
       {view==="jobs"&&["Accepted","Crew Assignment"].includes(selected.status)&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
       {!selected.linked_job_id&&<button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("cancelOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Cancel opportunity</button>}

@@ -1,3 +1,4 @@
+import {canEditContractorBilling} from "@/lib/pricing/agreementBillingEdit";
 import { validateMonthlyWeekdays } from "@/lib/scheduling/monthlyWeekdays";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { addProposalHistory, getProposalById } from "@/lib/services/proposals";
@@ -266,17 +267,28 @@ export async function saveAgreementEdits(id: string, input: AgreementUpdate) {
   if (!hasPermission(profile, "agreements.manage")) throw new Error("Agreement management permission is required.");
   if (current.status === "Draft") return updateAgreement(id, input);
   if (!["Sent", "Accepted", "Active", "Paused"].includes(current.status)) throw new Error(`A ${current.status} agreement cannot be edited.`);
-  // Non-Draft edits are operational only. Preserve the contractual source,
-  // accepted pricing, billing configuration, and lifecycle state.
+  const billingChanged=(input.billing_type!==undefined&&input.billing_type!==current.billing_type)
+    ||(input.billing_amount!==undefined&&input.billing_amount!==current.billing_amount);
+  const editBilling=billingChanged&&canEditContractorBilling(current,profile);
+  if(editBilling){
+    const [invoices,occurrences]=await Promise.all([
+      getSupabaseClient().from("invoices").select("id").eq("service_agreement_id",id).not("status","in","(Cancelled,Archived)").limit(1),
+      getSupabaseClient().from("service_occurrences").select("id").eq("agreement_id",id).not("job_id","is",null).limit(1),
+    ]);
+    if(invoices.error||occurrences.error)throw invoices.error??occurrences.error;
+    if(invoices.data?.length||occurrences.data?.length)throw new Error("Billing cannot change after this agreement has Jobs or invoices. Review those records before changing billing.");
+  }
+  // Unsigned internal contractor billing may be configured by Master Admin
+  // before downstream Jobs/invoices. Signed and proposal-backed terms stay fixed.
   const operationalUpdate: AgreementUpdate = {
     ...input,
     client_id: current.client_id,
     property_id: current.property_id,
     proposal_id: current.proposal_id,
     division: current.division,
-    billing_type: current.billing_type,
-    billing_amount: current.billing_amount,
-    pricing_snapshot: current.pricing_snapshot,
+    billing_type: editBilling?(input.billing_type??current.billing_type):current.billing_type,
+    billing_amount: editBilling?(input.billing_amount??current.billing_amount):current.billing_amount,
+    pricing_snapshot: editBilling?(input.pricing_snapshot??current.pricing_snapshot):current.pricing_snapshot,
     payment_terms: current.payment_terms,
     agreement_terms: current.agreement_terms,
     cancellation_terms: current.cancellation_terms,
