@@ -15,7 +15,7 @@ import {useAuth} from "@/components/auth/AuthProvider";
 import {normalizeSmsPhoneNumber,buildDeviceSmsUrl,openDeviceSmsApp} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
-type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
+type Company={id:string;minimum_crew_size?:number;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
 type Opportunity={id:string;request_property_id?:string|null;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
@@ -489,6 +489,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
      <p><b>Agreed compensation:</b> {currency(selected.agreed_amount)}</p>
      {hasPermission(profile,"agreements.manage")&&selected.request_property_id&&clientByCompany.get(selected.company_id)&&<Link className={secondary} href={`/agreements?create=1&clientId=${encodeURIComponent(clientByCompany.get(selected.company_id)!)}&propertyId=${encodeURIComponent(selected.request_property_id)}`}>Create recurring service agreement</Link>}
+     {(companies.find(company=>company.id===selected.company_id)?.minimum_crew_size??1)>1&&<p className="font-bold">Minimum crew: {companies.find(company=>company.id===selected.company_id)?.minimum_crew_size} people total (including crew lead).</p>}
      <p><b>Contractor written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      {view==="opportunities"&&!selected.linked_job_id&&!selected.partner_confirmed_at&&
       selected.submitted_by===null&&/^(brava|rose|brava-manual|contractor|contractor-manual):[a-f0-9]{64}$/.test(selected.external_reference??"")&&
@@ -503,7 +504,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p className="whitespace-pre-line"><b>Scope:</b> {selected.final_scope??selected.scope_of_work}</p>
      {job&&<p><b>Linked operational job:</b> {job.status} · {job.scheduled_date||"Schedule pending"} <Link className="text-[#143d1a] underline" href="/jobs">Open Jobs</Link></p>}
      {job&&!["Completed","Cancelled","Archived"].includes(job.status)&&
-      <ContractorJobAssignment key={job.id} jobId={job.id} date={job.scheduled_date}
+      <ContractorJobAssignment minimumCrewSize={companies.find(company=>company.id===selected.company_id)?.minimum_crew_size??1} key={job.id} jobId={job.id} date={job.scheduled_date}
         startTime={job.start_time} duration={job.estimated_duration} onAssigned={refresh}/>}
      {job?.status==="Completed"&&<div className="flex flex-wrap gap-2">
        {!selected.quality_approved_at&&<button type="button" className={secondary} disabled={busy} onClick={()=>void run("approveQuality",{opportunityId:selected.id})}>Approve completed work</button>}

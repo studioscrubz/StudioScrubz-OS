@@ -1,0 +1,31 @@
+// Run with @electric-sql/pglite installed, or set PGLITE_MODULE to its module path.
+const {PGlite}=await import(process.env.PGLITE_MODULE || '@electric-sql/pglite');
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+await db.exec(`create schema private; create schema auth; create role anon; create role authenticated;
+create function auth.uid() returns uuid language sql as 'select null::uuid';
+create function public.has_any_role(text[]) returns boolean language sql as 'select false';
+create function public.is_eligible_job_tech(uuid) returns boolean language sql as 'select true';
+create table contractor_companies(id uuid primary key,name text,client_id uuid);
+create table crews(id uuid primary key,technician_capacity integer);
+create table jobs(id uuid primary key,client_id uuid,assigned_employee_id uuid,assigned_crew_id uuid,assigned_crew_lead_id uuid,status text,archived_at timestamptz,operational_started_at timestamptz);
+create table job_crew_technicians(job_id uuid,crew_id uuid,employee_id uuid);
+create table contractor_opportunities(id uuid primary key,company_id uuid,cleaner_count integer);
+insert into contractor_companies values('00000000-0000-0000-0000-000000000001','LJ Facility Services LLC','00000000-0000-0000-0000-000000000002');
+insert into crews values('00000000-0000-0000-0000-000000000003',1),('00000000-0000-0000-0000-000000000004',0);`);
+await db.exec(readFileSync('supabase/migrations/20261119015000_contractor_minimum_crew.sql','utf8'));
+assert.equal((await db.query('select minimum_crew_size from contractor_companies')).rows[0].minimum_crew_size,2);
+console.log('PASS LJ minimum initialized to two');
+async function rejects(sql){await db.exec('begin');await assert.rejects(db.exec(sql));await db.exec('rollback');}
+await rejects(`insert into jobs(id,client_id,assigned_employee_id,status) values('00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','Scheduled')`);console.log('PASS solo assignment blocked');
+await rejects(`insert into jobs(id,client_id,assigned_crew_id,status) values('00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000004','Scheduled')`);console.log('PASS undersized crew blocked');
+await db.exec(`insert into jobs(id,client_id,assigned_crew_id,assigned_crew_lead_id,status) values('00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000006','Scheduled')`);console.log('PASS crew scheduling allowed before technicians selected');
+await rejects(`update jobs set status='In Progress',operational_started_at=now()`);console.log('PASS start without technician blocked');
+await rejects(`update crews set technician_capacity=0 where id='00000000-0000-0000-0000-000000000003'`);console.log('PASS capacity reduction below required minimum blocked');
+await db.exec(`insert into job_crew_technicians values('00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000007');update jobs set status='In Progress',operational_started_at=now()`);console.log('PASS lead and technician can start');
+await db.exec(`insert into contractor_opportunities values('00000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000001',1)`);
+assert.equal((await db.query('select cleaner_count from contractor_opportunities')).rows[0].cleaner_count,2);console.log('PASS new opportunities require two cleaners');
+await rejects('update contractor_companies set minimum_crew_size=1');console.log('PASS unauthorized policy change blocked');
+await db.exec(`insert into jobs(id,client_id,assigned_employee_id,status) values('00000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000006','Scheduled')`);console.log('PASS other clients keep individual assignment');
+await db.close();
