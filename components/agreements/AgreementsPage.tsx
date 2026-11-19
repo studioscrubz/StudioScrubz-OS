@@ -58,6 +58,7 @@ export function AgreementsPage() {
   const [occurrences, setOccurrences] = useState<ServiceOccurrenceWithRelations[]>([]);
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [form, setForm] = useState<AgreementWithRelations | null | "new">(null);
+  const [initialLocation,setInitialLocation]=useState<{clientId:string;propertyId:string}|null>(null);
   const [proposalSource, setProposalSource] = useState<ProposalWithRelations | null>(null);
   const [linkableProposals, setLinkableProposals] = useState<ProposalWithRelations[]>([]);
 
@@ -93,6 +94,11 @@ export function AgreementsPage() {
       void getAgreementById(agreementId).then(setPreview).catch((cause) => setError(message(cause)));
       return;
     }
+    if(params.get("create")==="1"&&params.get("clientId")&&params.get("propertyId")){
+      setInitialLocation({clientId:params.get("clientId")!,propertyId:params.get("propertyId")!});
+      setForm("new");
+      return;
+    }
     if (!proposalId) return;
     void Promise.all([getProposalById(proposalId), getAgreements()])
       .then(([proposal, rows]) => {
@@ -109,6 +115,7 @@ export function AgreementsPage() {
       const linked = new Set(agreements.filter(row => !row.archived_at && !["Cancelled", "Archived"].includes(row.status)).map(row => row.proposal_id));
       setLinkableProposals(proposals.filter(row => row.status === "Accepted" && Boolean(row.accepted) && !linked.has(row.id)));
       setProposalSource(null);
+      setInitialLocation(null);
       setForm("new");
     } catch (cause) { setError(message(cause)); }
   }
@@ -213,7 +220,7 @@ export function AgreementsPage() {
     </article>)}</div>
     <Occurrences rows={visibleOccurrences.filter((row) => row.scheduled_date >= today)} act={act} canManage={canManage} canCreateJobs={canCreateJobs}/>
     <div className="mt-5 flex gap-2"><button className={secondary} onClick={() => exportAgreements(shown, visibleOccurrences)}>Export Agreements CSV</button><button className={secondary} onClick={() => exportOccurrences(visibleOccurrences.filter((row) => row.scheduled_date >= today))}>Export Upcoming Services CSV</button></div>
-    {form && <AgreementForm key={form === "new" ? proposalSource?.id || "new" : form.id} value={form === "new" ? null : form} proposal={form === "new" ? proposalSource : null} availableProposals={linkableProposals} onProposalChange={setProposalSource} settings={settings} close={() => { setForm(null); setProposalSource(null); }} saved={async () => { setForm(null); setProposalSource(null); await load(); }}/>}
+    {form && <AgreementForm initialLocation={form==="new"?initialLocation:null} key={form === "new" ? proposalSource?.id || "new" : form.id} value={form === "new" ? null : form} proposal={form === "new" ? proposalSource : null} availableProposals={linkableProposals} onProposalChange={setProposalSource} settings={settings} close={() => { setForm(null); setProposalSource(null); }} saved={async () => { setForm(null); setProposalSource(null); await load(); }}/>}
     {preview && <Modal close={() => setPreview(null)}><div className="document-print-root" id="staff-agreement-print"><AgreementDocument agreement={preview} settings={settings}/></div><div className="print:hidden"><PhysicalSignedAgreement agreement={preview} canManage={canManagePhysicalSigning} onUpdated={async () => setPreview(await getAgreementById(preview.id))}/></div><div className="mt-5 flex flex-wrap gap-2 print:hidden">{canRepresentativeSign && representativeSigningEligible(preview) && !preview.representative_signature && <button className={primary} onClick={() => setRepresentativeSigning(preview)}>Sign as StudioScrubz</button>}<button type="button" className={primary} onClick={() => window.print()}>Print Agreement</button></div></Modal>}
     {documents && <Modal close={() => setDocuments(null)}><h2 className="text-2xl font-bold text-[#143d1a]">{documents.agreement_number} Documents</h2><p className="mt-1 text-sm text-neutral-500">{documents.agreement_name}</p><AgreementDocuments agreementId={documents.id} canManage={canManage}/></Modal>}
     {billing && <ContractBilling agreement={billing} canCreateInvoices={canCreateInvoices} close={() => setBilling(null)}/>}
@@ -342,13 +349,18 @@ function withCommercialRequirements(terms: string | null, type: string): string 
   const general = (index >= 0 ? source.slice(0, index) : source).trim();
   return [general, `${marker} ${type}]\n${COMMERCIAL_SERVICE_REQUIREMENTS[type] || COMMERCIAL_SERVICE_REQUIREMENTS.recurring}`].filter(Boolean).join("\n\n");
 }
-function AgreementForm({ value, proposal, availableProposals, onProposalChange, settings, close, saved }: { value: AgreementWithRelations | null; proposal: ProposalWithRelations | null; availableProposals: ProposalWithRelations[]; onProposalChange: (proposal: ProposalWithRelations | null) => void; settings: BusinessSettings | null; close: () => void; saved: () => Promise<void> }) {
+function AgreementForm({ initialLocation, value, proposal, availableProposals, onProposalChange, settings, close, saved }: { initialLocation:{clientId:string;propertyId:string}|null; value: AgreementWithRelations | null; proposal: ProposalWithRelations | null; availableProposals: ProposalWithRelations[]; onProposalChange: (proposal: ProposalWithRelations | null) => void; settings: BusinessSettings | null; close: () => void; saved: () => Promise<void> }) {
   const [commercialConfiguration, setCommercialConfiguration] = useState<(typeof COMMERCIAL_AGREEMENT_CONFIGURATIONS)[number]["id"]>("recurring");
   const operationalEdit = Boolean(value && value.status !== "Draft");
   const signedEdit = Boolean(value?.signing_method || value?.client_signed_at);
   const [draft, setDraft] = useState<AgreementInput>(value ? pick(value) : proposal ? proposalBlank(proposal,settings?.default_service_agreement_terms,settings?.default_cancellation_terms) : blank(settings?.default_service_agreement_terms,settings?.default_cancellation_terms)); const [clients, setClients] = useState<Client[]>([]); const [properties, setProperties] = useState<PropertyWithClient[]>([]); const [crews, setCrews] = useState<CrewWithRelations[]>([]); const [services, setServices] = useState<CatalogService[]>([]); const [rules, setRules] = useState<RecurringPricingRule[]>([]); const [selectedServiceId, setSelectedServiceId] = useState("");const [selectedRuleId,setSelectedRuleId]=useState(proposal?.result.recurringPricingRuleId??value?.pricing_snapshot?.recurring_pricing_rule_id??""); const [basePrice,setBasePrice]=useState(proposal?.result.weeklyContractTotal ?? proposal?.result.perVisitTotal ?? (value?.proposal_id ? value.billing_amount : value?.pricing_snapshot?.standard_service_price ?? value?.billing_amount ?? 0)); const [manualDiscount,setManualDiscount]=useState(value?.pricing_snapshot?.custom_discount_amount??0); const [additionalDiscount,setAdditionalDiscount]=useState(0); const [pricingDirty,setPricingDirty]=useState(false); const [billingConfirmed,setBillingConfirmed]=useState(!proposal); const [serviceDescription, setServiceDescription] = useState(value?.pricing_snapshot?.service_description || ""); const [scopeText, setScopeText] = useState(scopeToText(value?.scope ?? (proposal ? agreementScopeFromProposal(proposal) : []))); const [scopeDirty,setScopeDirty]=useState(false); const [error, setError] = useState<string | null>(null); const [saving,setSaving]=useState(false);
   useOperationalRealtime(["services", "recurring_pricing_rules"], async () => { const catalog = await getServiceCatalog(); setServices(catalog.services); setRules(catalog.recurringRules); });
-  useEffect(() => { void Promise.all([getClients(), getProperties(), getActiveCrews(), getServiceCatalog()]).then(([nextClients, nextProperties, nextCrews, catalog]) => { setClients(nextClients); setProperties(nextProperties); setCrews(nextCrews); setServices(catalog.services); setRules(catalog.recurringRules); if (value||proposal) { const source=value??proposal!; const name=value?.service_name??proposal?.result.serviceName; setSelectedServiceId(catalog.services.find((service) => service.service_name === name && (service.division===source.division||service.division==="Both"))?.id ?? "historical"); } }).catch((cause) => setError(message(cause))); }, [proposal,value]);
+  useEffect(() => { void Promise.all([getClients(), getProperties(), getActiveCrews(), getServiceCatalog()]).then(([nextClients, nextProperties, nextCrews, catalog]) => { setClients(nextClients); setProperties(nextProperties); if(initialLocation&&!value&&!proposal){
+    const property=nextProperties.find(row=>row.id===initialLocation.propertyId&&row.client_id===initialLocation.clientId&&!row.archived_at);
+    const client=nextClients.find(row=>row.id===initialLocation.clientId&&!row.archived_at);
+    if(!property||!client)throw new Error("The contractor service location is unavailable. Select an active client and property.");
+    setDraft(current=>({...current,client_id:client.id,property_id:property.id,division:property.property_type}));
+  } setCrews(nextCrews); setServices(catalog.services); setRules(catalog.recurringRules); if (value||proposal) { const source=value??proposal!; const name=value?.service_name??proposal?.result.serviceName; setSelectedServiceId(catalog.services.find((service) => service.service_name === name && (service.division===source.division||service.division==="Both"))?.id ?? "historical"); } }).catch((cause) => setError(message(cause))); }, [proposal,value,initialLocation]);
   const selectedService=services.find((item)=>item.id===selectedServiceId);const matchingRules=selectedService?matchingRecurringRules(draft.frequency,rules,selectedService.id):[];const effectiveRuleId=selectedRuleId||(matchingRules.length===1?matchingRules[0].id:"");const pricingRules=matchingRules.length>1&&!effectiveRuleId?[]:rules;
   const pricing=(()=>{if(proposal)return agreementPricingWithAdditionalDiscount({...proposalAgreementPricing(proposal),service_description:agreementServiceDescriptionFromProposal(proposal,services)},Math.min(Math.max(0,additionalDiscount),Math.max(0,(proposal.result.acceptedPricingAllocation?.baseServiceAmount??proposal.result.perVisitTotal)-0.01)));if(value?.proposal_id)return value.pricing_snapshot ? agreementPricingWithAdditionalDiscount(value.pricing_snapshot,Math.min(Math.max(0,additionalDiscount),Math.max(0,value.pricing_snapshot.accepted_pricing_allocation?.baseServiceAmount??value.pricing_snapshot.final_per_visit_price)-0.01)) : null;if(value&&!pricingDirty)return value.pricing_snapshot;return selectedService?catalogAgreementPricing({standardPrice:basePrice,frequency:draft.frequency,serviceDaysOfWeek:draft.days_of_week,serviceId:selectedService.id,rules:pricingRules,recurringPricingRuleId:effectiveRuleId||null,customDiscount:manualDiscount,serviceDescription:selectedService.description}):value?.pricing_snapshot??null})();
   const clientRows = clients.filter((client) => client.client_type === draft.division || client.client_type === "Contractor" || client.id === draft.client_id);

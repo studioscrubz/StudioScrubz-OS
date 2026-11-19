@@ -611,7 +611,7 @@ export async function POST(request:Request){
    if(!imported)requirePartner(ctx);
    const id=uuid(input.opportunityId);
    const opp=imported?await internalOpportunity(ctx,id):await partnerOpportunity(ctx,id);
-   if(imported&&(opp.submitted_by!==null||!/^(brava|rose):[a-f0-9]{64}$/.test(opp.external_reference??"")))
+   if(imported&&(opp.submitted_by!==null||!/^(brava|rose|brava-manual|contractor|contractor-manual):[a-f0-9]{64}$/.test(opp.external_reference??"")))
     throw new ContractorAccessError("Only imported text bookings support this confirmation.",409);
    if(opp.linked_job_id||!["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(opp.status))
     throw new ContractorAccessError("Opportunity is already closed.",409);
