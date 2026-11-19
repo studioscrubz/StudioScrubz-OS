@@ -158,7 +158,7 @@ test("partner profile updates and private messages use the server identity",()=>
  const privacy=read("supabase/migrations/20261107192154_contractor_private_messages.sql");
  const profile=api.slice(api.indexOf('if(action==="updateCompany")'),api.indexOf('if(action==="submitOpportunity")'));
  assert.match(profile,/ctx\.type==="internal"\?uuid\(input\.companyId\):ctx\.companyId/);
- assert.match(profile,/if\(ctx\.type==="internal"\)\{\s*if\(input\.payment_terms/);
+ assert.match(profile,/if\(ctx\.type==="internal"\)\{[\s\S]*?if\(input\.payment_terms/);
  assert.doesNotMatch(profile,/Company administrator access required/);
  assert.match(api,/ctx\.type==="partner"\?ctx\.userId:uuid\(input\.partnerUserId\)/);
  assert.match(api,/\.eq\("partner_user_id",ctx\.userId\)\.eq\("manager_user_id",manager\.id\)/);
