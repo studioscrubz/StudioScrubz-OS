@@ -20,3 +20,13 @@ export function contractorStartAllowed(division:ContractorDivision,time:string,d
  if(!hours)return true;
  return minute>=hours.open&&minute<=hours.lastStart&&minute+Math.max(0,durationMinutes)<=hours.close;
 }
+
+/** Residential bookings are closed on Sundays (Pacific calendar date). */
+export function contractorDateAllowed(division:ContractorDivision,date:string){
+ const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+ if(!match)return false;
+ const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
+ const dayUtc=new Date(Date.UTC(year,month-1,day));
+ if(dayUtc.getUTCFullYear()!==year||dayUtc.getUTCMonth()+1!==month||dayUtc.getUTCDate()!==day)return false;
+ return division!=="Residential"||dayUtc.getUTCDay()!==0;
+}
