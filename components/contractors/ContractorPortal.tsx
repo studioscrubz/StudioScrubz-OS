@@ -276,7 +276,7 @@ export function ContractorPortal(){
      <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      </div></PortalPanel>
      <PortalPanel title="Requested Schedule">
-      <ContractorAvailabilityCalendar chosenDate={requestedDate} onChoose={(date,time)=>{
+      <ContractorAvailabilityCalendar building={{address:address.street,city:address.city,state:address.state,zip:address.zip}} chosenDate={requestedDate} onChoose={(date,time)=>{
        setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
       }}/>
       <div className="mt-4 grid gap-4 md:grid-cols-2">

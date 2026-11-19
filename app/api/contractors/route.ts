@@ -376,7 +376,12 @@ export async function GET(request:Request){
     if(error)throw error;
     if(company?.status!=="Active")throw new ContractorAccessError("Contractor preview unavailable.",404);
    }else requirePartner(ctx);
-   try{return noCache(await getContractorMonthlyAvailability(params.get("month")??""));}
+   const street=params.get("street")?.trim().slice(0,240)||"";
+   const city=params.get("city")?.trim().slice(0,120)||"";
+   const state=params.get("state")?.trim().slice(0,10)||"";
+   const zip=params.get("zip")?.trim().slice(0,20)||"";
+   const building=street&&(city||zip)?{address:street,city,state,zip}:undefined;
+   try{return noCache(await getContractorMonthlyAvailability(params.get("month")??"",building));}
    catch(error){
     if(error instanceof Error&&/Select a valid calendar month|supports this month/.test(error.message))
      throw new ContractorAccessError(error.message,400);

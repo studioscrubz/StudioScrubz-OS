@@ -1,4 +1,5 @@
 import { formatJobServiceAddress } from "@/types/job";
+import {appointmentConflict} from "@/lib/scheduling/travelBuffer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type {
   CrewConflict,
@@ -341,14 +342,15 @@ export async function findCrewConflicts(
   duration: number,
 ): Promise<CrewConflict[]> {
   if (!crewId || !date || !startTime) return [];
+  const current=await getJobById(jobId);
+  const start=minutes(startTime),end=start+Math.max(duration,0)*60;
   if (!(await master())) {
     return (await getJobs())
       .filter((job) => job.id !== jobId && job.assigned_crew_id === crewId && job.scheduled_date === date && !job.archived_at && !["Cancelled", "Archived"].includes(job.status))
       .filter((job) => {
         if (!job.start_time) return false;
-        const start = minutes(startTime), end = start + Math.max(duration, 0) * 60;
         const otherStart = minutes(job.start_time), otherEnd = otherStart + Math.max(job.estimated_duration ?? 0, 0) * 60;
-        return start < otherEnd && otherStart < end;
+        return appointmentConflict({start,end,building:current.property},{start:otherStart,end:otherEnd,building:job.property});
       })
       .map(({ id, job_number, client_name, property_name, scheduled_date, start_time, estimated_duration }) => ({ id, job_number, client_name, property_name, scheduled_date, start_time, estimated_duration }));
   }
@@ -361,15 +363,13 @@ export async function findCrewConflicts(
     .is("archived_at", null)
     .not("status", "in", "(Cancelled,Archived)");
   if (error) throw error;
-  const start = minutes(startTime);
-  const end = start + Math.max(duration, 0) * 60;
   return (data as JobWithRelations[])
     .filter((job) => {
       if (!job.start_time) return false;
       const otherStart = minutes(job.start_time);
       const otherEnd =
         otherStart + Math.max(job.estimated_duration ?? 0, 0) * 60;
-      return start < otherEnd && otherStart < end;
+      return appointmentConflict({start,end,building:current.property},{start:otherStart,end:otherEnd,building:job.property});
     })
     .map(
       ({
@@ -399,10 +399,10 @@ export const getCrewConflicts = (
 ) => findCrewConflicts(jobId, crewId, date, time ?? "", 0.01);
 export async function findIndividualTechConflicts(jobId:string,employeeId:string,date:string,startTime:string,duration:number):Promise<CrewConflict[]> {
   if (!employeeId || !date || !startTime) return [];
-  const jobs = await getJobsForDateRange(date,date);
+  const [jobs,current] = await Promise.all([getJobsForDateRange(date,date),getJobById(jobId)]);
   const start=minutes(startTime),end=start+Math.max(duration,0)*60;
   return jobs.filter(job=>job.id!==jobId&&job.assigned_employee_id===employeeId&&!job.archived_at&&!['Cancelled','Archived'].includes(job.status)&&Boolean(job.start_time))
-    .filter(job=>{const otherStart=minutes(job.start_time!);const otherEnd=otherStart+Math.max(job.estimated_duration??0,0)*60;return start<otherEnd&&otherStart<end})
+    .filter(job=>{const otherStart=minutes(job.start_time!);const otherEnd=otherStart+Math.max(job.estimated_duration??0,0)*60;return appointmentConflict({start,end,building:current.property},{start:otherStart,end:otherEnd,building:job.property})})
     .map(({id,job_number,client_name,property_name,scheduled_date,start_time,estimated_duration})=>({id,job_number,client_name,property_name,scheduled_date,start_time,estimated_duration}));
 }
 export async function scheduleJob(
