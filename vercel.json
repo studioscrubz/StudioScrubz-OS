@@ -78,7 +78,8 @@
       "fix/submit-job-details": false,
       "fix/brava-payout-import": false,
       "feature/crew-manager-job-based-foundation-20261111": false,
-      "fix/public-agreement-signing": false
+      "fix/public-agreement-signing": false,
+      "fix/consolidate-sent-open-invoices": false
     }
   },
   "crons": [
