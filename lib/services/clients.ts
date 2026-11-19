@@ -1,14 +1,13 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { invalidateShortReadCache, shortCachedRead } from "@/lib/services/shortReadCache";
 import type { Client, ClientInput } from "@/types/client";
 
 export async function getClients(): Promise<Client[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("clients")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
+ return shortCachedRead("clients:list",async()=>{
+  const {data,error}=await getSupabaseClient().from("clients").select("*").order("created_at",{ascending:false});
+  if(error)throw error;
   return data;
+ });
 }
 export async function getClientById(id: string): Promise<Client> {
   const { data, error } = await getSupabaseClient().from("clients").select("*").eq("id", id).single();
@@ -19,12 +18,16 @@ export async function getClientById(id: string): Promise<Client> {
 export async function createClient(input: ClientInput): Promise<Client> {
   const { data, error } = await getSupabaseClient().from("clients").insert(input).select().single();
   if (error) throw error;
+  invalidateShortReadCache("clients:");
+  invalidateShortReadCache("property-clients");
   return data;
 }
 
 export async function updateClient(id: string, input: ClientInput): Promise<Client> {
   const { data, error } = await getSupabaseClient().from("clients").update(input).eq("id", id).select().single();
   if (error) throw error;
+  invalidateShortReadCache("clients:");
+  invalidateShortReadCache("property-clients");
   return data;
 }
 
@@ -36,6 +39,8 @@ export async function archiveClient(id: string): Promise<Client> {
     .select()
     .single();
   if (error) throw error;
+  invalidateShortReadCache("clients:");
+  invalidateShortReadCache("property-clients");
   return data;
 }
 

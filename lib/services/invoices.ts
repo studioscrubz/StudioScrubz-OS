@@ -8,6 +8,16 @@ import { requestImmediateAttentionPush } from "@/lib/push/client";
 
 const select = "*, job_lines:invoice_job_lines(*), job:jobs!invoices_job_id_fkey(*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)), agreement:service_agreements!invoices_service_agreement_id_fkey(*), proposal:proposals!invoices_proposal_id_fkey(*), client:clients!invoices_client_id_fkey(*), property:properties!invoices_property_id_fkey(*)";
 
+// Compact invoice-list projection: avoid hydrating full linked jobs, proposals,
+// clients, properties and agreements for every row. Detail views use getInvoiceById.
+const invoiceListSelect = "*, job_lines:invoice_job_lines(id,invoice_id,job_id,property_id,job_number_snapshot,property_name_snapshot,property_address_snapshot,service_name_snapshot,service_date_snapshot,amount,created_at), job:jobs!invoices_job_id_fkey(job_number), agreement:service_agreements!invoices_service_agreement_id_fkey(agreement_number)";
+export async function getInvoiceList():Promise<InvoiceWithRelations[]>{
+ const {data,error}=await getSupabaseClient().from("invoices").select(invoiceListSelect).order("created_at",{ascending:false});
+ if(error)throw error;
+ // List-only relationship projections are never passed to a financial edit API;
+ // the invoice detail fetch retrieves the full authoritative record on opening.
+ return data as unknown as InvoiceWithRelations[];
+}
 export async function getInvoices():Promise<InvoiceWithRelations[]>{const{data,error}=await getSupabaseClient().from("invoices").select(select).order("created_at",{ascending:false});if(error)throw error;return data as unknown as InvoiceWithRelations[]}
 export async function getInvoiceById(id:string):Promise<InvoiceWithRelations>{const{data,error}=await getSupabaseClient().from("invoices").select(select).eq("id",id).single();if(error)throw error;return data as unknown as InvoiceWithRelations}
 export async function getInvoiceJobPhotos(invoiceId:string):Promise<InvoiceJobPhotoWithUrl[]>{const client=getSupabaseClient();const{data,error}=await client.from("invoice_job_photos").select("*").eq("invoice_id",invoiceId).order("uploaded_at");if(error)throw error;const photos=(data??[]) as InvoiceJobPhoto[];if(!photos.length)return[];const{data:signed,error:signedError}=await client.storage.from(OPERATIONAL_PHOTO_BUCKET).createSignedUrls(photos.map(photo=>photo.storage_path),15*60);if(signedError)throw signedError;return photos.map((photo,index)=>({...photo,signedUrl:signed[index]?.signedUrl??null}))}

@@ -210,6 +210,27 @@ async function completedContractorJobCounts(db:ContractorContext["admin"],client
  return counts;
 }
 
+// Dashboard totals can be requested independently from the actionable contractor
+// records, so slow history/count queries never gate the main dashboard paint.
+async function contractorDashboardSummary(ctx:ContractorContext){
+ requireInternal(ctx);
+ const db=ctx.admin;
+ const [companies,clients]=await Promise.all([
+  db.from("contractor_companies").select("client_id,status").not("client_id","is",null),
+  db.from("clients").select("id").eq("client_type","Contractor").eq("status","Active").is("archived_at",null),
+ ]);
+ if(companies.error||clients.error)throw companies.error??clients.error;
+ const eligible=new Set((companies.data??[])
+  .filter(company=>company.status!=="Archived"&&company.status!=="Suspended")
+  .map(company=>company.client_id).filter((id):id is string=>Boolean(id)));
+ const ids=(clients.data??[]).map(client=>client.id).filter(id=>eligible.has(id));
+ const [invoiceTotals,upcomingJobs,completedJobCounts]=await Promise.all([
+  contractorInvoiceTotals(db,ids),
+  upcomingContractorJobs(db,ids),
+  completedContractorJobCounts(db,ids),
+ ]);
+ return {invoiceTotals,upcomingJobs,completedJobCounts};
+}
 async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  const db=ctx.admin;
  if(ctx.type==="internal"){
@@ -314,6 +335,7 @@ export async function GET(request:Request){
   const ctx=await contractorContext();
   const params=new URL(request.url).searchParams;
   const view=params.get("view");
+  if(view==="dashboard-summary")return noCache(await contractorDashboardSummary(ctx));
   if(view==="booking-times"){
    requirePartner(ctx);
    const date=params.get("date");
