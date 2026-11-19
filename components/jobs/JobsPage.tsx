@@ -135,40 +135,69 @@ export function JobsPage() {
     setActiveTechs(techs);
     return next;
   }
-  useOperationalRealtime(["jobs", "time_entries", "crews", "employees", "invoices", "service_occurrences"], async () => { await load(); });
+  // Refresh the data that actually changed rather than fetching every jobs-page
+  // dependency whenever any operational table emits an update.
+  useOperationalRealtime(["jobs", "service_occurrences", "invoices", "job_crew_technicians"], async () => {
+    const next = await getJobs();
+    setRows(next);
+    setSelected(current => {
+      const updated = current && next.find(job => job.id === current.id);
+      return current && updated
+        ? { ...current, job_technicians: updated.job_technicians, assigned_crew_lead_id: updated.assigned_crew_lead_id, on_my_way_initiated_at: updated.on_my_way_initiated_at }
+        : current;
+    });
+  });
+  useOperationalRealtime(["time_entries"], async () => { setTimeEntries(await getTimeEntries()); });
+  useOperationalRealtime(["crews"], async () => { setActiveCrews(await getActiveCrews()); });
+  useOperationalRealtime(["employees"], async () => {
+    const [crews, techs] = await Promise.all([
+      getActiveCrews(),
+      hasPermission(profile, "jobs.schedule") ? getEligibleJobTechs() : Promise.resolve([]),
+    ]);
+    setActiveCrews(crews);
+    setActiveTechs(techs);
+  });
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      getJobs(),
-      getTimeEntries(),
-      getActiveCrews(),
-      hasPermission(profile,"jobs.schedule") ? getEligibleJobTechs() : Promise.resolve([]),
-      canViewArchived ? getArchivedJobs() : Promise.resolve([]),
-    ])
-      .then(([x, entries, crews, techs, archivedJobs]) => {
+    // Jobs are the primary content. Do not hold the entire page behind slower
+    // time-entry, crew, technician, or archive requests.
+    void getJobs()
+      .then(jobs => {
+        if (!active) return;
+        setRows(jobs);
+        const jobId = new URLSearchParams(window.location.search).get("jobId");
+        if (jobId) setSelected(jobs.find(job => job.id === jobId) ?? null);
+      })
+      .catch(cause => {
         if (active) {
-          setRows(x);
-          setArchivedRows(archivedJobs);
-          setTimeEntries(entries);
-          setActiveCrews(crews);
-          setActiveTechs(techs);
-          const jobId = new URLSearchParams(window.location.search).get(
-            "jobId",
-          );
-          if (jobId) setSelected([...x, ...archivedJobs].find((job) => job.id === jobId) ?? null);
+          console.error("Jobs load failed", cause);
+          setError(message(cause, "Jobs could not be loaded."));
         }
       })
-      .catch((x: unknown) => {
-        console.error("Jobs load failed", x);
-        if (active) setError(message(x, "Jobs could not be loaded."));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [canViewArchived]);
+      .finally(() => { if (active) setLoading(false); });
+
+    void getTimeEntries().then(entries => { if (active) setTimeEntries(entries); })
+      .catch(cause => { console.error("Job time entries load failed", cause); });
+    void getActiveCrews().then(crews => { if (active) setActiveCrews(crews); })
+      .catch(cause => { console.error("Job crews load failed", cause); });
+    if (hasPermission(profile, "jobs.schedule")) {
+      void getEligibleJobTechs().then(techs => { if (active) setActiveTechs(techs); })
+        .catch(cause => { console.error("Eligible technicians load failed", cause); });
+    }
+    if (canViewArchived) {
+      // Archived records are not displayed on Jobs; keep direct job links
+      // working without fetching the full archive for every page visit.
+      const jobId = new URLSearchParams(window.location.search).get("jobId");
+      if (jobId) {
+        void getArchivedJobs().then(archived => {
+          if (!active) return;
+          setArchivedRows(archived);
+          setSelected(current => current ?? archived.find(job => job.id === jobId) ?? null);
+        }).catch(cause => { console.error("Archived job deep link load failed", cause); });
+      }
+    }
+    return () => { active = false; };
+  }, [canViewArchived, profile?.role]);
   async function mutate(
     job: JobWithRelations,
     fn: () => Promise<unknown>,
