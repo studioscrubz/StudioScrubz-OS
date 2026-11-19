@@ -38,6 +38,6 @@ test("Cached client and property reads are per-auth user, expire and invalidate 
 });
 test("Core Web Vitals contain no personal identifiers",()=>{
  const metric=read("components/performance/OsWebVitals.tsx");
- assert.match(metric,/track\("os_web_vital"/);
+ assert.match(metric,/performance\.mark/);
  assert.doesNotMatch(metric,/userId|jobId|invoiceId|email:/);
 });
