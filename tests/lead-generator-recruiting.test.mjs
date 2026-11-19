@@ -11,3 +11,15 @@ test("public submission is server validated, spam limited, and anonymous data ac
 test("management-only RPCs maintain status history without operational record creation",()=>{assert.match(migration,/has_any_role\(array\['Master Admin','Administrator','Manager'\]\)/g);assert.match(migration,/Status Changed/);assert.match(migration,/actor_user_id/);assert.match(applicationTypes,/New[\s\S]*Contacted[\s\S]*Interviewing[\s\S]*Selected[\s\S]*Declined/);assert.match(management,/mailto:/);assert.match(management,/tel:/);assert.match(permissions,/jobApplications\.manage/);assert.doesNotMatch(migration,/insert into public\.(employees|user_profiles|time_entries|payments|commissions)/i)});
 test("email is best effort after durable insert and no SMS or protected fields are collected",()=>{assert.ok(server.indexOf('const created=await db.from("job_applications").insert')<server.indexOf("try{const sent=await sendResendEmail"));assert.match(server,/catch\(cause\).*status:"Failed"/s);assert.doesNotMatch(server,/send.*sms|twilio/i);for(const forbidden of["dateOfBirth","socialSecurity","ssn","banking","race","disability","medical","marital","resume"])assert.doesNotMatch(form,new RegExp(`name=[{]?"${forbidden}"`,"i"))});
 test("existing estimate and marketing routes remain present",()=>{assert.match(proxy,/"\/request-estimate"/);for(const path of["/residential","/commercial","/post-construction","/contact"])assert.ok(proxy.includes(`"${path}"`))});
+
+test("Scrub Technician applications use the existing intake without lead-generation answers", () => {
+  const scrubTechMigration = read("supabase/migrations/20261119230000_add_scrub_technician_applications.sql");
+  assert.match(careers, /id="scrub-technician"[\s\S]*Long Beach, CA · Part-time W-2 · \$25 per hour/);
+  assert.match(careers, /<LeadGeneratorApplicationForm opening="scrub-tech"/);
+  assert.match(form, /!scrubTech&&<Check name="commissionAcknowledged"/);
+  assert.match(server, /contact_interests:scrubTech\?null:interests\(raw\.contactInterests\)/);
+  assert.match(server, /opening_identifier:opening/);
+  assert.match(scrubTechMigration, /opening_identifier = 'scrub-tech' and not commission_acknowledged/);
+  assert.match(scrubTechMigration, /opening_identifier = 'scrub-tech' and contact_interests is null/);
+  assert.match(management, /"scrub-tech": \{ type: "Scrub Tech"/);
+});
