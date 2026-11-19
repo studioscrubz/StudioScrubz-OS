@@ -271,15 +271,12 @@ export async function saveAgreementEdits(id: string, input: AgreementUpdate) {
     ||(input.billing_amount!==undefined&&input.billing_amount!==current.billing_amount);
   const editBilling=billingChanged&&canEditContractorBilling(current,profile);
   if(editBilling){
-    const [invoices,occurrences]=await Promise.all([
-      getSupabaseClient().from("invoices").select("id").eq("service_agreement_id",id).not("status","in","(Cancelled,Archived)").limit(1),
-      getSupabaseClient().from("service_occurrences").select("id").eq("agreement_id",id).not("job_id","is",null).limit(1),
-    ]);
-    if(invoices.error||occurrences.error)throw invoices.error??occurrences.error;
-    if(invoices.data?.length||occurrences.data?.length)throw new Error("Billing cannot change after this agreement has Jobs or invoices. Review those records before changing billing.");
+    const invoices=await getSupabaseClient().from("invoices").select("id").eq("service_agreement_id",id).not("status","in","(Cancelled,Archived)").limit(1);
+    if(invoices.error)throw invoices.error;
+    if(invoices.data?.length)throw new Error("Billing cannot change after this agreement has invoices. Review those records before changing billing.");
   }
   // Unsigned internal contractor billing may be configured by Master Admin
-  // before downstream Jobs/invoices. Signed and proposal-backed terms stay fixed.
+  // before invoices. Existing Jobs retain their recorded pricing. Signed and proposal-backed terms stay fixed.
   const operationalUpdate: AgreementUpdate = {
     ...input,
     client_id: current.client_id,
