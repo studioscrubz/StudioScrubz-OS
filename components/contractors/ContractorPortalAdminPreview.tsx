@@ -2,6 +2,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
+import {ContractorAvailabilityCalendar} from "@/components/contractors/ContractorAvailabilityCalendar";
 import {formatTime12Hour} from "@/lib/formatTime";
 
 type Opportunity={
@@ -17,7 +18,7 @@ type Preview={
  opportunities:Opportunity[];upcomingJobs:ScheduledJob[];completedJobs:CompletedJob[];invoiceHistory:Invoice[];
  operationsManager:{name:string}|null;
 };
-type Tab="dashboard"|"jobs"|"messages"|"company";
+type Tab="dashboard"|"calendar"|"jobs"|"messages"|"company";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a]";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white";
 const money=(value:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(value));
@@ -60,7 +61,7 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
    </div></header>
    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
     <nav aria-label="Contractor portal preview sections" className="flex flex-wrap gap-2">
-     {([["dashboard","Dashboard"],["jobs","My Requests & Jobs"],["messages","Messages"],["company","Company Profile"]] as const).map(([key,label])=>
+     {([["dashboard","Dashboard"],["calendar","Availability Calendar"],["jobs","My Requests & Jobs"],["messages","Messages"],["company","Company Profile"]] as const).map(([key,label])=>
       <button key={key} type="button" onClick={()=>setTab(key)} className={tab===key?primary:secondary} aria-current={tab===key?"page":undefined}>{label}</button>)}
      <button className={secondary+" cursor-not-allowed opacity-50"} type="button" disabled title="Creating jobs is disabled in preview mode">Submit New Job · Disabled</button>
     </nav>
@@ -98,6 +99,7 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
       {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted.</p>}
      </section>
     </>}
+    {tab==="calendar"&&<ContractorAvailabilityCalendar previewCompanyId={companyId}/>}
     {tab==="jobs"&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
      {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
       <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>

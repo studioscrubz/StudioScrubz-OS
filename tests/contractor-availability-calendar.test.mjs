@@ -1,0 +1,50 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
+const api=read("app/api/contractors/route.ts");
+const availability=read("lib/contractors/availability.ts");
+const google=read("lib/google-calendar/server.ts");
+const portal=read("components/contractors/ContractorPortal.tsx");
+const calendar=read("components/contractors/ContractorAvailabilityCalendar.tsx");
+test("Monthly availability is scoped to verified contractors or Master Admin previews",()=>{
+ const i=api.indexOf('if(view==="availability-month")');
+ const e=api.indexOf('if(view==="booking-times")',i);
+ assert.ok(i>0&&e>i);
+ const route=api.slice(i,e);
+ assert.match(route,/requirePartner\(ctx\)/);
+ assert.match(route,/getContractorMonthlyAvailability/);
+ assert.match(route,/Scheduling availability could not be verified/);
+ assert.match(route,/requireMaster\(ctx\)/);
+ assert.match(route,/previewCompanyId/);
+ assert.match(route,/company\?\.status!=="Active"/);
+ assert.doesNotMatch(route,/requireInternal|event\.summary/);
+});
+test("Google freebusy masks private event titles, locations and attendees",()=>{
+ const i=google.indexOf("export async function getContractorCalendarBusy");
+ const code=google.slice(i);
+ assert.ok(i>0);
+ assert.match(code,/\/freeBusy/);
+ assert.match(code,/encrypted_refresh_token,calendar_id/);
+ assert.match(code,/return \(calendar\.busy\?\?\[\]\)\.map/);
+ assert.doesNotMatch(code,/summary|description|attendees|location/);
+});
+test("Month feed combines Google busy, scheduled OS jobs and pending requests, never customer info",()=>{
+ assert.match(availability,/getContractorCalendarBusy/);
+ assert.match(availability,/from\("jobs"\)\.select\("scheduled_date,start_time,estimated_duration"\)/);
+ assert.match(availability,/from\("contractor_opportunities"\)\.select\("requested_date,requested_time"\)/);
+ assert.match(availability,/not\("status","in","\(Declined,Cancelled,Disputed\)"\)/);
+ assert.match(availability,/TIMEZONE="America\/Los_Angeles"/);
+ assert.match(availability,/overlaps\(start,end,googleBlocks\)/);
+ assert.doesNotMatch(availability,/client_name|customer_email|notes|description|event_title/);
+});
+test("All contractor accounts see calendar tab and can prefill job request",()=>{
+ assert.match(portal,/calendar:"Availability Calendar"/);
+ assert.match(portal,/tab==="calendar"&&<ContractorAvailabilityCalendar/);
+ assert.match(portal,/setRequestedDate\(date\);setRequestedTime\(time\)/);
+ assert.match(portal,/<PortalPanel title="Requested Schedule">\s*<ContractorAvailabilityCalendar/);
+ assert.match(calendar,/view:"availability-month"/);
+ assert.ok(read("components/contractors/ContractorPortalAdminPreview.tsx").includes("ContractorAvailabilityCalendar previewCompanyId={companyId}"));
+ assert.match(calendar,/aria-label=\{\x60\$\{day\.date\}/);
+ assert.match(calendar,/indicative, not a reservation/);
+});
