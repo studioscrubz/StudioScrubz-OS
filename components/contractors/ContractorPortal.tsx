@@ -9,6 +9,7 @@ import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
 import {ContractorAvailabilityCalendar} from "@/components/contractors/ContractorAvailabilityCalendar";
+import {contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
 type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;property_name:string|null;property_type:ContractorPropertyType;request_options:Partial<ContractorRequestOptions>|null;updated_at:string;submitted_by:string|null;internal_confirmed_at:string|null;square_feet:number|null;bedrooms:number|null;bathrooms:number|null;estimated_person_hours:number;cleaner_count:number;pricing_basis:string;special_instructions:string|null;access_arrangements:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string;read_at:string|null};
@@ -17,7 +18,7 @@ type Job={id:string;status:string;scheduled_date:string|null;start_time:string|n
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
 type InvoiceHistoryEntry=Pick<Invoice,"id"|"invoice_number"|"status"|"total"|"amount_paid">&{balance_due:number;issue_date:string|null};
 type CompletedJob={id:string;client_name:string;job_number:string;property_name:string|null;service_name:string|null;completed_at:string|null};
-type Portal={completedJobs?:CompletedJob[];invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Portal={completedJobs?:CompletedJob[];invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null;contractor_division:ContractorDivision};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -52,6 +53,7 @@ export function ContractorPortal(){
   if(res.status===401){router.replace(contractorPage("/login"));return;}
   if(!res.ok){setData(null);throw new Error(body.error??"Company account unavailable");}
   if(!["Member","Company Admin"].includes(body.role))throw new Error("Contractor portal access is required.");
+  setPropertyType(body.company.contractor_division==="Commercial"?"Commercial":"Residential");
   setData(body);setOpportunityId(current=>body.opportunities?.some((request:Opportunity)=>request.id===current)?current:"");
  },[router]);
  useEffect(()=>{let alive=true;void reload().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Portal unavailable")}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false};},[reload]);
@@ -76,6 +78,8 @@ export function ContractorPortal(){
  },[tab,jobOptionsRetry]);
  const [bookingTimes,setBookingTimes]=useState<{key:string;unavailable:string[]}|null>(null);
  const [bookingError,setBookingError]=useState("");
+ const contractorDivision=data?.company.contractor_division??"Residential";
+ const estimatedDurationMinutes=Math.max(1,Math.ceil((Number(hours)||2)/(Math.max(1,Number(cleaners)||1))*60));
  const [bookingRetry,setBookingRetry]=useState(0);
  const bookingKey=`${requestedDate}:${editing?.id??""}:${bookingRetry}`;
  const blockedTimes=bookingTimes?.key===bookingKey?bookingTimes.unavailable:null;
@@ -92,7 +96,7 @@ export function ContractorPortal(){
   }).catch(error=>{if(!controller.signal.aborted)setBookingError(error.message);});
   return()=>controller.abort();
  },[tab,requestedDate,editing?.id,bookingKey]);
- const availableServices=jobOptions?.services.filter(service=>service.division===propertyType)??[];
+ const availableServices=jobOptions?.services.filter(service=>service.division===contractorDivision)??[];
  const selectedService=availableServices.find(service=>service.name===serviceType);
  const action=async(name:string,args:Record<string,unknown>)=>{
   setBusy(true);setError("");setNotice("");
@@ -163,7 +167,7 @@ export function ContractorPortal(){
      setTab("submit");
     }}
    />}
-   {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+   {data&&tab==="dashboard"&&<><p className="text-sm font-bold text-[#143d1a]">{contractorDivision} Contractor{contractorDivision==="Residential"?" · Booking hours: 8:00 AM–6:00 PM Pacific":" · Commercial scheduling"}</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
     <PortalPanel title="Invoice history">
@@ -244,8 +248,8 @@ export function ContractorPortal(){
      <p className="text-sm text-neutral-600">Submitted prices and scope are proposals until StudioScrubz Operations confirms the final terms.</p>
     <form className="space-y-5" onSubmit={async e=>{e.preventDefault();const r=await action(editing?"editOpportunity":"submitOpportunity",{opportunityId:editing?.id,updatedAt:editing?.updatedAt,propertyName,serviceType,address:address.street,addressLine2:address.line2,city:address.city,state:address.state,zip:address.zip,propertyType,squareFeet:squareFeet||null,bedrooms:bedrooms||null,bathrooms:bathrooms||null,scopeItems,scopeDetails,addons,condition,requestedDate,requestedTime:requestedTime||null,estimatedHours:Number(hours),cleaners:Number(cleaners),amount:Number(amount),pricingBasis:basis,instructions,access,externalReference:submissionKey});if(r){setSubmissionKey(crypto.randomUUID());resetJobForm();setSubmittedRequestId(r.opportunity.id);setOpportunityId(r.opportunity.id);setTab("jobs");}}}>
      <PortalPanel title="Client and Service Location"><div className="grid gap-4 md:grid-cols-2">
-     <label className="text-sm font-bold">Property type<select className={input} value={propertyType} onChange={e=>{setPropertyType(e.target.value as ContractorPropertyType);setServiceType("");setScopeItems([]);setScopeDetails("");setAddons([]);}}>
-      {contractorPropertyTypes.map(type=><option key={type}>{type}</option>)}
+     <label className="text-sm font-bold">Property type<select className={input} value={contractorDivision} disabled>
+      <option value={contractorDivision}>{contractorDivision}</option>
      </select></label>
      <PortalField label={propertyType==="Residential"?"Residential customer or property name":"Property name"} value={propertyName} set={setPropertyName} required={propertyType==="Residential"}/>
      <fieldset className="grid gap-4 md:col-span-2 md:grid-cols-2">
@@ -279,12 +283,13 @@ export function ContractorPortal(){
       <ContractorAvailabilityCalendar building={{address:address.street,city:address.city,state:address.state,zip:address.zip}} chosenDate={requestedDate} onChoose={(date,time)=>{
        setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
       }}/>
+      {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential appointments must be scheduled between 8:00 AM and 6:00 PM Pacific, including estimated cleaning duration.</p>}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
      <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
      <label className="text-sm font-bold">Requested start time (Pacific time)
       <select className={input} required disabled={!blockedTimes} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
        <option value="">{!requestedDate?"Choose a date first":!blockedTimes?"Checking available times…":"Choose a start time"}</option>
-       {[...new Set([...bookingStarts,...(requestedTime?[requestedTime]:[])])].sort().map(time=><option key={time} value={time} disabled={blockedTimes?.includes(time)}>{formatTime12Hour(time)}{blockedTimes?.includes(time)?" · Reserved":""}</option>)}
+       {[...new Set([...bookingStarts,...(requestedTime?[requestedTime]:[])])].filter(time=>contractorStartAllowed(contractorDivision,time,estimatedDurationMinutes)).sort().map(time=><option key={time} value={time} disabled={blockedTimes?.includes(time)}>{formatTime12Hour(time)}{blockedTimes?.includes(time)?" · Reserved":""}</option>)}
       </select>
       {bookingError&&<span className="block text-red-700">{bookingError} <button type="button" className="underline" onClick={()=>setBookingRetry(retry=>retry+1)}>Retry</button></span>}
       <span className="block text-xs font-normal text-neutral-600">Submitting holds this start time while Operations reviews the request.</span>
@@ -300,7 +305,7 @@ export function ContractorPortal(){
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
      </div></PortalPanel>
-     <button className={primary} disabled={busy||!selectedService||!scopeItems.length||!requestedTime||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
+     <button className={primary} disabled={busy||!selectedService||!scopeItems.length||!requestedTime||!contractorStartAllowed(contractorDivision,requestedTime,estimatedDurationMinutes)||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
     </form>
     </div>
    </dialog>}
