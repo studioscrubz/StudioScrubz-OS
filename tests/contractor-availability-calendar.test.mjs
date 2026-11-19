@@ -31,8 +31,8 @@ test("Google freebusy masks private event titles, locations and attendees",()=>{
 });
 test("Month feed combines Google busy, scheduled OS jobs and pending requests, never customer info",()=>{
  assert.match(availability,/getContractorCalendarBusy/);
- assert.match(availability,/from\("jobs"\)\.select\("scheduled_date,start_time,estimated_duration"\)/);
- assert.match(availability,/from\("contractor_opportunities"\)\.select\("requested_date,requested_time"\)/);
+ assert.match(availability,/from\("jobs"\)\.select\("scheduled_date,start_time,estimated_duration,property_id"\)/);
+ assert.match(availability,/from\("contractor_opportunities"\)\.select\("requested_date,requested_time,request_options,linked_job_id"\)/);
  assert.match(availability,/not\("status","in","\(Declined,Cancelled,Disputed\)"\)/);
  assert.match(availability,/TIMEZONE="America\/Los_Angeles"/);
  assert.match(availability,/overlaps\(start,end,googleBlocks\)/);
