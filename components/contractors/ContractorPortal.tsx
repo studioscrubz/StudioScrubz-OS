@@ -9,7 +9,7 @@ import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
 import {ContractorAvailabilityCalendar} from "@/components/contractors/ContractorAvailabilityCalendar";
-import {contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
+import {contractorDateAllowed,contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
 type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;property_name:string|null;property_type:ContractorPropertyType;request_options:Partial<ContractorRequestOptions>|null;updated_at:string;submitted_by:string|null;internal_confirmed_at:string|null;square_feet:number|null;bedrooms:number|null;bathrooms:number|null;estimated_person_hours:number;cleaner_count:number;pricing_basis:string;special_instructions:string|null;access_arrangements:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string;read_at:string|null};
@@ -168,7 +168,7 @@ export function ContractorPortal(){
      setTab("submit");
     }}
    />}
-   {data&&tab==="dashboard"&&<><p className="text-sm font-bold text-[#143d1a]">{contractorDivision} Contractor{contractorDivision==="Residential"?" · Starts 8:00 AM–6:00 PM · Finish by 8:00 PM Pacific":" · Commercial scheduling"}</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+   {data&&tab==="dashboard"&&<><p className="text-sm font-bold text-[#143d1a]">{contractorDivision} Contractor{contractorDivision==="Residential"?" · Monday–Saturday · Starts 8:00 AM–6:00 PM · Finish by 8:00 PM Pacific":" · Commercial scheduling"}</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
     <PortalPanel title="Invoice history">
@@ -284,7 +284,7 @@ export function ContractorPortal(){
       <ContractorAvailabilityCalendar requestDurationMinutes={estimatedDurationMinutes} building={{address:address.street,city:address.city,state:address.state,zip:address.zip}} chosenDate={requestedDate} onChoose={(date,time)=>{
        setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
       }}/>
-      {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential bookings may start 8:00 AM–6:00 PM Pacific, but must finish by 8:00 PM.</p>}
+      {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential bookings: Monday–Saturday, starts 8:00 AM–6:00 PM Pacific, finish by 8:00 PM. Sundays unavailable.</p>}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
      <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
      <label className="text-sm font-bold">Requested start time (Pacific time)
@@ -306,7 +306,7 @@ export function ContractorPortal(){
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
      </div></PortalPanel>
-     <button className={primary} disabled={busy||!selectedService||!scopeItems.length||!requestedTime||!contractorStartAllowed(contractorDivision,requestedTime,estimatedDurationMinutes)||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
+     <button className={primary} disabled={busy||!contractorDateAllowed(contractorDivision,requestedDate)||!selectedService||!scopeItems.length||!requestedTime||!contractorStartAllowed(contractorDivision,requestedTime,estimatedDurationMinutes)||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
     </form>
     </div>
    </dialog>}
