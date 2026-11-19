@@ -3,7 +3,7 @@ import {createSupabaseAdminClient} from "@/lib/supabase/admin";
 import {getContractorCalendarBusy} from "@/lib/google-calendar/server";
 import {contractorScheduledJobStatuses} from "@/lib/contractors/scheduledJobs";
 import {DEFAULT_TRAVEL_BUFFER_MINUTES,sameBuilding,type BuildingAddress} from "@/lib/scheduling/travelBuffer";
-import {contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
+import {contractorDateAllowed,contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
 
 type Block={start:number;end:number;building?:BuildingAddress|null};
 export type AvailabilityStatus="available"|"limited"|"busy";
@@ -107,7 +107,7 @@ export async function getContractorMonthlyAvailability(month:string,building?:Bu
    const hour=Math.floor(minute/60),m=minute%60;
    const start=pacificTimeUtc(year,monthNumber,day,hour,m);
    const end=start+REQUEST_DURATION_MINUTES*60_000;
-   const withinHours=contractorStartAllowed(division,`${String(hour).padStart(2,"0")}:${String(m).padStart(2,"0")}`,REQUEST_DURATION_MINUTES);
+   const withinHours=contractorDateAllowed(division,date)&&contractorStartAllowed(division,`${String(hour).padStart(2,"0")}:${String(m).padStart(2,"0")}`,REQUEST_DURATION_MINUTES);
    // The preview is advisory. Other crews may be free even when one is working.
    const status:AvailabilityStatus=!withinHours||start<Date.now()||overlaps(start,end,googleBlocks)?"busy":
     [...scheduledBlocks,...requestedBlocks].some(block=>{
