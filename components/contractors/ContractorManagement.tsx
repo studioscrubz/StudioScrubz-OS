@@ -16,7 +16,7 @@ import {useAuth} from "@/components/auth/AuthProvider";
 import {normalizeSmsPhoneNumber,buildDeviceSmsUrl,openDeviceSmsApp} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
-type Company={id:string;minimum_crew_size?:number;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
+type Company={contractor_division:"Residential"|"Commercial";id:string;minimum_crew_size?:number;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
 type Opportunity={id:string;request_property_id?:string|null;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
@@ -62,6 +62,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [companyId,setCompanyId]=useState(""),[opportunityId,setOpportunityId]=useState("");
  const [managedCompanyId,setManagedCompanyId]=useState("");
  const [companyName,setCompanyName]=useState(""),[companyEmail,setCompanyEmail]=useState(""),[companyContact,setCompanyContact]=useState("");
+ const [newCompanyDivision,setNewCompanyDivision]=useState<"Residential"|"Commercial">("Residential");
  const [companyEdit,setCompanyEdit]=useState<Record<string,string>>({});
  const [preparedText,setPreparedText]=useState<{companyId:string;email:string;phone:string;body:string;url:string}|null>(null);
  const [inviteEmailInput,setInviteEmail]=useState<string|null>(null),[invitePhone,setInvitePhone]=useState<string|null>(null);
@@ -256,13 +257,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
    {!dashboardCompanies.length&&<p className="p-4 text-sm text-neutral-500">No active contractors to report.</p>}</div>
    <h2 className="text-lg font-extrabold">Recent opportunities</h2><OpportunityTable rows={allOpportunities.slice(0,20)} companies={companies}/></>}
   {view==="companies"&&<section className="grid gap-5 lg:grid-cols-2">
-   <Panel title="Create contractor company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
+   <Panel title="Create contractor company"><form className="space-y-3" onSubmit={async e=>{e.preventDefault();const r=await run("createCompany",{name:companyName,email:companyEmail,contactName:companyContact,contractorDivision:newCompanyDivision});if(r){setCompanyName("");setCompanyEmail("");setCompanyContact("");setCompanyId(r.companyId);}}}>
     <Field label="Company name" value={companyName} set={setCompanyName} required/>
     <Field label="Primary email" value={companyEmail} set={setCompanyEmail} type="email" required/>
     <Field label="Primary contact" value={companyContact} set={setCompanyContact}/>
+    <label className="block text-sm font-bold">Contractor division<select className={input} value={newCompanyDivision} onChange={e=>setNewCompanyDivision(e.target.value as "Residential"|"Commercial")}><option value="Residential">Residential</option><option value="Commercial">Commercial</option></select></label>
     <button disabled={busy} className={button}>Create Company</button><p className="text-xs text-neutral-600">Saves the company under Accounts → Clients. Portal access is managed separately.</p></form></Panel>
-   <Panel title="Active contractor directory"><div className="space-y-2">
-    {data?.directory.map(entry=><div key={entry.clientId} className="rounded-lg border bg-white p-3">
+   <Panel title="Active contractor directory"><div className="space-y-4">
+    {(["Residential","Commercial"] as const).map(division=><section key={division}><h3 className="mb-2 font-extrabold text-[#143d1a]">{division} Contractors</h3><div className="space-y-2">
+    {data?.directory.filter(entry=>companies.find(company=>company.id===entry.companyId)?.contractor_division===division).map(entry=><div key={entry.clientId} className="rounded-lg border bg-white p-3">
      <button type="button" className="block w-full text-left hover:text-[#143d1a]" onClick={()=>{setManagedCompanyId(entry.companyId);setCompanyId(entry.companyId);}}>
       <b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>
       <small className="block text-neutral-500">Portal access: {entry.portalStatus}</small>
@@ -273,7 +276,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
       className="mt-2 inline-flex rounded-lg border border-[#143d1a]/30 px-3 py-2 text-sm font-bold text-[#143d1a]"
      >View as Contractor · Read Only</Link>}
     </div>)}
-    {!data?.directory.length&&<p className="text-sm text-neutral-500">No active contractor clients found.</p>}
+    {!data?.directory.some(entry=>companies.find(company=>company.id===entry.companyId)?.contractor_division===division)&&<p className="text-sm text-neutral-500">No active {division.toLowerCase()} contractors.</p>}
+   </div></section>)}
    </div></Panel>
    {canManagePortalAccess&&<div id="manage-portal-access" ref={portalAccessRef} className="scroll-mt-20">
     <Panel title="Manage portal access">
@@ -326,6 +330,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
        const rates=JSON.parse(companyEdit.proposed_rates??JSON.stringify(selectedCompany.proposed_rates??{}));
        const negotiated=JSON.parse(companyEdit.negotiated_rates??JSON.stringify(selectedCompany.negotiated_rates??{}));
        await run("updateCompany",{companyId:selectedCompany.id,
+        ...(profile?.role==="Master Admin"?{contractor_division:companyEdit.contractor_division??selectedCompany.contractor_division}:{}),
         contact_name:companyEdit.contact_name??selectedCompany.contact_name,
         phone:companyEdit.phone??selectedCompany.phone,
         payment_terms:companyEdit.payment_terms??selectedCompany.payment_terms,
@@ -336,6 +341,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
        });
       }catch(e){setError(e instanceof Error?e.message:"Check rate-card JSON format");}
      }}>
+      {profile?.role==="Master Admin"&&<label className="block text-xs font-bold">Contractor division<select className={input} value={companyEdit.contractor_division??selectedCompany.contractor_division} onChange={e=>setCompanyEdit(v=>({...v,contractor_division:e.target.value}))}><option value="Residential">Residential</option><option value="Commercial">Commercial</option></select></label>}
       {(["contact_name","phone","payment_terms","territories","service_types"] as const).map(key=><label key={key} className="block text-xs font-bold">
        {({contact_name:"Primary contact",phone:"Phone",payment_terms:"Payment terms",territories:"Service territories (comma-separated)",service_types:"Cleaning work types (comma-separated)"} as Record<string,string>)[key]}
        <input className={input} value={companyEdit[key]??(Array.isArray(selectedCompany[key])?selectedCompany[key].join(","):selectedCompany[key]??"")} onChange={e=>setCompanyEdit(v=>({...v,[key]:e.target.value}))}/></label>)}
