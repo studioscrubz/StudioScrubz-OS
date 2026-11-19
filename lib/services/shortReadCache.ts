@@ -6,6 +6,7 @@ const MAX_AGE_MS=5_000;
 type Entry={until:number;value:unknown};
 const saved=new Map<string,Entry>();
 const pending=new Map<string,Promise<unknown>>();
+const revisions=new Map<string,number>();
 let subscribed=false;
 function ensureAuthInvalidation(){
  if(subscribed||typeof window==="undefined")return;
@@ -19,6 +20,7 @@ function ensureAuthInvalidation(){
 export function invalidateShortReadCache(prefix:string){
  for(const key of [...saved.keys()])if(key.includes(`:${prefix}`))saved.delete(key);
  for(const key of [...pending.keys()])if(key.includes(`:${prefix}`))pending.delete(key);
+ revisions.set(prefix,(revisions.get(prefix)??0)+1);
 }
 export async function shortCachedRead<T>(key:string,load:()=>Promise<T>):Promise<T>{
  if(typeof window==="undefined")return load();
