@@ -8,6 +8,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 import {getSupabaseClient} from "@/lib/supabase/client";
 import {StudioScrubzLogo} from "@/components/branding/StudioScrubzLogo";
+import {ContractorAvailabilityCalendar} from "@/components/contractors/ContractorAvailabilityCalendar";
 type Opportunity={id:string;opportunity_number:string;service_type:string;property_address:string;property_name:string|null;property_type:ContractorPropertyType;request_options:Partial<ContractorRequestOptions>|null;updated_at:string;submitted_by:string|null;internal_confirmed_at:string|null;square_feet:number|null;bedrooms:number|null;bathrooms:number|null;estimated_person_hours:number;cleaner_count:number;pricing_basis:string;special_instructions:string|null;access_arrangements:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;requested_time:string|null;proposed_amount:number;agreed_amount:number|null;status:string;final_scope:string|null;linked_job_id:string|null;partner_confirmed_at:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Msg={id:string;opportunity_id:string|null;sender_side:string;body:string;created_at:string;read_at:string|null};
@@ -23,7 +24,7 @@ const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-s
 const currency=(x:number|null)=>x==null?"Pending":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(x));
 const bookingStarts=Array.from({length:96},(_,index)=>`${String(Math.floor(index/4)).padStart(2,"0")}:${String((index%4)*15).padStart(2,"0")}`);
 const blankAddress:ContractorPropertyAddress={street:"",line2:"",city:"",state:"",zip:""};
-type Tab="dashboard"|"submit"|"jobs"|"messages"|"company";
+type Tab="dashboard"|"calendar"|"submit"|"jobs"|"messages"|"company";
 export function ContractorPortal(){
  const router=useRouter();
  const [data,setData]=useState<Portal|null>(null),[tab,setTab]=useState<Tab>("dashboard");
@@ -152,10 +153,16 @@ export function ContractorPortal(){
    <button className="rounded border border-white/60 px-3 py-2 text-sm" onClick={async()=>{await getSupabaseClient().auth.signOut({scope:"local"});router.replace(contractorPage("/login"))}}>Sign out</button>
   </div></header>
   <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
-   <div className="flex flex-wrap gap-2">{(["dashboard","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>{if(t==="submit"&&editing)resetJobForm();if(t==="jobs")setOpportunityId("");setTab(t);}}>{({dashboard:"Dashboard",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
+   <div className="flex flex-wrap gap-2">{(["dashboard","calendar","submit","jobs","messages","company"] as Tab[]).map(t=><button key={t} className={tab===t?primary:secondary} onClick={()=>{if(t==="submit"&&editing)resetJobForm();if(t==="jobs")setOpportunityId("");setTab(t);}}>{({dashboard:"Dashboard",calendar:"Availability Calendar",submit:"Submit New Job",jobs:"My Requests & Jobs",messages:"Messages",company:"Company Profile"} as Record<Tab,string>)[t]}</button>)}</div>
    {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
+   {data&&tab==="calendar"&&<ContractorAvailabilityCalendar
+    onChoose={(date,time)=>{
+     setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
+     setTab("submit");
+    }}
+   />}
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
@@ -268,7 +275,11 @@ export function ContractorPortal(){
      {scopeItems.includes("Other")&&<label className="block text-sm font-bold md:col-span-2">Other scope details<textarea className={input} rows={2} required maxLength={2000} value={scopeDetails} onChange={e=>setScopeDetails(e.target.value)}/></label>}
      <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      </div></PortalPanel>
-     <PortalPanel title="Requested Schedule"><div className="grid gap-4 md:grid-cols-2">
+     <PortalPanel title="Requested Schedule">
+      <ContractorAvailabilityCalendar chosenDate={requestedDate} onChoose={(date,time)=>{
+       setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
+      }}/>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
      <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
      <label className="text-sm font-bold">Requested start time (Pacific time)
       <select className={input} required disabled={!blockedTimes} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
