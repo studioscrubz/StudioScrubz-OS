@@ -3,6 +3,7 @@ import {createSupabaseAdminClient} from "@/lib/supabase/admin";
 import {getContractorCalendarBusy} from "@/lib/google-calendar/server";
 import {contractorScheduledJobStatuses} from "@/lib/contractors/scheduledJobs";
 import {DEFAULT_TRAVEL_BUFFER_MINUTES,sameBuilding,type BuildingAddress} from "@/lib/scheduling/travelBuffer";
+import {contractorStartAllowed,type ContractorDivision} from "@/lib/contractors/division";
 
 type Block={start:number;end:number;building?:BuildingAddress|null};
 export type AvailabilityStatus="available"|"limited"|"busy";
@@ -43,7 +44,7 @@ function dateFromValue(value:string){
  if(year<2025||year>2100||month<1||month>12)throw new Error("Select a valid calendar month.");
  return {year,month};
 }
-export async function getContractorMonthlyAvailability(month:string,building?:BuildingAddress){
+export async function getContractorMonthlyAvailability(month:string,building?:BuildingAddress,division:ContractorDivision="Commercial"){
  const {year,month:monthNumber}=dateFromValue(month);
  const today=localParts(Date.now());
  const delta=(year-today.year)*12+monthNumber-today.month;
@@ -106,8 +107,9 @@ export async function getContractorMonthlyAvailability(month:string,building?:Bu
    const hour=Math.floor(minute/60),m=minute%60;
    const start=pacificTimeUtc(year,monthNumber,day,hour,m);
    const end=start+REQUEST_DURATION_MINUTES*60_000;
+   const withinHours=contractorStartAllowed(division,`${String(hour).padStart(2,"0")}:${String(m).padStart(2,"0")}`,REQUEST_DURATION_MINUTES);
    // The preview is advisory. Other crews may be free even when one is working.
-   const status:AvailabilityStatus=start<Date.now()||overlaps(start,end,googleBlocks)?"busy":
+   const status:AvailabilityStatus=!withinHours||start<Date.now()||overlaps(start,end,googleBlocks)?"busy":
     [...scheduledBlocks,...requestedBlocks].some(block=>{
      const buffer=sameBuilding(building,block.building)?0:DEFAULT_TRAVEL_BUFFER_MINUTES;
      // Existing work always conflicts with an overlapping proposed appointment.
@@ -120,5 +122,5 @@ export async function getContractorMonthlyAvailability(month:string,building?:Bu
   const status:AvailabilityStatus=!usable.length?"busy":usable.some(slot=>slot.status==="available")?"available":"limited";
   days.push({date,status,times});
  }
- return {month,timezone:TIMEZONE,slotMinutes:SLOT_MINUTES,indicative:true,days};
+ return {month,timezone:TIMEZONE,slotMinutes:SLOT_MINUTES,division,indicative:true,days};
 }
