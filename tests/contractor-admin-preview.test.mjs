@@ -1,0 +1,30 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
+const api=read("app/api/contractors/route.ts");
+const ui=read("components/contractors/ContractorPortalAdminPreview.tsx");
+const management=read("components/contractors/ContractorManagement.tsx");
+test("Contractor preview requires verified Master Admin and active company",()=>{
+ const start=api.indexOf('if(view==="admin-portal-preview")');
+ const end=api.indexOf('if(view==="dashboard-summary")',start);
+ assert.ok(start>0&&end>start);
+ const segment=api.slice(start,end);
+ assert.match(segment,/requireMaster\(ctx\)/);
+ assert.match(segment,/uuid\(params\.get\("companyId"\)\)/);
+ assert.match(segment,/\.eq\("id",companyId\)/);
+ assert.match(segment,/company\.status!=="Active"/);
+ assert.match(segment,/await list\(/);
+ assert.match(segment,/messages:\[\]/);
+ assert.match(segment,/documents:\[\]/);
+ assert.doesNotMatch(segment,/await audited|\.insert\(|\.update\(|\.delete\(/);
+});
+test("Preview is a separate read-only interface with no contractor mutations or secret access",()=>{
+ assert.match(ui,/view:"admin-portal-preview"/);
+ assert.match(ui,/READ-ONLY CONTRACTOR PREVIEW/);
+ assert.match(ui,/Submit New Job · Disabled/);
+ assert.doesNotMatch(ui,/method:"POST"|method:'POST'|signOut\(|auth\.signIn|markMessagesRead|\/api\/contractors\/files/);
+ assert.match(management,/profile\?\.role==="Master Admin"/);
+ assert.match(management,/View as Contractor · Read Only/);
+ assert.match(management,/\/contractors\/preview\?companyId=/);
+});
