@@ -37,6 +37,7 @@ export type AgreementPricingSnapshot = {
 export type ServiceAgreement = {
   id: string; agreement_number: string; client_id: string | null; property_id: string | null; proposal_id: string | null;
   division: "Residential" | "Commercial"; agreement_name: string; service_name: string; frequency: AgreementFrequency;
+  source_contractor_opportunity_id?: string | null;
   monthly_week_ordinals?: number[] | null;
   days_of_week: Weekday[]; interval_weeks: number; day_of_month: number | null; second_day_of_month: number | null; third_day_of_month?: number | null; custom_interval_days: number | null;
   start_date: string; end_date: string | null; auto_renew: boolean; billing_type: AgreementBillingType; billing_amount: number; pricing_snapshot: AgreementPricingSnapshot | null;

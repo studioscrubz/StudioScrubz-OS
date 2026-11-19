@@ -1,5 +1,6 @@
 "use client";
 
+import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import { monthlyWeekdayLabel } from "@/lib/scheduling/monthlyWeekdays";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -44,6 +45,8 @@ import { PhysicalSignedAgreement } from "@/components/agreements/PhysicalSignedA
 import { createInPersonSigningSession } from "@/lib/services/inPersonAgreements";
 import { SignaturePad } from "@/components/agreements/SignaturePad";
 
+type ContractorAgreementSource={clientId:string;propertyId:string;opportunity?:{id:string;service_type:string;property_type:"Residential"|"Commercial";requested_date:string;requested_time:string;estimated_person_hours:number;cleaner_count:number;agreed_amount:number|null;proposed_amount:number;final_scope:string|null;scope_of_work:string;access_arrangements:string|null;request_options?:{bookingFrequency?:string}}};
+
 export function AgreementsPage() {
   const { profile } = useAuth();
   const canManage = hasPermission(profile, "agreements.manage");
@@ -58,7 +61,7 @@ export function AgreementsPage() {
   const [occurrences, setOccurrences] = useState<ServiceOccurrenceWithRelations[]>([]);
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [form, setForm] = useState<AgreementWithRelations | null | "new">(null);
-  const [initialLocation,setInitialLocation]=useState<{clientId:string;propertyId:string}|null>(null);
+  const [initialLocation,setInitialLocation]=useState<ContractorAgreementSource|null>(null);
   const [proposalSource, setProposalSource] = useState<ProposalWithRelations | null>(null);
   const [linkableProposals, setLinkableProposals] = useState<ProposalWithRelations[]>([]);
 
@@ -90,6 +93,15 @@ export function AgreementsPage() {
   }, []);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search), proposalId = params.get("proposalId"), agreementId = params.get("agreementId");
+    if(params.get("contractorOpportunityId")){
+      void fetch("/api/contractors",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"agreementSource",opportunityId:params.get("contractorOpportunityId")})})
+       .then(async response=>{const body=await response.json();if(!response.ok)throw new Error(body.error||"Contractor request could not be loaded.");return body as ContractorAgreementSource&{agreementId:string|null};})
+       .then(async source=>{
+        if(source.agreementId){const existing=await getAgreementById(source.agreementId);if(existing.status==="Draft")setForm(existing);else setPreview(existing);return;}
+        setInitialLocation(source);setProposalSource(null);setForm("new");
+       }).catch(cause=>setError(message(cause)));
+      return;
+    }
     if (agreementId) {
       void getAgreementById(agreementId).then(setPreview).catch((cause) => setError(message(cause)));
       return;
@@ -194,7 +206,7 @@ export function AgreementsPage() {
       {agreement.client_signed_at && <p className="mt-1 text-xs font-semibold text-green-700">Signed by {agreement.client_signed_name} on {new Date(agreement.client_signed_at).toLocaleString()}</p>}
       {hasDocumentedVerbalAcceptance(agreement) && !hasClientSignature(agreement) && <p className="mt-1 text-xs text-green-700">{agreement.agreement_number === "AGR-20260824-2986" ? "Deloris Forzley verbally approved by phone on September 8, 2026 at 2:15:23 PM PDT; witnessed by Kris Greer." : "Client verbally approved in person on October 14, 2026 at 11:50 AM Pacific time; witnessed by Kris Greer."} Documented retrospectively; no electronic signature on file.</p>}
       {agreement.signing_method === "physical" && <p className="mt-1 text-xs font-semibold text-green-700">Physically signed {agreement.physically_signed_on ? new Date(`${agreement.physically_signed_on}T12:00:00`).toLocaleDateString() : "date not recorded"} · Uploaded by {agreement.physical_signed_uploaded_by_name || "authorized administrator"}</p>}
-      <p className={`mt-1 text-xs font-semibold ${["Fully Signed", "Verbal Acceptance Documented"].includes(agreementSignatureState(agreement)) ? "text-green-700" : "text-amber-700"}`}>{agreementSignatureState(agreement)}</p>
+      <p className={`mt-1 text-xs font-semibold ${["Active", "Fully Signed", "Verbal Acceptance Documented"].includes(agreementSignatureState(agreement)) ? "text-green-700" : "text-amber-700"}`}>{agreementSignatureState(agreement)}</p>
       {canDeleteDraft&&agreement.proposal_id&&<AgreementDepositPanel proposalId={agreement.proposal_id} onChange={()=>void load()}/>}
       <div className="mt-3 flex flex-wrap gap-1">
         {canManage && ["Draft", "Sent", "Accepted", "Active", "Paused"].includes(agreement.status) && <button className={secondary} onClick={() => setForm(agreement)}>Edit</button>}
@@ -267,6 +279,7 @@ function agreementSignatureState(agreement: AgreementWithRelations) {
     return agreement.representative_signature ? "Fully Signed" : "Awaiting StudioScrubz Signature";
   }
   if (hasDocumentedVerbalAcceptance(agreement)) return "Verbal Acceptance Documented";
+  if(agreement.status==="Active")return "Active";
   return "Awaiting Client Signature";
 }
 function representativeSigningEligible(agreement: AgreementWithRelations) { return !agreement.archived_at && ["Sent", "Accepted", "Active", "Paused"].includes(agreement.status); }
@@ -349,7 +362,7 @@ function withCommercialRequirements(terms: string | null, type: string): string 
   const general = (index >= 0 ? source.slice(0, index) : source).trim();
   return [general, `${marker} ${type}]\n${COMMERCIAL_SERVICE_REQUIREMENTS[type] || COMMERCIAL_SERVICE_REQUIREMENTS.recurring}`].filter(Boolean).join("\n\n");
 }
-function AgreementForm({ initialLocation, value, proposal, availableProposals, onProposalChange, settings, close, saved }: { initialLocation:{clientId:string;propertyId:string}|null; value: AgreementWithRelations | null; proposal: ProposalWithRelations | null; availableProposals: ProposalWithRelations[]; onProposalChange: (proposal: ProposalWithRelations | null) => void; settings: BusinessSettings | null; close: () => void; saved: () => Promise<void> }) {
+function AgreementForm({ initialLocation, value, proposal, availableProposals, onProposalChange, settings, close, saved }: { initialLocation:ContractorAgreementSource|null; value: AgreementWithRelations | null; proposal: ProposalWithRelations | null; availableProposals: ProposalWithRelations[]; onProposalChange: (proposal: ProposalWithRelations | null) => void; settings: BusinessSettings | null; close: () => void; saved: () => Promise<void> }) {
   const [commercialConfiguration, setCommercialConfiguration] = useState<(typeof COMMERCIAL_AGREEMENT_CONFIGURATIONS)[number]["id"]>("recurring");
   const operationalEdit = Boolean(value && value.status !== "Draft");
   const signedEdit = Boolean(value?.signing_method || value?.client_signed_at);
@@ -359,7 +372,19 @@ function AgreementForm({ initialLocation, value, proposal, availableProposals, o
     const property=nextProperties.find(row=>row.id===initialLocation.propertyId&&row.client_id===initialLocation.clientId&&!row.archived_at);
     const client=nextClients.find(row=>row.id===initialLocation.clientId&&!row.archived_at);
     if(!property||!client)throw new Error("The contractor service location is unavailable. Select an active client and property.");
-    setDraft(current=>({...current,client_id:client.id,property_id:property.id,division:property.property_type}));
+    const opportunity=initialLocation.opportunity;
+    const frequency=contractorBookingFrequency(opportunity?.request_options?.bookingFrequency);
+    setDraft(current=>({...current,client_id:client.id,property_id:property.id,division:property.property_type,
+     ...(opportunity?{source_contractor_opportunity_id:opportunity.id,agreement_name:`${opportunity.service_type} Service Agreement`,service_name:opportunity.service_type,
+      frequency:frequency==="One-Time"?"Weekly":frequency,interval_weeks:frequency==="Biweekly"?2:1,start_date:opportunity.requested_date,
+      default_start_time:opportunity.requested_time,estimated_duration:Number(opportunity.estimated_person_hours)/Math.max(1,Number(opportunity.cleaner_count)),
+      special_instructions:opportunity.access_arrangements,scope:[{id:`contractor-${opportunity.id}`,text:opportunity.final_scope??opportunity.scope_of_work}]}:{})}));
+    if(opportunity){
+     setBasePrice(Number(opportunity.agreed_amount??opportunity.proposed_amount));
+     setScopeText(opportunity.final_scope??opportunity.scope_of_work);setScopeDirty(true);
+     const service=catalog.services.find(row=>row.service_name.toLowerCase()===opportunity.service_type.toLowerCase()&&(row.division===property.property_type||row.division==="Both"));
+     if(service){setSelectedServiceId(service.id);setServiceDescription(service.description||service.service_name);}
+    }
   } setCrews(nextCrews); setServices(catalog.services); setRules(catalog.recurringRules); if (value||proposal) { const source=value??proposal!; const name=value?.service_name??proposal?.result.serviceName; setSelectedServiceId(catalog.services.find((service) => service.service_name === name && (service.division===source.division||service.division==="Both"))?.id ?? "historical"); } }).catch((cause) => setError(message(cause))); }, [proposal,value,initialLocation]);
   const isContractor=clients.find(client=>client.id===draft.client_id)?.client_type==="Contractor";
   const selectedService=services.find((item)=>item.id===selectedServiceId);const matchingRules=!isContractor&&selectedService?matchingRecurringRules(draft.frequency,rules,selectedService.id):[];const effectiveRuleId=selectedRuleId||(matchingRules.length===1?matchingRules[0].id:"");const pricingRules=matchingRules.length>1&&!effectiveRuleId?[]:rules;
