@@ -166,7 +166,7 @@ export function JobsPage() {
         if (!active) return;
         setRows(jobs);
         const jobId = new URLSearchParams(window.location.search).get("jobId");
-        if (jobId) setSelected(jobs.find(job => job.id === jobId) ?? null);
+        if (jobId) setSelected(current => current ?? jobs.find(job => job.id === jobId) ?? null);
       })
       .catch(cause => {
         if (active) {
