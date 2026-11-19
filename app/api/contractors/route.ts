@@ -381,6 +381,8 @@ export async function GET(request:Request){
     if(error instanceof Error&&/Select a valid calendar month|supports this month/.test(error.message))
      throw new ContractorAccessError(error.message,400);
     console.error("Contractor monthly availability unavailable",error);
+    if(error instanceof Error&&"status" in error&&(error as {status?:number}).status===403)
+     throw new ContractorAccessError("Google Calendar availability needs to be reauthorized by StudioScrubz Operations. Please contact Operations; the calendar cannot confirm slots yet.",503);
     throw new ContractorAccessError("Scheduling availability could not be verified. Please try again.",503);
    }
   }
