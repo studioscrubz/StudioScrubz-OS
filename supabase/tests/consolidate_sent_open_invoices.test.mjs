@@ -15,7 +15,13 @@ create table service_agreements(id uuid,billing_type text);
 insert into properties values('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','Client residence','123 Main','Unit 2','Long Beach','CA','90802',null);
 insert into jobs(id,client_id,property_id,job_number,service_name,status,price) values('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','JOB-TEST','Standard','Completed',100);
 insert into invoices(id,job_id,client_id,total,status,sent_at,client_access_token,amount_paid,balance_due,deposit_requested,is_consolidated) values('00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000002',125,'Open',now(),'test-link',0,125,false,false);`);
-await db.exec(readFileSync('supabase/migrations/20261119001000_consolidate_sent_open_invoices.sql','utf8'));
+await db.exec(readFileSync('supabase/migrations/20261119003000_consolidation_sent_status.sql','utf8'));
+for (const status of ['Open','Sent','Past Due']) {
+  await db.exec(`update invoices set status='${status}'`);
+  assert.equal((await db.query('select * from contractor_invoice_consolidation_candidates')).rows.length,1,status);
+  console.log('PASS unpaid '+status+' invoice included');
+}
+await db.exec("update invoices set status='Sent'");
 const rows=async()=> (await db.query('select * from contractor_invoice_consolidation_candidates')).rows;
 assert.equal((await rows()).length,1);assert.equal(Number((await rows())[0].amount),125); console.log('PASS sent open invoice included at original invoice total');
 for(const [label,sql] of [
