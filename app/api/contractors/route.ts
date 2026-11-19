@@ -627,7 +627,7 @@ export async function POST(request:Request){
    const cleanersRequested=Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1)));
    const estimatedMinutes=Math.max(1,Math.ceil(hours/cleanersRequested*60));
    if(!contractorStartAllowed(division,startTime,estimatedMinutes))
-    throw new ContractorAccessError("Residential appointments must start at or after 8:00 AM and finish by 6:00 PM Pacific time.",400);
+    throw new ContractorAccessError("Residential bookings must start between 8:00 AM and 6:00 PM and finish by 8:00 PM Pacific time.",400);
    const values={
     service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address,bookingFrequency:contractorBookingFrequency(input.frequency)},
     property_address:fullAddress,property_type:type,
