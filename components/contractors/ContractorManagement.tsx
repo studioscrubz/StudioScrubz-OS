@@ -17,7 +17,7 @@ import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
 type Company={id:string;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
-type Opportunity={id:string;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
+type Opportunity={id:string;request_property_id?:string|null;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
 type Message={id:string;company_id:string;partner_user_id:string;read_at:string|null;opportunity_id:string|null;sender_side:string;body:string;created_at:string};
 type Assessment={opportunity_id:string;updated_at:string;minimum_price:number|null;projected_margin:number|null;cost_complete:boolean;override_approved_by:string|null;override_reason:string|null;projection:Record<string,unknown>};
@@ -488,9 +488,10 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Requested:</b> {selected.requested_date}</p><p><b>Status:</b> {selected.status}</p>
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
      <p><b>Agreed compensation:</b> {currency(selected.agreed_amount)}</p>
+     {hasPermission(profile,"agreements.manage")&&selected.request_property_id&&clientByCompany.get(selected.company_id)&&<Link className={secondary} href={`/agreements?create=1&clientId=${encodeURIComponent(clientByCompany.get(selected.company_id)!)}&propertyId=${encodeURIComponent(selected.request_property_id)}`}>Create recurring service agreement</Link>}
      <p><b>Contractor written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      {view==="opportunities"&&!selected.linked_job_id&&!selected.partner_confirmed_at&&
-      selected.submitted_by===null&&/^(brava|rose):[a-f0-9]{64}$/.test(selected.external_reference??"")&&
+      selected.submitted_by===null&&/^(brava|rose|brava-manual|contractor|contractor-manual):[a-f0-9]{64}$/.test(selected.external_reference??"")&&
       ["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(selected.status)&&
       <button type="button" className={secondary} disabled={busy} onClick={()=>{
        if(window.confirm("Does the contractor’s text confirm the current scope and compensation shown here?"))
