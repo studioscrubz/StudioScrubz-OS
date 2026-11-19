@@ -22,8 +22,8 @@ function shiftMonth(month:string,amount:number){
  const d=new Date(Date.UTC(year,m-1+amount,1));
  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
 }
-export function ContractorAvailabilityCalendar({onChoose,chosenDate}:{
- onChoose:(date:string,time:string)=>void;chosenDate?:string;
+export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompanyId}:{
+ onChoose?:(date:string,time:string)=>void;chosenDate?:string;previewCompanyId?:string;
 }){
  const [month,setMonth]=useState(()=>chosenDate?.slice(0,7)||pacificMonth());
  const [selected,setSelected]=useState(chosenDate||"");
@@ -37,7 +37,7 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate}:{
  const maxMonth=useMemo(()=>shiftMonth(pacificMonth(),12),[]);
  useEffect(()=>{
   const controller=new AbortController();
-  void fetch("/api/contractors?"+new URLSearchParams({view:"availability-month",month}),{
+  void fetch("/api/contractors?"+new URLSearchParams({view:"availability-month",month,...(previewCompanyId?{previewCompanyId}:{})}),{
    cache:"no-store",signal:controller.signal,
   }).then(async response=>{
    const payload=await response.json();
@@ -47,7 +47,7 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate}:{
    if(!controller.signal.aborted){setData(null);setError(cause instanceof Error?cause.message:"Availability unavailable.");}
   }).finally(()=>{if(!controller.signal.aborted)setLoading(false)});
   return()=>controller.abort();
- },[month,refresh]);
+ },[month,refresh,previewCompanyId]);
  const days=data?.month===month?data.days:[];
  const chosen=days.find(day=>day.date===selected);
  const dates=Array.from({length:firstWeekday},(_,index)=>`empty-${index}`);
@@ -90,7 +90,7 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate}:{
    <p className="font-bold">Choose a requested start time · {chosen.date}</p>
    <div className="mt-3 grid max-h-56 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4 md:grid-cols-6">
     {chosen.times.filter(slot=>slot.status!=="busy").map(slot=><button type="button"
-     key={slot.time} onClick={()=>onChoose(chosen.date,slot.time)}
+     key={slot.time} disabled={!onChoose} onClick={()=>onChoose?.(chosen.date,slot.time)}
      className={`rounded-lg border px-2 py-2 text-xs font-semibold ${classFor[slot.status]}`}
      title={slot.status==="limited"?"Other work may overlap; Operations will confirm.":"Request this time"}
     >{formatTime12Hour(slot.time)}{slot.status==="limited"?" · Limited":""}</button>)}
