@@ -156,33 +156,6 @@ export function ContractorPortal(){
    {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
    {notice&&<p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-[#143d1a]">{notice}</p>}
    {!data&&<p>Company membership is not active. Contact StudioScrubz Operations to request access.</p>}
-   {data&&(tab==="dashboard"||tab==="jobs")&&<PortalPanel title="Upcoming jobs">
-    {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-b-0">
-     <b>{job.property_name??job.service_name??job.job_number}</b>
-     <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
-     <p className="text-sm">{new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))} · {formatTime12Hour(job.start_time,"Time pending")}</p>
-     {job.location&&<p className="text-sm">{job.location}</p>}
-    </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
-   </PortalPanel>}
-   {data&&tab==="jobs"&&<PortalPanel title="Completed jobs">
-    {data.completedJobs?.length?<ul className="divide-y">
-     {data.completedJobs.map(job=>{
-      const request=data.opportunities.find(opportunity=>opportunity.linked_job_id===job.id);
-      const completedDate=job.completed_at
-       ?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"America/Los_Angeles"}).format(new Date(job.completed_at))
-       :null;
-      return <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-       <div>
-        <b>{job.client_name}</b>
-        <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
-        {job.property_name&&<p className="text-sm">{job.property_name}</p>}
-        {completedDate&&<p className="text-sm">Completed {completedDate}</p>}
-       </div>
-       {request&&<button type="button" className={secondary} onClick={()=>{setOpportunityId(request.id);document.getElementById("contractor-requests")?.scrollIntoView({block:"start"});}}>Open request</button>}
-      </li>;
-     })}
-    </ul>:<p className="text-sm text-neutral-600">No completed jobs are available yet.</p>}
-   </PortalPanel>}
    {data&&tab==="dashboard"&&<><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
@@ -217,6 +190,33 @@ export function ContractorPortal(){
       <span>{opportunity.status}</span>
      </button>;
     })}</PortalPanel></>}
+   {data&&(tab==="dashboard"||tab==="jobs")&&<PortalPanel title="Upcoming jobs">
+    {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-b-0">
+     <b>{job.property_name??job.service_name??job.job_number}</b>
+     <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
+     <p className="text-sm">{new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))} · {formatTime12Hour(job.start_time,"Time pending")}</p>
+     {job.location&&<p className="text-sm">{job.location}</p>}
+    </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
+   </PortalPanel>}
+   {data&&tab==="jobs"&&<PortalPanel title="Completed jobs">
+    {data.completedJobs?.length?<ul className="divide-y">
+     {data.completedJobs.map(job=>{
+      const request=data.opportunities.find(opportunity=>opportunity.linked_job_id===job.id);
+      const completedDate=job.completed_at
+       ?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"America/Los_Angeles"}).format(new Date(job.completed_at))
+       :null;
+      return <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+       <div>
+        <b>{job.client_name}</b>
+        <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
+        {job.property_name&&<p className="text-sm">{job.property_name}</p>}
+        {completedDate&&<p className="text-sm">Completed {completedDate}</p>}
+       </div>
+       {request&&<button type="button" className={secondary} onClick={()=>{setOpportunityId(request.id);document.getElementById("contractor-requests")?.scrollIntoView({block:"start"});}}>Open request</button>}
+      </li>;
+     })}
+    </ul>:<p className="text-sm text-neutral-600">No completed jobs are available yet.</p>}
+   </PortalPanel>}
    {requestOpen&&<dialog ref={requestDialog} aria-labelledby="portal-request-title"
     onCancel={event=>{event.preventDefault();if(!busy)closeRequest();}}
     className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto rounded-2xl bg-white text-neutral-900 shadow-2xl backdrop:bg-[#07190a]/65">

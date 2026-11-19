@@ -64,13 +64,6 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
       <button key={key} type="button" onClick={()=>setTab(key)} className={tab===key?primary:secondary} aria-current={tab===key?"page":undefined}>{label}</button>)}
      <button className={secondary+" cursor-not-allowed opacity-50"} type="button" disabled title="Creating jobs is disabled in preview mode">Submit New Job · Disabled</button>
     </nav>
-    {(tab==="dashboard"||tab==="jobs")&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
-     {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
-      <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>
-      <p className="text-sm">{date(job.scheduled_date)} · {formatTime12Hour(job.start_time,"Time pending")}</p>
-      {job.location&&<p className="text-sm">{job.location}</p>}
-     </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
-    </section>}
     {tab==="dashboard"&&<>
      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {([["Submitted opportunities",data.opportunities.length],
@@ -98,6 +91,13 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
       {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted.</p>}
      </section>
     </>}
+    {(tab==="dashboard"||tab==="jobs")&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
+     {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
+      <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>
+      <p className="text-sm">{date(job.scheduled_date)} · {formatTime12Hour(job.start_time,"Time pending")}</p>
+      {job.location&&<p className="text-sm">{job.location}</p>}
+     </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
+    </section>}
     {tab==="jobs"&&<>
      <section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">My Requests &amp; Jobs</h2>
       {data.opportunities.map(op=><div key={op.id} className="border-b py-3 last:border-0">
