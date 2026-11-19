@@ -2,6 +2,7 @@ import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import "server-only";
 import {getContractorMonthlyAvailability} from "@/lib/contractors/availability";
+import {contractorStartAllowed,validContractorDivision,type ContractorDivision} from "@/lib/contractors/division";
 import {createHash} from "node:crypto";
 import { contractorScheduledJobStatuses, type ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
@@ -289,7 +290,7 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
  }
  const companyId=ctx.companyId;
  const [company,opportunities,offers,documents]=await Promise.all([
-  db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id,client_id")
+  db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id,client_id,contractor_division")
    .eq("id",companyId).single(),
   db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_name,property_address,property_type,request_options,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at,updated_at,internal_confirmed_at,submitted_by").eq("company_id",companyId).or("status.neq.Cancelled,linked_job_id.not.is.null").order("created_at",{ascending:false}).limit(500),
   db.from("contractor_offers").select("id,opportunity_id,company_id,offered_by_side,amount,pricing_basis,scope_text,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
@@ -381,7 +382,10 @@ export async function GET(request:Request){
    const state=params.get("state")?.trim().slice(0,10)||"";
    const zip=params.get("zip")?.trim().slice(0,20)||"";
    const building=street&&(city||zip)?{address:street,city,state,zip}:undefined;
-   try{return noCache(await getContractorMonthlyAvailability(params.get("month")??"",building));}
+   const previewId=ctx.type==="internal"?uuid(params.get("previewCompanyId")):ctx.companyId;
+   const {data:category,error:categoryError}=await ctx.admin.from("contractor_companies").select("contractor_division").eq("id",previewId).single();
+   if(categoryError||!category)throw categoryError??new ContractorAccessError("Contractor division unavailable.",503);
+   try{return noCache(await getContractorMonthlyAvailability(params.get("month")??"",building,category.contractor_division as ContractorDivision));}
    catch(error){
     if(error instanceof Error&&/Select a valid calendar month|supports this month/.test(error.message))
      throw new ContractorAccessError(error.message,400);
@@ -401,10 +405,12 @@ export async function GET(request:Request){
     const opportunity=await partnerOpportunity(ctx,uuid(editId));
     if(opportunity.submitted_by===ctx.userId)ownRequestId=opportunity.id;
    }
+   const {data:division,error:divisionError}=await ctx.admin.from("contractor_companies").select("contractor_division").eq("id",ctx.companyId).single();
+   if(divisionError||!division)throw divisionError??new ContractorAccessError("Contractor division unavailable.",503);
    const {data,error}=await ctx.admin.from("contractor_opportunities").select("id,requested_time")
     .eq("requested_date",date).not("requested_time","is",null).not("status","in","(Declined,Cancelled)");
    if(error)throw error;
-   return noCache({unavailable:data.filter(row=>row.id!==ownRequestId).map(row=>row.requested_time?.slice(0,5))});
+   return noCache({division:division.contractor_division,unavailable:data.filter(row=>row.id!==ownRequestId).map(row=>row.requested_time?.slice(0,5))});
   }
   if(view==="job-options"){
    requirePartner(ctx);
@@ -427,6 +433,7 @@ export async function POST(request:Request){
    const contactName=optional(input.contactName,160)??"";
    const {data,error}=await db.from("contractor_companies").insert({
     name,contact_email:email,contact_name:contactName,
+    contractor_division:validContractorDivision(input.contractorDivision)?input.contractorDivision:"Residential",
     phone:optional(input.phone,60),business_address:optional(input.address,500),
     territories:Array.isArray(input.territories)?input.territories.filter(x=>typeof x==="string").slice(0,30):[],
     service_types:Array.isArray(input.serviceTypes)?input.serviceTypes.filter(x=>typeof x==="string").slice(0,30):[],
@@ -478,6 +485,11 @@ export async function POST(request:Request){
     changes.service_types=input.service_types;
    }
    if(ctx.type==="internal"){
+    if(input.contractor_division!==undefined){
+     requireMaster(ctx);
+     if(!validContractorDivision(input.contractor_division))throw new ContractorAccessError("Choose Residential or Commercial.",400);
+     changes.contractor_division=input.contractor_division;
+    }
     if(input.payment_terms!==undefined)changes.payment_terms=optional(input.payment_terms,500);
     if(input.status!==undefined){
      const status=required(input.status,"status",30);
@@ -607,6 +619,15 @@ export async function POST(request:Request){
    const startTime=required(input.requestedTime,"start time",5);
    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime))
     throw new ContractorAccessError("Select a valid start time.",400);
+   const {data:submissionCompany,error:divisionLoadError}=await db.from("contractor_companies")
+    .select("contractor_division").eq("id",companyId).single();
+   if(divisionLoadError||!submissionCompany)throw divisionLoadError??new ContractorAccessError("Contractor division unavailable.",503);
+   const division=submissionCompany.contractor_division as ContractorDivision;
+   if(type!==division)throw new ContractorAccessError(`This is a ${division.toLowerCase()} contractor account. Choose ${division.toLowerCase()} service.`,400);
+   const cleanersRequested=Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1)));
+   const estimatedMinutes=Math.max(1,Math.ceil(hours/cleanersRequested*60));
+   if(!contractorStartAllowed(division,startTime,estimatedMinutes))
+    throw new ContractorAccessError("Residential appointments must start at or after 8:00 AM and finish by 6:00 PM Pacific time.",400);
    const values={
     service_type:serviceType,property_name:propertyName,request_options:{...requestOptions,address,bookingFrequency:contractorBookingFrequency(input.frequency)},
     property_address:fullAddress,property_type:type,
@@ -616,7 +637,7 @@ export async function POST(request:Request){
     scope_of_work:required(scope,"scope of work",10000),
     property_condition:condition,requested_date:date,
     requested_time:startTime,estimated_person_hours:hours,
-    cleaner_count:Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1))),
+    cleaner_count:cleanersRequested,
     proposed_amount:proposed,pricing_basis:required(input.pricingBasis??"Flat Price","pricing basis",80),
     special_instructions:optional(input.instructions,5000),access_arrangements:optional(input.access,2500),
    };
