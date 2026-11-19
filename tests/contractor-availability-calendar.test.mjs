@@ -15,7 +15,10 @@ test("Monthly availability is scoped to verified contractors or Master Admin pre
  assert.match(route,/requirePartner\(ctx\)/);
  assert.match(route,/getContractorMonthlyAvailability/);
  assert.match(route,/Scheduling availability could not be verified/);
- assert.doesNotMatch(route,/requireInternal|requireMaster|event\.summary/);
+ assert.match(route,/requireMaster\(ctx\)/);
+ assert.match(route,/previewCompanyId/);
+ assert.match(route,/company\?\.status!=="Active"/);
+ assert.doesNotMatch(route,/requireInternal|event\.summary/);
 });
 test("Google freebusy masks private event titles, locations and attendees",()=>{
  const i=google.indexOf("export async function getContractorCalendarBusy");
