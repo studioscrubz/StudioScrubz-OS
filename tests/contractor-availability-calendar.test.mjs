@@ -7,7 +7,7 @@ const availability=read("lib/contractors/availability.ts");
 const google=read("lib/google-calendar/server.ts");
 const portal=read("components/contractors/ContractorPortal.tsx");
 const calendar=read("components/contractors/ContractorAvailabilityCalendar.tsx");
-test("Monthly availability is scoped to signed-in contractors only",()=>{
+test("Monthly availability is scoped to verified contractors or Master Admin previews",()=>{
  const i=api.indexOf('if(view==="availability-month")');
  const e=api.indexOf('if(view==="booking-times")',i);
  assert.ok(i>0&&e>i);
@@ -41,6 +41,7 @@ test("All contractor accounts see calendar tab and can prefill job request",()=>
  assert.match(portal,/setRequestedDate\(date\);setRequestedTime\(time\)/);
  assert.match(portal,/<PortalPanel title="Requested Schedule">\s*<ContractorAvailabilityCalendar/);
  assert.match(calendar,/view:"availability-month"/);
+ assert.match(read("components/contractors/ContractorPortalAdminPreview.tsx"),/ContractorAvailabilityCalendar previewCompanyId=\\{companyId\\}/);
  assert.match(calendar,/aria-label=\{\x60\$\{day\.date\}/);
  assert.match(calendar,/indicative, not a reservation/);
 });
