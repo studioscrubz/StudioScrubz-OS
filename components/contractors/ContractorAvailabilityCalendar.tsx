@@ -81,7 +81,7 @@ export function ContractorAvailabilityCalendar({onChoose,chosenDate,previewCompa
     className={`min-h-14 rounded-lg border p-1 text-center disabled:cursor-not-allowed ${classFor[day.status]} ${selected===day.date?"ring-2 ring-[#143d1a] ring-offset-1":""}`}
     onClick={()=>selectDate(day)}>
     <span className="block text-sm font-bold">{Number(day.date.slice(-2))}</span>
-    <span className="block text-[10px] leading-tight">{labelFor[day.status]}</span>
+    <span className={`text-[10px] leading-tight ${day.status==="available"?"hidden sm:block":"block"}`}>{labelFor[day.status]}</span>
    </button>)}
   </div>}
   {loading&&<p role="status" className="mt-2 text-sm text-neutral-500">Checking live availability…</p>}

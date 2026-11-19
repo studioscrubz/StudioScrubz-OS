@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/mobile-calendar-requestable-label": false,
       "feature/twice-monthly-weekdays": false,
       "fix/brava-crew-reminder-format": false,
       "feature/brava-building-units": false,
