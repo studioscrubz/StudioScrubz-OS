@@ -36,7 +36,7 @@ export function BravaEmailCodeLogin(){
       const {data,error:otpError}=await auth.auth.verifyOtp({email:EMAIL,token:code,type:"email"});
       if(otpError||!data.user)throw otpError??new Error("Verification failed.");
       if(data.user.email?.toLowerCase()!==EMAIL){await auth.auth.signOut({scope:"local"});throw new Error("This email is not authorized.");}
-      const {error:activationError}=await auth.rpc("activate_brava_email_invitation");
+      const {error:activationError}=await auth.rpc("activate_brava_email_invitation" as never);
       if(activationError){await auth.auth.signOut({scope:"local"});throw activationError;}
       const session=await fetch("/api/contractors/session",{cache:"no-store"});
       if(!session.ok){await auth.auth.signOut({scope:"local"});throw new Error("Brava membership could not be verified.");}
