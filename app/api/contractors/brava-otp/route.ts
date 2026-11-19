@@ -18,7 +18,7 @@ export async function POST(request:Request) {
     const db=createSupabaseAdminClient();
     const {data:company,error:companyError}=await db.from("contractor_companies")
       .select("id,status,contact_email").eq("id",COMPANY_ID).maybeSingle();
-    if(companyError||company?.status!=="Active"||company.contact_email.toLowerCase()!==EMAIL)
+    if(companyError||company?.status!=="Active"||company.contact_email?.toLowerCase()!==EMAIL)
       return Response.json({error:"Brava sign-in is unavailable."},{status:403,headers:HEADER});
     const {data:member,error:memberError}=await db.from("contractor_members")
       .select("id").eq("company_id",COMPANY_ID).eq("email",EMAIL).eq("is_active",true).limit(1);
@@ -27,7 +27,7 @@ export async function POST(request:Request) {
       .eq("member_role","Company Admin").eq("status","Pending").gt("expires_at",new Date().toISOString()).limit(1);
     if(memberError||inviteError||(!member?.length&&!invite?.length))
       return Response.json({error:"Brava management access must be approved by StudioScrubz Operations."},{status:403,headers:HEADER});
-    const {data:reserved,error:limitError}=await db.rpc("reserve_brava_email_otp");
+    const {data:reserved,error:limitError}=await db.rpc("reserve_brava_email_otp" as never);
     if(limitError)throw limitError;
     if(reserved!==true)return Response.json({error:"Code requests are limited. Please try again later."},{status:429,headers:HEADER});
     // Supabase generates a real Auth OTP; the server sends only the six-digit code via Resend.
