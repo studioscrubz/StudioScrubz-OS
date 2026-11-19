@@ -2,8 +2,9 @@ import "server-only";
 import {createSupabaseAdminClient} from "@/lib/supabase/admin";
 import {getContractorCalendarBusy} from "@/lib/google-calendar/server";
 import {contractorScheduledJobStatuses} from "@/lib/contractors/scheduledJobs";
+import {DEFAULT_TRAVEL_BUFFER_MINUTES,sameBuilding,type BuildingAddress} from "@/lib/scheduling/travelBuffer";
 
-type Block={start:number;end:number};
+type Block={start:number;end:number;building?:BuildingAddress|null};
 export type AvailabilityStatus="available"|"limited"|"busy";
 export type AvailabilityDay={date:string;status:AvailabilityStatus;times:Array<{time:string;status:AvailabilityStatus}>};
 const SLOT_MINUTES=30;
@@ -42,7 +43,7 @@ function dateFromValue(value:string){
  if(year<2025||year>2100||month<1||month>12)throw new Error("Select a valid calendar month.");
  return {year,month};
 }
-export async function getContractorMonthlyAvailability(month:string){
+export async function getContractorMonthlyAvailability(month:string,building?:BuildingAddress){
  const {year,month:monthNumber}=dateFromValue(month);
  const today=localParts(Date.now());
  const delta=(year-today.year)*12+monthNumber-today.month;
@@ -56,17 +57,25 @@ export async function getContractorMonthlyAvailability(month:string){
  const db=createSupabaseAdminClient();
  const [google,scheduled,requests]=await Promise.all([
   getContractorCalendarBusy(queryStart,queryEnd),
-  db.from("jobs").select("scheduled_date,start_time,estimated_duration")
+  db.from("jobs").select("scheduled_date,start_time,estimated_duration,property_id")
    .gte("scheduled_date",startDate).lt("scheduled_date",through)
    .in("status",contractorScheduledJobStatuses).is("archived_at",null)
    .not("start_time","is",null),
-  db.from("contractor_opportunities").select("requested_date,requested_time")
+  db.from("contractor_opportunities").select("requested_date,requested_time,request_options,linked_job_id")
    .gte("requested_date",startDate).lt("requested_date",through)
    .not("status","in","(Declined,Cancelled,Disputed)")
    .not("requested_time","is",null),
  ]);
  if(scheduled.error||requests.error)throw scheduled.error??requests.error;
  const googleBlocks=blocksOfGoogle(google);
+ // Fetch only building location fields. Unit identifiers, clients and job details
+ // are never returned to the contractor calendar.
+ const propertyIds=[...new Set((scheduled.data??[]).map(row=>row.property_id).filter((id):id is string=>Boolean(id)))];
+ const {data:properties,error:propertyError}=propertyIds.length
+  ?await db.from("properties").select("id,address,city,state,zip").in("id",propertyIds)
+  :{data:[],error:null};
+ if(propertyError)throw propertyError;
+ const buildings=new Map((properties??[]).map(property=>[property.id,property]));
  const scheduledBlocks:Block[]=[];
  for(const row of scheduled.data??[]){
   if(!row.scheduled_date||!row.start_time)continue;
@@ -74,7 +83,7 @@ export async function getContractorMonthlyAvailability(month:string){
   const clock=row.start_time.split(":").map(Number);
   const start=pacificTimeUtc(date[0],date[1],date[2],clock[0],clock[1]);
   const duration=Number(row.estimated_duration);
-  scheduledBlocks.push({start,end:start+(Number.isFinite(duration)&&duration>0?Math.min(duration*60,24*60):REQUEST_DURATION_MINUTES)*60_000});
+  scheduledBlocks.push({start,end:start+(Number.isFinite(duration)&&duration>0?Math.min(duration*60,24*60):REQUEST_DURATION_MINUTES)*60_000,building:row.property_id?buildings.get(row.property_id):null});
  }
  const requestedBlocks:Block[]=[];
  for(const row of requests.data??[]){
@@ -82,7 +91,12 @@ export async function getContractorMonthlyAvailability(month:string){
   const date=row.requested_date.split("-").map(Number);
   const clock=row.requested_time.split(":").map(Number);
   const start=pacificTimeUtc(date[0],date[1],date[2],clock[0],clock[1]);
-  requestedBlocks.push({start,end:start+REQUEST_DURATION_MINUTES*60_000});
+  // An accepted opportunity is represented by its linked scheduled job, avoiding duplicate blocks.
+  if(row.linked_job_id)continue;
+  const options=row.request_options as {address?:{street?:string;city?:string;state?:string;zip?:string}}|null;
+  const addr=options?.address;
+  const requestBuilding=addr?{address:addr.street,city:addr.city,state:addr.state,zip:addr.zip}:null;
+  requestedBlocks.push({start,end:start+REQUEST_DURATION_MINUTES*60_000,building:requestBuilding});
  }
  const days:AvailabilityDay[]=[];
  for(let day=1;day<=lastDay;day++){
@@ -94,7 +108,12 @@ export async function getContractorMonthlyAvailability(month:string){
    const end=start+REQUEST_DURATION_MINUTES*60_000;
    // The preview is advisory. Other crews may be free even when one is working.
    const status:AvailabilityStatus=start<Date.now()||overlaps(start,end,googleBlocks)?"busy":
-    overlaps(start,end,scheduledBlocks)||overlaps(start,end,requestedBlocks)?"limited":"available";
+    [...scheduledBlocks,...requestedBlocks].some(block=>{
+     const buffer=sameBuilding(building,block.building)?0:DEFAULT_TRAVEL_BUFFER_MINUTES;
+     // Existing work always conflicts with an overlapping proposed appointment.
+     // The travel buffer only extends AFTER the existing appointment.
+     return start<block.end+buffer*60_000&&end>block.start;
+    })?"limited":"available";
    times.push({time:`${String(hour).padStart(2,"0")}:${String(m).padStart(2,"0")}`,status});
   }
   const usable=times.filter(slot=>slot.status!=="busy");
