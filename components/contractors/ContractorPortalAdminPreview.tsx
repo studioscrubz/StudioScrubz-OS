@@ -82,6 +82,13 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
         <span>{invoice.invoice_number} · {invoice.status}{invoice.issue_date?` · ${invoice.issue_date}`:""}</span><span>{money(invoice.total)} total · {money(invoice.balance_due)} due</span>
        </div>)}</div></details>}
      </section>
+    {tab==="dashboard"&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
+     {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
+      <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>
+      <p className="text-sm">{date(job.scheduled_date)} · {formatTime12Hour(job.start_time,"Time pending")}</p>
+      {job.location&&<p className="text-sm">{job.location}</p>}
+     </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
+    </section>}
      <section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Recent opportunities</h2>
       {data.opportunities.slice(0,15).map(op=><div key={op.id} className="flex flex-wrap items-start justify-between gap-2 border-b py-3">
        <div><b>{op.property_name??op.property_address}</b><p className="text-sm">{op.opportunity_number} · {op.service_type}</p>
@@ -91,7 +98,7 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
       {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted.</p>}
      </section>
     </>}
-    {(tab==="dashboard"||tab==="jobs")&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
+    {tab==="jobs"&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
      {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-0">
       <b>{job.property_name??job.service_name??job.job_number}</b><p className="text-sm">{job.job_number}{job.service_name?` · ${job.service_name}`:""}</p>
       <p className="text-sm">{date(job.scheduled_date)} · {formatTime12Hour(job.start_time,"Time pending")}</p>
