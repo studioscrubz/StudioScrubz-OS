@@ -174,6 +174,14 @@ export function ContractorPortal(){
       </li>)}</ul>
      </details>}
     </PortalPanel>
+   {data&&<PortalPanel title="Upcoming jobs">
+    {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-b-0">
+     <b>{job.property_name??job.service_name??job.job_number}</b>
+     <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
+     <p className="text-sm">{new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))} · {formatTime12Hour(job.start_time,"Time pending")}</p>
+     {job.location&&<p className="text-sm">{job.location}</p>}
+    </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
+   </PortalPanel>}
     <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(opportunity=>{
      const job=data.jobs.find(job=>job.id===opportunity.linked_job_id);
      const scheduledDate=job?.scheduled_date
@@ -190,7 +198,7 @@ export function ContractorPortal(){
       <span>{opportunity.status}</span>
      </button>;
     })}</PortalPanel></>}
-   {data&&(tab==="dashboard"||tab==="jobs")&&<PortalPanel title="Upcoming jobs">
+   {data&&tab==="jobs"&&<PortalPanel title="Upcoming jobs">
     {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-b-0">
      <b>{job.property_name??job.service_name??job.job_number}</b>
      <p className="text-sm">{job.job_number}{job.service_name&&` · ${job.service_name}`}</p>
