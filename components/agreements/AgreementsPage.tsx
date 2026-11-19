@@ -194,7 +194,7 @@ export function AgreementsPage() {
       {agreement.client_signed_at && <p className="mt-1 text-xs font-semibold text-green-700">Signed by {agreement.client_signed_name} on {new Date(agreement.client_signed_at).toLocaleString()}</p>}
       {hasDocumentedVerbalAcceptance(agreement) && !hasClientSignature(agreement) && <p className="mt-1 text-xs text-green-700">{agreement.agreement_number === "AGR-20260824-2986" ? "Deloris Forzley verbally approved by phone on September 8, 2026 at 2:15:23 PM PDT; witnessed by Kris Greer." : "Client verbally approved in person on October 14, 2026 at 11:50 AM Pacific time; witnessed by Kris Greer."} Documented retrospectively; no electronic signature on file.</p>}
       {agreement.signing_method === "physical" && <p className="mt-1 text-xs font-semibold text-green-700">Physically signed {agreement.physically_signed_on ? new Date(`${agreement.physically_signed_on}T12:00:00`).toLocaleDateString() : "date not recorded"} · Uploaded by {agreement.physical_signed_uploaded_by_name || "authorized administrator"}</p>}
-      <p className={`mt-1 text-xs font-semibold ${["Fully Signed", "Verbal Acceptance Documented"].includes(agreementSignatureState(agreement)) ? "text-green-700" : "text-amber-700"}`}>{agreementSignatureState(agreement)}</p>
+      <p className={`mt-1 text-xs font-semibold ${["Active", "Fully Signed", "Verbal Acceptance Documented"].includes(agreementSignatureState(agreement)) ? "text-green-700" : "text-amber-700"}`}>{agreementSignatureState(agreement)}</p>
       {canDeleteDraft&&agreement.proposal_id&&<AgreementDepositPanel proposalId={agreement.proposal_id} onChange={()=>void load()}/>}
       <div className="mt-3 flex flex-wrap gap-1">
         {canManage && ["Draft", "Sent", "Accepted", "Active", "Paused"].includes(agreement.status) && <button className={secondary} onClick={() => setForm(agreement)}>Edit</button>}
@@ -267,6 +267,7 @@ function agreementSignatureState(agreement: AgreementWithRelations) {
     return agreement.representative_signature ? "Fully Signed" : "Awaiting StudioScrubz Signature";
   }
   if (hasDocumentedVerbalAcceptance(agreement)) return "Verbal Acceptance Documented";
+  if(agreement.status==="Active")return "Active";
   return "Awaiting Client Signature";
 }
 function representativeSigningEligible(agreement: AgreementWithRelations) { return !agreement.archived_at && ["Sent", "Accepted", "Active", "Paused"].includes(agreement.status); }
