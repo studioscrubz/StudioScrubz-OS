@@ -9,10 +9,11 @@ export type AvailabilityDay={date:string;status:AvailabilityStatus;times:Array<{
 const SLOT_MINUTES=30;
 const REQUEST_DURATION_MINUTES=120;
 const TIMEZONE="America/Los_Angeles";
+const pacificPartsFormatter=new Intl.DateTimeFormat("en-US",{timeZone:TIMEZONE,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
 const isoDate=(year:number,month:number,day:number)=>`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
 
 function localParts(timestamp:number){
- const parts=new Intl.DateTimeFormat("en-US",{timeZone:TIMEZONE,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(timestamp);
+ const parts=pacificPartsFormatter.formatToParts(timestamp);
  const vals=Object.fromEntries(parts.map(p=>[p.type,Number(p.value)]));
  return {year:vals.year,month:vals.month,day:vals.day,hour:vals.hour,minute:vals.minute};
 }
