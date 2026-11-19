@@ -1,5 +1,3 @@
-begin;
-
 alter table public.contractor_companies
  add column if not exists contractor_division text not null default 'Residential';
 
@@ -15,5 +13,3 @@ update public.contractor_companies
 update public.contractor_companies
  set contractor_division='Residential',updated_at=now()
  where id in ('a1b0e01c-3990-47e8-9c4f-40c772ce35fd','ee489374-42ce-4134-bee6-190d86be8edd');
-
-commit;
