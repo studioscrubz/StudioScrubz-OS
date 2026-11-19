@@ -87,12 +87,17 @@ export async function createAgreement(input: AgreementInput) {
     const old = await getAgreementForProposal(input.proposal_id);
     if (old) return old;
   }
+  if(!input.client_id)throw new Error("Select an active client.");
+  const {data:agreementClient,error:clientError}=await getSupabaseClient().from("clients").select("client_type").eq("id",input.client_id).single();
+  if(clientError)throw clientError;
+  const isContractor=agreementClient.client_type==="Contractor";
+  if(isContractor&&input.pricing_snapshot&&((input.pricing_snapshot.frequency_discount_amount??0)>0||(input.pricing_snapshot.custom_discount_amount??0)>0))throw new Error("Contractor agreements cannot include discounts.");
   let prepared = input;
   if (!input.proposal_id && !input.pricing_snapshot) {
     const catalog = await getServiceCatalog();
     const service = catalog.services.find((row) => row.service_name === input.service_name && (row.division === input.division || row.division === "Both"));
     if (!service) throw new Error("Select an active Service Catalog service before creating the agreement.");
-    const pricing = catalogAgreementPricing({ standardPrice:input.billing_amount, frequency:input.frequency, serviceDaysOfWeek:input.days_of_week, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
+    const pricing = catalogAgreementPricing({ isContractor, standardPrice:input.billing_amount, frequency:input.frequency, serviceDaysOfWeek:input.days_of_week, serviceId:service.id, rules:catalog.recurringRules, serviceDescription:service.description });
     prepared = { ...input, billing_amount:input.billing_type !== "Per Visit" ? input.billing_amount : pricing.final_per_visit_price, pricing_snapshot:pricing };
   }
   for (let i = 0; i < 5; i++) {
