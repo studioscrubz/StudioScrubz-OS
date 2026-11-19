@@ -434,24 +434,26 @@ export async function POST(request:Request){
    await audited(ctx,{companyId,type:"Company Updated",detail:{fields:Object.keys(changes)}});
    return noCache({ok:true});
   }
-  if(action==="submitOpportunity"||action==="editOpportunity"||action==="importRoseBooking"||action==="importBravaBooking"||action==="createBravaOpportunity"){
+  if(action==="submitOpportunity"||action==="editOpportunity"||action==="importRoseBooking"||action==="importBravaBooking"||action==="createBravaOpportunity"||action==="importContractorBooking"||action==="createContractorOpportunity"){
    let companyId:string;
    let submitterId:string|null=ctx.userId;
    const manualBrava=action==="createBravaOpportunity";
+   const generic=action==="importContractorBooking"||action==="createContractorOpportunity";
+   const manualEntry=manualBrava||action==="createContractorOpportunity";
    const brava=action==="importBravaBooking"||manualBrava;
-   const importing=brava||action==="importRoseBooking";
+   const importing=brava||generic||action==="importRoseBooking";
    if(importing){
     requireInternal(ctx);
     companyId=uuid(input.companyId);
     const {data:company,error}=await db.from("contractor_companies").select("name,status").eq("id",companyId).maybeSingle();
     if(error)throw error;
-    if(!company||bookingClientKind(company.name)!==(brava?"brava":"rose"))
+    if(!company||(!generic&&bookingClientKind(company.name)!==(brava?"brava":"rose")))
      throw new ContractorAccessError(brava?"Select the BRAVA Home Cleaning record.":"Select the Rose Company record.",409);
     if(company.status!=="Active")
      throw new ContractorAccessError("Activate this contractor company in Contractors before importing a booking.",409);
     submitterId=null;
     if(!brava&&(typeof input.amount!=="string"||!input.amount.trim()))
-     throw new ContractorAccessError("Enter the price from Rose Company's booking.",400);
+     throw new ContractorAccessError("Enter the contractor’s proposed price.",400);
    }else{
     requirePartner(ctx);
     companyId=ctx.companyId;
@@ -538,19 +540,19 @@ export async function POST(request:Request){
    }
    // Require a stable submission key so browser retries cannot create duplicate jobs.
    const externalRef=importing
-    ?`${manualBrava?"brava-manual":brava?"brava":"rose"}:${createHash("sha256").update(JSON.stringify([
+    ?`${generic?(manualEntry?"contractor-manual":"contractor"):manualBrava?"brava-manual":brava?"brava":"rose"}:${createHash("sha256").update(JSON.stringify([
      values.requested_date,values.requested_time,values.property_address.toLowerCase(),values.property_name?.toLowerCase(),
     ])).digest("hex")}`
     :uuid(input.externalReference);
    const {data,error}=await db.from("contractor_opportunities").insert({...values,
     company_id:companyId,submitted_by:submitterId,external_reference:externalRef,
-    ...(importing&&!manualBrava?{status:"Awaiting Approval",agreed_amount:proposed,final_scope:values.scope_of_work,
+    ...(importing&&!manualEntry?{status:"Awaiting Approval",agreed_amount:proposed,final_scope:values.scope_of_work,
      partner_confirmed_at:new Date().toISOString()}:{}),
    }).select("id,opportunity_number").single();
    if(error){if(error.code==="23505"&&error.message.includes("contractor_opportunities_held_start_idx"))throw new ContractorAccessError("That start time is already reserved. Choose another time.",409);if(error.code==="23505")throw new ContractorAccessError("This external reference was already submitted.",409);throw error;}
    scheduleAttentionPushAfterResponse();
-   await audited(ctx,{companyId,opportunityId:data.id,type:manualBrava?"BRAVA Opportunity Created":brava?"BRAVA Booking Imported":importing?"Rose Booking Imported":"Opportunity Submitted",
-    ...(importing&&!manualBrava?{detail:{confirmationSource:"Contractor text dispatch",amount:proposed}}:{})});
+   await audited(ctx,{companyId,opportunityId:data.id,type:generic?(manualEntry?"Contractor Opportunity Created":"Contractor Booking Imported"):manualBrava?"BRAVA Opportunity Created":brava?"BRAVA Booking Imported":importing?"Rose Booking Imported":"Opportunity Submitted",
+    ...(importing&&!manualEntry?{detail:{confirmationSource:"Contractor text dispatch",amount:proposed}}:{})});
    await notify(ctx,"New contractor opportunity",companyName=>[
     `Opportunity ${data.opportunity_number} was submitted for review.`,
     `Contractor: ${companyName}`,

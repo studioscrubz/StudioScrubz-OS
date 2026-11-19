@@ -49,6 +49,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  },[]);
  const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [submissionClientId,setSubmissionClientId]=useState("");
+ const [submissionPropertyType,setSubmissionPropertyType]=useState("Residential");
  const [roseText,setRoseText]=useState("");
  const [manualBrava,setManualBrava]=useState(false);
  const [savedProperties,setSavedProperties]=useState<PropertyWithClient[]>([]);
@@ -108,7 +109,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
    if(action==="createCompany"){
     if(result.welcomeEmailSent)setNotice("Company created and welcome email sent. You can send the portal invitation separately.");
     else setError("Company created, but the welcome email could not be sent.");
-   }else setNotice((action==="importRoseBooking"||action==="importBravaBooking")?"Booking added to Job Opportunities.":`${action} completed.`);
+   }else setNotice((["importRoseBooking","importBravaBooking","importContractorBooking","createContractorOpportunity"].includes(action))?"Booking added to Job Opportunities.":`${action} completed.`);
    await refresh();
    return result;
   }catch(e){setError(e instanceof Error?e.message:"Request failed");return null;}
@@ -134,7 +135,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }catch(e){setError(e instanceof Error?e.message:"Invitation failed");}finally{setBusy(false);}
  };
  const companies=data?.companies??[],allOpportunities=data?.opportunities??[];
- const submissionClients=companies.filter(company=>bookingClientKind(company.name)&&["Active","Pending"].includes(company.status));
+ const submissionClients=companies.filter(company=>["Active","Pending"].includes(company.status));
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
  const savedClientId=data?.directory.find(entry=>entry.companyId===submissionClientId)?.clientId;
@@ -350,6 +351,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <label className="block text-sm font-semibold">Client
      <select className={input} value={submissionClientId} disabled={busy} onChange={event=>{
       setSubmissionClientId(event.target.value);
+      setSubmissionPropertyType("Residential");
       setManualBrava(false);
       setRoseText("");
       setRosePreview(null);
@@ -358,7 +360,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
       {submissionClients.map(company=><option key={company.id} value={company.id} disabled={company.status!=="Active"}>{company.name}{company.status!=="Active"?" (activate in Contractors)":""}</option>)}
      </select>
     </label>
-    {isBrava&&<div className="flex flex-wrap gap-2">
+    {submissionClient&&!isBrava&&<label className="block text-sm font-semibold">Property type<select className={input} value={submissionPropertyType} onChange={event=>setSubmissionPropertyType(event.target.value)}><option>Residential</option><option>Commercial</option></select></label>}
+    {submissionClient&&<div className="flex flex-wrap gap-2">
      <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);}}>Paste dispatch</button>
      <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview(parseRoseBooking("Customer:","brava"));}}>Enter manually</button>
     </div>}
@@ -390,7 +393,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      </label>}
     </div>}
     {submissionClient&&!manualBrava&&<>
-    <label className="block text-sm font-semibold">{isBrava?"BRAVA":"Rose"} booking text
+    <label className="block text-sm font-semibold">{submissionClient.name} booking text
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
     </label>
     <button type="button" className={secondary} disabled={busy||!roseText.trim()} onClick={()=>{
@@ -402,7 +405,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     </Panel>
     {submissionClient&&rosePreview&&<form className="space-y-5" onSubmit={async event=>{
      event.preventDefault();
-     const result=await run(manualBrava?"createBravaOpportunity":isBrava?"importBravaBooking":"importRoseBooking",{...rosePreview,companyId:submissionClient.id,propertyType:"Residential",instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
+     const result=await run(manualBrava?(isBrava?"createBravaOpportunity":"createContractorOpportunity"):isBrava?"importBravaBooking":bookingClientKind(submissionClient.name)==="rose"?"importRoseBooking":"importContractorBooking",{...rosePreview,companyId:submissionClient.id,propertyType:isBrava?"Residential":submissionPropertyType,instructions:rosePreview.pets.trim()?`Pets: ${rosePreview.pets.trim()}`:null});
      if(result){setRoseText("");setRosePreview(null);submissionDialog.current?.close();setOpportunityId(result.opportunity.id);}
     }}>
      {([
@@ -454,7 +457,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       {title==="Proposed Compensation"&&isBrava&&listedPayout===null&&<p className="mt-3 text-sm">Automatic pricing is unavailable for this booking. Verify the payout with BRAVA before entering it.</p>}
      </Panel>)}
      {!manualBrava&&<p className="text-sm">Creating this opportunity records the contractor’s text as written confirmation of the scope and payout above.</p>}
-     <button className={button} disabled={busy}>Create {isBrava?"BRAVA":"Rose"} opportunity</button>
+     <button className={button} disabled={busy}>Create {submissionClient.name} opportunity</button>
     </form>}
     </div>
     </dialog>
