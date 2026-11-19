@@ -1,0 +1,43 @@
+const {PGlite}=await import(process.env.PGLITE_MODULE || '@electric-sql/pglite');
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+await db.exec(`create schema private;create schema auth;create role anon;create role authenticated;
+create function auth.uid() returns uuid language sql as $$ select '00000000-0000-0000-0000-000000000001'::uuid $$;
+create function public.is_master_admin() returns boolean language sql as $$ select current_setting('test.admin',true)='yes' $$;
+create table jobs(id uuid primary key,status text,archived_at timestamptz,operational_started_at timestamptz,equipment_responsibility_confirmed_at timestamptz,updated_at timestamptz);
+create table invoices(job_id uuid references jobs);
+create function private.job_retained_history_reasons(uuid) returns text[] language sql as $$ select case when exists(select 1 from public.invoices where job_id=$1) then array['Financial records'] else '{}'::text[] end $$;
+create table job_equipment_assignments(id uuid primary key,job_id uuid references jobs);
+create table job_equipment_assignment_audit(assignment_id uuid references job_equipment_assignments);
+create table job_equipment_clearances(job_id uuid references jobs);
+create table job_equipment_handoffs(job_id uuid references jobs);
+create table jobsite_arrival_checks(job_id uuid references jobs);
+create table jobsite_arrival_exceptions(job_id uuid references jobs);
+create table job_equipment_responsibility_tasks(id uuid primary key,job_id uuid references jobs,status text);
+create table job_equipment_responsibility_events(job_id uuid references jobs,task_id uuid references job_equipment_responsibility_tasks);
+create table job_equipment_notifications(job_id uuid references jobs);
+create table job_assignment_events(job_id uuid references jobs);
+create table job_lifecycle_events(job_id uuid);
+create table job_crew_technicians(job_id uuid references jobs);
+create table contractor_opportunities(linked_job_id uuid references jobs,status text,updated_at timestamptz);
+create function private.guard_job_roster() returns trigger language plpgsql as $$ declare j public.jobs; begin select * into j from public.jobs where id=coalesce(new.job_id,old.job_id) for update;
+ if j.status not in ('Ready to Schedule','Scheduled','Crew Assigned') or j.operational_started_at is not null then raise exception 'locked';end if;return coalesce(new,old);end $$;
+create trigger roster_guard before delete on job_crew_technicians for each row execute function private.guard_job_roster();
+create function private.protect_job_equipment_responsibility_event() returns trigger language plpgsql as $$ begin raise exception 'immutable';end $$;
+create trigger equipment_immutable before update or delete on job_equipment_responsibility_events for each row execute function private.protect_job_equipment_responsibility_event();
+create function private.prevent_job_lifecycle_event_mutation() returns trigger language plpgsql as $$ begin raise exception 'immutable';end $$;
+create trigger lifecycle_immutable before update or delete on job_lifecycle_events for each row execute function private.prevent_job_lifecycle_event_mutation();
+set test.admin='yes';`);
+await db.exec(readFileSync('supabase/migrations/20261119020500_cancelled_job_planning_cleanup.sql','utf8'));
+const id='00000000-0000-0000-0000-000000000002';
+async function seed(){await db.exec(`insert into jobs(id,status) values('${id}','Cancelled');insert into job_equipment_assignments values('${id}','${id}');insert into job_equipment_assignment_audit values('${id}');insert into job_equipment_responsibility_tasks values('${id}','${id}','Assigned');insert into job_equipment_responsibility_events values('${id}','${id}');insert into job_lifecycle_events values('${id}');insert into job_assignment_events values('${id}');insert into job_equipment_notifications values('${id}');insert into job_crew_technicians values('${id}');insert into contractor_opportunities values('${id}','Crew Assignment',null);`);}
+await seed();
+for(const [label,sql] of [['started job',`update jobs set operational_started_at=now()`],['equipment confirmation',`update jobs set equipment_responsibility_confirmed_at=now()`],['financial evidence',`insert into invoices values('${id}')`],['equipment clearance',`insert into job_equipment_clearances values('${id}')`],['active job',`update jobs set status='Scheduled'`],['unauthorized user',`set test.admin='no'`]]){
+ await db.exec('begin;'+sql);await assert.rejects(db.exec(`delete from jobs where id='${id}'`));await db.exec('rollback');assert.equal((await db.query('select count(*) n from job_equipment_assignments')).rows[0].n,1);console.log('PASS protected '+label+' and rolled back cleanup');
+}
+await db.exec(`delete from jobs where id='${id}'`);
+for(const table of ['jobs','job_equipment_assignments','job_equipment_assignment_audit','job_equipment_responsibility_tasks','job_equipment_responsibility_events','job_lifecycle_events','job_assignment_events','job_equipment_notifications','job_crew_technicians'])assert.equal((await db.query(`select count(*) n from ${table}`)).rows[0].n,0,table);
+assert.equal((await db.query('select status,linked_job_id from contractor_opportunities')).rows[0].status,'Cancelled');console.log('PASS cancelled job and all unused planning records removed; request no longer scheduled');
+await db.exec(`delete from contractor_opportunities;insert into jobs(id,status,archived_at) values('${id}','Archived',now());insert into job_equipment_assignments values('${id}','${id}');delete from jobs where id='${id}';`);console.log('PASS archive deletion uses same cleanup');
+await db.close();

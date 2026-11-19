@@ -84,7 +84,8 @@
       "fix/all-contractors-opportunity-dropdown": false,
       "fix/contractor-saved-property-selection": false,
       "fix/contractor-acceptance-recurring-agreement": false,
-      "fix/contractor-agreement-no-discounts": false
+      "fix/contractor-agreement-no-discounts": false,
+      "fix/cancelled-job-planning-cleanup": false
     }
   },
   "crons": [
