@@ -44,7 +44,7 @@ test("All contractor accounts see calendar tab and can prefill job request",()=>
  assert.match(portal,/setRequestedDate\(date\);setRequestedTime\(time\)/);
  assert.match(portal,/<PortalPanel title="Requested Schedule">\s*<ContractorAvailabilityCalendar/);
  assert.match(calendar,/view:"availability-month"/);
- assert.match(read("components/contractors/ContractorPortalAdminPreview.tsx"),/ContractorAvailabilityCalendar previewCompanyId=\\{companyId\\}/);
+ assert.ok(read("components/contractors/ContractorPortalAdminPreview.tsx").includes("ContractorAvailabilityCalendar previewCompanyId={companyId}"));
  assert.match(calendar,/aria-label=\{\x60\$\{day\.date\}/);
  assert.match(calendar,/indicative, not a reservation/);
 });
