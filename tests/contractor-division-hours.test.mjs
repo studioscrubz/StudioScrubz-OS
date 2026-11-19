@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {contractorStartAllowed,contractorBookingWindow,contractorTimeMinutes} from "../lib/contractors/division.ts";
+import {contractorStartAllowed,contractorBookingWindow,contractorTimeMinutes,contractorDateAllowed} from "../lib/contractors/division.ts";
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 test("Residential starts 8AM through 6PM, latest completion 8PM Pacific",()=>{
  assert.equal(contractorStartAllowed("Residential","07:59",60),false);
@@ -40,4 +40,23 @@ test("Booking requests, imported bookings, and calendar enforce company division
  const management=read("components/contractors/ContractorManagement.tsx");
  assert.match(management,/{division} Contractors/);
  assert.match(management,/contractor_division:companyEdit\.contractor_division/);
+});
+
+test("Residential Sundays unavailable including month-end and year transitions",()=>{
+ assert.equal(contractorDateAllowed("Residential","2026-11-22"),false);
+ assert.equal(contractorDateAllowed("Residential","2026-11-23"),true);
+ assert.equal(contractorDateAllowed("Residential","2026-11-21"),true);
+ assert.equal(contractorDateAllowed("Residential","2026-11-29"),false);
+ assert.equal(contractorDateAllowed("Commercial","2026-11-22"),true);
+ assert.equal(contractorDateAllowed("Residential","2026-02-30"),false);
+ assert.equal(contractorDateAllowed("Residential","invalid"),false);
+});
+test("Sunday restrictions enforced on server, calendar and booking form",()=>{
+ const api=read("app/api/contractors/route.ts");
+ assert.match(api,/if\(!contractorDateAllowed\(division,date\)\)/);
+ const calendar=read("lib/contractors/availability.ts");
+ assert.match(calendar,/contractorDateAllowed\(division,date\)/);
+ const portal=read("components/contractors/ContractorPortal.tsx");
+ assert.match(portal,/Sundays are unavailable for residential bookings/);
+ assert.match(portal,/!contractorDateAllowed\(contractorDivision,requestedDate\)/);
 });
