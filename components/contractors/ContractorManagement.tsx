@@ -262,11 +262,17 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <Field label="Primary contact" value={companyContact} set={setCompanyContact}/>
     <button disabled={busy} className={button}>Create Company</button><p className="text-xs text-neutral-600">Saves the company under Accounts → Clients. Portal access is managed separately.</p></form></Panel>
    <Panel title="Active contractor directory"><div className="space-y-2">
-    {data?.directory.map(entry=><button key={entry.clientId} type="button" className="block w-full rounded-lg border bg-white p-3 text-left hover:border-[#143d1a]" onClick={()=>{setManagedCompanyId(entry.companyId);setCompanyId(entry.companyId);}}>
-     <b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>
-     <small className="block text-neutral-500">Portal access: {entry.portalStatus}</small>
-     <span className="mt-1 block text-sm font-bold text-[#143d1a]">Manage</span>
-    </button>)}
+    {data?.directory.map(entry=><div key={entry.clientId} className="rounded-lg border bg-white p-3">
+     <button type="button" className="block w-full text-left hover:text-[#143d1a]" onClick={()=>{setManagedCompanyId(entry.companyId);setCompanyId(entry.companyId);}}>
+      <b>{entry.name}</b><small className="block text-neutral-500">{[entry.contactName,entry.email,entry.phone].filter(Boolean).join(" · ")}</small>
+      <small className="block text-neutral-500">Portal access: {entry.portalStatus}</small>
+      <span className="mt-1 block text-sm font-bold text-[#143d1a]">Manage</span>
+     </button>
+     {profile?.role==="Master Admin"&&entry.portalStatus==="Active"&&<Link
+      href={`/contractors/preview?companyId=${encodeURIComponent(entry.companyId)}`}
+      className="mt-2 inline-flex rounded-lg border border-[#143d1a]/30 px-3 py-2 text-sm font-bold text-[#143d1a]"
+     >View as Contractor · Read Only</Link>}
+    </div>)}
     {!data?.directory.length&&<p className="text-sm text-neutral-500">No active contractor clients found.</p>}
    </div></Panel>
    {canManagePortalAccess&&<div id="manage-portal-access" ref={portalAccessRef} className="scroll-mt-20">

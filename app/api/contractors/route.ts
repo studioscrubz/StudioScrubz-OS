@@ -335,6 +335,36 @@ export async function GET(request:Request){
   const ctx=await contractorContext();
   const params=new URL(request.url).searchParams;
   const view=params.get("view");
+  if(view==="admin-portal-preview"){
+   requireMaster(ctx);
+   const companyId=uuid(params.get("companyId"));
+   const {data:company,error:companyError}=await ctx.admin.from("contractor_companies")
+    .select("id,status").eq("id",companyId).maybeSingle();
+   if(companyError)throw companyError;
+   if(!company||company.status!=="Active")throw new ContractorAccessError("Active contractor company not found.",404);
+   // This is a read-only projection; it never creates a contractor session or
+   // grants membership. The existing partner data query enforces company scoping.
+   const preview=await list({
+    type:"partner",userId:ctx.userId,role:"Company Admin",
+    companyId,admin:ctx.admin,
+   },false);
+   return noCache({
+    preview:true,
+    company:preview.company,
+    role:"Company Admin",
+    opportunities:preview.opportunities,
+    offers:preview.offers,
+    upcomingJobs:preview.upcomingJobs,
+    completedJobs:preview.completedJobs,
+    invoiceHistory:preview.invoiceHistory,
+    jobs:preview.jobs,
+    invoices:preview.invoices,
+    operationsManager:preview.operationsManager,
+    // Never expose teammate-private messages or secured documents in the preview.
+    messages:[],
+    documents:[],
+   });
+  }
   if(view==="dashboard-summary")return noCache(await contractorDashboardSummary(ctx));
   if(view==="booking-times"){
    requirePartner(ctx);
