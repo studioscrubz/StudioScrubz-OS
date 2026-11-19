@@ -1,6 +1,7 @@
 import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import "server-only";
+import {getContractorMonthlyAvailability} from "@/lib/contractors/availability";
 import {createHash} from "node:crypto";
 import { contractorScheduledJobStatuses, type ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { scheduleAttentionPushAfterResponse } from "@/lib/push/postResponse";
@@ -366,6 +367,16 @@ export async function GET(request:Request){
    });
   }
   if(view==="dashboard-summary")return noCache(await contractorDashboardSummary(ctx));
+  if(view==="availability-month"){
+   requirePartner(ctx);
+   try{return noCache(await getContractorMonthlyAvailability(params.get("month")??""));}
+   catch(error){
+    if(error instanceof Error&&/Select a valid calendar month|supports this month/.test(error.message))
+     throw new ContractorAccessError(error.message,400);
+    console.error("Contractor monthly availability unavailable",error);
+    throw new ContractorAccessError("Scheduling availability could not be verified. Please try again.",503);
+   }
+  }
   if(view==="booking-times"){
    requirePartner(ctx);
    const date=params.get("date");
