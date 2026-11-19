@@ -57,760 +57,70 @@ type NavGroup = {
 
 
 const navItems: Array<NavLink | NavGroup> = [
-
-  {
-
-    label: "Home",
-
-    href: "/lead-rep",
-
-    marker: "H",
-
-    permission: "leadRep.portal",
-
-  },
-
-  {
-
-    label: "My Leads",
-
-    href: "/lead-rep/leads",
-
-    marker: "L",
-
-    permission: "leadRep.leads.viewOwn",
-
-  },
-
-  {
-
-    label: "Commissions",
-
-    href: "/lead-rep/commissions",
-
-    marker: "$",
-
-    permission: "leadRep.commissions.viewOwn",
-
-  },
-
-  {
-
-    label: "Dashboard",
-
-    href: "/",
-
-    marker: "D",
-
-    permission: "dashboard.view",
-
-  },
-
-  {
-
-    label: "Schedule",
-
-    href: "/schedule",
-
-    marker: "S",
-
-    permission: "schedule.view",
-
-  },
-
-  {
-
-    label: "Estimates",
-
-    marker: "E",
-
-    children: [
-
-      {
-
-        label: "Estimate Calculator",
-
-        href: "/estimates",
-
-        marker: "",
-
-        permission: "estimates.create",
-
-      },
-
-      {
-
-        label: "Open Estimates",
-
-        href: "/open-estimates",
-
-        marker: "",
-
-        permission: "estimates.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Walkthroughs",
-
-    href: "/field-walkthroughs",
-
-    marker: "W",
-
-    permission: "walkthroughs.field",
-
-  },
-
-  {
-
-    label: "Proposals",
-
-    marker: "P",
-
-    children: [
-
-      {
-
-        label: "Proposal Calculator",
-
-        href: "/proposals",
-
-        marker: "",
-
-        permission: "proposals.create",
-
-      },
-
-      {
-
-        label: "Open Proposals",
-
-        href: "/open-proposals",
-
-        marker: "",
-
-        permission: "proposals.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Jobs",
-
-    marker: "J",
-
-    children: [
-
-      {
-
-        label: "Jobs",
-
-        href: "/jobs",
-
-        marker: "J",
-
-        permission: "jobs.view",
-
-      },
-
-      {
-
-        label: "Job Performance",
-
-        href: "/job-performance",
-
-        marker: "R",
-
-        permission: "reports.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Operations",
-
-    marker: "O",
-
-    children: [
-
-      { label: "Contractor Dashboard", href: "/contractors", marker: "D", permission: "contractors.view" },
-
-      { label: "Contractors", href: "/contractors/companies", marker: "C", permission: "contractors.view" },
-
-      { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
-
-      { label: "Scheduled Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
-
-      { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
-
-
-    ],
-
-  },
-
-  {
-
-    label: "Porter Hub",
-
-    marker: "P",
-
-    children: [
-
-      {
-
-        label: "Overview",
-
-        href: "/properties/porter",
-
-        marker: "",
-
-        permission: "porterVisits.view",
-
-      },
-
-      {
-
-        label: "Property Service Plans",
-
-        href: "/properties/service-plans",
-
-        marker: "",
-
-        permission: "propertyServicePlans.manage",
-
-      },
-
-      {
-
-        label: "Porter Visits",
-
-        href: "/properties/porter-visits",
-
-        marker: "",
-
-        permission: "porterVisits.view",
-
-      },
-
-      {
-
-        label: "Porter Routes",
-
-        href: "/properties/porter-routes",
-
-        marker: "",
-
-        permission: "porterVisits.view",
-
-      },
-
-      {
-
-        label: "Property Service Reports",
-
-        href: "/properties/service-reports",
-
-        marker: "",
-
-        permission: "porterVisits.manage",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Sales",
-
-    marker: "S",
-
-    children: [
-
-      {
-
-        label: "Assessments",
-
-        href: "/walkthroughs",
-
-        marker: "S",
-
-        permission: "walkthroughs.view",
-
-      },
-
-      {
-
-        label: "My Prospects",
-
-        href: "/my-prospects",
-
-        marker: "M",
-
-        permission: "prospects.view",
-
-      },
-
-      {
-
-        label: "Prospects",
-
-        href: "/prospects",
-
-        marker: "P",
-
-        permission: "prospects.view",
-
-      },
-
-      {
-
-        label: "Marketing Materials",
-
-        href: "/marketing-materials",
-
-        marker: "M",
-
-        permission: "marketingMaterials.send",
-
-      },
-
-      {
-
-        label: "Vendor Packets",
-
-        href: "/vendor-packets",
-
-        marker: "V",
-
-        permission: "estimates.create",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Invoices",
-
-    marker: "I",
-
-    children: [
-
-      {
-
-        label: "Invoices",
-
-        href: "/invoices",
-
-        marker: "I",
-
-        permission: "invoices.view",
-
-      },
-
-      {
-
-        label: "Service Agreements",
-
-        href: "/agreements",
-
-        marker: "A",
-
-        permission: "agreements.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Accounts",
-
-    marker: "A",
-
-    children: [
-
-      {
-
-        label: "Clients",
-
-        href: "/clients",
-
-        marker: "C",
-
-        permission: "clients.view",
-
-      },
-
-      {
-
-        label: "Properties",
-
-        href: "/properties",
-
-        marker: "P",
-
-        permission: "properties.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Communications",
-
-    marker: "C",
-
-    children: [
-
-      {
-
-        label: "Messages",
-
-        href: "/messages",
-
-        marker: "",
-
-        permission: "messages.view",
-
-      },
-
-      {
-
-        label: "General Email",
-
-        href: "/communications/general-email",
-
-        marker: "",
-
-        permission: "communications.create",
-
-      },
-
-      {
-
-        label: "Employee Email",
-
-        href: "/communications/employee-email",
-
-        marker: "",
-
-        permission: "employeeEmails.send",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Employees",
-
-    marker: "E",
-
-    children: [
-
-      {
-
-        label: "Employee Directory",
-
-        href: "/employees",
-
-        marker: "",
-
-        permission: "employees.directory_view",
-
-      },
-
-      {
-
-        label: "Scrub Technicians",
-
-        href: "/employees/scrub-technicians",
-
-        marker: "",
-
-        permission: "employees.scrubTechRosterView",
-
-      },
-
-      {
-
-        label: "Sales",
-
-        href: "/employees/sales",
-
-        marker: "",
-
-        permission: "employees.view",
-
-      },
-
-      {
-
-        label: "Administration / Management",
-
-        href: "/employees/administration",
-
-        marker: "",
-
-        permission: "employees.view",
-
-      },
-
-      {
-
-        label: "Applications",
-
-        href: "/applications",
-
-        marker: "",
-
-        permission: "jobApplications.manage",
-
-      },
-
-      {
-
-        label: "Time Clock",
-
-        href: "/time-clock",
-
-        marker: "",
-
-        permission: "timeClock.view",
-
-      },
-
-      {
-
-        label: "Time Off",
-
-        href: "/time-off",
-
-        marker: "",
-
-        permission: "timeOff.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Finances",
-
-    marker: "F",
-
-    children: [
-
-      {
-
-        label: "Revenue",
-
-        href: "/revenue",
-
-        marker: "",
-
-        permission: "finances.view",
-
-      },
-
-      {
-
-        label: "Customer Credits",
-
-        href: "/customer-credits",
-
-        marker: "",
-
-        permission: "customerCredits.manage",
-
-      },
-
-      {
-
-        label: "Commission Payouts",
-
-        href: "/lead-commission-payouts",
-
-        marker: "",
-
-        permission: "leadRep.payouts.manage",
-
-      },
-
-      {
-
-        label: "Expenses",
-
-        href: "/expenses",
-
-        marker: "",
-
-        permission: "expenses.view",
-
-      },
-
-      {
-
-        label: "Vehicles",
-
-        href: "/vehicles",
-
-        marker: "",
-
-        permission: "vehicles.view",
-
-      },
-
-      {
-
-        label: "Payroll Preparation",
-
-        href: "/payroll-prep",
-
-        marker: "",
-
-        permission: "payrollPrep.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "User Management",
-
-    marker: "U",
-
-    children: [
-
-      {
-
-        label: "Users",
-
-        href: "/users",
-
-        marker: "",
-
-        permission: "users.manage",
-
-      },
-
-      {
-
-        label: "Archives",
-
-        href: "/archives",
-
-        marker: "",
-
-        permission: "archives.view",
-
-      },
-
-    ],
-
-  },
-
-  {
-
-    label: "Settings",
-
-    marker: "S",
-
-    children: [
-
-      {
-
-        label: "Appearance",
-
-        href: "/settings",
-
-        marker: "",
-
-        permission: "appearance.view",
-
-      },
-
-      {
-        label: "Email Signature",
-        href: "/settings/email",
-        marker: "",
-        permission: "emailSettings.view",
-      },
-
-      {
-
-        label: "Notifications",
-
-        href: "/settings/notifications",
-
-        marker: "",
-
-        permission: "attention.view",
-
-      },
-
-      {
-
-        label: "Service Catalog",
-
-        href: "/settings/services",
-
-        marker: "",
-
-        permission: "settings.manage",
-
-      },
-
-      {
-
-        label: "Business Settings",
-
-        href: "/settings/business",
-
-        marker: "",
-
-        permission: "settings.manage",
-
-      },
-
-    ],
-
-  },
-
+  { label: "Home", href: "/lead-rep", marker: "H", permission: "leadRep.portal" },
+  { label: "My Leads", href: "/lead-rep/leads", marker: "L", permission: "leadRep.leads.viewOwn" },
+  { label: "Commissions", href: "/lead-rep/commissions", marker: "$", permission: "leadRep.commissions.viewOwn" },
+  { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
+  { label: "Work", marker: "W", children: [
+    { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
+    { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
+    { label: "Job Performance", href: "/job-performance", marker: "R", permission: "reports.view" },
+    { label: "Walkthroughs", href: "/field-walkthroughs", marker: "W", permission: "walkthroughs.field" },
+    { label: "Porter Hub Overview", href: "/properties/porter", marker: "", permission: "porterVisits.view" },
+    { label: "Property Service Plans", href: "/properties/service-plans", marker: "", permission: "propertyServicePlans.manage" },
+    { label: "Porter Visits", href: "/properties/porter-visits", marker: "", permission: "porterVisits.view" },
+    { label: "Porter Routes", href: "/properties/porter-routes", marker: "", permission: "porterVisits.view" },
+    { label: "Property Service Reports", href: "/properties/service-reports", marker: "", permission: "porterVisits.manage" },
+  ] },
+  { label: "Sales", marker: "S", children: [
+    { label: "Estimate Calculator", href: "/estimates", marker: "", permission: "estimates.create" },
+    { label: "Open Estimates", href: "/open-estimates", marker: "", permission: "estimates.view" },
+    { label: "Proposal Calculator", href: "/proposals", marker: "", permission: "proposals.create" },
+    { label: "Open Proposals", href: "/open-proposals", marker: "", permission: "proposals.view" },
+    { label: "Assessments", href: "/walkthroughs", marker: "S", permission: "walkthroughs.view" },
+    { label: "My Prospects", href: "/my-prospects", marker: "M", permission: "prospects.view" },
+    { label: "Prospects", href: "/prospects", marker: "P", permission: "prospects.view" },
+    { label: "Marketing Materials", href: "/marketing-materials", marker: "M", permission: "marketingMaterials.send" },
+    { label: "Vendor Packets", href: "/vendor-packets", marker: "V", permission: "estimates.create" },
+    { label: "Clients", href: "/clients", marker: "C", permission: "clients.view" },
+    { label: "Properties", href: "/properties", marker: "P", permission: "properties.view" },
+  ] },
+  { label: "Contractors", marker: "C", children: [
+    { label: "Contractor Dashboard", href: "/contractors", marker: "D", permission: "contractors.view" },
+    { label: "Contractors", href: "/contractors/companies", marker: "C", permission: "contractors.view" },
+    { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
+    { label: "Scheduled Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
+    { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
+  ] },
+  { label: "Billing & Finance", marker: "F", children: [
+    { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
+    { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
+    { label: "Revenue", href: "/revenue", marker: "", permission: "finances.view" },
+    { label: "Customer Credits", href: "/customer-credits", marker: "", permission: "customerCredits.manage" },
+    { label: "Commission Payouts", href: "/lead-commission-payouts", marker: "", permission: "leadRep.payouts.manage" },
+    { label: "Expenses", href: "/expenses", marker: "", permission: "expenses.view" },
+    { label: "Vehicles", href: "/vehicles", marker: "", permission: "vehicles.view" },
+    { label: "Payroll Preparation", href: "/payroll-prep", marker: "", permission: "payrollPrep.view" },
+  ] },
+  { label: "Team", marker: "T", children: [
+    { label: "Employee Directory", href: "/employees", marker: "", permission: "employees.directory_view" },
+    { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "", permission: "employees.scrubTechRosterView" },
+    { label: "Sales", href: "/employees/sales", marker: "", permission: "employees.view" },
+    { label: "Administration / Management", href: "/employees/administration", marker: "", permission: "employees.view" },
+    { label: "Applications", href: "/applications", marker: "", permission: "jobApplications.manage" },
+    { label: "Time Clock", href: "/time-clock", marker: "", permission: "timeClock.view" },
+    { label: "Time Off", href: "/time-off", marker: "", permission: "timeOff.view" },
+  ] },
+  { label: "Settings", marker: "S", children: [
+    { label: "Appearance", href: "/settings", marker: "", permission: "appearance.view" },
+    { label: "Email Signature", href: "/settings/email", marker: "", permission: "emailSettings.view" },
+    { label: "Notifications", href: "/settings/notifications", marker: "", permission: "attention.view" },
+    { label: "Service Catalog", href: "/settings/services", marker: "", permission: "settings.manage" },
+    { label: "Business Settings", href: "/settings/business", marker: "", permission: "settings.manage" },
+    { label: "Users", href: "/users", marker: "", permission: "users.manage" },
+    { label: "Archives", href: "/archives", marker: "", permission: "archives.view" },
+  ] },
 ];
-
-
 
 function isGroup(item: NavLink | NavGroup): item is NavGroup {
 
@@ -944,6 +254,9 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
 
 
+  const role = auth.profile?.role;
+  const fieldRole = role === "Crew Lead" || role === "Scrub Technician";
+
   const visibleItems = navItems.reduce<Array<NavLink | NavGroup>>(
 
     (items, item) => {
@@ -982,12 +295,17 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
 
 
 
-      return children.length
+      if (item.label === "Work" && fieldRole) {
+        const isQuickLink = (link: NavLink) => link.href === "/schedule" || link.href === "/jobs";
+        items = [...items, ...children.filter(isQuickLink)];
+        const remaining = children.filter((link) => !isQuickLink(link));
+        return remaining.length ? [...items, { ...item, children: remaining }] : items;
+      }
 
-        ? [...items, { ...item, children }]
-
-        : items;
-
+      const label = role === "Lead Representative" && item.label === "Team"
+        ? "Employees"
+        : item.label;
+      return children.length ? [...items, { ...item, label, children }] : items;
     },
 
     [],
@@ -1299,7 +617,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                     <NavMarker value={item.marker} />
 
                     <span className="flex-1">{item.label}</span>
-                    {item.label === "Operations" && hasPermission(auth.profile, "contractors.view") && contractorRequests > 0 && (
+                    {item.label === "Contractors" && hasPermission(auth.profile, "contractors.view") && contractorRequests > 0 && (
                       <span aria-label={`${contractorRequests} job opportunities need review`} className="min-w-5 rounded-full bg-red-700 px-1.5 text-center text-xs font-bold leading-5 text-white">
                         {contractorRequests}
                       </span>

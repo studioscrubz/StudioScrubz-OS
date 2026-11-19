@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -445,6 +446,16 @@ export function MessagesPage() {
             </button>
           ) : null}
         </div>
+        {(hasPermission(profile, "communications.create") || hasPermission(profile, "employeeEmails.send")) && (
+          <nav aria-label="Email tools" className="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-[#143d1a]">
+            {hasPermission(profile, "communications.create") && (
+              <Link className="underline underline-offset-4" href="/communications/general-email">General Email</Link>
+            )}
+            {hasPermission(profile, "employeeEmails.send") && (
+              <Link className="underline underline-offset-4" href="/communications/employee-email">Employee Email</Link>
+            )}
+          </nav>
+        )}
       </header>
 
       <div

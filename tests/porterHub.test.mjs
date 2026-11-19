@@ -76,7 +76,7 @@ test("dashboard includes role-aware links and graceful loading, empty, error, an
   assert.match(component, /management && <Link[^>]+service-reports/);
   assert.match(component, /href="\/properties\/porter-visits"/);
   assert.match(component, /href="\/properties\/porter-routes"/);
-  assert.match(sidebar, /label: "Overview"[\s\S]*href: "\/properties\/porter"[\s\S]*permission: "porterVisits\.view"/);
+  assert.match(sidebar, /label: "Porter Hub Overview"[\s\S]*href: "\/properties\/porter"[\s\S]*permission: "porterVisits\.view"/);
 });
 
 test("dashboard reads only existing authorized services and does not mutate Porter records", () => {
