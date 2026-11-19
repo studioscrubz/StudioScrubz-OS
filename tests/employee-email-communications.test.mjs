@@ -7,13 +7,13 @@ const route = read("app/api/communications/employee-email/route.ts");
 const page = read("components/communications/EmployeeEmailPage.tsx");
 const migration = read("supabase/migrations/20261017162512_employee_email_communications.sql");
 const permissions = read("lib/auth/permissions.ts");
-const sidebar = read("components/layout/Sidebar.tsx");
+const messages = read("components/messages/MessagesPage.tsx");
 
 test("employee email is restricted to active Master Admin and Administrator users", () => {
   assert.match(route, /AUTHORIZED_ROLES = new Set\(\["Master Admin", "Administrator"\]\)/);
   assert.match(route, /!profile\?\.is_active \|\| !AUTHORIZED_ROLES\.has\(profile\.role\)/);
   assert.match(permissions, /operationalAdmin[\s\S]*"employeeEmails\.send"/);
-  assert.match(sidebar, /Employee Email[\s\S]*employeeEmails\.send/);
+  assert.match(messages, /hasPermission\(profile, "employeeEmails\.send"\)[\s\S]*>Employee Email<\/Link>/);
 });
 
 test("server resolves active employee recipients without trusting browser email addresses", () => {

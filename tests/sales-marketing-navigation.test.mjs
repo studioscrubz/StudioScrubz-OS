@@ -6,9 +6,9 @@ const sidebar = readFileSync(new URL("../components/layout/Sidebar.tsx", import.
 test("Marketing Materials and Vendor Packets live inside Sales without duplicate navigation groups", () => {
   const nav=sidebar.slice(sidebar.indexOf("const navItems:"),sidebar.indexOf("function isGroup("));
   const salesStart=nav.indexOf('label: "Sales"');
-  const invoicesStart=nav.indexOf('label: "Invoices"', salesStart);
-  assert.ok(salesStart>=0&&invoicesStart>salesStart);
-  const sales=nav.slice(salesStart,invoicesStart);
+  const salesEnd=nav.indexOf('label: "Contractors"', salesStart);
+  assert.ok(salesStart>=0&&salesEnd>salesStart);
+  const sales=nav.slice(salesStart,salesEnd);
   assert.match(sales,/href: "\/marketing-materials"/);
   assert.match(sales,/href: "\/vendor-packets"/);
   assert.match(sales,/permission: "marketingMaterials.send"/);

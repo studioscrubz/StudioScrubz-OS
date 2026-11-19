@@ -38,12 +38,11 @@ test("unread state is based on messages and read states", () => {
   assert.match(sidebar, /getUnreadDirectMessageCount/);
 });
 
-test("sidebar exposes Messages above Employee Email in Communications using the same route and permission", () => {
-  const communications = sidebar.slice(sidebar.indexOf('label: "Communications"'), sidebar.indexOf('label: "Employees"'));
-  assert.match(communications, /label: "Messages"[\s\S]*href: "\/messages"[\s\S]*permission: "messages\.view"/);
-  assert.ok(communications.indexOf('label: "Messages"') < communications.indexOf('label: "Employee Email"'));
-  assert.match(communications, /label: "Employee Email"[\s\S]*permission: "employeeEmails\.send"/);
-  assert.equal((sidebar.match(/(?:href:\s*|href=)"\/messages"/g) ?? []).length, 2);
+test("Messages keeps one sidebar shortcut and exposes email tools by permission", () => {
+  assert.equal((sidebar.match(/href="\/messages"/g) ?? []).length, 1);
+  assert.doesNotMatch(sidebar, /href: "\/communications\/(general-email|employee-email)"/);
+  assert.match(page, /hasPermission\(profile, "communications\.create"\)[\s\S]*href="\/communications\/general-email"/);
+  assert.match(page, /hasPermission\(profile, "employeeEmails\.send"\)[\s\S]*href="\/communications\/employee-email"/);
 });
 
 test("existing Messages header bubble keeps unread count behavior and click action", () => {
