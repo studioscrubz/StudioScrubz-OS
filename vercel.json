@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/shared-building-gps": false,
       "fix/residential-saturday-closure": false,
       "ui/remove-recent-opportunities": false,
       "fix/brava-zelle-invoices": false,

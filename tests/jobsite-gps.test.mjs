@@ -66,3 +66,17 @@ test("job details connect GPS without gating original job lifecycle", () => {
  assert.match(jobs, /startOperationalJob\(job\.id\)/);
  assert.match(jobs, /joinJob\(job\.id\)/);
 });
+
+test("job GPS shares setup only at an active, fully matched building and keeps job-specific arrival", () => {
+ const migration = readFileSync("supabase/migrations/20261120213000_share_verified_building_jobsite_gps.sql", "utf8");
+ assert.match(migration, /candidate\.client_id=target\.client_id/);
+ for (const field of ["address", "city", "state", "zip"]) {
+  assert.match(migration, new RegExp(`nullif\\([^\\n]*target\\.${field}[^\\n]*=.+candidate\\.${field}`));
+ }
+ assert.doesNotMatch(migration, /address_line_2/);
+ assert.match(migration, /target\.archived_at is null and candidate\.archived_at is null/);
+ assert.match(migration, /own\.property_id=target\.id/);
+ assert.equal((migration.match(/from private\.resolve_jobsite_geofence\(/g) ?? []).length, 4);
+ assert.match(migration, /c\.job_id=p_job_id and c\.employee_id=v_lead/);
+ assert.match(migration, /v_check\.result<>'Within Radius'/);
+});
