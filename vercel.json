@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/brava-zelle-invoices": false,
       "feature/scrub-tech-careers": false,
       "ui/condensed-os-sidebar": false,
       "fix/mobile-calendar-requestable-label": false,
