@@ -194,22 +194,7 @@ export function ContractorPortal(){
      {job.location&&<p className="text-sm">{job.location}</p>}
     </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
    </PortalPanel>}
-    <PortalPanel title="Recent opportunities">{data.opportunities.slice(0,15).map(opportunity=>{
-     const job=data.jobs.find(job=>job.id===opportunity.linked_job_id);
-     const scheduledDate=job?.scheduled_date
-      ?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(job.scheduled_date))
-      :null;
-     return <button key={opportunity.id} type="button" className="flex w-full flex-wrap items-start justify-between gap-2 border-b p-3 text-left hover:bg-neutral-50" onClick={()=>{setOpportunityId("");setTab("jobs")}}>
-      <span><b>{opportunity.property_name??opportunity.property_address}</b>
-       <small className="block">{opportunity.opportunity_number} · {opportunity.service_type}</small>
-       {scheduledDate&&<span className="mt-1 block text-sm">
-        <span className="block"><b>Scheduled</b> {scheduledDate} · {formatTime12Hour(job?.start_time,"Time pending")}</span>
-        <span className="block"><b>Location</b> {opportunity.property_address}</span>
-       </span>}
-      </span>
-      <span>{opportunity.status}</span>
-     </button>;
-    })}</PortalPanel></>}
+   </>}
    {data&&tab==="jobs"&&<PortalPanel title="Upcoming jobs">
     {data.upcomingJobs?.length?data.upcomingJobs.map(job=><div key={job.id} className="border-b py-3 last:border-b-0">
      <b>{job.property_name??job.service_name??job.job_number}</b>

@@ -90,14 +90,6 @@ export function ContractorPortalAdminPreview({companyId}:{companyId:string}){
       {job.location&&<p className="text-sm">{job.location}</p>}
      </div>):<p className="text-sm text-neutral-600">No upcoming jobs scheduled.</p>}
     </section>}
-     <section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Recent opportunities</h2>
-      {data.opportunities.slice(0,15).map(op=><div key={op.id} className="flex flex-wrap items-start justify-between gap-2 border-b py-3">
-       <div><b>{op.property_name??op.property_address}</b><p className="text-sm">{op.opportunity_number} · {op.service_type}</p>
-        <p className="text-sm">{date(op.requested_date)}{op.requested_time?` · ${formatTime12Hour(op.requested_time)}`:""} · {op.property_address}</p></div>
-       <span className="text-sm">{op.status}</span>
-      </div>)}
-      {!data.opportunities.length&&<p className="text-sm text-neutral-600">No opportunities submitted.</p>}
-     </section>
     </>}
     {tab==="calendar"&&<ContractorAvailabilityCalendar previewCompanyId={companyId}/>}
     {tab==="jobs"&&<section className={panel}><h2 className="mb-4 text-xl font-extrabold text-[#143d1a]">Upcoming jobs</h2>
