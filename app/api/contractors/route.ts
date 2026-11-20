@@ -623,7 +623,7 @@ export async function POST(request:Request){
     .select("contractor_division").eq("id",companyId).single();
    if(divisionLoadError||!submissionCompany)throw divisionLoadError??new ContractorAccessError("Contractor division unavailable.",503);
    const division=submissionCompany.contractor_division as ContractorDivision;
-   if(!contractorDateAllowed(division,date))throw new ContractorAccessError("Residential bookings are unavailable on Sundays. Please select Monday through Saturday.",400);
+   if(!contractorDateAllowed(division,date))throw new ContractorAccessError("Residential bookings are unavailable on this date. Please choose an available date.",400);
    if(type!==division)throw new ContractorAccessError(`This is a ${division.toLowerCase()} contractor account. Choose ${division.toLowerCase()} service.`,400);
    const cleanersRequested=Math.max(1,Math.min(100,Math.trunc(Number(input.cleaners)||1)));
    const estimatedMinutes=Math.max(1,Math.ceil(hours/cleanersRequested*60));

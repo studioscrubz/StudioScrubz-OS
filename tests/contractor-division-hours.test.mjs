@@ -42,21 +42,24 @@ test("Booking requests, imported bookings, and calendar enforce company division
  assert.match(management,/contractor_division:companyEdit\.contractor_division/);
 });
 
-test("Residential Sundays unavailable including month-end and year transitions",()=>{
+test("Residential weekends close after the last open Saturday, and Sundays are always closed",()=>{
  assert.equal(contractorDateAllowed("Residential","2026-11-22"),false);
  assert.equal(contractorDateAllowed("Residential","2026-11-23"),true);
  assert.equal(contractorDateAllowed("Residential","2026-11-21"),true);
+ assert.equal(contractorDateAllowed("Residential","2026-11-28"),false);
  assert.equal(contractorDateAllowed("Residential","2026-11-29"),false);
+ assert.equal(contractorDateAllowed("Residential","2027-01-02"),false);
+ assert.equal(contractorDateAllowed("Commercial","2026-11-28"),true);
  assert.equal(contractorDateAllowed("Commercial","2026-11-22"),true);
  assert.equal(contractorDateAllowed("Residential","2026-02-30"),false);
  assert.equal(contractorDateAllowed("Residential","invalid"),false);
 });
-test("Sunday restrictions enforced on server, calendar and booking form",()=>{
+test("Weekend restrictions enforced on server, calendar and booking form",()=>{
  const api=read("app/api/contractors/route.ts");
  assert.match(api,/if\(!contractorDateAllowed\(division,date\)\)/);
  const calendar=read("lib/contractors/availability.ts");
  assert.match(calendar,/contractorDateAllowed\(division,date\)/);
  const portal=read("components/contractors/ContractorPortal.tsx");
- assert.match(portal,/Sundays are unavailable for residential bookings/);
+ assert.match(portal,/Residential bookings are unavailable on this date/);
  assert.match(portal,/!contractorDateAllowed\(contractorDivision,requestedDate\)/);
 });
