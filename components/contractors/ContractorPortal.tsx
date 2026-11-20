@@ -168,7 +168,7 @@ export function ContractorPortal(){
      setTab("submit");
     }}
    />}
-   {data&&tab==="dashboard"&&<><p className="text-sm font-bold text-[#143d1a]">{contractorDivision} Contractor{contractorDivision==="Residential"?" · Monday–Saturday · Starts 8:00 AM–6:00 PM · Finish by 8:00 PM Pacific":" · Commercial scheduling"}</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+   {data&&tab==="dashboard"&&<><p className="text-sm font-bold text-[#143d1a]">{contractorDivision} Contractor{contractorDivision==="Residential"?" · Starts 8:00 AM–6:00 PM · Finish by 8:00 PM Pacific":" · Commercial scheduling"}</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">
     {[["Submitted opportunities",data.opportunities.length],["Pending decisions",data.opportunities.filter(x=>["New Opportunity","Information Requested","Negotiating","Awaiting Approval"].includes(x.status)).length],
      ["Accepted jobs",data.opportunities.filter(x=>Boolean(x.linked_job_id)).length],["Outstanding invoices",currency(invoiceTotals.due)]].map(([label,value])=><div key={String(label)} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{label}</p><p className="mt-2 text-2xl font-extrabold text-[#143d1a]">{value}</p></div>)}</div>
     <PortalPanel title="Invoice history">
@@ -269,10 +269,10 @@ export function ContractorPortal(){
       <ContractorAvailabilityCalendar requestDurationMinutes={estimatedDurationMinutes} building={{address:address.street,city:address.city,state:address.state,zip:address.zip}} chosenDate={requestedDate} onChoose={(date,time)=>{
        setRequestedDate(date);setRequestedTime(time);setBookingRetry(value=>value+1);
       }}/>
-      {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential bookings: Monday–Saturday, starts 8:00 AM–6:00 PM Pacific, finish by 8:00 PM. Sundays unavailable.</p>}
+      {contractorDivision==="Residential"&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Residential bookings start 8:00 AM–6:00 PM Pacific and finish by 8:00 PM. Sundays and Saturdays after November 21, 2026 are closed.</p>}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
      <PortalField label="Requested service date" value={requestedDate} set={date=>{setRequestedDate(date);setRequestedTime("");setBookingRetry(retry=>retry+1);}} type="date" required/>
-     {requestedDate&&contractorDivision==="Residential"&&!contractorDateAllowed(contractorDivision,requestedDate)&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-900 md:col-span-2">Sundays are unavailable for residential bookings. Please choose Monday through Saturday.</p>}
+     {requestedDate&&contractorDivision==="Residential"&&!contractorDateAllowed(contractorDivision,requestedDate)&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-900 md:col-span-2">Residential bookings are unavailable on this date. Please choose an available date.</p>}
      <label className="text-sm font-bold">Requested start time (Pacific time)
       <select className={input} required disabled={!blockedTimes||!contractorDateAllowed(contractorDivision,requestedDate)} value={requestedTime} onChange={event=>setRequestedTime(event.target.value)}>
        <option value="">{!requestedDate?"Choose a date first":!blockedTimes?"Checking available times…":"Choose a start time"}</option>
