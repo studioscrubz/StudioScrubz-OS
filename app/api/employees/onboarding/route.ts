@@ -170,18 +170,11 @@ export async function POST(req:Request){
       .select("status").eq("employee_id",caseRow.employee_id).maybeSingle();
     if(screenError)throw screenError;
     if(screening?.status!=="cleared")throw new OnboardingError("Background screening is not cleared.");
-    // Keep employee record inactive until all checks pass. Existing workers are not reclassified.
-    const {error:activateError}=await admin.from("employees").update({
-      employment_status:"Active",job_title:caseRow.position,
-      hourly_rate:caseRow.hourly_rate,
-    }).eq("id",caseRow.employee_id);
-    if(activateError)throw activateError;
-    const {error:approveError}=await admin.from("employee_onboarding_cases").update({
-      status:"completed",approved_at:new Date().toISOString(),approved_by:actor,
-      invite_token_hash:null,invite_expires_at:null,updated_at:new Date().toISOString(),
-    }).eq("id",caseId);
+    // Atomic transaction: updates onboarding, employee activation, and audit together.
+    const {error:approveError}=await admin.rpc("complete_employee_onboarding",{
+      p_case_id:caseId,p_actor_id:actor
+    });
     if(approveError)throw approveError;
-    await audit(admin,caseId,"approved",actor);
     return Response.json({ok:true},{headers:noStore});
   }
   throw new OnboardingError("Unsupported onboarding action.");
