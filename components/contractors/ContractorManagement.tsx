@@ -30,6 +30,8 @@ type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
+const noScheduledJobs: ContractorScheduledJob[]=[];
+
 type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];completedJobCounts?:Record<string,number>;upcomingJobs?:ContractorScheduledJob[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
@@ -182,18 +184,20 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
  const currentPreparedText=preparedText?.companyId===companyId&&preparedText.email===inviteEmail&&preparedText.phone===smsPhone?preparedText:null;
  const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
+ const scheduledJobs=data?.upcomingJobs??noScheduledJobs;
  const calendarJobIds=useMemo(()=>{
   const ids=new Set<string>();
   if(view==="jobs"){
+   for(const job of scheduledJobs)ids.add(job.id);
    for(const opportunity of visibleOpportunities){
     if(opportunity.linked_job_id)ids.add(opportunity.linked_job_id);
    }
   }
   return ids;
- },[visibleOpportunities,view]);
- const scheduledJobs=data?.upcomingJobs??[];
+ },[visibleOpportunities,view,scheduledJobs]);
  const visibleOpportunityIds=new Set(visibleOpportunities.map(opportunity=>opportunity.id));
- const directScheduledJobs=scheduledJobs.filter(job=>!calendarJobIds.has(job.id)&&
+ const primaryJobIds=new Set(visibleOpportunities.map(opportunity=>opportunity.linked_job_id));
+ const directScheduledJobs=scheduledJobs.filter(job=>!primaryJobIds.has(job.id)&&
   (!job.sourceOpportunityId||!visibleOpportunityIds.has(job.sourceOpportunityId)));
  const calendarClientIds=useMemo(()=>new Set(data?.directory.map(entry=>entry.clientId)),[data?.directory]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
@@ -368,7 +372,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <p className="text-xs text-neutral-500">Operations Managers may activate pending contractors. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
-   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
+   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds} initialDate={scheduledJobs[0]?.scheduled_date}/>}
    {view==="opportunities"&&canManagePortalAccess&&<>
     <button type="button" className={button} onClick={()=>{setError("");submissionDialog.current?.showModal();}}>Submit Job Details</button>
     <dialog ref={submissionDialog} aria-labelledby="opportunity-submission-title"
@@ -539,7 +543,6 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Requested:</b> {selected.requested_date}</p><p><b>Status:</b> {selected.status}</p>
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
      <p><b>Agreed compensation:</b> {currency(selected.agreed_amount)}</p>
-     {hasPermission(profile,"agreements.manage")&&selected.request_property_id&&clientByCompany.get(selected.company_id)&&<Link className={secondary} href={`/agreements?contractorOpportunityId=${encodeURIComponent(selected.id)}`}>Create recurring service agreement</Link>}
      {(companies.find(company=>company.id===selected.company_id)?.minimum_crew_size??1)>1&&<p className="font-bold">Minimum crew: {companies.find(company=>company.id===selected.company_id)?.minimum_crew_size} people total (including crew lead).</p>}
      <p><b>Contractor written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      {view==="opportunities"&&!selected.linked_job_id&&!selected.partner_confirmed_at&&
@@ -608,7 +611,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       <ContractorRecurringSchedule key={selected.id} start={selected.requested_date} frequency={contractorBookingFrequency(selected.request_options?.bookingFrequency)}
        busy={busy} onSchedule={dates=>void run("scheduleRecurringVisits",{opportunityId:selected.id,dates})}/>}
      <div className="flex flex-wrap gap-2">
-      {view==="opportunities"&&<>{contractorBookingFrequency(selected.request_options?.bookingFrequency)!=="One-Time"?<Link className={button} href={`/agreements?contractorOpportunityId=${encodeURIComponent(selected.id)}`}>Use service agreement instead</Link>:<button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>}
+      {view==="opportunities"&&<>{contractorBookingFrequency(selected.request_options?.bookingFrequency)==="One-Time"&&<button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>}
       <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button></>}
       {view==="jobs"&&["Accepted","Crew Assignment"].includes(selected.status)&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
       {!selected.linked_job_id&&<button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("cancelOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Cancel opportunity</button>}

@@ -123,9 +123,10 @@ function walkthroughClient(walkthrough: WalkthroughWithRelations) {
     "Deleted Client"
   );
 }
-export function SchedulePage({ scheduledJobIds, scheduledClientIds }: {
+export function SchedulePage({ scheduledJobIds, scheduledClientIds, initialDate }: {
   scheduledJobIds?: ReadonlySet<string>;
   scheduledClientIds?: ReadonlySet<string>;
+  initialDate?: string;
 }) {
   const contractorCalendar = scheduledJobIds !== undefined;
   const communication = useJobCommunication();
@@ -154,7 +155,7 @@ export function SchedulePage({ scheduledJobIds, scheduledClientIds }: {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [view, setView] = useState<View>("Week");
-  const [selectedDate, setSelectedDate] = useState(today());
+  const [selectedDate, setSelectedDate] = useState(() => initialDate ?? today());
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<(typeof statuses)[number]>("All");
   const [division, setDivision] = useState("All");
