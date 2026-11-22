@@ -539,7 +539,6 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <p><b>Requested:</b> {selected.requested_date}</p><p><b>Status:</b> {selected.status}</p>
      <p><b>Original offer:</b> {currency(selected.proposed_amount)}</p>
      <p><b>Agreed compensation:</b> {currency(selected.agreed_amount)}</p>
-     {hasPermission(profile,"agreements.manage")&&selected.request_property_id&&clientByCompany.get(selected.company_id)&&<Link className={secondary} href={`/agreements?contractorOpportunityId=${encodeURIComponent(selected.id)}`}>Create recurring service agreement</Link>}
      {(companies.find(company=>company.id===selected.company_id)?.minimum_crew_size??1)>1&&<p className="font-bold">Minimum crew: {companies.find(company=>company.id===selected.company_id)?.minimum_crew_size} people total (including crew lead).</p>}
      <p><b>Contractor written confirmation:</b> {selected.partner_confirmed_at?"Received":"Required"}</p>
      {view==="opportunities"&&!selected.linked_job_id&&!selected.partner_confirmed_at&&
@@ -608,7 +607,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       <ContractorRecurringSchedule key={selected.id} start={selected.requested_date} frequency={contractorBookingFrequency(selected.request_options?.bookingFrequency)}
        busy={busy} onSchedule={dates=>void run("scheduleRecurringVisits",{opportunityId:selected.id,dates})}/>}
      <div className="flex flex-wrap gap-2">
-      {view==="opportunities"&&<>{contractorBookingFrequency(selected.request_options?.bookingFrequency)!=="One-Time"?<Link className={button} href={`/agreements?contractorOpportunityId=${encodeURIComponent(selected.id)}`}>Use service agreement instead</Link>:<button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>}
+      {view==="opportunities"&&<>{contractorBookingFrequency(selected.request_options?.bookingFrequency)==="One-Time"&&<button className={button} disabled={busy||selected.status!=="Awaiting Approval"||!selected.partner_confirmed_at} onClick={()=>void run("accept",{opportunityId:selected.id,reason:reviewReason})}>Accept & create operational Job</button>}
       <button className={secondary} disabled={busy||!reviewReason} onClick={()=>void run("decline",{opportunityId:selected.id,reason:reviewReason})}>Decline</button></>}
       {view==="jobs"&&["Accepted","Crew Assignment"].includes(selected.status)&&!selected.linked_job_id&&<button className={secondary} disabled={busy} onClick={()=>void run("retryJobConversion",{opportunityId:selected.id})}>Retry Job handoff</button>}
       {!selected.linked_job_id&&<button className={secondary} disabled={busy||reviewReason.trim().length<8} onClick={()=>void run("cancelOpportunity",{opportunityId:selected.id,reason:reviewReason})}>Cancel opportunity</button>}
