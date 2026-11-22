@@ -52,7 +52,14 @@ export async function GET(request:Request) {
   const query=admin.from("employee_background_screenings").select("employee_id,status,provider,provider_reference,conditional_offer_at,authorization_recorded_at,authorization_reference,invitation_at,completed_at,reviewed_at,cleared_at,updated_at").order("updated_at",{ascending:false});
   const {data,error}=employeeId?await query.eq("employee_id",validateId(employeeId)):await query.limit(200);
   if(error) throw error;
-  return Response.json({screenings:data??[]},{headers:noStore});
+  const eventQuery=admin.from("employee_background_screening_events")
+    .select("id,employee_id,previous_status,next_status,actor_id,occurred_at,action_reference")
+    .order("occurred_at",{ascending:false}).limit(100);
+  const {data:events,error:eventError}=employeeId
+    ? await eventQuery.eq("employee_id",validateId(employeeId))
+    : await eventQuery;
+  if(eventError)throw eventError;
+  return Response.json({screenings:data??[],events:events??[]},{headers:noStore});
  }catch(e){return reject(e);}
 }
 export async function POST(request:Request) {
