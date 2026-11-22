@@ -233,7 +233,7 @@ async function contractorDashboardSummary(ctx:ContractorContext){
  ]);
  return {invoiceTotals,upcomingJobs,completedJobCounts};
 }
-async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
+async function list(ctx:ContractorContext,includeInvoiceTotals:boolean,includeScheduledJobs=false){
  const db=ctx.admin;
  if(ctx.type==="internal"){
   const [companies,opportunities,offers,invitations,assessments,members,documents,managers,attempts,followups,activeClients]=await Promise.all([
@@ -282,7 +282,7 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean){
   const [invoiceTotals,upcomingJobs,completedJobCounts]=includeInvoiceTotals?await Promise.all([
    contractorInvoiceTotals(db,directoryClientIds),upcomingContractorJobs(db,directoryClientIds),
    completedContractorJobCounts(db,directoryClientIds),
-  ]):[undefined,[],undefined];
+  ]):[undefined,includeScheduledJobs?await upcomingContractorJobs(db,directoryClientIds):[],undefined];
   return {role:ctx.role,companies:companies.data,directory,invoiceTotals,upcomingJobs,completedJobCounts,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    viewerId:ctx.userId,attempts:attempts.data,followups:followups.data,
@@ -416,7 +416,7 @@ export async function GET(request:Request){
    requirePartner(ctx);
    return noCache(await loadContractorJobOptions());
   }
-  return noCache(await list(ctx,view==="dashboard"));
+  return noCache(await list(ctx,view==="dashboard",view==="scheduled-jobs"));
  }catch(error){return handleContractorError(error);}
 }
 export async function POST(request:Request){

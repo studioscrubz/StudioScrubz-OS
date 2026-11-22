@@ -82,7 +82,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const refreshSequence=useRef(0);
  const refresh=useCallback(async()=>{
   const sequence=++refreshSequence.current;
-  const response=await fetch(view==="dashboard"?"/api/contractors?view=dashboard-core":"/api/contractors",{cache:"no-store"});
+  const response=await fetch(view==="dashboard"?"/api/contractors?view=dashboard-core":view==="jobs"?"/api/contractors?view=scheduled-jobs":"/api/contractors",{cache:"no-store"});
   const result=await response.json();
   if(!response.ok)throw new Error(result.error??"Contractor data unavailable");
   if(sequence!==refreshSequence.current)return;
@@ -190,6 +190,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }
   return ids;
  },[visibleOpportunities,view]);
+ const directScheduledJobs=(data?.upcomingJobs??[]).filter(job=>!calendarJobIds.has(job.id));
  const calendarClientIds=useMemo(()=>new Set(data?.directory.map(entry=>entry.clientId)),[data?.directory]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
  const selectedId=selected?.id;
@@ -505,6 +506,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
     </div>
     </dialog>
    </>}
+   {view==="jobs"&&directScheduledJobs.length>0&&<Panel title="Scheduled jobs without an opportunity">
+    <ul className="divide-y">
+     {directScheduledJobs.map(job=><li key={job.id} className="py-3">
+      <Link className="font-bold text-[#143d1a] underline" href={`/jobs?jobId=${job.id}`}>{job.job_number}</Link>
+      <p className="text-sm">{[job.property_name,job.service_name].filter(Boolean).join(" · ")}</p>
+      <p className="text-sm">{job.scheduled_date}{job.start_time&&` · ${job.start_time.slice(0,5)} Pacific`}</p>
+     </li>)}
+    </ul>
+   </Panel>}
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<div id="opportunity-detail" className="scroll-mt-4"><Panel title={`Review ${selected.opportunity_number}`}>
     <button type="button" className={`${secondary} mb-4`} onClick={()=>setOpportunityId("")}>Close review</button>
