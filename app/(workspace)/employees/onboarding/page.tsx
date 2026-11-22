@@ -32,6 +32,9 @@ export default function EmployeeOnboarding(){
   setData(json);
   return json as Data;
  },[]);
+ useEffect(()=>{const preset=new URLSearchParams(window.location.search).get("application");
+  if(preset){setMode("application");setApplicationId(preset);}
+ },[]);
  useEffect(()=>{let active=true;void refresh().catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[refresh]);
  const selected=data?.cases.find(c=>c.id===chosen)??data?.cases[0];
  const person=data?.employees.find(e=>e.id===selected?.employee_id);
