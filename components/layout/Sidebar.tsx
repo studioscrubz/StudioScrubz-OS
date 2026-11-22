@@ -111,6 +111,7 @@ const navItems: Array<NavLink | NavGroup> = [
     { label: "Time Off", href: "/time-off", marker: "", permission: "timeOff.view" },
     { label: "Applications", href: "/applications", marker: "", permission: "jobApplications.manage" },
     { label: "Background Screening", href: "/employees/background-screening", marker: "", permission: "backgroundScreening.manage" },
+    { label: "Employee Onboarding", href: "/employees/onboarding", marker: "", permission: "employeeOnboarding.manage" },
   ] },
   { label: "Settings", marker: "S", children: [
     { label: "Appearance", href: "/settings", marker: "", permission: "appearance.view" },

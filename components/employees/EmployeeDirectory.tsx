@@ -91,6 +91,7 @@ export function EmployeeDirectory({
   const { profile } = useAuth();
 
   const canManage = hasPermission(profile, "employees.manage");
+  const canOnboard = hasPermission(profile, "employeeOnboarding.manage");
 
   const canManageCrews = hasPermission(profile, "crews.manage");
 
@@ -583,6 +584,7 @@ export function EmployeeDirectory({
           canManage={canManage && !activeScrubTechsOnly}
 
           canViewTime={canViewTime}
+          canOnboard={canOnboard}
 
         />
 
@@ -1044,6 +1046,8 @@ function EmployeeDetail({
 
   canViewTime,
 
+  canOnboard,
+
   canMessage,
 
 }: {
@@ -1065,6 +1069,8 @@ function EmployeeDetail({
   canManage: boolean;
 
   canViewTime: boolean;
+
+  canOnboard: boolean;
 
   canMessage: boolean;
 
@@ -1255,6 +1261,13 @@ function EmployeeDetail({
       )}
 
       <div className="mt-5 flex flex-wrap gap-2">
+        {canOnboard && employee.department === "Scrub Technicians" &&
+          employee.employment_type === "Part-Time" && employee.employment_status === "Inactive" && (
+          <button className={secondary} onClick={() => window.location.assign(`/employees/onboarding?employee=${encodeURIComponent(employee.id)}`)}>
+            Employee Onboarding
+          </button>
+        )}
+
 
         {canMessageEmployee && (
 
