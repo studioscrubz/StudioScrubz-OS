@@ -70,9 +70,9 @@ export async function POST(req:Request){
     }else if(body.source==="indeed"){
       const name=requiredText(body.fullName,160);
       email=requiredText(body.email,254);
-      if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
         throw new OnboardingError("Enter a valid candidate email address.");
-      const words=name.split(/\\s+/);
+      const words=name.split(/\s+/);
       if(words.length<2)throw new OnboardingError("Provide candidate's verified first and last name.");
       const {data:matches,error:matchError}=await admin.from("employees")
         .select("id").ilike("email",email).limit(1);
