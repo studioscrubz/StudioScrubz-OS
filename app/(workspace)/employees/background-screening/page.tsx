@@ -35,7 +35,7 @@ const next: Record<Status,Status[]> = {
 const requiresReference = new Set<Status>(["authorized","pre_adverse_action","final_adverse_decision"]);
 export default function BackgroundScreeningPage(){
  const {profile}=useAuth();
- const canManage=!!profile?.is_active&&["Master Admin","Administrator"].includes(profile.role);
+ const canManage=!!profile?.is_active&&["Master Admin","Administrator","Manager"].includes(profile.role);
  const [employees,setEmployees]=useState<Employee[]>([]);
  const [records,setRecords]=useState<Screening[]>([]);
  const [events,setEvents]=useState<ScreeningEvent[]>([]);
