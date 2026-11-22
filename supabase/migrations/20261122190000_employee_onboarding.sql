@@ -54,3 +54,62 @@ revoke all on public.employee_onboarding_steps from anon,authenticated;
 revoke all on public.employee_onboarding_events from anon,authenticated;
 -- All candidate access is through expiring random token and strict server handlers.
 -- All manager access is via authenticated, role-checked server routes.
+
+-- Extend the existing new-W-2 assignment safeguard. Legacy personnel remain exempt.
+create or replace function public.check_employee_screening_clearance(p_employee_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare employee_row record; allowed boolean;
+begin
+ select employment_type into employee_row from public.employees where id=p_employee_id;
+ if not found then raise exception 'Employee not found'; end if;
+ if employee_row.employment_type='1099' then return; end if;
+ if exists(select 1 from public.employee_screening_legacy_exemptions where employee_id=p_employee_id) then return; end if;
+ select exists(select 1 from public.employee_background_screenings
+   where employee_id=p_employee_id and status='cleared' and reviewed_by is not null and cleared_at is not null)
+ into allowed;
+ if not allowed then raise exception 'New W-2 employee requires background-screening clearance before assignment'; end if;
+ select exists(select 1 from public.employee_onboarding_cases
+   where employee_id=p_employee_id and status='completed' and approved_by is not null and approved_at is not null)
+ into allowed;
+ if not allowed then raise exception 'New W-2 employee requires completed onboarding before assignment'; end if;
+end;
+$$;
+revoke all on function public.check_employee_screening_clearance(uuid) from public,anon,authenticated;
+
+-- One database transaction for final approval and activation.
+create or replace function public.complete_employee_onboarding(p_case_id uuid,p_actor_id uuid)
+returns void language plpgsql security invoker set search_path = '' as $$
+declare case_row public.employee_onboarding_cases%rowtype;
+declare actor_role text;
+declare actor_active boolean;
+declare verified_count integer;
+begin
+ select role,is_active into actor_role,actor_active from public.user_profiles where id=p_actor_id;
+ if actor_active is distinct from true or not (
+    actor_role in ('Master Admin','Administrator') or
+    (actor_role='Manager' and exists(
+      select 1 from public.employee_screening_authorized_reviewers where user_id=p_actor_id
+    ))
+  ) then raise exception 'Not authorized for onboarding approval'; end if;
+ select * into case_row from public.employee_onboarding_cases where id=p_case_id for update;
+ if not found or case_row.status in ('completed','canceled') then raise exception 'Onboarding case unavailable'; end if;
+ if case_row.candidate_ack_at is null then raise exception 'Candidate orientation acknowledgment is missing'; end if;
+ select count(*) into verified_count from public.employee_onboarding_steps
+ where case_id=p_case_id and completed_at is not null and completed_by is not null;
+ if verified_count<>21 then raise exception 'All onboarding requirements must be verified before approval'; end if;
+ if not exists(select 1 from public.employee_background_screenings where employee_id=case_row.employee_id and status='cleared' and reviewed_by is not null and cleared_at is not null)
+ then raise exception 'Background screening clearance is required'; end if;
+ if not exists(select 1 from public.employees where id=case_row.employee_id and employment_type<>'1099' and archived_at is null)
+ then raise exception 'Employee is not eligible'; end if;
+ update public.employee_onboarding_cases
+ set status='completed',approved_at=now(),approved_by=p_actor_id,
+     invite_token_hash=null,invite_expires_at=null,updated_at=now()
+ where id=p_case_id;
+ update public.employees set employment_status='Active',job_title=case_row.position,
+ hourly_rate=case_row.hourly_rate,employment_type='Part-Time'
+ where id=case_row.employee_id;
+ insert into public.employee_onboarding_events(case_id,event_type,actor_id) values(p_case_id,'approved',p_actor_id);
+end;
+$$;
+revoke all on function public.complete_employee_onboarding(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.complete_employee_onboarding(uuid,uuid) to service_role;
