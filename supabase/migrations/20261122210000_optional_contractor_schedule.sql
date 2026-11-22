@@ -49,6 +49,7 @@ declare
  first_job uuid;
  created_job uuid;
  duration numeric;
+ requested_frequency text;
 begin
  if not private.contractor_is_internal() then raise exception 'Operations management permission required.'; end if;
  select * into strict op from public.contractor_opportunities where id=p_opportunity_id for update;
@@ -64,12 +65,10 @@ begin
  if company.status<>'Active' or company.client_id is null or op.request_property_id is null or op.requested_time is null then
   raise exception 'An active contractor, saved property, and start time are required.';
  end if;
+ requested_frequency:=lower(regexp_replace(coalesce(op.request_options->>'bookingFrequency',''),'[^a-zA-Z0-9]','','g'));
+ if requested_frequency='everyotherweek' then requested_frequency:='biweekly'; end if;
  if p_frequency is null or p_frequency not in ('Weekly','Biweekly','Monthly','Twice Monthly','Multiple Days Per Week','Every 4 Weeks','Daily','Custom')
-  or lower(regexp_replace(p_frequency,'[^a-zA-Z0-9]','','g')) is distinct from
-     case lower(regexp_replace(coalesce(op.request_options->>'bookingFrequency',''),'[^a-zA-Z0-9]','','g'))
-      when 'everyotherweek' then 'biweekly'
-      else lower(regexp_replace(coalesce(op.request_options->>'bookingFrequency',''),'[^a-zA-Z0-9]','','g'))
-     end
+  or lower(regexp_replace(p_frequency,'[^a-zA-Z0-9]','','g')) is distinct from requested_frequency
   or coalesce(cardinality(p_dates),0) not between 2 and 366
   or cardinality(p_dates)<>(select count(distinct d) from unnest(p_dates) d)
   or not (op.requested_date=any(p_dates))
