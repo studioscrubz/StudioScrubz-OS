@@ -51,7 +51,13 @@ export default function BackgroundScreeningPage(){
    const [emps,response]=await Promise.all([getEmployees(),fetch("/api/employees/background-screening",{cache:"no-store"})]);
    const data=await response.json();
    if(!response.ok)throw new Error(data.error||"Unable to load background screening.");
-   setEmployees(emps.filter(e=>!e.archived_at&&e.employment_type!=="1099"));
+   setEmployees(
+     emps.filter(e=>!e.archived_at).sort((a,b)=>{
+       const aTech=a.department==="Scrub Technicians"?0:1;
+       const bTech=b.department==="Scrub Technicians"?0:1;
+       return aTech-bTech || a.last_name.localeCompare(b.last_name);
+     })
+   );
    setRecords(data.screenings||[]);
    setEvents(data.events||[]);
  },[]);
@@ -101,7 +107,7 @@ export default function BackgroundScreeningPage(){
   <header>
    <p className="text-xs font-semibold uppercase tracking-widest text-green-800">Employees / Hiring</p>
    <h1 className="text-2xl font-extrabold text-green-950">Background Screening</h1>
-   <p className="mt-2 text-sm text-neutral-600">Review screening status for new W-2 hires. This tracks status only; order reports and obtain candidate consent through your approved screening provider.</p>
+   <p className="mt-2 text-sm text-neutral-600">Review employees and screening status, including all SCRUBZ Techs. W-2 screening steps are available for eligible hires; 1099 contractors appear for visibility only.</p>
   </header>
   <div className="grid gap-3 sm:grid-cols-4">
    {([["Authorization pending",count.pending],["In progress",count.progress],["Needs review",count.review],["Cleared",count.clear]] as const).map(([label,n])=>
@@ -116,7 +122,8 @@ export default function BackgroundScreeningPage(){
       {employees.map(e=><option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.job_title||e.department}</option>)}
      </select>
     </label>
-    {!worker?<p className="text-sm">No eligible W-2 employees currently available.</p>:<>
+    {!worker?<p className="text-sm">No active employees currently available.</p>:<>
+     {worker.employment_type==="1099"&&<div role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">1099 contractor — shown for directory visibility. W-2 employee screening actions are not applicable here; no employment classification has been changed.</div>}
      <div className="rounded-lg bg-neutral-50 p-4 space-y-2">
       <p className="font-semibold">{worker.first_name} {worker.last_name}</p>
       <p className="text-sm">Current status: <strong>{names[status]}</strong></p>
@@ -125,7 +132,7 @@ export default function BackgroundScreeningPage(){
      </div>
      <p className="text-sm text-neutral-700">For consent and background reports, use your authorized provider's secure dashboard. Never enter SSNs, criminal findings, or full screening reports into StudioScrubz OS.</p>
      <a href="https://dashboard.checkr.com/" target="_blank" rel="noopener noreferrer" className="inline-block rounded-lg border px-4 py-2 text-sm font-semibold text-green-800">Open Checkr dashboard ↗</a>
-     <div className="border-t pt-4 space-y-3">
+     {worker.employment_type!=="1099"&&<div className="border-t pt-4 space-y-3">
       <h2 className="font-bold">Record next screening step</h2>
       {next[status].length?<>
        <select className="w-full rounded-lg border p-3" value={target??""} onChange={e=>{setTarget(e.target.value as Status||null);setReference("");setConfirmReview(false);}}>
@@ -145,7 +152,7 @@ export default function BackgroundScreeningPage(){
         <button className="rounded-lg bg-green-900 px-4 py-2 font-semibold text-white disabled:opacity-50" disabled={saving} onClick={()=>void update()}>{saving?"Saving…":"Save screening step"}</button>
        </>}
       </>:<p className="text-sm text-neutral-600">This screening workflow is complete or closed. Contact the Master Admin for correction procedures.</p>}
-     </div>
+     </div>}
     </>}
    </section>
    <section className="rounded-xl border bg-white p-5">
