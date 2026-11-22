@@ -3,6 +3,7 @@ export const contractorScheduledJobStatuses = ["Scheduled", "Crew Assigned", "In
 export type ContractorScheduledJob = {
  id: string;
  job_number: string;
+ sourceOpportunityId?: string | null;
  service_name: string | null;
  property_name: string | null;
  location: string | null;
