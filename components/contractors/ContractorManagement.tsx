@@ -30,6 +30,8 @@ type Invoice={id:string;job_id:string;invoice_number:string;status:string;total:
 type Document={id:string;company_id:string;opportunity_id:string|null;file_name:string;category:string};
 type ContactAttempt={id:string;company_id:string;opportunity_id:string|null;method:string;outcome:string;notes:string|null;attempted_at:string};
 type Followup={id:string;company_id:string;opportunity_id:string|null;assigned_manager_id:string;note:string;due_at:string;status:string;created_at:string};
+const noScheduledJobs: ContractorScheduledJob[]=[];
+
 type Data={role:string;viewerId:string;managers:Array<{id:string;display_name:string|null;email:string|null;role:string}>;companies:Company[];directory:DirectoryEntry[];completedJobCounts?:Record<string,number>;upcomingJobs?:ContractorScheduledJob[];invoiceTotals?:Record<string,{total:number;balanceDue:number}>;opportunities:Opportunity[];offers:Offer[];messages:Message[];assessments:Assessment[];invitations:Invite[];members:ContractorMember[];jobs:Job[];invoices:Invoice[];documents:Document[];attempts:ContactAttempt[];followups:Followup[]};
 export type ContractorView="dashboard"|"companies"|"opportunities"|"jobs"|"messages";
 const currency=(n:number|null|undefined)=>n==null?"Unavailable":new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(n));
@@ -182,18 +184,20 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const smsPhone=normalizeSmsPhoneNumber(invitationPhone);
  const currentPreparedText=preparedText?.companyId===companyId&&preparedText.email===inviteEmail&&preparedText.phone===smsPhone?preparedText:null;
  const visibleOpportunities=useMemo(()=>allOpportunities.filter(opportunity=>matchesOpportunityView(opportunity,view)),[allOpportunities,view]);
+ const scheduledJobs=data?.upcomingJobs??noScheduledJobs;
  const calendarJobIds=useMemo(()=>{
   const ids=new Set<string>();
   if(view==="jobs"){
+   for(const job of scheduledJobs)ids.add(job.id);
    for(const opportunity of visibleOpportunities){
     if(opportunity.linked_job_id)ids.add(opportunity.linked_job_id);
    }
   }
   return ids;
- },[visibleOpportunities,view]);
- const scheduledJobs=data?.upcomingJobs??[];
+ },[visibleOpportunities,view,scheduledJobs]);
  const visibleOpportunityIds=new Set(visibleOpportunities.map(opportunity=>opportunity.id));
- const directScheduledJobs=scheduledJobs.filter(job=>!calendarJobIds.has(job.id)&&
+ const primaryJobIds=new Set(visibleOpportunities.map(opportunity=>opportunity.linked_job_id));
+ const directScheduledJobs=scheduledJobs.filter(job=>!primaryJobIds.has(job.id)&&
   (!job.sourceOpportunityId||!visibleOpportunityIds.has(job.sourceOpportunityId)));
  const calendarClientIds=useMemo(()=>new Set(data?.directory.map(entry=>entry.clientId)),[data?.directory]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
@@ -368,7 +372,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <p className="text-xs text-neutral-500">Operations Managers may activate pending contractors. Suspension, archiving, and access revocation require Master Admin authorization.</p></div></Panel>}
   </section>}
   {(view==="opportunities"||view==="jobs")&&<>
-   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds}/>}
+   {view==="jobs"&&<ContractorCalendar scheduledJobIds={calendarJobIds} scheduledClientIds={calendarClientIds} initialDate={scheduledJobs[0]?.scheduled_date}/>}
    {view==="opportunities"&&canManagePortalAccess&&<>
     <button type="button" className={button} onClick={()=>{setError("");submissionDialog.current?.showModal();}}>Submit Job Details</button>
     <dialog ref={submissionDialog} aria-labelledby="opportunity-submission-title"
