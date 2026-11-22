@@ -100,7 +100,7 @@ export default function EmployeeOnboarding(){
    {mode==="employee"&&<label className="block text-sm">Employee
     <select value={employeeId} onChange={e=>setEmployeeId(e.target.value)} className="mt-1 w-full rounded-lg border p-3">
      <option value="">Choose employee</option>
-     {data?.employees.filter(e=>e.employment_type!=="1099").map(e=><option value={e.id} key={e.id}>{e.first_name} {e.last_name} — {e.employment_status}</option>)}
+     {data?.employees.filter(e=>e.department==="Scrub Technicians"&&e.employment_status==="Inactive"&&e.employment_type==="Part-Time").map(e=><option value={e.id} key={e.id}>{e.first_name} {e.last_name} — {e.employment_status}</option>)}
     </select>
    </label>}
    <div className="grid gap-3 md:grid-cols-2">
