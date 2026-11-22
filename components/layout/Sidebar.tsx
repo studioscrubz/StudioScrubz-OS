@@ -672,7 +672,6 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                           active={child.href === pathname}
 
                           onNavigate={onClose}
-                screeningCount={screeningCount}
                           screeningCount={screeningCount}
 
                         />
