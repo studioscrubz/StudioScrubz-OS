@@ -14,6 +14,7 @@ create table if not exists public.employee_background_screenings (
  invitation_at timestamptz,
  completed_at timestamptz,
  reviewed_by uuid references public.user_profiles(id),
+ updated_by uuid not null references public.user_profiles(id),
  reviewed_at timestamptz,
  cleared_at timestamptz,
  updated_at timestamptz not null default now(),
@@ -37,6 +38,26 @@ create table if not exists public.employee_background_screening_events (
  constraint screening_event_ref_length check (length(coalesce(action_reference,'')) <= 300)
 );
 create index if not exists screening_events_employee_idx on public.employee_background_screening_events(employee_id,occurred_at desc);
+
+-- Database-side audit is atomic with each status transition.
+create or replace function public.audit_employee_background_screening()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if TG_OP='INSERT' or old.status is distinct from new.status then
+   insert into public.employee_background_screening_events
+     (employee_id,previous_status,next_status,actor_id,action_reference)
+   values (new.employee_id,case when TG_OP='INSERT' then null else old.status end,
+           new.status,new.updated_by,null);
+ end if;
+ return new;
+end;
+$$;
+revoke all on function public.audit_employee_background_screening() from public,anon,authenticated;
+drop trigger if exists audit_employee_screening_status on public.employee_background_screenings;
+create trigger audit_employee_screening_status
+ after insert or update of status on public.employee_background_screenings
+ for each row execute function public.audit_employee_background_screening();
+
 
 -- Explicit role-based exception for an already authorized Operations Manager.
 -- Seed only currently active Managers; newly added Managers do not gain automatic access.
