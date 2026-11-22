@@ -34,8 +34,14 @@ async function authorize() {
   const {data:profile,error:profileError} = await admin.from("user_profiles").select("id,role,is_active").eq("id",user.id).maybeSingle();
   if(profileError) throw profileError;
   // Explicitly restrict screening report status to HR-authorized roles.
-  if(!profile?.is_active || !["Master Admin","Administrator"].includes(profile.role))
-    throw new ApiError("Background screening management is restricted.",403);
+  if(!profile?.is_active)throw new ApiError("Background screening management is restricted.",403);
+  if(!["Master Admin","Administrator"].includes(profile.role)){
+    if(profile.role!=="Manager")throw new ApiError("Background screening management is restricted.",403);
+    const {data:allowed,error:permissionError}=await admin.from("employee_screening_authorized_reviewers")
+      .select("user_id").eq("user_id",user.id).maybeSingle();
+    if(permissionError)throw permissionError;
+    if(!allowed)throw new ApiError("Management screening access has not been authorized.",403);
+  }
   return { admin, actor:user.id };
 }
 function reject(error:unknown){
