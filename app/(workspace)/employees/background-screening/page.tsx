@@ -10,6 +10,7 @@ type Status =
  | "not_started"|"conditional_offer_issued"|"authorization_pending"|"authorized"
  | "invited"|"in_progress"|"completed_review_pending"|"individualized_review"
  | "pre_adverse_action"|"response_pending"|"cleared"|"final_adverse_decision"|"declined"|"canceled";
+type ScreeningEvent={id:string;employee_id:string;previous_status:string|null;next_status:string;occurred_at:string;actor_id:string};
 type Screening = {employee_id:string;status:Status;provider:string;provider_reference:string|null;
  conditional_offer_at:string|null;authorization_recorded_at:string|null;invitation_at:string|null;
  completed_at:string|null;reviewed_at:string|null;cleared_at:string|null;updated_at:string};
@@ -37,6 +38,7 @@ export default function BackgroundScreeningPage(){
  const canManage=!!profile?.is_active&&["Master Admin","Administrator"].includes(profile.role);
  const [employees,setEmployees]=useState<Employee[]>([]);
  const [records,setRecords]=useState<Screening[]>([]);
+ const [events,setEvents]=useState<ScreeningEvent[]>([]);
  const [employeeId,setEmployeeId]=useState("");
  const [target,setTarget]=useState<Status|null>(null);
  const [reference,setReference]=useState("");
@@ -51,6 +53,7 @@ export default function BackgroundScreeningPage(){
    if(!response.ok)throw new Error(data.error||"Unable to load background screening.");
    setEmployees(emps.filter(e=>!e.archived_at&&e.employment_type!=="1099"));
    setRecords(data.screenings||[]);
+   setEvents(data.events||[]);
  },[]);
  useEffect(()=>{if(!canManage){setLoading(false);return;}
    let active=true;
@@ -144,6 +147,18 @@ export default function BackgroundScreeningPage(){
       </>:<p className="text-sm text-neutral-600">This screening workflow is complete or closed. Contact the Master Admin for correction procedures.</p>}
      </div>
     </>}
+   </section>
+   <section className="rounded-xl border bg-white p-5">
+    <h2 className="font-bold text-green-950">Screening Activity</h2>
+    <p className="mt-1 text-xs text-neutral-500">Restricted audit history; no report contents stored.</p>
+    <ul className="mt-3 space-y-2 text-sm">
+     {events.filter(e=>e.employee_id===employeeId).slice(0,12).map(e=>
+       <li key={e.id} className="border-t py-2">
+         <span className="font-medium">{names[e.next_status as Status]??e.next_status}</span>
+         <span className="ml-2 text-xs text-neutral-500">{new Date(e.occurred_at).toLocaleString()}</span>
+       </li>)}
+     {!events.some(e=>e.employee_id===employeeId)&&<li className="text-neutral-500">No activity recorded yet.</li>}
+    </ul>
    </section>
    <p className="text-xs text-neutral-500">Legal note: Screening requires appropriate standalone disclosure, authorization, and any applicable federal/California fair-chance and adverse-action procedure. This screen does not collect consent or order reports.</p>
   </>}
