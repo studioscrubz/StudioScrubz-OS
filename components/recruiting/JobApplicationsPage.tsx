@@ -105,6 +105,11 @@ function ApplicationCard({ application, busy, save }: { application: JobApplicat
       {isCurrent ? <><Detail title="Relevant experience" text={application.relevant_experience_boolean ? "Yes" : "No"}/>{application.opening_identifier!=="scrub-tech"&&<Detail title="Contact interests" text={(application.contact_interests ?? []).join("\n")}/>}</> : <><Detail title="Experience" text={application.relevant_experience ?? "Not provided"}/><Detail title="Networks" text={application.reachable_networks ?? "Not provided"}/>{application.weekly_availability && <Detail title="Weekly availability" text={application.weekly_availability}/>}</>}
       <Detail title="Why they’re a fit" text={application.fit_reason}/>
     </div>
+    {application.status==="Selected"&&application.opening_identifier==="scrub-tech"&&(
+      <a className="mt-4 inline-block rounded-lg border border-[#143d1a] px-4 py-2 text-sm font-semibold text-[#143d1a]" href={`/employees/onboarding?application=${encodeURIComponent(application.id)}`}>
+        Start Employee Onboarding
+      </a>
+    )}
     <label className="mt-5 block text-sm font-bold">Internal notes<textarea className={`${field} mt-1 min-h-24 w-full`} maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)}/></label>
     <button disabled={busy} className="mt-4 rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-60" onClick={() => void save(application, next, notes)}>Save status and notes</button>
     <details className="mt-4 text-sm"><summary className="cursor-pointer font-bold text-[#143d1a]">Audit history ({application.events.length})</summary><ul className="mt-2 space-y-1 text-neutral-600">{application.events.map((event) => <li key={event.id}>{new Date(event.created_at).toLocaleString()} — {event.event_type}{event.from_status !== event.to_status ? ` (${event.from_status ?? "None"} → ${event.to_status})` : ""}</li>)}</ul></details>
