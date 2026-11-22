@@ -1282,6 +1282,9 @@ function EmployeeDetail({
 
           <>
 
+            <button className={secondary} onClick={() => window.location.assign(`/employees/background-screening?employee=${encodeURIComponent(employee.id)}`)}>
+              Background Screening
+            </button>
             <button
 
               className={primary}
