@@ -92,10 +92,12 @@ export async function POST(req:Request){
     }else{
       employeeId=id(body.employeeId);
       const {data:employee,error}=await admin.from("employees")
-        .select("id,email,employment_type,archived_at").eq("id",employeeId).maybeSingle();
+        .select("id,email,employment_type,employment_status,department,archived_at")
+        .eq("id",employeeId).maybeSingle();
       if(error)throw error;
-      if(!employee||employee.archived_at||employee.employment_type==="1099")
-        throw new OnboardingError("Select an eligible W-2 employee.");
+      if(!employee||employee.archived_at||employee.department!=="Scrub Technicians"
+       ||employee.employment_status!=="Inactive"||employee.employment_type!=="Part-Time")
+        throw new OnboardingError("Select an inactive part-time SCRUBZ Tech new-hire record. Existing active employees cannot be reclassified through onboarding.");
       email=requiredText(employee.email,254);
     }
     const startDate=body.startDate;
