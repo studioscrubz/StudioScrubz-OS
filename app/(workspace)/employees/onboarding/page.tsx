@@ -34,6 +34,8 @@ export default function EmployeeOnboarding(){
  },[]);
  useEffect(()=>{const preset=new URLSearchParams(window.location.search).get("application");
   if(preset){setMode("application");setApplicationId(preset);}
+  const employee=new URLSearchParams(window.location.search).get("employee");
+  if(!preset&&employee){setMode("employee");setEmployeeId(employee);}
  },[]);
  useEffect(()=>{let active=true;void refresh().catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[refresh]);
  const selected=data?.cases.find(c=>c.id===chosen)??data?.cases[0];
