@@ -15,7 +15,7 @@ export const PERMISSIONS = [
   "proposals.view", "proposals.create", "proposals.approve", "proposals.send",
   "jobs.view", "jobs.create", "jobs.edit", "jobs.schedule", "jobs.complete", "jobs.archive",
   "schedule.view", "schedule.edit",
-  "employees.directory_view", "employees.scrubTechRosterView", "employees.view", "employees.manage", "backgroundScreening.manage",
+  "employees.directory_view", "employees.scrubTechRosterView", "employees.view", "employees.manage", "backgroundScreening.manage", "employeeOnboarding.manage",
   "crews.view", "crews.manage", "timeClock.view", "timeClock.manageAll", "timeOff.view", "timeOff.manage",
   "payrollPrep.view", "agreements.view", "agreements.manage", "agreements.financialSummary",
   "invoices.view", "invoices.create", "invoices.edit", "invoices.send", "invoices.recordPayment",
@@ -258,6 +258,7 @@ const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
   ["/jobs", "jobs.view"],
   ["/schedule", "schedule.view"],
 
+  ["/employees/onboarding", "employeeOnboarding.manage"],
   ["/employees/background-screening", "backgroundScreening.manage"],
   ["/employees/scrub-technicians", "employees.scrubTechRosterView"],
   ["/employees/sales", "employees.view"],
