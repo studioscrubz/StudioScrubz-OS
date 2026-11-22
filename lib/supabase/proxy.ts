@@ -42,6 +42,8 @@ export async function updateSession(request: NextRequest, { partnerEntry = false
     || request.nextUrl.pathname.startsWith("/api/public/invoices/")
     || request.nextUrl.pathname === "/api/public/internal-schedule-rsvp"
     || request.nextUrl.pathname.startsWith("/internal-event/rsvp/")
+    || request.nextUrl.pathname.startsWith("/onboarding/invite/")
+    || request.nextUrl.pathname.startsWith("/api/onboarding/invite/")
     || ["/agreement/", "/assessment/", "/change-request/", "/estimate/", "/invoice/", "/proposal/"].some((prefix) => request.nextUrl.pathname.startsWith(prefix));
 
   if ((error || !data?.claims) && !isLogin && !isPublicDocument) {
