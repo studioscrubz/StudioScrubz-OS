@@ -137,7 +137,7 @@ export default function EmployeeOnboarding(){
    {selected&&<>
     <div className="rounded-xl bg-neutral-50 p-4 space-y-1">
      <h3 className="font-bold text-[#143d1a]">{person?.first_name} {person?.last_name}</h3>
-     <p className="text-sm">Position: {selected.position} · ${selected.hourly_rate}/hour · {statuses[selected.status]??selected.status}</p>
+     <p className="text-sm">Position: {selected.position} · ${selected.hourly_rate}/hour · {selected.status==="invited"&&!selected.invite_sent_at?"Invitation delivery not confirmed":(statuses[selected.status]??selected.status)}</p>
      <p className="text-sm">Candidate orientation: {selected.candidate_ack_at?"Acknowledged":"Pending"}</p>
      <p className="text-sm">Background Screening: <strong>{eligible?"Cleared":"Not cleared"}</strong></p>
      <p className="text-sm">Requirements verified: <strong>{done}/{ONBOARDING_STEPS.length}</strong></p>
