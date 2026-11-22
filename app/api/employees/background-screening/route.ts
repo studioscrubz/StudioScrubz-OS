@@ -55,6 +55,13 @@ export async function GET(request:Request) {
   const {admin}=await authorize();
   const url=new URL(request.url);
   const employeeId=url.searchParams.get("employeeId");
+  if(url.searchParams.get("summary")==="1"){
+    const {count,error:countError}=await admin.from("employee_background_screenings")
+      .select("employee_id",{count:"exact",head:true})
+      .in("status",["completed_review_pending","individualized_review","pre_adverse_action","response_pending"]);
+    if(countError)throw countError;
+    return Response.json({needsReview:count??0},{headers:noStore});
+  }
   const query=admin.from("employee_background_screenings").select("employee_id,status,provider,provider_reference,conditional_offer_at,authorization_recorded_at,authorization_reference,invitation_at,completed_at,reviewed_at,cleared_at,updated_at").order("updated_at",{ascending:false});
   const {data,error}=employeeId?await query.eq("employee_id",validateId(employeeId)):await query.limit(200);
   if(error) throw error;
