@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/group-contractor-visits": false,
       "fix/contractor-agreement-optional": false,
       "fix/contractor-occurrence-visibility": false,
       "fix/shared-building-gps": false,

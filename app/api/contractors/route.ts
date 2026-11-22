@@ -124,11 +124,11 @@ async function contractorInvoiceTotals(db:ContractorContext["admin"],clientIds:s
  return totals;
 }
 
-async function upcomingContractorJobs(db:ContractorContext["admin"],clientIds:string[]):Promise<ContractorScheduledJob[]>{
+async function upcomingContractorJobs(db:ContractorContext["admin"],clientIds:string[],includeOpportunitySource=false):Promise<ContractorScheduledJob[]>{
  if(!clientIds.length)return [];
  const today=new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
  const {data,error}=await db.from("jobs")
-  .select("id,client_id,job_number,service_name,property_name,scheduled_date,start_time,client:clients!jobs_client_id_fkey!inner(id),property:properties!jobs_property_id_fkey(client_id,address,address_line_2,city,state,zip)")
+  .select("id,client_id,job_number,service_name,property_name,scheduled_date,start_time,source_contractor_opportunity_id,client:clients!jobs_client_id_fkey!inner(id),property:properties!jobs_property_id_fkey(client_id,address,address_line_2,city,state,zip)")
   .in("client_id",clientIds).eq("client.client_type","Contractor").eq("client.status","Active").is("client.archived_at",null)
   .is("archived_at",null).in("status",contractorScheduledJobStatuses).gte("scheduled_date",today)
   .order("scheduled_date").order("start_time").order("id");
@@ -139,7 +139,8 @@ async function upcomingContractorJobs(db:ContractorContext["admin"],clientIds:st
   const property=linkedProperty?.client_id===row.client_id?linkedProperty:null;
   const location=property?[property.address,property.address_line_2,property.city,[property.state,property.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "):null;
   return [{id:row.id,job_number:row.job_number,service_name:row.service_name,property_name:row.property_name,
-   location,scheduled_date:row.scheduled_date,start_time:row.start_time}];
+   location,scheduled_date:row.scheduled_date,start_time:row.start_time,
+   ...(includeOpportunitySource?{sourceOpportunityId:row.source_contractor_opportunity_id}:{})}];
  });
 }
 
@@ -282,7 +283,7 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean,includeSc
   const [invoiceTotals,upcomingJobs,completedJobCounts]=includeInvoiceTotals?await Promise.all([
    contractorInvoiceTotals(db,directoryClientIds),upcomingContractorJobs(db,directoryClientIds),
    completedContractorJobCounts(db,directoryClientIds),
-  ]):[undefined,includeScheduledJobs?await upcomingContractorJobs(db,directoryClientIds):[],undefined];
+  ]):[undefined,includeScheduledJobs?await upcomingContractorJobs(db,directoryClientIds,true):[],undefined];
   return {role:ctx.role,companies:companies.data,directory,invoiceTotals,upcomingJobs,completedJobCounts,opportunities:effectiveOpportunityStatuses(opportunities.data??[],jobs.data??[],invoices.data??[]),offers:offers.data,messages,
    invitations:invitations.data,assessments:assessments.data,members:members.data,documents:documents.data,managers:managers.data,
    viewerId:ctx.userId,attempts:attempts.data,followups:followups.data,

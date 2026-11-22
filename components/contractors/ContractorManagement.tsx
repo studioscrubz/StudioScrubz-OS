@@ -191,10 +191,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }
   return ids;
  },[visibleOpportunities,view]);
- const directScheduledJobs=(data?.upcomingJobs??[]).filter(job=>!calendarJobIds.has(job.id));
+ const scheduledJobs=data?.upcomingJobs??[];
+ const visibleOpportunityIds=new Set(visibleOpportunities.map(opportunity=>opportunity.id));
+ const directScheduledJobs=scheduledJobs.filter(job=>!calendarJobIds.has(job.id)&&
+  (!job.sourceOpportunityId||!visibleOpportunityIds.has(job.sourceOpportunityId)));
  const calendarClientIds=useMemo(()=>new Set(data?.directory.map(entry=>entry.clientId)),[data?.directory]);
  const selected=visibleOpportunities.find(x=>x.id===opportunityId);
  const selectedId=selected?.id;
+ const recurringVisits=selectedId?scheduledJobs.filter(job=>job.sourceOpportunityId===selectedId):[];
  useEffect(()=>{
   if(selectedId)document.getElementById("opportunity-detail")?.scrollIntoView({block:"start"});
  },[selectedId]);
@@ -519,6 +523,15 @@ export function ContractorManagement({view}: {view:ContractorView}){
    <OpportunityTable rows={visibleOpportunities} companies={companies} select={setOpportunityId}/>
    {selected&&<div id="opportunity-detail" className="scroll-mt-4"><Panel title={`Review ${selected.opportunity_number}`}>
     <button type="button" className={`${secondary} mb-4`} onClick={()=>setOpportunityId("")}>Close review</button>
+    {recurringVisits.length>0&&<section className="mb-5 rounded-lg border p-4">
+     <h3 className="font-bold">Scheduled visits ({recurringVisits.length})</h3>
+     <ul className="mt-2 divide-y">
+      {recurringVisits.map(visit=><li key={visit.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+       <Link className="font-bold text-[#143d1a] underline" href={`/jobs?jobId=${visit.id}`}>{visit.job_number}</Link>
+       <span>{visit.scheduled_date}{visit.start_time&&` · ${visit.start_time.slice(0,5)} Pacific`}</span>
+      </li>)}
+     </ul>
+    </section>}
     <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2 text-sm">
      <p><b>Company:</b> {companies.find(x=>x.id===selected.company_id)?.name}</p>
      {selected.property_name&&<p><b>Name:</b> {selected.property_name}</p>}
