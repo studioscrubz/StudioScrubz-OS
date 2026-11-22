@@ -53,7 +53,7 @@ alter table public.employee_screening_rollout enable row level security;
 revoke all on public.employee_screening_rollout from anon,authenticated;
 
 create or replace function public.assert_employee_screening_clearance()
-returns trigger language plpgsql security invoker set search_path = '' as $$
+returns trigger language plpgsql security definer set search_path = '' as $
 declare person uuid;
 begin
  if TG_TABLE_NAME = 'crews' then person := new.crew_lead_id;
