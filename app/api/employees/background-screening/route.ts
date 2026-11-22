@@ -105,7 +105,7 @@ export async function POST(request:Request) {
   if(["cleared"].includes(status) && body.confirmHumanReview!==true)
     throw new ApiError("Human review confirmation is required.");
   const now=new Date().toISOString();
-  const patch:Record<string,unknown> = {employee_id:employeeId,status,updated_at:now};
+  const patch:Record<string,unknown> = {employee_id:employeeId,status,updated_at:now,updated_by:actor};
   if(status==="conditional_offer_issued")patch.conditional_offer_at=now;
   if(status==="authorized"){patch.authorization_recorded_at=now;patch.authorization_reference=evidence;}
   if(status==="invited"){patch.invitation_at=now;patch.provider_reference=evidence||existing?.provider_reference||null;}
@@ -121,11 +121,6 @@ export async function POST(request:Request) {
     const {error}=await admin.from("employee_background_screenings").insert(patch);
     if(error)throw error;
   }
-  const {error:auditError}=await admin.from("employee_background_screening_events").insert({
-    employee_id:employeeId,previous_status:from,next_status:status,actor_id:actor,
-    action_reference:evidence||null,
-  });
-  if(auditError)throw auditError;
   return Response.json({ok:true,status},{headers:noStore});
  }catch(e){return reject(e);}
 }
