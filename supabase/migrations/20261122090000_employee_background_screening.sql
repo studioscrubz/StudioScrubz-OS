@@ -43,14 +43,15 @@ revoke all on public.employee_background_screenings from anon, authenticated;
 revoke all on public.employee_background_screening_events from anon, authenticated;
 -- Never add public/client RLS policies. Access solely via role-checked server routes.
 
--- Apply gating only to employees created after this release. Existing workforce is unaffected.
-create table if not exists public.employee_screening_rollout (
- singleton boolean primary key default true check(singleton),
- cutoff timestamptz not null default now()
+-- Preserve only employees that already exist at rollout; a future employee cannot
+-- evade screening by supplying an older created_at timestamp.
+create table if not exists public.employee_screening_legacy_exemptions (
+ employee_id uuid primary key references public.employees(id) on delete cascade
 );
-insert into public.employee_screening_rollout(singleton) values (true) on conflict (singleton) do nothing;
-alter table public.employee_screening_rollout enable row level security;
-revoke all on public.employee_screening_rollout from anon,authenticated;
+insert into public.employee_screening_legacy_exemptions(employee_id)
+ select id from public.employees on conflict do nothing;
+alter table public.employee_screening_legacy_exemptions enable row level security;
+revoke all on public.employee_screening_legacy_exemptions from anon,authenticated;
 
 create or replace function public.assert_employee_screening_clearance()
 returns trigger language plpgsql security definer set search_path = '' as $$
@@ -78,13 +79,12 @@ $$;
 -- write functions. Do not silently bypass this guard.
 create or replace function public.check_employee_screening_clearance(p_employee_id uuid)
 returns void language plpgsql security definer set search_path = '' as $$
-declare employee_row record; allowed boolean; cutoff_value timestamptz;
+declare employee_row record; allowed boolean;
 begin
  select created_at,employment_type into employee_row from public.employees where id=p_employee_id;
  if not found then raise exception 'Employee not found'; end if;
  if employee_row.employment_type = '1099' then return; end if;
- select cutoff into cutoff_value from public.employee_screening_rollout where singleton=true;
- if employee_row.created_at < cutoff_value then return; end if;
+ if exists(select 1 from public.employee_screening_legacy_exemptions where employee_id=p_employee_id) then return; end if;
  select exists(select 1 from public.employee_background_screenings
      where employee_id=p_employee_id and status='cleared' and reviewed_by is not null and cleared_at is not null)
    into allowed;
