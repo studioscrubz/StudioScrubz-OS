@@ -146,6 +146,17 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const [{ total: attentionCount, contractorRequests }, setAttentionCounts] = useState({ total: 0, contractorRequests: 0 });
 
   const [messageCount, setMessageCount] = useState(0);
+  const [screeningCount, setScreeningCount] = useState(0);
+  useEffect(() => {
+    if (!hasPermission(auth.profile, "backgroundScreening.manage")) return;
+    let active = true;
+    void fetch("/api/employees/background-screening?summary=1", { cache: "no-store" })
+      .then(async response => response.ok ? await response.json() : {needsReview:0})
+      .then(summary => { if(active) setScreeningCount(Math.max(0, Number(summary.needsReview) || 0)); })
+      .catch(() => { if(active) setScreeningCount(0); });
+    return () => { active=false; };
+  }, [auth.profile, pathname]);
+
 
 
 
@@ -661,6 +672,8 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                           active={child.href === pathname}
 
                           onNavigate={onClose}
+                screeningCount={screeningCount}
+                          screeningCount={screeningCount}
 
                         />
 
@@ -826,6 +839,8 @@ function NavItem({
 
   onNavigate,
 
+  screeningCount = 0,
+
 }: {
 
   item: NavLink;
@@ -833,6 +848,8 @@ function NavItem({
   active: boolean;
 
   onNavigate: () => void;
+
+  screeningCount?: number;
 
 }) {
 
@@ -863,6 +880,10 @@ function NavItem({
         {item.marker && <NavMarker value={item.marker} />}
 
         <span>{item.label}</span>
+        {item.href === "/employees/background-screening" && screeningCount > 0 && (
+          <span aria-label={`${screeningCount} screenings need review`} className="ml-auto min-w-5 rounded-full bg-red-700 px-1.5 text-center text-xs font-bold leading-5 text-white">{screeningCount}</span>
+        )}
+
 
       </Link>
 
