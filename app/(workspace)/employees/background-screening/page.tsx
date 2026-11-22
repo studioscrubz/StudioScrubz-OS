@@ -148,3 +148,4 @@ export default function BackgroundScreeningPage(){
    <p className="text-xs text-neutral-500">Legal note: Screening requires appropriate standalone disclosure, authorization, and any applicable federal/California fair-chance and adverse-action procedure. This screen does not collect consent or order reports.</p>
   </>}
  </main>;
+}
