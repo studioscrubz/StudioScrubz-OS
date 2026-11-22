@@ -680,8 +680,7 @@ export async function POST(request:Request){
     ...(values.bathrooms===null?[]:[`Bathrooms: ${values.bathrooms}`]),
     `Proposed price: ${new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(values.proposed_amount)}`,
    ].join("\n"),companyId,data.id,"internal");
-   let agreementRequired=contractorBookingFrequency(input.frequency)!=="One-Time";
-   if(!agreementRequired){
+   if(contractorBookingFrequency(input.frequency)==="One-Time"){
     const {data:source,error:sourceError}=await db.from("contractor_opportunities").select("request_property_id").eq("id",data.id).single();
     if(sourceError)throw sourceError;
     const {data:owner,error:ownerError}=await db.from("contractor_companies").select("client_id").eq("id",companyId).single();
@@ -692,13 +691,12 @@ export async function POST(request:Request){
       .eq("status","Active").is("archived_at",null).neq("frequency","One-Time").limit(1);
      if(existingError)throw existingError;
      if(existing?.length){
-      agreementRequired=true;
       const {error:updateError}=await db.from("contractor_opportunities").update({request_options:{...values.request_options,bookingFrequency:existing[0].frequency},updated_at:new Date().toISOString()}).eq("id",data.id);
       if(updateError)throw updateError;
      }
     }
    }
-   return noCache({opportunity:data,agreementRequired});
+   return noCache({opportunity:data});
   }
   if(action==="message"||action==="markMessagesRead"){
    const companyId=ctx.type==="partner"?ctx.companyId:uuid(input.companyId);
@@ -821,6 +819,22 @@ export async function POST(request:Request){
    await notify(ctx,"Contractor counteroffer",`A counteroffer was submitted for opportunity ${opp.opportunity_number}.`,
     opp.company_id,opp.id,"contractor",`offer:${offerId}`);
    return noCache({offerId});
+  }
+  if(action==="scheduleRecurringVisits"){
+   requireInternal(ctx);
+   const opp=await internalOpportunity(ctx,uuid(input.opportunityId));
+   const dates=input.dates;
+   const frequency=contractorBookingFrequency(opp.request_options?.bookingFrequency);
+   if(frequency==="One-Time"||!Array.isArray(dates)||dates.length<2||dates.length>366||
+    dates.some(date=>typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date)))
+    throw new ContractorAccessError("Select valid recurring visit dates.",400);
+   const session=await createSupabaseServerClient();
+   const {data:jobId,error}=await session.rpc("schedule_contractor_opportunity_visits" as never,{
+    p_opportunity_id:opp.id,p_expected_updated_at:opp.updated_at,p_dates:dates,p_frequency:frequency,
+   } as never);
+   if(error)throw new ContractorAccessError(error.message,409);
+   await notify(ctx,"Recurring contractor visits scheduled",`Visits for ${opp.opportunity_number} have been scheduled.`,opp.company_id,opp.id,"contractor",`recurring:${jobId}`);
+   return noCache({jobId});
   }
   if(action==="accept"||action==="decline"){
    requireInternal(ctx);
