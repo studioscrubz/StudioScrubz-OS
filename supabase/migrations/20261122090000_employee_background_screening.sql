@@ -37,6 +37,19 @@ create table if not exists public.employee_background_screening_events (
  constraint screening_event_ref_length check (length(coalesce(action_reference,'')) <= 300)
 );
 create index if not exists screening_events_employee_idx on public.employee_background_screening_events(employee_id,occurred_at desc);
+
+-- Explicit role-based exception for an already authorized Operations Manager.
+-- Seed only currently active Managers; newly added Managers do not gain automatic access.
+create table if not exists public.employee_screening_authorized_reviewers (
+ user_id uuid primary key references public.user_profiles(id) on delete cascade,
+ authorized_at timestamptz not null default now()
+);
+insert into public.employee_screening_authorized_reviewers(user_id)
+  select id from public.user_profiles where role='Manager' and is_active=true
+  on conflict do nothing;
+alter table public.employee_screening_authorized_reviewers enable row level security;
+revoke all on public.employee_screening_authorized_reviewers from anon,authenticated;
+
 alter table public.employee_background_screenings enable row level security;
 alter table public.employee_background_screening_events enable row level security;
 revoke all on public.employee_background_screenings from anon, authenticated;
