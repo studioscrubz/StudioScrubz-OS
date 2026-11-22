@@ -104,6 +104,7 @@ const navItems: Array<NavLink | NavGroup> = [
   ] },
   { label: "Team", marker: "T", children: [
     { label: "Employee Directory", href: "/employees", marker: "", permission: "employees.directory_view" },
+    { label: "Background Screening", href: "/employees/background-screening", marker: "", permission: "employees.manage" },
     { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "", permission: "employees.scrubTechRosterView" },
     { label: "Sales", href: "/employees/sales", marker: "", permission: "employees.view" },
     { label: "Administration / Management", href: "/employees/administration", marker: "", permission: "employees.view" },
