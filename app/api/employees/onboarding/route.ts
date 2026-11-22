@@ -67,6 +67,28 @@ export async function POST(req:Request){
       if(createError)throw createError;
       employeeId=employee.id;
       newEmployeeId=employeeId;
+    }else if(body.source==="indeed"){
+      const name=requiredText(body.fullName,160);
+      email=requiredText(body.email,254);
+      if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))
+        throw new OnboardingError("Enter a valid candidate email address.");
+      const words=name.split(/\\s+/);
+      if(words.length<2)throw new OnboardingError("Provide candidate's verified first and last name.");
+      const {data:matches,error:matchError}=await admin.from("employees")
+        .select("id").ilike("email",email).limit(1);
+      if(matchError)throw matchError;
+      if(matches?.length)throw new OnboardingError("This email already belongs to an employee. Use Existing Employee instead.");
+      const phone=typeof body.phone==="string"?body.phone.trim().slice(0,30):"";
+      const {data:employee,error:createError}=await admin.from("employees").insert({
+        employee_number:"SCR-"+randomUUID().slice(0,12).toUpperCase(),
+        first_name:words[0],last_name:words.slice(1).join(" "),
+        email,phone:phone||null,department:"Scrub Technicians",
+        job_title:position,employment_type:"Part-Time",employment_status:"Inactive",
+        hourly_rate:rate,commission_rate:0,
+      }).select("id").single();
+      if(createError)throw createError;
+      employeeId=employee.id;
+      newEmployeeId=employeeId;
     }else{
       employeeId=id(body.employeeId);
       const {data:employee,error}=await admin.from("employees")
