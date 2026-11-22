@@ -104,11 +104,11 @@ const navItems: Array<NavLink | NavGroup> = [
   ] },
   { label: "Team", marker: "T", children: [
     { label: "Employee Directory", href: "/employees", marker: "", permission: "employees.directory_view" },
-    { label: "Background Screening", href: "/employees/background-screening", marker: "", permission: "backgroundScreening.manage" },
     { label: "Scrub Technicians", href: "/employees/scrub-technicians", marker: "", permission: "employees.scrubTechRosterView" },
     { label: "Sales", href: "/employees/sales", marker: "", permission: "employees.view" },
     { label: "Administration / Management", href: "/employees/administration", marker: "", permission: "employees.view" },
     { label: "Applications", href: "/applications", marker: "", permission: "jobApplications.manage" },
+    { label: "Background Screening", href: "/employees/background-screening", marker: "", permission: "backgroundScreening.manage" },
     { label: "Time Clock", href: "/time-clock", marker: "", permission: "timeClock.view" },
     { label: "Time Off", href: "/time-off", marker: "", permission: "timeOff.view" },
   ] },
