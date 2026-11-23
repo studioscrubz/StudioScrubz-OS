@@ -278,3 +278,5 @@ Job-specific crew roster integration: job_crew_technicians, job_assignment_event
 Contractor recurring visits use `schedule_contractor_opportunity_visits` (authenticated Operations only), defined in `20261122210000_optional_contractor_schedule.sql`.
 
 2026-11-23 Rose Company cleaning scope: `contractor_companies.scope_catalog` is a JSONB source-of-truth checklist seeded only for the active Residential `Rose Company` record by migration `20261123150000_rose_company_scope_catalog.sql`. Internal and contractor portal opportunity creation read the company-scoped catalog and the server renders the selected Standard, Deep, or Move-In/Move-Out scope (including garage exclusion and optional-service caveat). Existing historical opportunities and financial rate cards are not modified.
+
+2026-11-23 Existing onboarding dependency: `employee_onboarding_follow_up` is referenced by `app/api/employees/onboarding/route.ts` and defined in `supabase/migrations/20261123200000_employee_onboarding_follow_up.sql`. This manifest entry records the prior onboarding RPC dependency and does not alter its behavior.
