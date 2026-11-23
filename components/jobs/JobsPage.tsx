@@ -711,8 +711,8 @@ function JobModal({
         />
       </div>
       {((job.contracted_addons??job.pricing_snapshot?.addons)?.length??0)>0?<><h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-1.5 list-disc pl-5 text-sm">{(job.contracted_addons??job.pricing_snapshot!.addons).map((item)=><li key={item.id}>{item.pricingType==="Per Unit"?`${item.label} — ${item.quantity} ${item.unitName}${item.quantity===1?"":"s"}`:item.label}</li>)}</ul></>:(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-1.5 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
-      </section>
       <JobWorkScope key={job.id} job={job} openScope={() => setTab("Scope")} />
+      </section>
       <CompactJobSection title="Schedule" subtitle={scheduleSummary} actionLabel={canSchedule ? "Edit Schedule" : "Details"}>
       {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-2 grid gap-2 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
