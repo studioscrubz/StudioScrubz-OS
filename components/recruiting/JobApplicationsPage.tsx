@@ -97,7 +97,7 @@ function ApplicationCard({ application, busy, save }: { application: JobApplicat
         {opening?.subtitle && <p className="mt-1 max-w-3xl text-sm text-neutral-600">{opening.subtitle}</p>}
         <h2 className="mt-3 text-xl font-extrabold text-[#143d1a]">{application.full_name}</h2>
         <p className="text-sm text-neutral-600">{application.city} · prefers {application.preferred_contact_method}</p>
-        <div className="mt-3 flex gap-3 text-sm font-bold"><a className="text-[#143d1a] underline" href={`mailto:${application.email}`}>Email</a><a className="text-[#143d1a] underline" href={`tel:${application.phone}`}>Call</a></div>
+        <div className="mt-3 flex gap-3 text-sm font-bold"><a className="text-[#143d1a] underline" href={`mailto:${application.email}`}>Email</a><a className="text-[#143d1a] underline" href={`tel:${application.phone}`}>Call</a>{application.has_resume&&<a className="text-[#143d1a] underline" href={`/api/applications/${application.id}/resume`}>Download résumé</a>}</div>
       </div>
       <div className="min-w-60"><label className="text-sm font-bold">Status<select className={`${field} mt-1 w-full`} value={next} onChange={(event) => setNext(event.target.value as JobApplicationStatus)}>{JOB_APPLICATION_STATUSES.map((value) => <option key={value}>{value}</option>)}</select></label></div>
     </div>

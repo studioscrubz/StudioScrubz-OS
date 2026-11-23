@@ -9,7 +9,7 @@ test("forward migration preserves historical answers and constrains version two"
 test("new management details and notification show experience and contact interests without availability",()=>{assert.match(management,/title="Relevant experience"/);assert.match(management,/title="Contact interests"/);assert.match(management,/application\.contact_interests/);assert.match(server,/Relevant experience: \$\{experienceLabel\}/);assert.match(server,/Contact interests: \$\{interestLabels\}/);assert.doesNotMatch(server,/weeklyAvailability|weekly_availability|Weekly availability/)});
 test("public submission is server validated, spam limited, and anonymous data access is absent",()=>{assert.match(route,/attempts=new Map/);assert.match(route,/status:429/);assert.match(server,/raw\.website/);assert.match(server,/submitted_ip_hash/);assert.match(server,/contact_fingerprint/);assert.match(server,/commissionAcknowledged!==true/);assert.match(server,/contactConsent!==true/);assert.match(migration,/enable row level security/g);assert.match(migration,/revoke all on table public\.job_applications, public\.job_application_events from public, anon, authenticated/);assert.match(migration,/grant select, insert, update on table public\.job_applications to service_role/);assert.match(migration,/grant select, insert on table public\.job_application_events to service_role/);assert.doesNotMatch(migration,/grant (select|update|delete|insert).* anon/i);assert.doesNotMatch(migration,/grant[^;]*delete[^;]*service_role/i)});
 test("management-only RPCs maintain status history without operational record creation",()=>{assert.match(migration,/has_any_role\(array\['Master Admin','Administrator','Manager'\]\)/g);assert.match(migration,/Status Changed/);assert.match(migration,/actor_user_id/);assert.match(applicationTypes,/New[\s\S]*Contacted[\s\S]*Interviewing[\s\S]*Selected[\s\S]*Declined/);assert.match(management,/mailto:/);assert.match(management,/tel:/);assert.match(permissions,/jobApplications\.manage/);assert.doesNotMatch(migration,/insert into public\.(employees|user_profiles|time_entries|payments|commissions)/i)});
-test("email is best effort after durable insert and no SMS or protected fields are collected",()=>{assert.ok(server.indexOf('const created=await db.from("job_applications").insert')<server.indexOf("try{const sent=await sendResendEmail"));assert.match(server,/catch\(cause\).*status:"Failed"/s);assert.doesNotMatch(server,/send.*sms|twilio/i);for(const forbidden of["dateOfBirth","socialSecurity","ssn","banking","race","disability","medical","marital","resume"])assert.doesNotMatch(form,new RegExp(`name=[{]?"${forbidden}"`,"i"))});
+test("email is best effort after durable insert and no SMS or protected fields are collected",()=>{assert.ok(server.indexOf('const created=await db.from("job_applications").insert')<server.indexOf("try{const sent=await sendResendEmail"));assert.match(server,/catch\(cause\).*status:"Failed"/s);assert.doesNotMatch(server,/send.*sms|twilio/i);for(const forbidden of["dateOfBirth","socialSecurity","ssn","banking","race","disability","medical","marital"])assert.doesNotMatch(form,new RegExp(`name=[{]?"${forbidden}"`,"i"))});
 test("existing estimate and marketing routes remain present",()=>{assert.match(proxy,/"\/request-estimate"/);for(const path of["/residential","/commercial","/post-construction","/contact"])assert.ok(proxy.includes(`"${path}"`))});
 
 test("Scrub Technician applications use the existing intake without lead-generation answers", () => {
@@ -22,4 +22,16 @@ test("Scrub Technician applications use the existing intake without lead-generat
   assert.match(scrubTechMigration, /opening_identifier = 'scrub-tech' and not commission_acknowledged/);
   assert.match(scrubTechMigration, /opening_identifier = 'scrub-tech' and contact_interests is null/);
   assert.match(management, /"scrub-tech": \{ type: "Scrub Tech"/);
+});
+
+test("optional résumé upload is confined to Scrub Tech and downloads require staff permissions", () => {
+  const upload = read("supabase/migrations/20261123150000_scrub_technician_resumes.sql");
+  const download = read("app/api/applications/[id]/resume/route.ts");
+  assert.match(form, /scrubTech&&<label[^>]*>Résumé \(optional\)/);
+  assert.match(route, /request\.formData\(\)/);
+  assert.match(server, /!scrubTech \|\| resume\.type !== "application\/pdf"/);
+  assert.match(server, /\.remove\(\[resumePath\]\)/);
+  assert.match(upload, /'job-application-resumes', false, 3145728/);
+  assert.ok(download.indexOf('"jobApplications.manage"') < download.indexOf(".download("));
+  assert.match(download, /"Cache-Control": "private, no-store"/);
 });
