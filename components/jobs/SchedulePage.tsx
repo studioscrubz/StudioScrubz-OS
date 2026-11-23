@@ -1,4 +1,5 @@
 "use client";
+import {DirectCustomerServiceScope} from "@/components/jobs/DirectCustomerServiceScope";
 import { contractorScheduledJobStatuses } from "@/lib/contractors/scheduledJobs";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import Link from "next/link";
@@ -1218,6 +1219,7 @@ function QuickDetail({
       <Link href={`/jobs?jobId=${encodeURIComponent(job.id)}`} className={`${primary} mt-4 inline-block`}>View Full Job</Link>
       {canViewJobTime && <JobTimeSummary job={job} />}
       <h3 className="mt-5 font-extrabold text-[#143d1a]">Scope</h3>
+      <DirectCustomerServiceScope jobId={job.id}/>
       <ul className="mt-2 list-disc pl-5 text-sm">
         {job.scope.map((x) => (
           <li key={x.id}>{x.text}</li>
