@@ -1,5 +1,5 @@
 import type {Property} from "@/types/property";
-type RoomCounts=Pick<Property,"bedrooms"|"bathrooms">|null|undefined;
+type RoomCounts=Partial<Pick<Property,"bedrooms"|"bathrooms">>|null|undefined;
 export function jobBedBathLabel(property:RoomCounts):string{
  const beds=property?.bedrooms;
  const baths=property?.bathrooms;
