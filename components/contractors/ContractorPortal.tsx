@@ -99,6 +99,8 @@ export function ContractorPortal(){
  },[tab,requestedDate,editing?.id,bookingKey]);
  const availableServices=jobOptions?.services.filter(service=>service.division===contractorDivision)??[];
  const selectedService=availableServices.find(service=>service.name===serviceType);
+ const roseCatalog=data?.company.scope_catalog;
+ const roseScope=roseCatalog?contractorServiceScope(roseCatalog,serviceType):null;
  const action=async(name:string,args:Record<string,unknown>)=>{
   setBusy(true);setError("");setNotice("");
   try{const r=await fetch("/api/contractors",{method:"POST",headers:{"content-type":"application/json"},
