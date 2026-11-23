@@ -2,6 +2,7 @@
 import { contractorScheduledJobStatuses } from "@/lib/contractors/scheduledJobs";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
 import Link from "next/link";
+import {jobBedBathLabel,jobBedBathCompact} from "@/lib/jobs/roomCounts";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -540,7 +541,7 @@ export function SchedulePage({ scheduledJobIds, scheduledClientIds, initialDate 
                       <button type="button" onClick={() => { setSelectedDate(date); setView("Day"); }} className={`mb-2 rounded-full px-2 py-1 text-sm font-bold hover:bg-[#edf4ec] ${date === today() ? "bg-[#143d1a] text-white hover:text-[#143d1a]" : inMonth ? "text-[#143d1a]" : "text-neutral-400"}`} aria-label={`View ${pretty(date)}`}>{Number(date.slice(8))}</button>
                       <div className="space-y-1">
                         {dayEvents.slice(0, 3).map((event) => (
-                          <button key={`${event.kind}-${event.id}`} type="button" onClick={() => { if (event.kind === "Job") setDetail(event.job); else if (event.kind === "Internal Event") setInternalDetail(event.internalEvent); else { setSelectedDate(date); setView("Day"); } }} className="block w-full truncate rounded bg-[#edf4ec] px-2 py-1 text-left text-[11px] text-[#143d1a]" title={event.kind === "Job" ? (event.job.client_name ?? "Job") : event.kind === "Internal Event" ? event.internalEvent.title : event.kind === "Recurring Service" ? (event.occurrence.agreement.client?.company_name || event.occurrence.agreement.service_name) : walkthroughClient(event.walkthrough)}>{event.time ? `${formatTime(event.time)} ` : ""}{event.kind === "Job" ? event.job.client_name : event.kind === "Internal Event" ? event.internalEvent.title : event.kind === "Recurring Service" ? (event.occurrence.agreement.client?.company_name || event.occurrence.agreement.service_name) : walkthroughClient(event.walkthrough)}</button>
+                          <button key={`${event.kind}-${event.id}`} type="button" onClick={() => { if (event.kind === "Job") setDetail(event.job); else if (event.kind === "Internal Event") setInternalDetail(event.internalEvent); else { setSelectedDate(date); setView("Day"); } }} className="block w-full truncate rounded bg-[#edf4ec] px-2 py-1 text-left text-[11px] text-[#143d1a]" title={event.kind === "Job" ? (event.job.client_name ?? "Job") : event.kind === "Internal Event" ? event.internalEvent.title : event.kind === "Recurring Service" ? (event.occurrence.agreement.client?.company_name || event.occurrence.agreement.service_name) : walkthroughClient(event.walkthrough)}>{event.time ? `${formatTime(event.time)} ` : ""}{event.kind === "Job" ? `${event.job.client_name || "Job"} · ${jobBedBathCompact(event.job.property)}` : event.kind === "Internal Event" ? event.internalEvent.title : event.kind === "Recurring Service" ? (event.occurrence.agreement.client?.company_name || event.occurrence.agreement.service_name) : walkthroughClient(event.walkthrough)}</button>
                         ))}
                         {dayEvents.length > 3 && <button type="button" onClick={() => { setSelectedDate(date); setView("Day"); }} className="text-xs font-semibold text-[#143d1a]">+${dayEvents.length - 3} more</button>}
                       </div>
@@ -1194,6 +1195,8 @@ function QuickDetail({
           rows={[
             ["Client", job.client_name || "-"],
             ["Property", job.property_name || "-"],
+            ["Bedrooms", job.property?.bedrooms == null ? "Not recorded" : String(job.property.bedrooms)],
+            ["Bathrooms", job.property?.bathrooms == null ? "Not recorded" : String(job.property.bathrooms)],
             ["Service", job.service_name || "-"],
             ["Date", job.scheduled_date || "Unscheduled"],
             ["Time", formatTime(job.start_time)],
@@ -1212,6 +1215,7 @@ function QuickDetail({
           ]}
         />
       </div>
+      <Link href={`/jobs?jobId=${encodeURIComponent(job.id)}`} className={`${primary} mt-4 inline-block`}>View Full Job</Link>
       {canViewJobTime && <JobTimeSummary job={job} />}
       <h3 className="mt-5 font-extrabold text-[#143d1a]">Scope</h3>
       <ul className="mt-2 list-disc pl-5 text-sm">

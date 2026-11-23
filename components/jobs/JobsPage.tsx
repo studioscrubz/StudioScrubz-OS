@@ -1,4 +1,5 @@
 "use client";
+import {jobBedBathLabel} from "@/lib/jobs/roomCounts";
 import { normalizeSmsPhoneNumber, openDeviceSmsApp } from "@/lib/deviceSms";
 import { useEffect, useMemo, useState } from "react";
 import { useJobCommunication } from "@/components/communications/LogCommunicationModal";
@@ -447,13 +448,14 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
     </div>
     <div className="grid gap-2 text-left sm:grid-cols-[minmax(0,1.4fr)_minmax(10rem,1fr)] lg:grid-cols-[minmax(0,1.4fr)_minmax(10rem,1fr)_auto] md:items-start">
       <div className="min-w-0">
-        <h3 className="text-lg font-extrabold leading-tight text-[#143d1a]">{job.client_name || "Unnamed client"}</h3>
+        <h3 className="text-lg font-extrabold leading-tight text-[#143d1a]"><button type="button" onClick={open} className="text-left underline-offset-2 hover:underline focus-visible:underline" aria-label={`View job ${job.job_number}`}>{job.client_name || "Unnamed client"}</button></h3>
         <p className="mt-1 text-[10px] font-medium tracking-wide text-neutral-500">{job.job_number}</p>
         <p className="mt-0.5 text-sm text-neutral-600">{job.property_name || "Property not specified"}</p>
         {(job.service_address || job.property) && (
           <p className="mt-0.5 text-sm text-neutral-600">{job.service_address || formatJobServiceAddress(job.property)}</p>
         )}
         <p className="mt-1 text-xs font-bold text-[#143d1a]">{job.service_name || "Service not specified"}</p>
+        <p className="mt-1 text-xs font-semibold text-[#143d1a]">{jobBedBathLabel(job.property)}</p>
       </div>
       <div className="text-sm text-neutral-600">
         <p><span className="font-bold text-neutral-800">Assigned Worker:</span> {jobAssignmentLabel(job)}</p>
@@ -691,6 +693,8 @@ function JobModal({
           rows={[
             ["Client", job.client_name || "—"],
             ["Property", job.property_name || "—"],
+            ["Bedrooms", job.property?.bedrooms == null ? "Not recorded" : String(job.property.bedrooms)],
+            ["Bathrooms", job.property?.bathrooms == null ? "Not recorded" : String(job.property.bathrooms)],
             ["Service address", job.service_address || formatJobServiceAddress(job.property) || "—"],
             ["Proposal", job.proposal?.proposal_number ?? "—"],
             ["Estimate", job.estimate_id || "—"],
