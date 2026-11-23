@@ -711,15 +711,8 @@ function JobModal({
         />
       </div>
       {((job.contracted_addons??job.pricing_snapshot?.addons)?.length??0)>0?<><h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-1.5 list-disc pl-5 text-sm">{(job.contracted_addons??job.pricing_snapshot!.addons).map((item)=><li key={item.id}>{item.pricingType==="Per Unit"?`${item.label} — ${item.quantity} ${item.unitName}${item.quantity===1?"":"s"}`:item.label}</li>)}</ul></>:(job.proposal?.result.adjustments??[]).length>0&&<><h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Purchased Add-Ons</h3><ul className="mt-1.5 list-disc pl-5 text-sm">{(job.proposal?.result.adjustments??[]).map((item)=><li key={item.id}>{item.label}</li>)}</ul></>}
-      {job.scope.length > 0 && <>
-        <h3 className="mt-3 text-sm font-extrabold text-[#143d1a]">Operational Scope / Instructions</h3>
-        <ul className="mt-1.5 list-disc pl-5 text-sm">
-          {job.scope.map((x) => (
-            <li key={x.id}>{x.text}</li>
-          ))}
-        </ul>
-      </>}
       </section>
+      <JobWorkScope key={job.id} job={job} openScope={() => setTab("Scope")} />
       <CompactJobSection title="Schedule" subtitle={scheduleSummary} actionLabel={canSchedule ? "Edit Schedule" : "Details"}>
       {canSchedule && !["Completed", "Cancelled", "Archived"].includes(job.status) && <section className="mt-2 grid gap-2 sm:grid-cols-3">
         <Field label="Scheduled Date" type="date" value={date} set={setDate} />
@@ -1052,6 +1045,39 @@ function CrewPresenceModal({ job, crew, techs, busy, close, start }: {
       </div>
     </section>
   </div>;
+}
+
+function JobWorkScope({ job, openScope }: { job: JobWithRelations; openScope: () => void }) {
+  const [accepted, setAccepted] = useState<JobScopeItem[] | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const instructions = job.scope.filter(item => item.text?.trim());
+  useEffect(() => {
+    let active = true;
+    void getJobScopeV1(job.id)
+      .then(scope => { if (active) setAccepted(scope.items); })
+      .catch(() => { if (active) setUnavailable(true); });
+    return () => { active = false; };
+  }, [job.id]);
+
+  return <section aria-label="Scope of work" className="rounded-lg border border-[#143d1a]/15 bg-white p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h3 className="font-extrabold text-[#143d1a]">Scope of work</h3>
+      <button type="button" onClick={openScope} className="text-sm font-bold text-[#143d1a] underline">View scope details</button>
+    </div>
+    {!!instructions.length && <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+      {instructions.map(item => <li key={item.id} className="whitespace-pre-wrap">{item.text}</li>)}
+    </ul>}
+    {!!accepted?.length && <ul className="mt-2 list-disc space-y-2 pl-5 text-sm">
+      {accepted.map(item => <li key={item.id}>
+        <span className="font-semibold">{item.name}</span>
+        {item.quantity != null && <span> · {item.quantity}{item.unit ? ` ${item.unit}` : ""}</span>}
+        {item.description && <p className="whitespace-pre-wrap text-neutral-700">{item.description}</p>}
+      </li>)}
+    </ul>}
+    {unavailable ? <p className="mt-2 text-sm text-neutral-600">Accepted scope could not be loaded.</p> :
+      accepted === null ? <p className="mt-2 text-sm text-neutral-600">Loading accepted scope…</p> :
+      !instructions.length && !accepted.length ? <p className="mt-2 text-sm text-neutral-600">No scope of work has been recorded for this job.</p> : null}
+  </section>;
 }
 
 function JobScopePanel({ jobId, recordDiscovery }: { jobId: string; recordDiscovery: (question: string) => void }) {
