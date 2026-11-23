@@ -10,9 +10,21 @@ export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose
   const lines = (hasHeading ? allLines.slice(1) : allLines).join("\n")
     .replace(/^(\s*Bedrooms?\s*:[^\n]+?)[^\S\r\n]+(Bathrooms?\s*:)/gim, "$1\n$2").split("\n");
   const fields = new Map<string, string>();
+  const addOnHeading = /^(?:add[- ]?ons|additional services)$/i;
+  const bookingHeading = /^(?:customer|date|time|team|address|service|bedrooms?|bathrooms?|frequency|pets|price|instructions(?:\s*\/\s*access)?|access|notes)$/i;
+  let addOnKey: string | null = null;
   for (const line of lines) {
     const field = line.match(/^\s*([^:]+):\s*(.*)$/);
-    if (field) fields.set(field[1].trim().toLowerCase(), field[2].trim());
+    const key = field?.[1].trim().toLowerCase();
+    if (kind === "brava" && addOnKey && (!key || !bookingHeading.test(key) && !addOnHeading.test(key))) {
+      const detail = line.trim().replace(/^[•*-]\s+/, "");
+      if (detail) fields.set(addOnKey, [fields.get(addOnKey), detail].filter(Boolean).join(", "));
+      continue;
+    }
+    if (field && key) {
+      fields.set(key, field[2].trim());
+      addOnKey = kind === "brava" && addOnHeading.test(key) ? key : null;
+    }
   }
   const read = (key: string) => fields.get(key) ?? "";
   const address = read("address").match(/^(.+),\s*([^,]+),\s*([a-z]{2})[ ,]+(\d{5}(?:-\d{4})?)$/i);
@@ -28,6 +40,7 @@ export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose
     ? `${String(time[3] ? hour % 12 + (time[3].toLowerCase() === "pm" ? 12 : 0) : hour).padStart(2, "0")}:${time[2]}`
     : "";
   const price = read("price").replace(/[$,]/g, "").trim();
+  const addOns = read("add-ons") || (kind === "brava" ? read("add ons") || read("addons") || read("additional services") : "");
   const streetParts = address?.[1].split(",").map(part => part.trim()) ?? [];
   return {
     propertyName: read("customer"),
@@ -43,11 +56,11 @@ export function parseRoseBooking(message: string, kind: "rose" | "brava" = "rose
     bathrooms: read("bathrooms") || read("bathroom"),
     frequency: read("frequency"),
     pets: read("pets"),
-    addOns: read("add-ons"),
+    addOns,
     access: read("instructions / access") || read("instructions/access"),
     amount: kind === "rose" && /^\d+(\.\d{1,2})?$/.test(price) ? price : "",
     scope: [kind === "brava" ? bravaScopeHeading(read("service")) : read("service"), read("frequency") && `Frequency: ${read("frequency")}`,
-      read("add-ons") && `Add-ons: ${read("add-ons")}`].filter(Boolean).join("\n"),
+      addOns && `Add-ons: ${addOns}`].filter(Boolean).join("\n"),
     estimatedHours: "",
   };
 }
