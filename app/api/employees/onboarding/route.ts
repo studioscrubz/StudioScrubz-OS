@@ -70,6 +70,8 @@ export async function POST(req:Request){
     }else if(body.source==="indeed"){
       const name=requiredText(body.fullName,160);
       email=requiredText(body.email,254);
+      const phone=typeof body.phone==="string"?body.phone.trim():"";
+      if(!phone||phone.length>30)throw new OnboardingError("Enter the candidate phone number (up to 30 characters).");
       if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
         throw new OnboardingError("Enter a valid candidate email address.");
       const words=name.split(/\s+/);
@@ -78,11 +80,10 @@ export async function POST(req:Request){
         .select("id").ilike("email",email).limit(1);
       if(matchError)throw matchError;
       if(matches?.length)throw new OnboardingError("This email already belongs to an employee. Use Existing Employee instead.");
-      const phone=typeof body.phone==="string"?body.phone.trim().slice(0,30):"";
       const {data:employee,error:createError}=await admin.from("employees").insert({
         employee_number:"SCR-"+randomUUID().slice(0,12).toUpperCase(),
         first_name:words[0],last_name:words.slice(1).join(" "),
-        email,phone:phone||null,department:"Scrub Technicians",
+        email,phone,department:"Scrub Technicians",
         job_title:position,employment_type:"Part-Time",employment_status:"Inactive",
         hourly_rate:rate,commission_rate:0,
       }).select("id").single();
