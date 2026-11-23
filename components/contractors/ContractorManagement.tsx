@@ -336,6 +336,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><a key={d.id} className="mr-3 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}
 
     <p>Status: <b>{selectedCompany.status}</b></p>
+    {selectedCompany.scope_catalog&&<details className="rounded-lg border p-3">
+      <summary className="cursor-pointer font-bold text-[#143d1a]">Rose Company — saved cleaning scope</summary>
+      <p className="mt-2 text-xs text-neutral-600">Source: {selectedCompany.scope_catalog.source} · {selectedCompany.scope_catalog.version}. Included tasks and exclusions automatically populate new job opportunities.</p>
+      {selectedCompany.scope_catalog.services.map(service=><details key={service} className="mt-2 rounded-lg border p-2">
+        <summary className="cursor-pointer text-sm font-semibold">{service}</summary>
+        <pre className="mt-2 whitespace-pre-wrap text-xs">{contractorServiceScope(selectedCompany.scope_catalog,service)}</pre>
+      </details>)}
+    </details>
     <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit contractor terms, territory and rates</summary>
      <form className="mt-3 space-y-3" onSubmit={async e=>{
       e.preventDefault();
