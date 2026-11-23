@@ -4,6 +4,7 @@ import { getCurrentProfile } from "@/lib/services/auth";
 import { getEmployees } from "@/lib/services/employees";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import { requestImmediateAttentionPush } from "@/lib/push/client";
+import { requestPendingJobCalendarSync } from "@/lib/google-calendar/client";
 import type { Crew, CrewInput, CrewUpdate, CrewWithRelations } from "@/types/crew";
 
 const select = "*, crew_lead:employees!crews_crew_lead_id_fkey(*)";
@@ -58,6 +59,9 @@ export async function setJobCrewTechnicians(jobId: string, employeeIds: string[]
   if (error) throw error;
   notifyAttentionRefresh();
   void requestImmediateAttentionPush();
+  // The roster trigger queues updated Google invitations; process promptly.
+  // Queue remains available for retry if Google Calendar is temporarily unavailable.
+  await requestPendingJobCalendarSync(jobId);
   return data as number;
 }
 
