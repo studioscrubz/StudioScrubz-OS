@@ -1,5 +1,5 @@
 "use client";
-import {contractorServiceScope,roseServiceIndex,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
+import {contractorServiceScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
 import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions, type ContractorPropertyAddress } from "@/lib/contractors/jobOptions";
 import type { ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
