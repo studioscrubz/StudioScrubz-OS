@@ -1,4 +1,5 @@
 "use client";
+import {DirectCustomerServiceScope} from "@/components/jobs/DirectCustomerServiceScope";
 import {jobBedBathLabel} from "@/lib/jobs/roomCounts";
 import { normalizeSmsPhoneNumber, openDeviceSmsApp } from "@/lib/deviceSms";
 import { useEffect, useMemo, useState } from "react";
@@ -1071,6 +1072,7 @@ function JobWorkScope({ job, openScope }: { job: JobWithRelations; openScope: ()
     {!!instructions.length && <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
       {instructions.map(item => <li key={item.id} className="whitespace-pre-wrap">{item.text}</li>)}
     </ul>}
+    <DirectCustomerServiceScope jobId={job.id}/>
     {!!accepted?.length && <ul className="mt-2 list-disc space-y-2 pl-5 text-sm">
       {accepted.map(item => <li key={item.id}>
         <span className="font-semibold">{item.name}</span>
@@ -1100,7 +1102,7 @@ function JobScopePanel({ jobId, recordDiscovery }: { jobId: string; recordDiscov
   if (loadingScope) return <p className="rounded-xl border bg-[#f6f8f5] p-4 text-sm text-neutral-600">Loading locked scope…</p>;
   if (scopeError) return <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{scopeError}</p>;
   if (!scope) return null;
-  if (!scope.snapshot && scope.items.length === 0) return <section><p className="rounded-xl border bg-[#f6f8f5] p-4 text-sm text-neutral-600">No locked scope snapshot is available for this Job.</p><ScopeAdvisory jobId={jobId} recordDiscovery={recordDiscovery}/><AuthorizedChanges jobId={jobId}/></section>;
+  if (!scope.snapshot && scope.items.length === 0) return <section><p className="rounded-xl border bg-[#f6f8f5] p-4 text-sm text-neutral-600">No locked scope snapshot is available for this Job.</p><DirectCustomerServiceScope jobId={jobId}/><ScopeAdvisory jobId={jobId} recordDiscovery={recordDiscovery}/><AuthorizedChanges jobId={jobId}/></section>;
 
   const groups = scope.items.reduce<Record<string, JobScopeItem[]>>((result, item) => {
     (result[item.item_type] ??= []).push(item);
@@ -1127,6 +1129,7 @@ function JobScopePanel({ jobId, recordDiscovery }: { jobId: string; recordDiscov
       <span className="rounded-full border border-[#9a7a17]/40 bg-amber-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-[#71570c]">Locked</span>
     </div>
     {scope.snapshot && <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500"><span>{scope.snapshot.snapshot_type}</span>{scope.snapshot.accepted_at && <span>Accepted {new Date(scope.snapshot.accepted_at).toLocaleString()}</span>}</div>}
+    <DirectCustomerServiceScope jobId={jobId}/>
     <ScopeAdvisory jobId={jobId} recordDiscovery={recordDiscovery} />
     <div className="mt-5 grid gap-4">
       {groupNames.filter((name) => groups[name]?.length).map((name) => <section key={name} className="rounded-xl border border-neutral-200 bg-white p-4">
