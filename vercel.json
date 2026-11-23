@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "fix/show-job-work-scope": false,
       "fix/require-onboarding-phone": false,
       "feat/scrub-tech-resumes": false,
       "fix/remove-contractor-agreement-links": false,
