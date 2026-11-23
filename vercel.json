@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "feat/scrub-tech-resumes": false,
       "fix/remove-contractor-agreement-links": false,
       "fix/group-contractor-visits": false,
       "fix/contractor-agreement-optional": false,

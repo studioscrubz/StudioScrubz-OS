@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { MAX_RESUME_BYTES, RESUME_BUCKET } from "./resumes";
+import { createHash, randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendResendEmail } from "@/lib/email/resend";
 import { resolveEmailSenderProfile } from "@/lib/email/senderProfiles";
@@ -13,12 +14,20 @@ const phone=(v:unknown)=>{const d=String(v??"").replace(/\D/g,"");const normaliz
 const hash=(v:string)=>createHash("sha256").update(v).digest("hex");
 const experience=(v:unknown)=>{if(typeof v!=="boolean")throw new JobApplicationError("Select Yes or No for relevant experience.");return v};
 const interests=(v:unknown)=>{if(!Array.isArray(v)||v.length===0)throw new JobApplicationError("Select at least one contact-interest area.");if(v.some(x=>typeof x!=="string"||x.trim()!==x||!isLeadGeneratorContactInterest(x)))throw new JobApplicationError("Select only approved contact-interest areas.");if(new Set(v).size!==v.length)throw new JobApplicationError("Duplicate contact-interest areas are not allowed.");return v};
-export async function submitLeadGeneratorApplication(raw:LeadGeneratorApplicationInput,ip:string){
+export async function submitLeadGeneratorApplication(raw:LeadGeneratorApplicationInput,ip:string,resume:File|null=null){
   if(!raw||typeof raw!=="object")throw new JobApplicationError("Invalid submission.");
   const opening=raw.opening===undefined?"lead-generator":raw.opening;
   if(opening!=="lead-generator"&&opening!=="scrub-tech")throw new JobApplicationError("Invalid opening.");
   const scrubTech=opening==="scrub-tech",title=scrubTech?"Scrub Technician":"Lead Generator";
   if(raw.website)throw new JobApplicationError("Invalid submission.");
+  let resumeBytes: Uint8Array | null = null;
+  if (resume) {
+    if (!scrubTech || resume.type !== "application/pdf" || resume.size > MAX_RESUME_BYTES || resume.size < 5)
+      throw new JobApplicationError("Upload a PDF résumé up to 3 MB.");
+    resumeBytes = new Uint8Array(await resume.arrayBuffer());
+    if (new TextDecoder().decode(resumeBytes.subarray(0, 5)) !== "%PDF-")
+      throw new JobApplicationError("The résumé must be a valid PDF file.");
+  }
   const method=text(raw.preferredContactMethod,10,"Preferred contact method");if(!["Email","Phone","Text"].includes(method))throw new JobApplicationError("Select a valid preferred contact method.");
   if(!scrubTech&&raw.commissionAcknowledged!==true)throw new JobApplicationError("Acknowledge the commission-based compensation terms.");
   if(raw.contactConsent!==true)throw new JobApplicationError("Consent to contact is required.");
@@ -28,8 +37,19 @@ export async function submitLeadGeneratorApplication(raw:LeadGeneratorApplicatio
   if(ipCount.error||contactCount.error)throw new JobApplicationError("Application could not be submitted.",500);
   if((ipCount.count??0)>=5)throw new JobApplicationError("Too many applications were submitted from this connection. Please try again later.",429);
   if((contactCount.count??0)>0)throw new JobApplicationError("An application with this email and phone was recently submitted. Please wait before trying again.",429);
-  const created=await db.from("job_applications").insert({...clean,opening_identifier:opening,source_page:"/careers",submitted_ip_hash:ipHash,contact_fingerprint:fingerprint,status:"New"}).select("id,full_name,email,phone,city,created_at").single();
-  if(created.error)throw new JobApplicationError("Application could not be submitted.",500);
+  const applicationId = randomUUID();
+  const resumePath = `${applicationId}.pdf`;
+  if (resumeBytes) {
+    const {error} = await db.storage.from(RESUME_BUCKET).upload(resumePath, resumeBytes, {
+      contentType: "application/pdf", upsert: false,
+    });
+    if (error) throw new JobApplicationError("The résumé could not be uploaded. Please try again.", 503);
+  }
+  const created=await db.from("job_applications").insert({id:applicationId,...(resumeBytes ? {has_resume:true} : {}),...clean,opening_identifier:opening,source_page:"/careers",submitted_ip_hash:ipHash,contact_fingerprint:fingerprint,status:"New"}).select("id,full_name,email,phone,city,created_at").single();
+  if (created.error) {
+    if (resumeBytes) await db.storage.from(RESUME_BUCKET).remove([resumePath]);
+    throw new JobApplicationError("Application could not be submitted.",500);
+  }
   let notification:{status:"Sent"|"Failed";id?:string;error?:string};
   const experienceLabel=clean.relevant_experience_boolean?"Yes":"No",interestLabels=clean.contact_interests?.join(", ")??"";
   try{const sent=await sendResendEmail({recipientEmail:"info@studioscrubz.com",...resolveEmailSenderProfile("careers"),replyTo:clean.email,subject:`${title} application — ${clean.full_name}`,text:`New ${title} application\n\nApplicant: ${clean.full_name}\nEmail: ${clean.email}\nPhone: ${clean.phone}\nCity: ${clean.city}\nPreferred contact: ${clean.preferred_contact_method}\nRelevant experience: ${experienceLabel}\n${scrubTech?"":`Contact interests: ${interestLabels}\n`}Why they are a good fit: ${clean.fit_reason}\n${scrubTech?"":"Commission terms acknowledged: Yes\n"}Contact consent: Yes\n\nReview the application in the authenticated StudioScrubz OS.`,html:`<div style="font-family:Arial,sans-serif;line-height:1.6"><h1 style="color:#143d1a">New ${title} application</h1><p><strong>${escapeHtml(clean.full_name)}</strong> from ${escapeHtml(clean.city)}</p><p>Email: ${escapeHtml(clean.email)}<br>Phone: ${escapeHtml(clean.phone)}<br>Preferred contact: ${escapeHtml(clean.preferred_contact_method)}<br>Relevant experience: ${experienceLabel}</p>${scrubTech?"":`<p><strong>Contact interests:</strong> ${escapeHtml(interestLabels)}</p>`}<p><strong>Why they are a good fit:</strong> ${escapeHtml(clean.fit_reason)}</p><p>${scrubTech?"":"Commission terms acknowledged: Yes<br>"}Contact consent: Yes</p><p>Review the application in the authenticated StudioScrubz OS.</p></div>`,idempotencyKey:`job-application:${created.data.id}:notification:v1`});notification={status:"Sent",id:sent.id}}catch(cause){notification={status:"Failed",error:cause instanceof Error?cause.message:"Email delivery failed."}}
