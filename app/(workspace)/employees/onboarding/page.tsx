@@ -1,12 +1,12 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
-import {ONBOARDING_STEPS} from "@/lib/onboarding/steps";
+import {ONBOARDING_FOLLOW_UP,ONBOARDING_STEPS} from "@/lib/onboarding/steps";
 
 type Case={id:string;employee_id:string;application_id:string|null;candidate_email:string;position:string;hourly_rate:number;status:string;invite_sent_at:string|null;candidate_ack_at:string|null;approved_at:string|null;start_date:string|null;created_at:string};
 type Step={case_id:string;code:string;completed_at:string|null;completed_by:string|null};
 type Employee={id:string;first_name:string;last_name:string;email:string|null;department:string;employment_type:string|null;employment_status:string};
 type Application={id:string;full_name:string;email:string;status:string};
-type Data={cases:Case[];steps:Step[];employees:Employee[];selectedApplications:Application[];screenings:{employee_id:string;status:string}[]};
+type Data={cases:Case[];steps:Step[];followUp:Step[];employees:Employee[];selectedApplications:Application[];screenings:{employee_id:string;status:string}[]};
 const statuses:Record<string,string>={draft:"Not invited",invited:"Invitation sent",in_progress:"In progress",ready_for_review:"Review needed",completed:"Ready for assignment",canceled:"Canceled"};
 
 export default function EmployeeOnboarding(){
@@ -41,6 +41,7 @@ export default function EmployeeOnboarding(){
  const selected=data?.cases.find(c=>c.id===chosen)??data?.cases[0];
  const person=data?.employees.find(e=>e.id===selected?.employee_id);
  const steps=(data?.steps??[]).filter(x=>x.case_id===selected?.id);
+ const followUp=(data?.followUp??[]).filter(item=>item.case_id===selected?.id);
  const done=steps.filter(s=>s.completed_at).length;
  const eligible=data?.screenings.some(s=>s.employee_id===selected?.employee_id&&s.status==="cleared")??false;
  const allDone=ONBOARDING_STEPS.every(([code])=>steps.some(s=>s.code===code&&!!s.completed_at));
@@ -51,6 +52,7 @@ export default function EmployeeOnboarding(){
    ["Paperwork / Training",cases.filter(c=>["invited","in_progress","ready_for_review"].includes(c.status)).length],
    ["Awaiting Approval",cases.filter(c=>c.status!=="completed"&&c.status!=="canceled"&&c.candidate_ack_at&&data?.screenings.some(s=>s.employee_id===c.employee_id&&s.status==="cleared")&&ONBOARDING_STEPS.every(([code])=>data?.steps.some(s=>s.case_id===c.id&&s.code===code&&s.completed_at))).length],
    ["Ready for Assignment",cases.filter(c=>c.status==="completed").length],
+   ["Active Hires With Follow-up",cases.filter(c=>c.status==="completed"&&ONBOARDING_FOLLOW_UP.some(([code])=>!data?.followUp.some(item=>item.case_id===c.id&&item.code===code&&item.completed_at))).length],
   ] as const;
  },[data]);
  async function execute(body:Record<string,unknown>,success:string){
@@ -76,7 +78,7 @@ export default function EmployeeOnboarding(){
   {loading&&<p>Loading onboarding…</p>}
   {error&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-900">{notice}</p>}
-  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
    {counts.map(([title,count])=><div key={title} className="rounded-xl border bg-white p-4"><p className="text-xs text-neutral-600">{title}</p><p className="text-2xl font-bold text-[#143d1a]">{count}</p></div>)}
   </div>
   <section className="rounded-2xl border bg-white p-5 space-y-4">
@@ -142,20 +144,20 @@ export default function EmployeeOnboarding(){
      <p className="text-sm">Position: {selected.position} · ${selected.hourly_rate}/hour · {selected.status==="invited"&&!selected.invite_sent_at?"Invitation delivery not confirmed":(statuses[selected.status]??selected.status)}</p>
      <p className="text-sm">Candidate orientation: {selected.candidate_ack_at?"Acknowledged":"Pending"}</p>
      <p className="text-sm">Background Screening: <strong>{eligible?"Cleared":"Not cleared"}</strong></p>
-     <p className="text-sm">Requirements verified: <strong>{done}/{ONBOARDING_STEPS.length}</strong></p>
+     <p className="text-sm">First-shift requirements verified: <strong>{done}/{ONBOARDING_STEPS.length}</strong></p>
      <a className="text-sm font-semibold text-[#143d1a] underline" href={`/employees/background-screening?employee=${encodeURIComponent(selected.employee_id)}`}>View Background Screening</a>
     </div>
     <button disabled={busy||!eligible||selected.status==="completed"||selected.status==="canceled"} className="rounded-lg border border-green-800 px-4 py-2 text-sm font-semibold text-green-900 disabled:opacity-40" onClick={()=>void execute({action:"invite",caseId:selected.id},"Onboarding invitation submitted by email. Link expires in seven days.")}>Send / resend onboarding invitation</button>
     {!eligible&&<p className="text-sm text-amber-800">An invitation can be sent after background screening clearance. The candidate will review the position overview; complete legally required paperwork through secure, separate channels.</p>}
     <div className="space-y-3 border-t pt-4">
-     <h3 className="font-bold">Management verification checklist</h3>
+     <h3 className="font-bold">First-shift readiness checklist</h3>
      <p className="text-xs text-neutral-600">Check an item only after completing or verifying the actual requirement. Sensitive documents stay in authorized payroll/I-9 systems. Keep supporting references generic, not private form contents.</p>
      {ONBOARDING_STEPS.map(([code,label])=>{
       const step=steps.find(s=>s.code===code);
       const verified=!!step?.completed_at;
       return <div key={code} className="rounded-lg border p-3">
        <label className="flex gap-3 text-sm">
-        <input type="checkbox" checked={verified} disabled={busy||selected.status==="completed"}
+        <input type="checkbox" checked={verified} disabled={busy||selected.status==="completed"||selected.status==="canceled"}
          onChange={e=>void execute({action:"verify_step",caseId:selected.id,code,verified:e.target.checked,reference:references[code]??""},e.target.checked?"Requirement verified.":"Verification reset.")}/>
         <span className={verified?"font-semibold text-green-900":""}>{label}</span>
        </label>
@@ -167,8 +169,22 @@ export default function EmployeeOnboarding(){
     <div className="rounded-lg border p-4 space-y-3">
      <h3 className="font-bold">Final management approval</h3>
      <p className="text-sm">Approval requires all {ONBOARDING_STEPS.length} verified steps, candidate orientation acknowledgment, and cleared background screening. Newly created employee records remain inactive until this step.</p>
-     <button disabled={busy||!allDone||!selected.candidate_ack_at||!eligible||selected.status==="completed"} onClick={()=>void execute({action:"approve",caseId:selected.id},"Onboarding completed and employee activated.")}
+     <button disabled={busy||!allDone||!selected.candidate_ack_at||!eligible||selected.status==="completed"||selected.status==="canceled"} onClick={()=>void execute({action:"approve",caseId:selected.id},"Onboarding completed and employee activated.")}
       className="rounded-lg bg-[#143d1a] px-5 py-3 font-bold text-white disabled:opacity-40">{selected.status==="completed"?"Approved":"Approve & Activate Employee"}</button>
+    </div>
+    <div className="space-y-3 rounded-lg border p-4">
+     <h3 className="font-bold">Hiring follow-up</h3>
+     <p className="text-sm text-neutral-600">Record completion here as each task is done. These checks stay available after employee activation.</p>
+     {ONBOARDING_FOLLOW_UP.map(([code,label])=>{
+      const completed=followUp.find(item=>item.code===code)?.completed_at;
+      return <label key={code} className="flex gap-3 rounded-lg border p-3 text-sm">
+       <input type="checkbox" checked={!!completed} disabled={busy||selected.status==="canceled"}
+        onChange={e=>void execute({action:"verify_follow_up",caseId:selected.id,code,verified:e.target.checked},e.target.checked?"Follow-up recorded.":"Follow-up reset.")}/>
+       <span>{label}{completed&&<span className="block text-xs text-neutral-600">
+        Recorded {new Date(completed).toLocaleDateString("en-US",{timeZone:"America/Los_Angeles"})}
+       </span>}</span>
+      </label>;
+     })}
     </div>
    </>}
   </section>

@@ -26,3 +26,8 @@ export type OnboardingStatus="draft"|"invited"|"in_progress"|"ready_for_review"|
 export function onboardingStepsComplete(steps:Array<{code:string;completed_at:string|null}>){
  return ONBOARDING_STEPS.every(([code])=>steps.some(step=>step.code===code&&!!step.completed_at));
 }
+
+export const ONBOARDING_FOLLOW_UP = [
+  ["workplace_rights_notice_recorded", "Workplace Know Your Rights notice and emergency-contact designation process recorded"],
+  ["new_hire_report_filed", "California new-hire report (DE 34) filed"],
+] as const;

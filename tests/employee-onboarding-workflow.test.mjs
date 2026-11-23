@@ -41,3 +41,15 @@ test("Management endpoints require authorization and prohibit premature activati
  assert.match(route,/employment_status:"Inactive"/);
  assert.match(route,/background screening clearance/i);
 });
+
+test("Hiring follow-up stays editable after activation without changing readiness requirements", () => {
+ const route=read("app/api/employees/onboarding/route.ts");
+ const page=read("app/(workspace)/employees/onboarding/page.tsx");
+ const steps=read("lib/onboarding/steps.ts");
+ const migration=read("supabase/migrations/20261123200000_employee_onboarding_follow_up.sql");
+
+ assert.match(route,/action==="verify_follow_up"&&caseRow.status!=="canceled"[\s\S]+caseRow.status==="completed"\|\|caseRow.status==="canceled"/);
+ assert.match(page,/disabled=\{busy\|\|selected.status==="canceled"\}\s+onChange=\{e=>void execute\(\{action:"verify_follow_up"/);
+ assert.match(steps,/onboardingStepsComplete[\s\S]+return ONBOARDING_STEPS.every/);
+ assert.match(migration,/revoke all on public\.employee_onboarding_follow_up from public, anon, authenticated/);
+});

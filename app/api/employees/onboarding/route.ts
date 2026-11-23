@@ -1,7 +1,7 @@
 import "server-only";
 import {randomUUID} from "node:crypto";
 import {sendResendEmail} from "@/lib/email/resend";
-import {ONBOARDING_STEPS,onboardingStepsComplete} from "@/lib/onboarding/steps";
+import {ONBOARDING_FOLLOW_UP,ONBOARDING_STEPS,onboardingStepsComplete} from "@/lib/onboarding/steps";
 import {authorizedHiring,responseError,OnboardingError,noStore,id,requiredText,newInviteToken,hashToken} from "@/lib/onboarding/server";
 
 type Admin=Awaited<ReturnType<typeof authorizedHiring>>["admin"];
@@ -13,15 +13,16 @@ async function audit(admin:Admin,caseId:string,eventType:string,actor:string|nul
  if(error)console.error("Onboarding event audit failed",error);
 }
 async function load(admin:Admin){
- const [{data:cases,error:ce},{data:steps,error:se},{data:employees,error:ee},{data:applications,error:ae},{data:screenings,error:be}]=await Promise.all([
+ const [{data:cases,error:ce},{data:steps,error:se},{data:employees,error:ee},{data:applications,error:ae},{data:screenings,error:be},{data:followUp,error:fe}]=await Promise.all([
   admin.from("employee_onboarding_cases").select("id,employee_id,application_id,candidate_email,position,hourly_rate,status,invite_sent_at,candidate_ack_at,approved_at,start_date,created_at").order("created_at",{ascending:false}).limit(150),
   admin.from("employee_onboarding_steps").select("case_id,code,completed_at,completed_by"),
   admin.from("employees").select("id,first_name,last_name,email,department,employment_type,employment_status,archived_at").is("archived_at",null).order("last_name"),
   admin.from("job_applications").select("id,full_name,email,phone,status,opening_identifier").eq("status","Selected").eq("opening_identifier","scrub-tech").limit(100),
-  admin.from("employee_background_screenings").select("employee_id,status")
+  admin.from("employee_background_screenings").select("employee_id,status"),
+  admin.from("employee_onboarding_follow_up").select("case_id,code,completed_at,completed_by")
  ]);
- if(ce||se||ee||ae||be)throw ce||se||ee||ae||be;
- return {cases:cases??[],steps:steps??[],employees:employees??[],
+ if(ce||se||ee||ae||be||fe)throw ce||se||ee||ae||be||fe;
+ return {cases:cases??[],steps:steps??[],followUp:followUp??[],employees:employees??[],
    selectedApplications:applications??[],screenings:screenings??[]};
 }
 export async function GET(){
@@ -122,6 +123,18 @@ export async function POST(req:Request){
      .eq("id",caseId).maybeSingle();
   if(readError)throw readError;
   if(!caseRow)throw new OnboardingError("Onboarding case not found.",404);
+  if(action==="verify_follow_up"&&caseRow.status!=="canceled"){
+    const code=requiredText(body.code,80);
+    if(!ONBOARDING_FOLLOW_UP.some(([key])=>key===code))throw new OnboardingError("Unknown follow-up task.");
+    const verified=body.verified===true;
+    const followUp=admin.from("employee_onboarding_follow_up");
+    const {error}=verified
+      ? await followUp.upsert({case_id:caseId,code,completed_by:actor,completed_at:new Date().toISOString()})
+      : await followUp.delete().eq("case_id",caseId).eq("code",code);
+    if(error)throw error;
+    await audit(admin,caseId,verified?"step_verified":"step_reset",actor);
+    return Response.json({ok:true},{headers:noStore});
+  }
   if(caseRow.status==="completed"||caseRow.status==="canceled")
     throw new OnboardingError("This onboarding case is closed.",409);
   if(action==="verify_step"){
