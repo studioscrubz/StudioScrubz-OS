@@ -173,8 +173,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
  );
  const buildings=Array.from(new Map(savedProperties.map(property=>[buildingKey(property),property])).entries());
  const savedUnits=savedProperties.filter(property=>buildingKey(property)===savedBuilding);
- const listedPayout=isBrava&&rosePreview
-  ?bravaPayout(rosePreview.serviceType,rosePreview.bedrooms,rosePreview.bathrooms,rosePreview.addOns):null;
+ const payoutBreakdown=isBrava&&rosePreview
+  ?bravaPayout(rosePreview.serviceType,rosePreview.bedrooms,rosePreview.bathrooms,rosePreview.addOns,rosePreview.requestedDate):null;
+ const listedPayout=payoutBreakdown?.total??null;
  const clientByCompany=new Map(data?.directory.map(entry=>[entry.companyId,entry.clientId]));
  const dashboardCompanies=companies.filter(company=>clientByCompany.has(company.id));
  const selectedCompany=companies.find(x=>x.id===(view==="companies"?managedCompanyId:companyId));
@@ -474,8 +475,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
        ...(!manualBrava ? [["frequency","Booking frequency","text",false] as const] : []),["requestedTime","Start time","time",true],
        ["estimatedHours","Estimated person-hours","number",true],
       ]],
-      ["Proposed Compensation", [["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Exhibit B payout"):"Proposed pay","number",true]]],
+      ["Proposed Compensation", [["amount",isBrava?(listedPayout===null?"Confirmed BRAVA payout":"Total BRAVA payout"):"Proposed pay","number",true]]],
      ] as const).map(([title,fields])=><Panel key={title} title={title}>
+      {title==="Proposed Compensation"&&payoutBreakdown&&<dl className="mb-3 space-y-1 text-sm">
+       {payoutBreakdown.lines.map(line=><div key={line.label} className="flex justify-between gap-3">
+        <dt>{line.label}</dt>
+        <dd>{line.cents===0?"Included":`$${(line.cents/100).toFixed(2)}`}</dd>
+       </div>)}
+      </dl>}
       <div className="grid gap-3 sm:grid-cols-2">
        {title==="Requested Schedule"&&manualBrava&&<label className="block text-sm font-semibold">Booking frequency
         <select className={input} value={["Weekly","Biweekly","Monthly","Multiple Days Per Week","Twice Monthly","Every 4 Weeks"].includes(rosePreview.frequency)?rosePreview.frequency:"One-Time"} onChange={event=>setRosePreview({...rosePreview,frequency:event.target.value})}>

@@ -601,7 +601,7 @@ export async function POST(request:Request){
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
    const listedPayout=brava&&type==="Residential"
-    ?bravaPayout(serviceType,input.bedrooms,input.bathrooms,optional(input.addOns,500)??""):null;
+    ?bravaPayout(serviceType,input.bedrooms,input.bathrooms,optional(input.addOns,500)??"",date)?.total??null:null;
    if(brava&&listedPayout===null&&(typeof input.amount!=="string"||!input.amount.trim()))
     throw new ContractorAccessError("Enter the confirmed BRAVA payout for this booking.",400);
    const proposed=money(listedPayout??input.amount,"proposed payment");
