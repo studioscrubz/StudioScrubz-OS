@@ -8,6 +8,7 @@ import type {PropertyWithClient} from "@/types/property";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import {bravaScopeHeading} from "@/lib/contractors/bravaScope";
 import {parseRoseBooking} from "@/lib/contractors/roseBooking";
+import {contractorServiceScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
 import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
@@ -17,7 +18,7 @@ import {useAuth} from "@/components/auth/AuthProvider";
 import {normalizeSmsPhoneNumber,buildDeviceSmsUrl,openDeviceSmsApp} from "@/lib/deviceSms";
 import {hasPermission} from "@/lib/auth/permissions";
 import {ContractorJobAssignment} from "@/components/contractors/ContractorJobAssignment";
-type Company={contractor_division:"Residential"|"Commercial";id:string;minimum_crew_size?:number;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
+type Company={contractor_division:"Residential"|"Commercial";id:string;minimum_crew_size?:number;contractor_code:string;name:string;contact_email:string;contact_name:string;phone:string|null;status:string;payment_terms:string|null;internal_notes:string|null;territories:string[];service_types:string[];scope_catalog?:ContractorScopeCatalog|null;proposed_rates:Record<string,unknown>;negotiated_rates:Record<string,unknown>;assigned_manager_id:string|null};
 type DirectoryEntry={clientId:string;companyId:string;name:string;contactName:string;email:string|null;phone:string|null;portalStatus:string};
 type Opportunity={id:string;request_property_id?:string|null;request_options?:{address?:{street:string;line2:string;city:string;state:string;zip:string};bookingFrequency?:string};bedrooms?:number|null;bathrooms?:number|null;submitted_by?:string|null;external_reference?:string|null;opportunity_number:string;company_id:string;manager_id?:string|null;service_type:string;property_address:string;property_name:string|null;property_condition:string|null;scope_of_work:string;requested_date:string;proposed_amount:number;agreed_amount:number|null;final_scope:string|null;status:string;partner_confirmed_at:string|null;linked_job_id:string|null;quality_approved_at?:string|null};
 type Offer={id:string;opportunity_id:string;offered_by_side:string;amount:number;scope_text:string;created_at:string};
@@ -157,6 +158,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const submissionClients=companies.filter(company=>["Active","Pending"].includes(company.status));
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
+  const roseCatalog=submissionClient?.scope_catalog;
  const savedClientId=data?.directory.find(entry=>entry.companyId===submissionClientId)?.clientId;
  useEffect(()=>{
   let active=true;
@@ -334,6 +336,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {data?.documents.filter(d=>d.company_id===selectedCompany.id&&!d.opportunity_id).map(d=><a key={d.id} className="mr-3 text-sm text-[#143d1a] underline" href={`/api/contractors/files?id=${d.id}`}>{d.file_name} ({d.category})</a>)}
 
     <p>Status: <b>{selectedCompany.status}</b></p>
+    {selectedCompany.scope_catalog&&<details className="rounded-lg border p-3">
+      <summary className="cursor-pointer font-bold text-[#143d1a]">Rose Company — saved cleaning scope</summary>
+      <p className="mt-2 text-xs text-neutral-600">Source: {selectedCompany.scope_catalog.source} · {selectedCompany.scope_catalog.version}. Included tasks and exclusions automatically populate new job opportunities.</p>
+      {selectedCompany.scope_catalog.services.map(service=><details key={service} className="mt-2 rounded-lg border p-2">
+        <summary className="cursor-pointer text-sm font-semibold">{service}</summary>
+        <pre className="mt-2 whitespace-pre-wrap text-xs">{contractorServiceScope(selectedCompany.scope_catalog,service)}</pre>
+      </details>)}
+    </details>}
     <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit contractor terms, territory and rates</summary>
      <form className="mt-3 space-y-3" onSubmit={async e=>{
       e.preventDefault();
@@ -451,7 +461,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <textarea className={input} rows={4} value={roseText} onChange={event=>{setRoseText(event.target.value);setRosePreview(null);}}/>
     </label>
     <button type="button" className={secondary} disabled={busy||!roseText.trim()} onClick={()=>{
-     try{setRosePreview(parseRoseBooking(roseText,isBrava?"brava":"rose"));setError("");}
+     try{
+        const parsed=parseRoseBooking(roseText,isBrava?"brava":"rose");
+        setRosePreview({...parsed,scope:!isBrava&&roseCatalog?contractorServiceScope(roseCatalog,parsed.serviceType)??parsed.scope:parsed.scope});
+        setError("");
+      }
      catch(cause){setError(cause instanceof Error?cause.message:"The booking could not be read.");}
     }}>Preview booking</button>
     </>}
@@ -502,13 +516,16 @@ export function ContractorManagement({view}: {view:ContractorView}){
            const notes=previous&&(scope===previous||scope.startsWith(previous+"\n"))
             ?scope.slice(previous.length).trimStart():scope;
            setRosePreview({...rosePreview,serviceType:value,scope:[next,notes].filter(Boolean).join("\n")});
+          }else if(!isBrava&&key==="serviceType"&&roseCatalog){
+           setRosePreview({...rosePreview,serviceType:value,scope:contractorServiceScope(roseCatalog,value)??value});
           }else setRosePreview({...rosePreview,[key]:value});
          }}/>
        </label>)}
       </div>
       {title==="Service and Add-Ons"&&<>
+       {roseCatalog&&!isBrava&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Rose Company scope comes from its saved checklist ({roseCatalog.version}); included tasks change with the service. Exclusions apply.</p>}
        <label className="mt-3 block text-sm font-semibold">Scope and add-ons
-        <textarea required className={input} rows={3} value={rosePreview.scope} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
+        <textarea required className={input} rows={roseCatalog&&!isBrava?12:3} value={!isBrava&&roseCatalog?contractorServiceScope(roseCatalog,rosePreview.serviceType)??rosePreview.scope:rosePreview.scope} readOnly={Boolean(roseCatalog&&!isBrava)} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
        </label>
        {isBrava&&<label className="mt-3 block text-sm font-semibold">Instructions / access
         <textarea className={input} rows={2} value={rosePreview.access} onChange={event=>setRosePreview({...rosePreview,access:event.target.value})}/>

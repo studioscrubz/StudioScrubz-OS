@@ -1,4 +1,5 @@
 "use client";
+import {contractorServiceScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
 import { contractorPropertyConditions, contractorPropertyTypes, contractorScopeOptions, editableContractorRequestStatuses, type ContractorJobOptions, type ContractorPropertyType, type ContractorRequestOptions, type ContractorPropertyAddress } from "@/lib/contractors/jobOptions";
 import type { ContractorScheduledJob } from "@/lib/contractors/scheduledJobs";
 import { UsStateSelect } from "@/components/forms/UsStateSelect";
@@ -18,7 +19,7 @@ type Job={id:string;status:string;scheduled_date:string|null;start_time:string|n
 type Document={id:string;opportunity_id:string|null;file_name:string;category:string};
 type InvoiceHistoryEntry=Pick<Invoice,"id"|"invoice_number"|"status"|"total"|"amount_paid">&{balance_due:number;issue_date:string|null};
 type CompletedJob={id:string;client_name:string;job_number:string;property_name:string|null;service_name:string|null;completed_at:string|null};
-type Portal={completedJobs?:CompletedJob[];invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null;contractor_division:ContractorDivision};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
+type Portal={completedJobs?:CompletedJob[];invoiceHistory?:InvoiceHistoryEntry[];upcomingJobs?:ContractorScheduledJob[];role:string;viewerId:string;company:{id:string;name:string;contractor_code:string;contact_name:string;contact_email:string;phone:string|null;business_address:string|null;status:string;payment_terms:string|null;contractor_division:ContractorDivision;scope_catalog?:ContractorScopeCatalog|null};opportunities:Opportunity[];offers:Offer[];messages:Msg[];operationsManager:{name:string}|null;jobs:Job[];invoices:Invoice[];documents:Document[]};
 const input="mt-1 w-full rounded-lg border border-neutral-300 bg-white p-3 text-neutral-900";
 const primary="rounded-lg bg-[#143d1a] px-4 py-2.5 font-bold text-white disabled:opacity-50";
 const secondary="rounded-lg border border-[#143d1a]/30 bg-white px-4 py-2 text-sm font-bold text-[#143d1a] disabled:opacity-50";
@@ -98,6 +99,8 @@ export function ContractorPortal(){
  },[tab,requestedDate,editing?.id,bookingKey]);
  const availableServices=jobOptions?.services.filter(service=>service.division===contractorDivision)??[];
  const selectedService=availableServices.find(service=>service.name===serviceType);
+ const roseCatalog=data?.company.scope_catalog;
+ const roseScope=roseCatalog?contractorServiceScope(roseCatalog,serviceType):null;
  const action=async(name:string,args:Record<string,unknown>)=>{
   setBusy(true);setError("");setNotice("");
   try{const r=await fetch("/api/contractors",{method:"POST",headers:{"content-type":"application/json"},
@@ -255,14 +258,14 @@ export function ContractorPortal(){
      </select></label>
      </div></PortalPanel>
      <PortalPanel title="Service and Add-Ons"><div className="grid gap-4 md:grid-cols-2">
-     <label className="text-sm font-bold">Service type<select className={input} value={serviceType} required disabled={!jobOptions} onChange={e=>{setServiceType(e.target.value);setAddons([]);}}>
+     <label className="text-sm font-bold">Service type<select className={input} value={serviceType} required disabled={!jobOptions} onChange={e=>{setServiceType(e.target.value);setAddons([]);if(roseCatalog)setScopeItems(["Kitchen","Bedrooms","Bathrooms and restrooms","Living and dining areas"]);}}>
       <option value="">{jobOptions?"Select service type":"Loading service types…"}</option>
       {availableServices.map(service=><option key={service.name}>{service.name}</option>)}
      </select></label>
      {jobOptionsError&&<div className="md:col-span-2"><p role="alert" className="mb-2 text-sm text-red-700">{jobOptionsError}</p><button type="button" className={secondary} onClick={()=>{setJobOptionsError("");setJobOptionsRetry(value=>value+1);}}>Retry loading options</button></div>}
      {jobOptions&&!availableServices.length&&<p className="text-sm text-neutral-600 md:col-span-2">No services are currently available for this property type.</p>}
      <JobCheckboxes label="Scope of work" help="Select at least one area or task." options={contractorScopeOptions[propertyType]} value={scopeItems} set={setScopeItems}/>
-     {scopeItems.includes("Other")&&<label className="block text-sm font-bold md:col-span-2">Other scope details<textarea className={input} rows={2} required maxLength={2000} value={scopeDetails} onChange={e=>setScopeDetails(e.target.value)}/></label>}
+     {!roseCatalog&&scopeItems.includes("Other")&&<label className="block text-sm font-bold md:col-span-2">Other scope details<textarea className={input} rows={2} required maxLength={2000} value={scopeDetails} onChange={e=>setScopeDetails(e.target.value)}/></label>}
      <JobCheckboxes label="Add-ons" help={selectedService?(selectedService.addons.length?"Select any additional services to request.":"No add-ons are available for this service."):"Select a service type to see its available add-ons."} options={selectedService?.addons??[]} value={addons} set={setAddons}/>
      </div></PortalPanel>
      <PortalPanel title="Requested Schedule">
@@ -292,7 +295,7 @@ export function ContractorPortal(){
      <label className="block text-sm font-bold">Special instructions<textarea className={input} rows={2} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
      <label className="block text-sm font-bold">Access arrangements<textarea className={input} rows={2} value={access} onChange={e=>setAccess(e.target.value)}/></label>
      </div></PortalPanel>
-     <button className={primary} disabled={busy||!contractorDateAllowed(contractorDivision,requestedDate)||!selectedService||!scopeItems.length||!requestedTime||!contractorStartAllowed(contractorDivision,requestedTime,estimatedDurationMinutes)||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
+     <button className={primary} disabled={busy||!contractorDateAllowed(contractorDivision,requestedDate)||!selectedService||!scopeItems.length||(roseCatalog&&!roseScope)||!requestedTime||!contractorStartAllowed(contractorDivision,requestedTime,estimatedDurationMinutes)||!blockedTimes||blockedTimes.includes(requestedTime)}>{editing?"Save changes":"Submit opportunity"}</button>
     </form>
     </div>
    </dialog>}

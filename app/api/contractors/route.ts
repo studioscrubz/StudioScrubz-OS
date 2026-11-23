@@ -1,3 +1,4 @@
+import {contractorServiceScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
 import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import "server-only";
@@ -291,7 +292,7 @@ async function list(ctx:ContractorContext,includeInvoiceTotals:boolean,includeSc
  }
  const companyId=ctx.companyId;
  const [company,opportunities,offers,documents]=await Promise.all([
-  db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,payment_terms,status,assigned_manager_id,client_id,contractor_division")
+  db.from("contractor_companies").select("id,contractor_code,name,contact_name,contact_email,phone,business_address,territories,service_types,scope_catalog,payment_terms,status,assigned_manager_id,client_id,contractor_division")
    .eq("id",companyId).single(),
   db.from("contractor_opportunities").select("id,opportunity_number,company_id,service_type,property_name,property_address,property_type,request_options,square_feet,bedrooms,bathrooms,scope_of_work,property_condition,requested_date,requested_time,estimated_person_hours,cleaner_count,proposed_amount,pricing_basis,special_instructions,access_arrangements,status,final_scope,agreed_amount,partner_confirmed_at,linked_job_id,quality_approved_at,created_at,updated_at,internal_confirmed_at,submitted_by").eq("company_id",companyId).or("status.neq.Cancelled,linked_job_id.not.is.null").order("created_at",{ascending:false}).limit(500),
   db.from("contractor_offers").select("id,opportunity_id,company_id,offered_by_side,amount,pricing_basis,scope_text,created_at").eq("company_id",companyId).order("created_at",{ascending:false}).limit(500),
@@ -582,6 +583,15 @@ export async function POST(request:Request){
    const serviceType=required(input.serviceType,"service type",160);
    const condition=optional(input.condition,250);
    let scope=input.scope;
+   // Read the checklist from the selected company's persisted profile.
+   const {data:scopedCompany,error:scopeCompanyError}=await db.from("contractor_companies")
+    .select("name,scope_catalog").eq("id",companyId).single();
+   if(scopeCompanyError)throw scopeCompanyError;
+   const catalog=scopedCompany?.scope_catalog as ContractorScopeCatalog|null;
+   const roseChecklist=catalog?.source==="Rose Company Checklist"
+    ?contractorServiceScope(catalog,serviceType):null;
+   if(catalog?.source==="Rose Company Checklist"&&!roseChecklist)
+    throw new ContractorAccessError("Select Regular, Deep Cleaning, or Move-In / Move-Out for Rose Company's scope.",400);
    let requestOptions:ContractorRequestOptions|Record<string,never>={};
    if(input.scopeItems!==undefined||input.addons!==undefined){
     const scopeItems=validatedSelections(input.scopeItems,contractorScopeOptions[type as ContractorPropertyType],"scope of work");
@@ -597,6 +607,17 @@ export async function POST(request:Request){
     const areas=scopeItems.filter(item=>item!=="Other");
     scope=[areas.length&&`Scope of work: ${areas.join(", ")}`,details&&`Scope details: ${details}`,
      addons.length&&`Requested add-ons: ${addons.join(", ")}`].filter(Boolean).join("\n");
+   }
+   if(roseChecklist){
+    const userNotes=typeof input.scopeDetails==="string"&&input.scopeDetails.trim()
+     ?input.scopeDetails.trim().slice(0,2000):"";
+    const requestedAddons=Array.isArray(input.addons)&&input.addons.length
+     ?input.addons.join(", "):typeof input.addOns==="string"?input.addOns.trim().slice(0,400):"";
+    const details=[userNotes&&"Additional scope notes: "+userNotes,
+     requestedAddons&&"Requested add-ons (subject to contractor agreement): "+requestedAddons,
+     typeof input.frequency==="string"&&input.frequency.trim()&&"Frequency: "+input.frequency.trim().slice(0,80)]
+     .filter(Boolean).join("\n");
+    scope=roseChecklist+(details?"\n\n"+details:"");
    }
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
