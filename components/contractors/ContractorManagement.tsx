@@ -343,7 +343,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
         <summary className="cursor-pointer text-sm font-semibold">{service}</summary>
         <pre className="mt-2 whitespace-pre-wrap text-xs">{contractorServiceScope(selectedCompany.scope_catalog,service)}</pre>
       </details>)}
-    </details>
+    </details>}
     <details className="rounded-lg border p-3"><summary className="cursor-pointer font-bold">Edit contractor terms, territory and rates</summary>
      <form className="mt-3 space-y-3" onSubmit={async e=>{
       e.preventDefault();
