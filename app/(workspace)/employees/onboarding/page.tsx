@@ -66,7 +66,7 @@ export default function EmployeeOnboarding(){
   }catch(e){setError(e instanceof Error?e.message:"Onboarding action failed.");return false;}
   finally{setBusy(false);}
  }
- const canCreate=mode==="indeed"?!!fullName.trim()&&!!email.trim():mode==="application"?!!applicationId:!!employeeId;
+ const canCreate=mode==="indeed"?!!fullName.trim()&&!!email.trim()&&!!phone.trim():mode==="application"?!!applicationId:!!employeeId;
  return <main className="space-y-6 p-4 md:p-7">
   <header>
    <p className="text-xs font-bold uppercase tracking-widest text-green-800">Team / Employee Onboarding</p>
@@ -91,7 +91,7 @@ export default function EmployeeOnboarding(){
    {mode==="indeed"&&<div className="grid gap-3 md:grid-cols-2">
     <label className="text-sm">Applicant name<input className="mt-1 w-full rounded-lg border p-3" value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="First and last name"/></label>
     <label className="text-sm">Applicant email<input type="email" className="mt-1 w-full rounded-lg border p-3" value={email} onChange={e=>setEmail(e.target.value)}/></label>
-    <label className="text-sm">Phone (optional)<input className="mt-1 w-full rounded-lg border p-3" value={phone} onChange={e=>setPhone(e.target.value)}/></label>
+    <label className="text-sm">Phone (required)<input type="tel" autoComplete="tel" required maxLength={30} className="mt-1 w-full rounded-lg border p-3" value={phone} onChange={e=>setPhone(e.target.value)}/></label>
    </div>}
    {mode==="application"&&<label className="block text-sm">Selected applicant
      <select value={applicationId} onChange={e=>setApplicationId(e.target.value)} className="mt-1 w-full rounded-lg border p-3">
