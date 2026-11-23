@@ -16,3 +16,9 @@ export async function saveCorporateCapabilityProfile(profile: CorporateCapabilit
   if (error) throw new Error(`Corporate capability profile could not be saved: ${error.message}`);
   return validateCorporateCapabilityProfile(data);
 }
+
+export async function getVendorPacketEin(): Promise<string | null> {
+  const { data, error } = await getSupabaseClient().rpc("get_vendor_packet_ein" as never);
+  if (error) throw new Error("The vendor packet tax identifier could not be loaded.");
+  return typeof data === "string" ? data : null;
+}

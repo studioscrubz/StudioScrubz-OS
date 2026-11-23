@@ -244,6 +244,12 @@ async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity):
     try { corporateProfile = validateCorporateCapabilityProfile(business.corporate_capability_profile); }
     catch { throw new InputError("The Corporate Capability profile is invalid. Review Business Settings before sending.", 503); }
   }
+  let vendorEin: string | null = null;
+  if (identity.documentKind === "service-packet") {
+    const {data, error} = await admin.rpc("get_vendor_packet_ein" as never);
+    if (error) throw new InputError("The vendor packet tax identifier is unavailable.", 503);
+    vendorEin = typeof data === "string" ? data : null;
+  }
   try {
     return buildVendorCapabilityDocumentModel({
       documentKind: identity.documentKind === "both" ? "corporate-capability-statement" : identity.documentKind,
@@ -258,6 +264,7 @@ async function buildAuthoritativeModel(admin: Admin, identity: RequestIdentity):
         address: joinText([business.address, business.city, business.state, business.zip]),
       },
       corporateProfile,
+      vendorEin,
       moduleIds: identity.documentKind === "both" ? identity.moduleIds.slice(0, 4) : identity.moduleIds,
     });
   } catch (cause) {

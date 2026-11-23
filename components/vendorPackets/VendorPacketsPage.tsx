@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { VendorDocumentPreview } from "@/components/vendorPackets/VendorDocumentPreview";
 import { getBusinessIdentitySettings } from "@/lib/services/businessSettings";
 import { getClients } from "@/lib/services/clients";
-import { getCorporateCapabilityProfile } from "@/lib/services/corporateCapability";
+import { getCorporateCapabilityProfile, getVendorPacketEin } from "@/lib/services/corporateCapability";
 import { getProperties } from "@/lib/services/properties";
 import {
   buildVendorCapabilityDocumentModel,
@@ -24,6 +24,7 @@ type EmailDraft = { recipientEmail: string; subject: string; messageBody: string
 export function VendorPacketsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [vendorEin, setVendorEin] = useState<string | null>(null);
   const [business, setBusiness] = useState<BusinessIdentitySettings | null>(null);
   const [corporateProfile, setCorporateProfile] = useState<CorporateCapabilityProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,12 +43,13 @@ export function VendorPacketsPage() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([getClients(), getProperties(), getBusinessIdentitySettings(), getCorporateCapabilityProfile()])
-      .then(([rows, locations, settings, profile]) => {
+    Promise.all([getClients(), getProperties(), getBusinessIdentitySettings(), getCorporateCapabilityProfile(), getVendorPacketEin()])
+      .then(([rows, locations, settings, profile, ein]) => {
         if (!mounted) return;
         setClients(rows.filter((item) => !item.archived_at));
         setProperties(locations.filter((item) => !item.archived_at));
         setBusiness(settings);
+        setVendorEin(ein);
         setCorporateProfile(profile);
       })
       .catch(() => {
@@ -79,6 +81,7 @@ export function VendorPacketsPage() {
         address: businessAddress(business),
       },
       corporateProfile,
+      vendorEin,
       moduleIds: previewKind === "corporate-capability-statement" ? selectedModuleIds.slice(0, CORPORATE_CAPABILITY_MODULE_LIMIT) : selectedModuleIds,
     });
   })();

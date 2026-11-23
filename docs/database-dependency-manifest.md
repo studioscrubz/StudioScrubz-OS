@@ -276,3 +276,5 @@ Job-specific crew roster integration: job_crew_technicians, job_assignment_event
 2026-11-22 Employee Onboarding addition: the restricted management and token-invitation endpoints read/write `employee_onboarding_cases`, `employee_onboarding_steps` and `employee_onboarding_events`. The service-role-only `complete_employee_onboarding` RPC completes final management verification and employee activation atomically. All relations are defined in migration `20261122190000_employee_onboarding.sql` with RLS enabled, no anon/authenticated grants, and no collection of I-9, W-4, banking, or background-report documents. The migration also extends `check_employee_screening_clearance` so newly created W-2 employees require approved onboarding before assignment, while preserving legacy-exempt personnel.
 
 Contractor recurring visits use `schedule_contractor_opportunity_visits` (authenticated Operations only), defined in `20261122210000_optional_contractor_schedule.sql`.
+
+The detailed vendor packet reads `get_vendor_packet_ein` from private vendor tax settings. Access is limited to authorized packet staff and the server-side send service.
