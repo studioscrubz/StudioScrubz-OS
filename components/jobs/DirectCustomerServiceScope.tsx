@@ -11,13 +11,19 @@ export function DirectCustomerServiceScope({jobId}:{jobId:string}){
  useEffect(()=>{
   let mounted=true;
   setDescription(null);setError(false);
-  void getSupabaseClient()
-   .rpc("get_direct_customer_service_description",{p_job_id:jobId})
-   .then(({data,error})=>{
+  void (async()=>{
+   try{
+    // This new secured RPC is in the accompanying forward migration.
+    const client=getSupabaseClient() as unknown as {
+     rpc:(name:"get_direct_customer_service_description",args:{p_job_id:string})=>
+      Promise<{data:string|null;error:{message:string}|null}>;
+    };
+    const {data,error}=await client.rpc("get_direct_customer_service_description",{p_job_id:jobId});
     if(!mounted)return;
     if(error){setError(true);return;}
     setDescription(typeof data==="string"&&data.trim()?data.trim():null);
-   }).catch(()=>{if(mounted)setError(true);});
+   }catch{if(mounted)setError(true);}
+  })();
   return ()=>{mounted=false;};
  },[jobId]);
  if(error||!description)return null;
