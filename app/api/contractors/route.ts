@@ -590,7 +590,7 @@ export async function POST(request:Request){
    const catalog=scopedCompany?.scope_catalog as ContractorScopeCatalog|null;
    const roseChecklist=catalog?.source==="Rose Company Checklist"
     ?contractorServiceScope(catalog,serviceType):null;
-   if(catalog?.source==="Rose Company Checklist"&&!roseChecklist)
+   if(catalog?.source==="Rose Company Checklist"&&!roseChecklist&&!manualEntry)
     throw new ContractorAccessError("Select Regular, Deep Cleaning, or Move-In / Move-Out for Rose Company's scope.",400);
    let requestOptions:ContractorRequestOptions|Record<string,never>={};
    if(input.scopeItems!==undefined||input.addons!==undefined){
