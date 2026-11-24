@@ -590,7 +590,7 @@ export async function POST(request:Request){
    const catalog=scopedCompany?.scope_catalog as ContractorScopeCatalog|null;
    const roseChecklist=catalog?.source==="Rose Company Checklist"
     ?contractorServiceScope(catalog,serviceType):null;
-   if(catalog?.source==="Rose Company Checklist"&&!roseChecklist)
+   if(catalog?.source==="Rose Company Checklist"&&!roseChecklist&&!manualEntry)
     throw new ContractorAccessError("Select Regular, Deep Cleaning, or Move-In / Move-Out for Rose Company's scope.",400);
    let requestOptions:ContractorRequestOptions|Record<string,never>={};
    if(input.scopeItems!==undefined||input.addons!==undefined){
@@ -608,7 +608,7 @@ export async function POST(request:Request){
     scope=[areas.length&&`Scope of work: ${areas.join(", ")}`,details&&`Scope details: ${details}`,
      addons.length&&`Requested add-ons: ${addons.join(", ")}`].filter(Boolean).join("\n");
    }
-   if(roseChecklist){
+   if(roseChecklist&&!manualEntry){
     const userNotes=typeof input.scopeDetails==="string"&&input.scopeDetails.trim()
      ?input.scopeDetails.trim().slice(0,2000):"";
     const requestedAddons=Array.isArray(input.addons)&&input.addons.length
