@@ -59,6 +59,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const [manualBrava,setManualBrava]=useState(false);
  const [savedProperties,setSavedProperties]=useState<PropertyWithClient[]>([]);
  const [savedBuilding,setSavedBuilding]=useState("");
+ const [selectedScopePropertyId,setSelectedScopePropertyId]=useState("");
+ const [locationScopes,setLocationScopes]=useState<Array<{name:string;scope:string}>>([]);
+ const [scopeLoading,setScopeLoading]=useState(false);
  const [rosePreview,setRosePreview]=useState<ReturnType<typeof parseRoseBooking>|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const submissionDialog=useRef<HTMLDialogElement>(null);
@@ -159,8 +162,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
   const roseCatalog=submissionClient?.scope_catalog;
-  const manualServices=Array.from(new Set((roseCatalog?.services?.length?roseCatalog.services:isBrava?["Standard Cleaning","Brazilian Deep Clean"]:submissionClient?.service_types?.length?submissionClient.service_types:submissionClient?.contractor_division==="Commercial"?["Commercial Cleaning"]:["Standard Cleaning","Deep Cleaning","Move-In / Move-Out Cleaning"]).filter(Boolean)));
-  const scopeForManualService=(service:string)=>roseCatalog?contractorServiceScope(roseCatalog,service)??"":isBrava?bravaScopeHeading(service):service?`${service}\nScope details: Confirm tasks, exclusions and special instructions with the contractor before approving.`:"";
+  const manualServices=Array.from(new Set([...locationScopes.map(entry=>entry.name),...(roseCatalog?.services?.length?roseCatalog.services:isBrava?["Standard Cleaning","Brazilian Deep Clean"]:submissionClient?.service_types?.length?submissionClient.service_types:submissionClient?.contractor_division==="Commercial"?["Commercial Cleaning"]:["Standard Cleaning","Deep Cleaning","Move-In / Move-Out Cleaning"])]));
+  const scopeForManualService=(service:string)=>locationScopes.find(entry=>entry.name.toLowerCase()===service.toLowerCase())?.scope??"";
  const savedClientId=data?.directory.find(entry=>entry.companyId===submissionClientId)?.clientId;
  useEffect(()=>{
   let active=true;
@@ -172,6 +175,19 @@ export function ContractorManagement({view}: {view:ContractorView}){
   }
   return()=>{active=false;};
  },[manualBrava,savedClientId]);
+ useEffect(()=>{
+  let active=true;
+  setLocationScopes([]);
+  if(!manualBrava||!submissionClientId||!selectedScopePropertyId){setScopeLoading(false);return;}
+  setScopeLoading(true);
+  const params=new URLSearchParams({companyId:submissionClientId,propertyId:selectedScopePropertyId});
+  void fetch(`/api/contractors/location-scopes?${params}`,{cache:"no-store"})
+   .then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||"Location scopes unavailable.");return result as {services:Array<{name:string;scope:string}>};})
+   .then(result=>{if(!active)return;setLocationScopes(result.services);setRosePreview(current=>current?{...current,scope:result.services.find(item=>item.name.toLowerCase()===current.serviceType.toLowerCase())?.scope??""}:current);})
+   .catch(cause=>{if(active)setError(cause instanceof Error?cause.message:"Location scopes unavailable.");})
+   .finally(()=>{if(active)setScopeLoading(false);});
+  return()=>{active=false;};
+ },[manualBrava,submissionClientId,selectedScopePropertyId]);
  const buildingKey=(property:PropertyWithClient)=>JSON.stringify(
   [property.address,property.city,property.state,property.zip].map(value=>(value??"").trim().toLowerCase()),
  );
@@ -402,6 +418,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <select className={input} value={submissionClientId} disabled={busy} onChange={event=>{
       setSubmissionClientId(event.target.value);
       setSubmissionPropertyType("Residential");
+      setSelectedScopePropertyId("");setLocationScopes([]);
       setManualBrava(false);
       setRoseText("");
       setRosePreview(null);
@@ -412,13 +429,14 @@ export function ContractorManagement({view}: {view:ContractorView}){
     </label>
     {submissionClient&&!isBrava&&<label className="block text-sm font-semibold">Property type<select className={input} value={submissionPropertyType} onChange={event=>setSubmissionPropertyType(event.target.value)}><option>Residential</option><option>Commercial</option></select></label>}
     {submissionClient&&<div className="flex flex-wrap gap-2">
-     <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);}}>Paste dispatch</button>
-     <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview({...parseRoseBooking("Customer:","brava"),serviceType:"",scope:""});}}>Enter manually</button>
+     <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);setSelectedScopePropertyId("");setLocationScopes([]);}}>Paste dispatch</button>
+     <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setSelectedScopePropertyId("");setLocationScopes([]);setRosePreview({...parseRoseBooking("Customer:","brava"),serviceType:"",scope:""});}}>Enter manually</button>
     </div>}
     {submissionClient&&!isBrava&&manualBrava&&<label className="block text-sm font-semibold">Saved property / service address
      <select className={input} value={savedBuilding} onChange={event=>{
       const property=savedProperties.find(row=>row.id===event.target.value);
       setSavedBuilding(event.target.value);
+      setSelectedScopePropertyId(property?.id??"");setLocationScopes([]);
       if(property)setSubmissionPropertyType(property.property_type);
       setRosePreview(current=>({...current??parseRoseBooking("Customer:"),
        propertyName:property?.property_name??"",address:property?.address??"",
@@ -435,6 +453,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      <label className="block text-sm font-semibold">Saved building
       <select className={input} value={savedBuilding} onChange={event=>{
        setSavedBuilding(event.target.value);
+       setSelectedScopePropertyId("");setLocationScopes([]);
        const property=savedProperties.find(row=>buildingKey(row)===event.target.value);
        setRosePreview({...parseRoseBooking("Customer:","brava"),address:property?.address??"",
         city:property?.city??"",state:property?.state??"",zip:property?.zip??""});
@@ -446,6 +465,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
      {savedBuilding&&<label className="block text-sm font-semibold">Unit / customer
       <select className={input} value={savedUnits.find(property=>property.address_line_2===rosePreview?.addressLine2&&property.property_name===rosePreview?.propertyName)?.id??""} onChange={event=>{
        const property=savedUnits.find(row=>row.id===event.target.value);
+       setSelectedScopePropertyId(property?.id??"");setLocationScopes([]);
        const building=savedUnits[0];
        if(!building)return;
        setRosePreview({...parseRoseBooking("Customer:","brava"),propertyName:property?.property_name??"",
@@ -505,7 +525,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
          <option value="">Select a service</option>
          {manualServices.map(service=><option key={service} value={service}>{service}</option>)}
         </select>
-        {!roseCatalog&&!isBrava&&<span className="mt-1 block text-xs font-normal text-amber-700">This contractor has no detailed scope checklist saved. Review and complete the scope before creating the opportunity.</span>}
+        {scopeLoading&&<span className="mt-1 block text-xs font-normal">Loading this location’s existing job scopes…</span>}
+        {!scopeLoading&&<span className="mt-1 block text-xs font-normal text-amber-700">Scopes vary by location. Choose a saved property to reuse its current job scope; otherwise complete the scope below.</span>}
        </label>}
        {title==="Requested Schedule"&&manualBrava&&<label className="block text-sm font-semibold">Booking frequency
         <select className={input} value={["Weekly","Biweekly","Monthly","Multiple Days Per Week","Twice Monthly","Every 4 Weeks"].includes(rosePreview.frequency)?rosePreview.frequency:"One-Time"} onChange={event=>setRosePreview({...rosePreview,frequency:event.target.value})}>
@@ -532,9 +553,9 @@ export function ContractorManagement({view}: {view:ContractorView}){
        </label>)}
       </div>
       {title==="Service and Add-Ons"&&<>
-       {roseCatalog&&!isBrava&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Rose Company scope comes from its saved checklist ({roseCatalog.version}); included tasks change with the service. Exclusions apply.</p>}
+       {manualBrava&&selectedScopePropertyId&&scopeForManualService(rosePreview.serviceType)&&<p className="mt-3 text-sm font-semibold text-[#143d1a]">Scope loaded from an existing job at this location. Review before submitting.</p>}
        <label className="mt-3 block text-sm font-semibold">Scope and add-ons
-        <textarea required className={input} rows={roseCatalog&&!isBrava?12:3} value={!isBrava&&roseCatalog?contractorServiceScope(roseCatalog,rosePreview.serviceType)??rosePreview.scope:rosePreview.scope} readOnly={Boolean(roseCatalog&&!isBrava)} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
+        <textarea required className={input} rows={manualBrava?12:3} value={manualBrava?rosePreview.scope:!isBrava&&roseCatalog?contractorServiceScope(roseCatalog,rosePreview.serviceType)??rosePreview.scope:rosePreview.scope} readOnly={!manualBrava&&Boolean(roseCatalog&&!isBrava)} onChange={event=>setRosePreview({...rosePreview,scope:event.target.value})}/>
        </label>
        {isBrava&&<label className="mt-3 block text-sm font-semibold">Instructions / access
         <textarea className={input} rows={2} value={rosePreview.access} onChange={event=>setRosePreview({...rosePreview,access:event.target.value})}/>
