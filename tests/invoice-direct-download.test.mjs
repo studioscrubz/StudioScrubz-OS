@@ -35,3 +35,14 @@ test("invoice download is available on both desktop and mobile without print pop
  assert.equal((s.match(/<Action text="Download PDF"/g)||[]).length,2);
  assert.match(s,/downloadInvoicePdf\(x\)/);
 });
+
+test("invoice PDF email uses attachment-bearing verified Communications delivery",()=>{
+ const ui=readFileSync(new URL("../components/invoices/InvoicesPage.tsx",import.meta.url),"utf8");
+ assert.equal((ui.match(/<Action text="Email PDF"/g)||[]).length,2);
+ assert.match(ui,/sendCommunicationsEmail\(/);
+ assert.match(ui,/invoicePdfBytes\(invoice\)/);
+ assert.match(ui,/contentType:"application\/pdf"/);
+ assert.match(ui,/job\.job_number/);
+ assert.match(ui,/job\.scheduled_date/);
+ assert.match(ui,/communicationType:"Invoice"/);
+});
