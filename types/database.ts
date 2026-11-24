@@ -192,8 +192,8 @@ export interface Database {
   public: {
     Tables: {
       job_crew_technicians: {
-        Row: {job_id:string;crew_id:string;employee_id:string;assigned_by_employee_id:string;assigned_at:string};
-        Insert: {job_id:string;crew_id:string;employee_id:string;assigned_by_employee_id:string;assigned_at?:string};
+        Row: {job_id:string;crew_id:string;employee_id:string;assigned_by_employee_id:string|null;assigned_by_user_id:string|null;assigned_at:string};
+        Insert: {job_id:string;crew_id:string;employee_id:string;assigned_by_employee_id?:string|null;assigned_by_user_id?:string|null;assigned_at?:string};
         Update: {employee_id?:string};
         Relationships: [{foreignKeyName:"job_crew_technicians_employee_id_fkey";columns:["employee_id"];isOneToOne:false;referencedRelation:"employees";referencedColumns:["id"]}];
       };
