@@ -42,7 +42,7 @@ test("invoice PDF email uses attachment-bearing verified Communications delivery
  assert.match(ui,/sendCommunicationsEmail\(/);
  assert.match(ui,/invoicePdfBytes\(invoice\)/);
  assert.match(ui,/contentType:"application\/pdf"/);
- assert.match(ui,/job\.job_number/);
- assert.match(ui,/job\.scheduled_date/);
+ assert.match(ui,/job\?\.job_number/);
+ assert.match(ui,/job\?\.scheduled_date/);
  assert.match(ui,/communicationType:"Invoice"/);
 });
