@@ -439,7 +439,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
       setSelectedScopePropertyId(property?.id??"");setLocationScopes([]);
       if(property)setSubmissionPropertyType(property.property_type);
       setRosePreview(current=>({...current??parseRoseBooking("Customer:"),
-       propertyName:property?.property_name??"",address:property?.address??"",
+       propertyName:property?.property_name??"",serviceType:"",scope:"",address:property?.address??"",
        addressLine2:property?.address_line_2??"",city:property?.city??"",state:property?.state??"",
        zip:property?.zip??"",bedrooms:String(property?.bedrooms??""),bathrooms:String(property?.bathrooms??""),
        access:property?.access_instructions??""}));
@@ -455,7 +455,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
        setSavedBuilding(event.target.value);
        setSelectedScopePropertyId("");setLocationScopes([]);
        const property=savedProperties.find(row=>buildingKey(row)===event.target.value);
-       setRosePreview({...parseRoseBooking("Customer:","brava"),address:property?.address??"",
+       setRosePreview({...parseRoseBooking("Customer:","brava"),serviceType:"",scope:"",address:property?.address??"",
         city:property?.city??"",state:property?.state??"",zip:property?.zip??""});
       }}>
        <option value="">Enter a new building or address</option>
@@ -468,7 +468,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
        setSelectedScopePropertyId(property?.id??"");setLocationScopes([]);
        const building=savedUnits[0];
        if(!building)return;
-       setRosePreview({...parseRoseBooking("Customer:","brava"),propertyName:property?.property_name??"",
+       setRosePreview({...parseRoseBooking("Customer:","brava"),serviceType:"",scope:"",propertyName:property?.property_name??"",
         address:building.address,addressLine2:property?.address_line_2??"",city:building.city??"",
         state:building.state??"",zip:building.zip??"",bedrooms:String(property?.bedrooms??""),
         bathrooms:String(property?.bathrooms??""),access:property?.access_instructions??""});
