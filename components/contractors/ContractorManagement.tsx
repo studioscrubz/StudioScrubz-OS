@@ -159,6 +159,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
   const roseCatalog=submissionClient?.scope_catalog;
+  const manualServices=Array.from(new Set((roseCatalog?.services?.length?roseCatalog.services:isBrava?["Standard Cleaning","Brazilian Deep Clean"]:submissionClient?.service_types?.length?submissionClient.service_types:submissionClient?.contractor_division==="Commercial"?["Commercial Cleaning"]:["Standard Cleaning","Deep Cleaning","Move-In / Move-Out Cleaning"]).filter(Boolean)));
+  const scopeForManualService=(service:string)=>roseCatalog?contractorServiceScope(roseCatalog,service)??"":isBrava?bravaScopeHeading(service):service?`${service}\nScope details: Confirm tasks, exclusions and special instructions with the contractor before approving.`:"";
  const savedClientId=data?.directory.find(entry=>entry.companyId===submissionClientId)?.clientId;
  useEffect(()=>{
   let active=true;
@@ -411,7 +413,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     {submissionClient&&!isBrava&&<label className="block text-sm font-semibold">Property type<select className={input} value={submissionPropertyType} onChange={event=>setSubmissionPropertyType(event.target.value)}><option>Residential</option><option>Commercial</option></select></label>}
     {submissionClient&&<div className="flex flex-wrap gap-2">
      <button type="button" className={secondary} aria-pressed={!manualBrava} onClick={()=>{setManualBrava(false);setRosePreview(null);}}>Paste dispatch</button>
-     <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview(parseRoseBooking("Customer:","brava"));}}>Enter manually</button>
+     <button type="button" className={secondary} aria-pressed={manualBrava} onClick={()=>{setManualBrava(true);setRosePreview({...parseRoseBooking("Customer:","brava"),serviceType:"",scope:""});}}>Enter manually</button>
     </div>}
     {submissionClient&&!isBrava&&manualBrava&&<label className="block text-sm font-semibold">Saved property / service address
      <select className={input} value={savedBuilding} onChange={event=>{
@@ -498,12 +500,19 @@ export function ContractorManagement({view}: {view:ContractorView}){
        </div>)}
       </dl>}
       <div className="grid gap-3 sm:grid-cols-2">
+       {title==="Service and Add-Ons"&&manualBrava&&<label className="block text-sm font-semibold">Service
+        <select className={input} required value={rosePreview.serviceType} onChange={event=>{const serviceType=event.target.value;setRosePreview({...rosePreview,serviceType,scope:scopeForManualService(serviceType)});}}>
+         <option value="">Select a service</option>
+         {manualServices.map(service=><option key={service} value={service}>{service}</option>)}
+        </select>
+        {!roseCatalog&&!isBrava&&<span className="mt-1 block text-xs font-normal text-amber-700">This contractor has no detailed scope checklist saved. Review and complete the scope before creating the opportunity.</span>}
+       </label>}
        {title==="Requested Schedule"&&manualBrava&&<label className="block text-sm font-semibold">Booking frequency
         <select className={input} value={["Weekly","Biweekly","Monthly","Multiple Days Per Week","Twice Monthly","Every 4 Weeks"].includes(rosePreview.frequency)?rosePreview.frequency:"One-Time"} onChange={event=>setRosePreview({...rosePreview,frequency:event.target.value})}>
          {["One-Time","Weekly","Biweekly","Monthly","Multiple Days Per Week","Twice Monthly","Every 4 Weeks"].map(frequency=><option key={frequency}>{frequency}</option>)}
         </select>
        </label>}
-       {fields.filter(([key])=>!manualBrava||key!=="frequency").map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
+       {fields.filter(([key])=>!manualBrava||(key!=="frequency"&&key!=="serviceType")).map(([key,label,type,required])=><label className="block text-sm font-semibold" key={key}>{label}
         <input className={input} type={type} required={required} step={type==="number"?"0.01":undefined}
          readOnly={key==="amount"&&listedPayout!==null}
          value={key==="amount"&&isBrava?(listedPayout?.toFixed(2)??rosePreview.amount):rosePreview[key]}
