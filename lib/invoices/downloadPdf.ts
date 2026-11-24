@@ -35,6 +35,9 @@ export function invoicePdfBytes(invoice:InvoiceWithRelations):Uint8Array {
  add("Bill To: "+(invoice.client_name??""));
  add("Property: "+(invoice.property_name??""));
  add("Service: "+(invoice.service_name??""));
+ if(invoice.job?.job_number)add("Job Number: "+invoice.job.job_number);
+ if(invoice.job?.scheduled_date)add("Service Date: "+invoice.job.scheduled_date);
+ if(invoice.job?.service_address)add("Service Address: "+invoice.job.service_address);
  add("Invoice Date: "+invoice.issue_date);
  add("Due Date: "+(invoice.due_date??"Due on receipt"));
  add("Status: "+invoice.status);
