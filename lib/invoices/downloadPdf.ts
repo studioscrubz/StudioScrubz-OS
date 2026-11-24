@@ -10,7 +10,7 @@ function readable(value:unknown):string{
   .replace(/[\u0300-\u036f]/g,"")
   .replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"')
   .replace(/[\u2013\u2014]/g,"-").replace(/\u2026/g,"...")
-  .replace(/\u2022/g,"-").replace(/[\u00a0\u2000-\u200b\ufeff]/g," ")
+  .replace(/\u2022/g,"-").replace(/\?{2,}/g," ").replace(/[\u00a0\u2000-\u200b\ufeff]/g," ")
   .replace(/[^\x0a\x0d\x20-\x7e]/g,"");
 }
 function escaped(value:string):string{
