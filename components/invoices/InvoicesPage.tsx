@@ -55,11 +55,22 @@ function EmailPdfModal({invoice,close,sent}:{invoice:InvoiceWithRelations;close:
  const [body,setBody]=useState(`Hello,\n\nAttached is the StudioScrubz PDF invoice for the completed cleaning service.\n\nInvoice: ${invoice.invoice_number}\n${jobDetails?"Job / Location / Service: "+jobDetails+"\n":""}Invoice total: ${invoice.total.toFixed(2)}\nBalance due: ${invoice.balance_due.toFixed(2)}\n\nPlease let us know if any additional documentation is needed.\n\nThank you,\nStudioScrubz\nNo mess. No stress.`);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
+ const [previewOpen,setPreviewOpen]=useState(false);
+ const [previewUrl,setPreviewUrl]=useState<string|null>(null);
+ // Generate the attachment once so the preview and email contain identical PDF bytes.
+ const attachmentBytes=useMemo(()=>invoicePdfBytes(invoice),[invoice]);
+ useEffect(()=>{
+  if(!previewOpen)return;
+  const blob=new Blob([attachmentBytes as BlobPart],{type:"application/pdf"});
+  const url=URL.createObjectURL(blob);
+  setPreviewUrl(url);
+  return()=>{URL.revokeObjectURL(url);setPreviewUrl(null);};
+ },[previewOpen,attachmentBytes]);
  async function submit(){
   if(!recipient.trim()||!/^\S+@\S+\.\S+$/.test(recipient.trim()))return setError("Enter the billing recipient's valid email address.");
   setBusy(true);setError("");
   try{
-   const pdf=invoicePdfBytes(invoice);
+   const pdf=attachmentBytes;
    if(pdf.byteLength>2_000_000)throw new Error("Invoice PDF exceeds the 2 MB email attachment limit.");
    let binary="";for(let i=0;i<pdf.length;i+=32768)binary+=String.fromCharCode(...pdf.slice(i,i+32768));
    const content=btoa(binary);
@@ -80,6 +91,14 @@ function EmailPdfModal({invoice,close,sent}:{invoice:InvoiceWithRelations;close:
    <label className="block text-sm font-bold">Subject<input className={input} value={subject} onChange={event=>setSubject(event.target.value)}/></label>
    <label className="block text-sm font-bold">Message<textarea className={input} rows={11} value={body} onChange={event=>setBody(event.target.value)}/></label>
    <p className="text-sm font-semibold">Attachment: {invoice.invoice_number.replace(/[^A-Za-z0-9._-]/g,"_")}.pdf</p>
+   <div className="flex flex-wrap items-center gap-3">
+    <button type="button" disabled={busy} className={secondary} onClick={()=>setPreviewOpen(open=>!open)}>{previewOpen?"Hide Attachment Preview":"Preview Attachment"}</button>
+    {previewOpen&&previewUrl&&<a className="text-sm font-bold text-[#143d1a] underline" href={previewUrl} target="_blank" rel="noopener noreferrer">Open PDF in new tab</a>}
+   </div>
+   {previewOpen&&<section aria-label="Invoice PDF attachment preview" className="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 p-2">
+     {previewUrl?<iframe title={`Preview of ${invoice.invoice_number}.pdf`} src={previewUrl} className="h-[55vh] min-h-[300px] w-full rounded-lg bg-white"/>:<p className="p-4 text-sm">Preparing PDF preview…</p>}
+     <p className="mt-2 text-xs text-neutral-600">This is the same PDF file that will be attached to the email. If your browser cannot display it here, choose Open PDF in new tab.</p>
+   </section>}
    {error&&<Alert text={error}/>}
    <button disabled={busy||!recipient.trim()||!subject.trim()||!body.trim()} className={primary} onClick={()=>void submit()}>{busy?"Sending PDF…":"Send Email with PDF"}</button>
   </div>
