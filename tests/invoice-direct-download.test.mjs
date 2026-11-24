@@ -11,8 +11,8 @@ function createPdf(invoice){
  vm.runInNewContext(js,{exports,require:()=>({}),TextEncoder,Intl,Uint8Array,Blob,URL,document:{},window:{}});
  return exports.invoicePdfBytes(invoice);
 }
-test("invoice PDF is a real self-contained PDF and excludes internal notes",()=>{
- const pdf=createPdf({
+test("invoice PDF is a real self-contained PDF and excludes internal notes",async()=>{
+ const pdf=await createPdf({
   invoice_number:"INV-2026-001",client_name:"Test Client",property_name:"Unit 5",
   service_name:"Deep Clean",issue_date:"2026-11-24",due_date:"2026-12-24",
   status:"Sent",line_items:[{description:"Kitchen and bathroom",quantity:2,rate:100,amount:200}],
