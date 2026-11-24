@@ -608,7 +608,7 @@ export async function POST(request:Request){
     scope=[areas.length&&`Scope of work: ${areas.join(", ")}`,details&&`Scope details: ${details}`,
      addons.length&&`Requested add-ons: ${addons.join(", ")}`].filter(Boolean).join("\n");
    }
-   if(roseChecklist){
+   if(roseChecklist&&!manualEntry){
     const userNotes=typeof input.scopeDetails==="string"&&input.scopeDetails.trim()
      ?input.scopeDetails.trim().slice(0,2000):"";
     const requestedAddons=Array.isArray(input.addons)&&input.addons.length
