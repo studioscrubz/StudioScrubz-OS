@@ -5,7 +5,7 @@ import {readFileSync} from "node:fs";
 const settings=readFileSync(new URL("../components/settings/ProfitabilitySettings.tsx",import.meta.url),"utf8");
 
 test("Business Settings shows dollar-per-mile units and cents example",()=>{
- assert.match(settings,/Vehicle operating cost per mile \(USD\/mile\)/);
+ assert.match(settings,/Mileage Rate \(\$ \/ mile\)/);
  assert.match(settings,/0\.725 means 72\.5¢ per mile/);
  assert.match(settings,/72\.50 means \$72\.50 per mile/);
 });
