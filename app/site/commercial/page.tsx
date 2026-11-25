@@ -70,7 +70,7 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           <h2 id="lululemon-project-title" className="mt-4 text-2xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-3xl">lululemon — Recurring Retail Cleaning</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center">
             <dl className="grid gap-4 text-sm">
-              <div><dt className="font-bold text-neutral-500">Location Serviced</dt><dd className="mt-1 font-bold text-[#143d1a]">Downtown Disney, Anaheim</dd></div>
+              <div><dt className="font-bold text-neutral-500">Location Serviced</dt><dd className="mt-1 font-bold text-[#143d1a]">Orange County</dd></div>
               <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Recurring Retail Cleaning</dd></div>
               
               <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">LJ Facility Services LLC Subcontract</dd></div>
@@ -79,7 +79,7 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
               <img src="/branding/lululemon-logo.svg" width="185" height="90" alt="lululemon logo" loading="lazy" decoding="async" className="w-full max-w-[185px] object-contain" />
             </div>
           </div>
-          <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provides recurring retail cleaning support at the lululemon store in Downtown Disney, Anaheim, with service focused on customer-facing floors and fixtures, mirrors, fitting rooms, restrooms, storefront areas, and approved back-of-house spaces.</p>
+          <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provides recurring retail cleaning support at the lululemon store in Orange County, with service focused on customer-facing floors and fixtures, mirrors, fitting rooms, restrooms, storefront areas, and approved back-of-house spaces.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our twice-weekly service schedule supports a consistently welcoming retail environment, with tasks performed according to the approved location-specific scope.</p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">Services are provided as a subcontractor to LJ Facility Services LLC. Reference to lululemon identifies the serviced location and does not imply endorsement or a direct contract with lululemon.</p>
         </div>
