@@ -11,7 +11,7 @@ test("commercial page features recurring lululemon service alongside existing St
  assert.match(commercial,/Downtown Disney, Anaheim/);
  assert.doesNotMatch(commercial,/Service Frequency/);
  assert.match(commercial,/alt="lululemon logo"/);
- assert.match(commercial,/lululemon-logo\.png/);
+ assert.match(commercial,/\/branding\/lululemon-logo\.svg/);
 });
 test("featured retail subcontract does not imply a direct lululemon contract or endorsement",()=>{
  assert.match(commercial,/LJ Facility Services LLC Subcontract/);
