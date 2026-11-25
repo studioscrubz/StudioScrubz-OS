@@ -72,12 +72,11 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
             <dl className="grid gap-4 text-sm">
               <div><dt className="font-bold text-neutral-500">Location Serviced</dt><dd className="mt-1 font-bold text-[#143d1a]">Downtown Disney, Anaheim</dd></div>
               <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Recurring Retail Cleaning</dd></div>
-              <div><dt className="font-bold text-neutral-500">Service Frequency</dt><dd className="mt-1 font-bold text-[#143d1a]">Twice Weekly</dd></div>
+              
               <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">LJ Facility Services LLC Subcontract</dd></div>
             </dl>
             <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#fff7f7] px-4 py-5">
-              <span aria-label="lululemon brand name" className="text-center text-3xl font-bold tracking-[-.05em] text-[#c8102e]">lululemon</span>
-              <span className="mt-2 text-center text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Retail Facility Care</span>
+              <img src="/branding/lululemon-logo.svg" width="185" height="90" alt="lululemon logo" loading="lazy" decoding="async" className="w-full max-w-[185px] object-contain" />
             </div>
           </div>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provides recurring retail cleaning support at the lululemon store in Downtown Disney, Anaheim, with service focused on customer-facing floors and fixtures, mirrors, fitting rooms, restrooms, storefront areas, and approved back-of-house spaces.</p>

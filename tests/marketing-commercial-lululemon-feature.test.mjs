@@ -9,9 +9,11 @@ test("commercial page features recurring lululemon service alongside existing St
  assert.match(commercial,/lululemon — Recurring Retail Cleaning/);
  assert.match(commercial,/Women&apos;s Audio Mission Academy/);
  assert.match(commercial,/Downtown Disney, Anaheim/);
- assert.match(commercial,/Twice Weekly/);
+ assert.doesNotMatch(commercial,/Service Frequency/);
+ assert.match(commercial,/alt="lululemon logo"/);
+ assert.match(commercial,/\/branding\/lululemon-logo\.svg/);
 });
 test("featured retail subcontract does not imply a direct lululemon contract or endorsement",()=>{
  assert.match(commercial,/LJ Facility Services LLC Subcontract/);
- assert.match(commercial,/does not imply endorsement or a direct contract with lululemon/);
+ assert.match(commercial,/Services are provided as a subcontractor to LJ Facility Services LLC\. Reference to lululemon identifies the serviced location and does not imply endorsement or a direct contract with lululemon\./);
 });
