@@ -38,7 +38,7 @@ const commercialSpaces = [
 export default function CommercialPage(){return <><ServicePageJsonLd name="Commercial Cleaning and Janitorial Services" path="/commercial" description="One-time and recurring commercial cleaning and janitorial services for offices, restaurants, studios, and other facilities across Los Angeles County and the San Fernando Valley."/>
   <PageHero eyebrow="Commercial cleaning" title="Commercial Cleaning and Janitorial Services for Your Facility." copy="StudioScrubz provides one-time and recurring commercial cleaning and janitorial services for businesses and managed properties across Los Angeles County and the San Fernando Valley. Each plan reflects the facility type, cleanable areas, traffic, access, operating schedule, priorities, and service frequency." cta="Request a Commercial Walkthrough"/>
   <section className="px-5 py-20 sm:px-8 sm:py-28"><div className="mx-auto max-w-7xl"><SectionHeading eyebrow="Spaces we support" title="Commercial facility cleaning without the one-size-fits-all plan." copy="For business owners, office managers, facility contacts, property and community managers, and operators who need a clear scope for one-time cleaning or recurring janitorial service. We shape each plan around the space, cleaning frequency, access, scheduling, and day-to-day facility needs."/><div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{commercialSpaces.map(([space,copy])=><article id={space === "Property management" ? "property-management" : undefined} key={space} className="rounded-[1.6rem] border border-[#143d1a]/10 bg-[#f4f7f1] p-6"><h2 className="text-xl font-extrabold text-[#143d1a]">{space}</h2><p className="mt-3 text-sm leading-6 text-neutral-600">{copy}</p></article>)}</div><aside aria-label="Commercial service highlights" className="mt-8 rounded-[1.6rem] border border-[#143d1a]/10 bg-[#f4f7f1] p-6"><h2 className="text-xl font-extrabold text-[#143d1a]">Service Highlights</h2><ul className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-sm leading-6 text-neutral-700">{["Recurring janitorial service","Commercial high dusting by assessment","One-time and detail cleaning","Property and unit turns","Common-area cleaning","Flexible service frequency","Facility walkthroughs"].map(item=><li key={item} className="flex gap-2"><span aria-hidden="true" className="font-bold text-[#d4af37]">✦</span><span>{item}</span></li>)}</ul></aside></div></section>
-  <div className="px-5 pb-20 pt-4 sm:px-8 sm:pb-24 sm:pt-6"><div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2 lg:items-stretch">
+  <div className="px-5 pb-20 pt-4 sm:px-8 sm:pb-24 sm:pt-6"><div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2 xl:grid-cols-3 lg:items-stretch">
   <section aria-labelledby="commercial-project-title" className="min-w-0">
     <div className="h-full overflow-hidden rounded-[2rem] border border-[#143d1a]/10 bg-[#f4f7f1]">
       <div className="flex h-full flex-col gap-6 p-6 sm:p-8">
@@ -58,6 +58,31 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz successfully completed high-dusting assignments at two Starbucks locations, addressing accessible elevated surfaces, ceiling vents, fixtures, and other designated areas in accordance with the approved scope of work.</p>
           <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our experience supporting commercial facility service providers demonstrates our ability to deliver specialized cleaning services in active business environments.</p>
           <p className="mt-5 text-xs leading-5 text-neutral-500">This work was completed as a facility services subcontract. Reference to Starbucks identifies the serviced locations and does not imply endorsement or a direct contract with Starbucks.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section aria-labelledby="lululemon-project-title" className="min-w-0">
+    <div className="h-full overflow-hidden rounded-[2rem] border border-[#143d1a]/10 bg-white shadow-[0_12px_40px_rgba(20,61,26,.06)]">
+      <div className="flex h-full flex-col gap-6 p-6 sm:p-8">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#34734a]">Featured Recurring Commercial Service</p>
+          <h2 id="lululemon-project-title" className="mt-4 text-2xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-3xl">lululemon — Recurring Retail Cleaning</h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center">
+            <dl className="grid gap-4 text-sm">
+              <div><dt className="font-bold text-neutral-500">Location Serviced</dt><dd className="mt-1 font-bold text-[#143d1a]">Downtown Disney, Anaheim</dd></div>
+              <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Recurring Retail Cleaning</dd></div>
+              <div><dt className="font-bold text-neutral-500">Service Frequency</dt><dd className="mt-1 font-bold text-[#143d1a]">Twice Weekly</dd></div>
+              <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">LJ Facility Services LLC Subcontract</dd></div>
+            </dl>
+            <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#fff7f7] px-4 py-5">
+              <span aria-label="lululemon brand name" className="text-center text-3xl font-bold tracking-[-.05em] text-[#c8102e]">lululemon</span>
+              <span className="mt-2 text-center text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Retail Facility Care</span>
+            </div>
+          </div>
+          <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provides recurring retail cleaning support at the lululemon store in Downtown Disney, Anaheim, with service focused on customer-facing floors and fixtures, mirrors, fitting rooms, restrooms, storefront areas, and approved back-of-house spaces.</p>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-neutral-700">Our twice-weekly service schedule supports a consistently welcoming retail environment, with tasks performed according to the approved location-specific scope.</p>
+          <p className="mt-5 text-xs leading-5 text-neutral-500">Services are provided as a subcontractor to LJ Facility Services LLC. Reference to lululemon identifies the serviced location and does not imply endorsement or a direct contract with lululemon.</p>
         </div>
       </div>
     </div>
