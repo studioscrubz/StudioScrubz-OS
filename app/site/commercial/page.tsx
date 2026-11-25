@@ -76,7 +76,7 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
               <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">LJ Facility Services LLC Subcontract</dd></div>
             </dl>
             <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#fff7f7] px-4 py-5">
-              <img src="https://storage.rainbrand.com/storage/v1/object/public/public-assets/brand-guidelines/lululemon/lululemon-logo.png" width="185" height="90" alt="lululemon logo" loading="lazy" decoding="async" className="w-full max-w-[185px] object-contain" />
+              <img src="/branding/lululemon-logo.svg" width="185" height="90" alt="lululemon logo" loading="lazy" decoding="async" className="w-full max-w-[185px] object-contain" />
             </div>
           </div>
           <p className="mt-7 max-w-3xl text-base leading-8 text-neutral-700">StudioScrubz provides recurring retail cleaning support at the lululemon store in Downtown Disney, Anaheim, with service focused on customer-facing floors and fixtures, mirrors, fitting rooms, restrooms, storefront areas, and approved back-of-house spaces.</p>
