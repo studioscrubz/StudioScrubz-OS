@@ -1,4 +1,4 @@
-import {contractorServiceScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
+import {contractorServiceScope,starbucksScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
 import {contractorBookingFrequency} from "@/lib/contractors/bookingFrequency";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import "server-only";
@@ -618,6 +618,12 @@ export async function POST(request:Request){
      typeof input.frequency==="string"&&input.frequency.trim()&&"Frequency: "+input.frequency.trim().slice(0,80)]
      .filter(Boolean).join("\n");
     scope=roseChecklist+(details?"\n\n"+details:"");
+   }
+   const defaultStarbucksScope=starbucksScope(scopedCompany?.name,propertyName,serviceType);
+   if(defaultStarbucksScope&&type==="Commercial"&&(!manualEntry||typeof scope!=="string"||!scope.trim())){
+    const supplied=typeof input.scope==="string"?input.scope.trim():"";
+    const details=typeof input.scopeDetails==="string"?input.scopeDetails.trim():"";
+    scope=manualEntry?defaultStarbucksScope:[defaultStarbucksScope,supplied&&supplied!==defaultStarbucksScope&&!supplied.startsWith(defaultStarbucksScope)?"Additional scope notes: "+supplied:"",details?"Additional scope notes: "+details:""].filter(Boolean).join("\n\n");
    }
    const hours=money(input.estimatedHours,"estimated person-hours");
    if(hours<=0)throw new ContractorAccessError("Estimated person-hours are required.",400);
