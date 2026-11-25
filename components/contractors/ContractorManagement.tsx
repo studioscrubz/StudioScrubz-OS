@@ -8,7 +8,7 @@ import type {PropertyWithClient} from "@/types/property";
 import {bookingClientKind,bravaPayout} from "@/lib/contractors/bravaPayout";
 import {bravaScopeHeading} from "@/lib/contractors/bravaScope";
 import {parseRoseBooking} from "@/lib/contractors/roseBooking";
-import {contractorServiceScope,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
+import {contractorServiceScope,starbucksScope,isStarbucksLocation,type ContractorScopeCatalog} from "@/lib/contractors/scopeCatalog";
 import { notifyAttentionRefresh } from "@/lib/attentionEvents";
 import {useOperationalRealtime} from "@/components/realtime/OperationalRealtimeProvider";
 import type {ContractorScheduledJob} from "@/lib/contractors/scheduledJobs";
@@ -162,8 +162,8 @@ export function ContractorManagement({view}: {view:ContractorView}){
  const submissionClient=submissionClients.find(company=>company.id===submissionClientId);
  const isBrava=submissionClient&&bookingClientKind(submissionClient.name)==="brava";
   const roseCatalog=submissionClient?.scope_catalog;
-  const manualServices=Array.from(new Set([...locationScopes.map(entry=>entry.name),...(roseCatalog?.services?.length?roseCatalog.services:isBrava?["Standard Cleaning","Brazilian Deep Clean"]:submissionClient?.service_types?.length?submissionClient.service_types:submissionClient?.contractor_division==="Commercial"?["Commercial Cleaning"]:["Standard Cleaning","Deep Cleaning","Move-In / Move-Out Cleaning"])]));
-  const scopeForManualService=(service:string)=>locationScopes.find(entry=>entry.name.toLowerCase()===service.toLowerCase())?.scope??"";
+  const manualServices=Array.from(new Set([...(isStarbucksLocation(submissionClient?.name,rosePreview?.propertyName)?["High-Dusting"]:[]),...locationScopes.map(entry=>entry.name),...(roseCatalog?.services?.length?roseCatalog.services:isBrava?["Standard Cleaning","Brazilian Deep Clean"]:submissionClient?.service_types?.length?submissionClient.service_types:submissionClient?.contractor_division==="Commercial"?["Commercial Cleaning"]:["Standard Cleaning","Deep Cleaning","Move-In / Move-Out Cleaning"])]));
+  const scopeForManualService=(service:string)=>starbucksScope(submissionClient?.name,rosePreview?.propertyName,service)??locationScopes.find(entry=>entry.name.toLowerCase()===service.toLowerCase())?.scope??"";
  const savedClientId=data?.directory.find(entry=>entry.companyId===submissionClientId)?.clientId;
  useEffect(()=>{
   let active=true;
@@ -183,7 +183,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
   const params=new URLSearchParams({companyId:submissionClientId,propertyId:selectedScopePropertyId});
   void fetch(`/api/contractors/location-scopes?${params}`,{cache:"no-store"})
    .then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||"Location scopes unavailable.");return result as {services:Array<{name:string;scope:string}>};})
-   .then(result=>{if(!active)return;setLocationScopes(result.services);setRosePreview(current=>current?{...current,scope:result.services.find(item=>item.name.toLowerCase()===current.serviceType.toLowerCase())?.scope??""}:current);})
+   .then(result=>{if(!active)return;setLocationScopes(result.services);setRosePreview(current=>current?{...current,scope:result.services.find(item=>item.name.toLowerCase()===current.serviceType.toLowerCase())?.scope??current.scope}:current);})
    .catch(cause=>{if(active)setError(cause instanceof Error?cause.message:"Location scopes unavailable.");})
    .finally(()=>{if(active)setScopeLoading(false);});
   return()=>{active=false;};
@@ -485,7 +485,7 @@ export function ContractorManagement({view}: {view:ContractorView}){
     <button type="button" className={secondary} disabled={busy||!roseText.trim()} onClick={()=>{
      try{
         const parsed=parseRoseBooking(roseText,isBrava?"brava":"rose");
-        setRosePreview({...parsed,scope:!isBrava&&roseCatalog?contractorServiceScope(roseCatalog,parsed.serviceType)??parsed.scope:parsed.scope});
+        setRosePreview({...parsed,scope:starbucksScope(submissionClient.name,parsed.propertyName,parsed.serviceType)??(!isBrava&&roseCatalog?contractorServiceScope(roseCatalog,parsed.serviceType)??parsed.scope:parsed.scope)});
         setError("");
       }
      catch(cause){setError(cause instanceof Error?cause.message:"The booking could not be read.");}
@@ -548,6 +548,11 @@ export function ContractorManagement({view}: {view:ContractorView}){
            setRosePreview({...rosePreview,serviceType:value,scope:[next,notes].filter(Boolean).join("\n")});
           }else if(!isBrava&&key==="serviceType"&&roseCatalog){
            setRosePreview({...rosePreview,serviceType:value,scope:contractorServiceScope(roseCatalog,value)??value});
+          }else if(key==="propertyName"||key==="serviceType"){
+           const next={...rosePreview,[key]:value};
+           const previous=starbucksScope(submissionClient.name,rosePreview.propertyName,rosePreview.serviceType);
+           const suggested=starbucksScope(submissionClient.name,next.propertyName,next.serviceType);
+           setRosePreview({...next,scope:suggested&&(!previous||!rosePreview.scope)?suggested:!suggested&&previous&&rosePreview.scope===previous?"":rosePreview.scope});
           }else setRosePreview({...rosePreview,[key]:value});
          }}/>
        </label>)}
