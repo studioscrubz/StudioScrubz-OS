@@ -1,6 +1,7 @@
 import type { UserProfile, UserRole } from "@/types/auth";
 
 export const PERMISSIONS = [
+  "inventory.view", "inventory.manage",
   "contractors.view", "contractors.manage",
   "porterVisits.view", "porterVisits.manage",
   "propertyServicePlans.manage",
@@ -145,6 +146,11 @@ export function hasPermission(
   profile: UserProfile | null,
   permission: Permission,
 ): boolean {
+  if (permission === "inventory.view" || permission === "inventory.manage") {
+    return profile?.is_active === true && (permission === "inventory.manage"
+      ? ["Master Admin", "Manager"].includes(profile.role)
+      : ["Master Admin", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role));
+  }
   if (permission === "emailSettings.view") return profile?.is_active === true;
   if (["leadRep.portal", "leadRep.leads.viewOwn", "leadRep.commissions.viewOwn"].includes(permission)) {
     return profile?.is_active === true && profile.role === "Lead Representative";
@@ -210,6 +216,7 @@ export const canManageInvoicePhotoVisibility = (profile: UserProfile | null) =>
   ["Master Admin", "Administrator"].includes(profile.role);
 
 const ROUTE_PERMISSIONS: Array<[string, Permission]> = [
+  ["/inventory", "inventory.view"],
   ["/contractors", "contractors.view"],
   ["/communications/employee-email", "employeeEmails.send"],
   ["/lead-commission-payouts", "leadRep.payouts.manage"],

@@ -35,6 +35,7 @@ import {
 import { getActiveCrews } from "@/lib/services/crews";
 import { JobInvoiceAction } from "@/components/invoices/JobInvoiceAction";
 import { EquipmentAssignmentControl } from "@/components/jobs/EquipmentAssignmentControl";
+import { EquipmentReadinessChecklist } from "@/components/inventory/EquipmentReadinessChecklist";
 import { formatJobServiceAddress } from "@/types/job";
 import { JobCrewTechnicianPicker } from "@/components/jobs/JobCrewTechnicianPicker";
 import { JobCardGpsRegistration } from "@/components/jobs/JobCardGpsRegistration";
@@ -482,6 +483,7 @@ function JobCard({ job, open, timeEntries, employeeId, role, activeCrew, activeT
       {job.status === "In Progress" && canCardEndJob && activeEntries.length > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">END JOB will stop payroll for all {activeEntries.length} joined crew {activeEntries.length === 1 ? "member" : "members"}.</p>}
       <button type="button" onClick={open} className={secondary}>MANAGE JOB</button>
       {job.assigned_crew_id && employeeId===activeCrewLeadId && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy} /></div>}
+      {!job.assigned_crew_id && job.assigned_employee_id === employeeId && !["Completed", "Cancelled", "Archived"].includes(job.status) && <div className="w-full"><EquipmentReadinessChecklist jobId={job.id} disabled={busy} /></div>}
       {job.status === "In Progress" && currentEntry && <div className="w-full"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job" /></div>}
       {["Master Admin","Administrator","Manager"].includes(role ?? "") && job.status === "In Progress" && <div className="w-full"><EquipmentExceptionResolution jobId={job.id} /></div>}
       {canDelete && <button type="button" disabled={busy} onClick={requestDelete} className={danger}>PERMANENTLY DELETE</button>}
@@ -825,6 +827,7 @@ function JobModal({
       </JobTimeSummary>
       <JobCalendarStatus jobId={job.id} />
       {job.assigned_crew_id&&employeeId===activeCrewLeadId&&!['Completed','Cancelled','Archived'].includes(job.status)&&<div className="mt-2"><EquipmentAssignmentControl jobId={job.id} crewLeadId={activeCrewLeadId} employeeId={employeeId} role={role} techs={activeTechs} disabled={busy}/></div>}
+      {!job.assigned_crew_id && job.assigned_employee_id === employeeId && !["Completed", "Cancelled", "Archived"].includes(job.status) && <EquipmentReadinessChecklist jobId={job.id} disabled={busy} />}
       <JobEquipmentActions jobId={job.id} />
       {job.status==='In Progress'&&clock?.clockedIn&&<div className="mt-2"><EquipmentClearanceChecklist jobId={job.id} checkpoint="End Job"/></div>}
       {showLifecycle && (

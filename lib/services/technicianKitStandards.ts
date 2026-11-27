@@ -287,7 +287,27 @@ export type ResidentialKitService = "standard" | "deep" | "move-in-out";
 export function requiredKitItems(service: ResidentialKitService, specialtyIds: readonly string[] = []) {
   if (!["standard","deep","move-in-out"].includes(service)) throw new Error("Unsupported kit service");
   if (specialtyIds.some(id=>!KIT_ITEMS.some(item=>item.kit==="specialty" && item.id===id))) throw new Error("Unknown specialty item");
-  return KIT_ITEMS.filter(item=>item.kit==="essentials" || item.kit==="standard" || (service!=="standard" && (item.kit==="deep" || (item.kit==="specialty" && specialtyIds.includes(item.id)))));
+  return KIT_ITEMS.filter(item=>item.kit==="essentials" || item.kit==="standard" || (service!=="standard" && item.kit==="deep") || (item.kit==="specialty" && specialtyIds.includes(item.id)));
+}
+
+export type TowelColor = typeof TOWEL_COLORS[number]["name"];
+export function microfiberAvailability(counts: ReadonlyArray<{ color: TowelColor; clean: number; dirty: number }>) {
+  if (new Set(counts.map(row => row.color)).size !== counts.length || counts.some(row =>
+    !TOWEL_COLORS.some(color => color.name === row.color) || ![row.clean, row.dirty].every(value => Number.isSafeInteger(value) && value >= 0))) {
+    throw new Error("Invalid microfiber counts");
+  }
+  const colors = TOWEL_COLORS.map(color => {
+    const clean = counts.find(row => row.color === color.name)?.clean ?? 0;
+    return { ...color, clean, ...replenishment(color.target, clean, color.threshold) };
+  });
+  const clean = colors.reduce((sum, color) => sum + color.clean, 0);
+  return { clean, dirty: counts.reduce((sum, row) => sum + row.dirty, 0), colors,
+    due: clean <= 35 || colors.some(color => color.due), quantity: Math.max(0, 100 - clean) };
+}
+
+export function containerReplenishment(capacityOz: number, remainingOz: number) {
+  if (capacityOz <= 0 || remainingOz > capacityOz) throw new Error("Invalid container volume");
+  return replenishment(capacityOz, remainingOz, capacityOz * 0.25);
 }
 export function replenishment(target:number,current:number,threshold:number) {
   if (![target,current,threshold].every(Number.isFinite) || target<0 || current<0 || threshold<0 || threshold>target) throw new Error("Invalid stock quantity");

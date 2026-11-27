@@ -41,4 +41,8 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+supabase/.temp/
+inventory-*.tmp
+inventory-*.tmp.sql
+inventory-*.tmp.json
 next-env.d.ts

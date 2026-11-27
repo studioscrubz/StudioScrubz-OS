@@ -1,0 +1,133 @@
+"use client";
+
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { EquipmentMaintenancePanel } from "@/components/inventory/EquipmentMaintenancePanel";
+import { ChemicalFormulaReview } from "@/components/inventory/ChemicalFormulaReview";
+import { InventoryTrainingPanel } from "@/components/inventory/InventoryTrainingPanel";
+import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { KitStandardEditor } from "@/components/inventory/KitStandardEditor";
+import { inventoryAction, loadInventory, stockThreshold, type InventoryData } from "@/lib/services/inventory";
+
+const sections = ["Inventory Dashboard", "Master Inventory", "Kit Standards", "Assigned Kits", "Equipment Inspections", "Restocking Requests", "Chemical Formula Library", "Equipment Maintenance", "Inventory Transactions"] as const;
+const control = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900";
+const button = "rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50";
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block text-sm font-semibold">{label}{children}</label>; }
+
+export function InventoryPage() {
+  const { profile } = useAuth();
+  const allowed = Boolean(profile?.is_active && ["Master Admin", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role));
+  const manager = Boolean(profile && ["Master Admin", "Manager"].includes(profile.role));
+  const [section, setSection] = useState<typeof sections[number]>("Inventory Dashboard");
+  const [data, setData] = useState<InventoryData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [location, setLocation] = useState("");
+  const [itemKey, setItemKey] = useState("");
+  const [observations, setObservations] = useState<Record<string, number>>({});
+  const refresh = useCallback(async () => { setData(await loadInventory()); }, []);
+  useOperationalRealtime(allowed ? ["technician_restock_requests", "technician_equipment_maintenance", "technician_inventory_stock", "technician_equipment_assets", "technician_kit_assignments", "job_inventory_inspections"] : [], refresh);
+  useEffect(() => {
+    if (!allowed) return;
+    let active = true;
+    void loadInventory().then(result => { if (active) setData(result); }).catch(e => { if (active) setError(e instanceof Error ? e.message : "Inventory could not be loaded."); });
+    return () => { active = false; };
+  }, [allowed]);
+  async function act(name: string, args: Record<string, unknown>) {
+    setBusy(true); setError(null); setNotice(null);
+    try { await inventoryAction(name, args); await refresh(); setNotice("Saved."); } catch (e) { setError(e instanceof Error ? e.message : "Action failed."); } finally { setBusy(false); }
+  }
+  if (!allowed) return <p role="alert">You do not have inventory access.</p>;
+  if (!data) return <p role={error ? "alert" : "status"}>{error || "Loading inventoryâ€¦"}</p>;
+  const item = data.items.find(row => row.item_key === itemKey);
+  const selectedStock = data.stock.find(row => row.location_id === location && row.item_key === itemKey);
+  const threshold = item ? stockThreshold(item, selectedStock) : null;
+  const current = selectedStock?.quantity ?? 0;
+  const observed = observations[`${location}:${itemKey}`] ?? current;
+  const leafItems = data.items.filter(row => row.stock_state !== "aggregate");
+  const openRequests = data.requests.filter(row => !["completed", "declined", "cancelled"].includes(row.status));
+  const lowStock = data.locations.flatMap(loc => leafItems.filter(i => {
+    const stock = data.stock.find(s => s.location_id === loc.id && s.item_key === i.item_key);
+    const limits = stockThreshold(i, stock);
+    // Never imply that every optional specialty item is assigned to every location.
+    return stock && limits?.threshold != null && stock.quantity <= limits.threshold;
+  }).map(i => ({ loc, item: i, stock: data.stock.find(s => s.location_id === loc.id && s.item_key === i.item_key)! })));
+  const itemName = (key: string) => data.items.find(i => i.item_key === key)?.item_name ?? key;
+  const locationName = (id: string) => data.locations.find(l => l.id === id)?.name ?? id;
+  const selectLocation = <select required className={control} value={location} onChange={e => setLocation(e.target.value)}><option value="">Select location</option>{data.locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>;
+  const selectItem = <select required className={control} value={itemKey} onChange={e => setItemKey(e.target.value)}><option value="">Select item</option>{leafItems.map(i => <option key={i.item_key} value={i.item_key}>{i.item_name} ({i.unit})</option>)}</select>;
+  function submit(event: FormEvent<HTMLFormElement>, name: string, build: (form: FormData) => Record<string, unknown>) { event.preventDefault(); void act(name, build(new FormData(event.currentTarget))); }
+  return <main className="space-y-5 text-[#143d1a]">
+    <header><h1 className="text-2xl font-extrabold">Inventory &amp; Equipment</h1><p className="mt-1 text-sm text-neutral-600">Record physical stock and issuance. Complete preparation, inspections and maintenance during compensated working time.</p></header>
+    <nav aria-label="Inventory sections" className="flex flex-wrap gap-2">{sections.map(label => <button type="button" key={label} onClick={() => setSection(label)} aria-current={section === label ? "page" : undefined} className={section === label ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}</nav>
+    {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {section === "Inventory Dashboard" && <>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{([
+        ["Catalog items", data.items.filter(i => !i.parent_key).length, "Master Inventory"],
+        ["Assigned kits", data.assignments.filter(k => !k.returned_at).length, "Assigned Kits"],
+        ["Low-stock items", lowStock.length, "Master Inventory"],
+        ["Pending requests", openRequests.length, "Restocking Requests"],
+        ["Urgent shortages", openRequests.filter(r => r.priority === "urgent").length, "Restocking Requests"],
+        ["Out-of-service equipment", data.assets.filter(a => ["out_of_service", "missing", "needs_maintenance"].includes(a.condition)).length, "Equipment Maintenance"],
+        ["Open maintenance reports", data.maintenance.filter(r => r.status !== "completed").length, "Equipment Maintenance"],
+        ["Outstanding acknowledgments", data.assignments.filter(k => !k.returned_at && !k.acknowledged_at).length + data.assets.filter(a => a.location_id && !a.acknowledged_at).length, "Assigned Kits"],
+        ["Offboarding kit recovery", data.assignments.filter(k => k.return_required && !k.returned_at).length, "Assigned Kits"],
+        ["Pending training assessments", data.training.reduce((sum, r) => sum + 8 - Object.values(r.assessments).filter(a => a.passed && a.acknowledged_at).length, 0), "Assigned Kits"],
+        ["Overdue maintenance", data.assets.filter(a => a.condition !== "retired" && a.maintenance_due_at && new Date(a.maintenance_due_at).getTime() < data.loadedAt).length, "Equipment Maintenance"],
+        ...(manager ? [["Pending chemical verification", data.formulas.filter(f => f.status === "unverified" || f.status === "conflict").length, "Chemical Formula Library"]] : []),
+      ] as [string, number, typeof sections[number]][]).map(([label, count, target]) => <button type="button" className="rounded-xl border bg-white p-4 text-left" key={label} onClick={() => setSection(target)}><span className="block text-xs">{label}</span><strong className="text-2xl">{count}</strong></button>)}</div>
+      <h2 className="font-bold">Recorded low stock</h2>{lowStock.length ? lowStock.map(({ loc, item, stock }) => <p key={`${loc.id}:${item.item_key}`} className="rounded-lg border border-amber-300 p-3">{loc.name}: {item.item_name} â€” {stock.quantity} {item.unit}</p>) : <p>No recorded stock is at its restocking threshold.</p>}
+    </>}
+    {section === "Master Inventory" && <>
+      <div className="grid gap-3 sm:grid-cols-2"><Field label="Location">{selectLocation}</Field><Field label="Inventory item">{selectItem}</Field></div>
+      {item && <p>Available: {current} {item.unit}. {threshold ? `Target: ${threshold.target}. Restock at: ${threshold.threshold ?? "not set"}.` : "Record actual container capacity to calculate replenishment."}</p>}
+      {manager && <form className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2" onSubmit={e => submit(e, "inventory_move", f => ({ p_key: f.get("key"), p_item: itemKey, p_quantity: Number(f.get("quantity")), p_type: f.get("type"), p_reason: f.get("reason"), p_source: f.get("source") || null, p_destination: f.get("destination") || null, p_request: f.get("request") || null }))}>
+        <h2 className="font-bold sm:col-span-2">Record stock movement</h2>
+        <Field label="Action key (reuse when retrying)"><input className={control} required name="key" defaultValue={crypto.randomUUID()} /></Field>
+        <Field label="Type"><select name="type" className={control}>{["purchase", "issue", "consumption", "return", "transfer", "adjustment", "laundry_return", "damage", "loss", ...(profile?.role === "Master Admin" ? ["disposal"] : [])].map(t => <option key={t}>{t}</option>)}</select></Field>
+        {["source", "destination"].map(name => <Field key={name} label={name === "source" ? "Source (leave empty for purchase)" : "Destination (leave empty for consumption/loss)"}><select name={name} className={control}><option value="">None</option>{data.locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Field>)}
+        <Field label={`Quantity (${item?.unit ?? "select an item above"})`}><input className={control} name="quantity" type="number" required min="0.001" step="0.001" /></Field>
+        <Field label="Approved request (optional)"><select name="request" className={control}><option value="">None</option>{openRequests.filter(r => ["approved", "ready", "issued"].includes(r.status)).map(r => <option key={r.id} value={r.id}>{locationName(r.location_id)} â€” {itemName(r.item_key)} ({r.requested_quantity - r.issued_quantity} remaining)</option>)}</select></Field>
+        <Field label="Reason"><input className={control} name="reason" required /></Field><button disabled={busy || !item} className={button}>Record movement</button>
+      </form>}
+      {manager && item && <form className="flex flex-wrap items-end gap-3" onSubmit={e => submit(e, "inventory_set_capacity", f => ({ p_location: location, p_item: itemKey, p_capacity: Number(f.get("capacity")) }))}><Field label="Actual container capacity"><input className={control} name="capacity" required type="number" min="0.001" step="0.001" /></Field><button className={button} disabled={busy || !location}>Save capacity</button></form>}
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Item</th><th>Unit</th><th>Target</th><th>Restock at</th></tr></thead><tbody>{data.items.filter(i => !i.parent_key).map(i => <tr className="border-t" key={i.item_key}><td className="p-2">{i.item_name}</td><td>{i.unit}</td><td>{i.item_key === "bulk_alcohol" ? "Actual capacity" : i.target}</td><td>{i.item_key === "bulk_alcohol" ? "25% remaining" : i.restock_at ?? "â€”"}</td></tr>)}</tbody></table></div>
+    </>}
+    {section === "Kit Standards" && <div className="space-y-3"><p>Standard Cleaning: essentials + standard. Deep Cleaning and Move-In/Out add deep supplies. Specialty items apply only when required. Existing specialty service catalogs remain in use.</p>{data.items.filter(i => i.stock_state !== "dirty").map(i => <div className="rounded-lg border bg-white p-3" key={i.item_key}><strong>{i.item_name}</strong><p className="text-sm">{i.kit} Â· {i.target} {i.unit} Â· threshold {i.restock_at ?? "not set"} Â· version {i.standard_version}</p>{profile?.role === "Master Admin" && i.stock_state !== "aggregate" && <form className="mt-2 grid gap-2 sm:grid-cols-4" onSubmit={e => submit(e, "inventory_set_standard", f => ({ p_item: i.item_key, p_target: Number(f.get("target")), p_threshold: f.get("threshold") === "" ? null : Number(f.get("threshold")), p_version: f.get("version") }))}><Field label="Target"><input name="target" className={control} type="number" min="0.001" step="0.001" required defaultValue={i.target} /></Field><Field label="Threshold"><input name="threshold" className={control} type="number" min="0" step="0.001" defaultValue={i.restock_at ?? ""} /></Field><Field label="New version"><input name="version" className={control} required placeholder="e.g. 1.1" /></Field><button disabled={busy} className={button}>Save standard</button></form>}</div>)}</div>}
+    {section === "Assigned Kits" && <>
+      {manager && <form className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" onSubmit={e => submit(e, "inventory_assign_kit", f => ({ p_number: f.get("number"), p_kit: f.get("kit"), p_location: location }))}><Field label="Kit identification"><input className={control} name="number" required placeholder="KIT-TECH-001" /></Field><Field label="Kit standard"><select className={control} name="kit">{data.kits.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select></Field><Field label="Assigned location">{selectLocation}</Field><button disabled={busy || !location} className={button}>Record kit assignment</button></form>}
+      {data.assignments.map(k => <article className="rounded-xl border p-4" key={k.id}><h2 className="font-bold">{k.kit_number} Â· {data.kits.find(d => d.id === k.kit_id)?.name} Â· {locationName(k.location_id)}</h2><p>{k.returned_at ? "Returned" : k.return_required ? "Offboarding recovery required" : k.acknowledged_at ? "Receipt acknowledged" : "Receipt acknowledgment outstanding"}</p>{!k.returned_at && !k.acknowledged_at && <button disabled={busy} className={button} onClick={() => void act("inventory_acknowledge_kit", { p_id: k.id })}>Acknowledge kit received</button>}{manager && !k.returned_at && <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e => submit(e, "inventory_return_kit", f => ({ p_id: k.id, p_notes: f.get("notes") }))}><Field label="Physical return / recovery notes"><input className={control} name="notes" required /></Field><button disabled={busy} className={button}>Record kit returned</button></form>}</article>)}
+      {manager && <form className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" onSubmit={e => submit(e, "inventory_create_location", f => ({ p_name: f.get("name"), p_type: f.get("type"), p_employee: f.get("employee") || null, p_crew: f.get("crew") || null }))}>
+        <Field label="Location name"><input className={control} name="name" required /></Field><Field label="Location type"><select className={control} name="type"><option value="central">Central</option><option value="individual">Individual</option><option value="crew">Crew</option></select></Field>
+        <Field label="Employee ID (individual only)"><input className={control} name="employee" /></Field><Field label="Crew ID (crew only)"><input className={control} name="crew" /></Field><button disabled={busy} className={button}>Create inventory location</button><p className="text-xs">Creating a location does not issue supplies. Record physical issuance in Master Inventory.</p>
+      </form>}
+      {data.locations.map(l => <article key={l.id} className="rounded-xl border p-4"><h2 className="font-bold">{l.name} Â· {l.location_type}</h2>{data.stock.filter(s => s.location_id === l.id).map(s => <p key={s.item_key} className="mt-1 text-sm">{itemName(s.item_key)}: {s.quantity}</p>)}</article>)}{data.locations.length === 0 && <p>No inventory locations have been recorded.</p>}
+      <InventoryTrainingPanel data={data} manager={manager} busy={busy} act={act} />
+    </>}
+    {section === "Equipment Inspections" && <>
+      <p>Complete Check Equipment from Jobs â†’ Manage Job. These records retain the exact requirements and item versions used for each inspection.</p>
+      {manager && <form className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" onSubmit={e => submit(e, "inventory_set_job_scope", f => ({ p_job: f.get("job"), p_kit: f.get("kit") || null, p_specialties: f.getAll("specialty") }))}><Field label="Job ID"><input className={control} name="job" required /></Field><Field label="Kit standard"><select name="kit" className={control}><option value="">Preserve existing service-specific catalog</option>{data.kits.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select></Field><fieldset className="sm:col-span-2"><legend className="font-semibold">Applicable specialty requirements</legend>{data.items.filter(i => ["shower","mold","grout","brushes","steel"].includes(i.item_key)).map(i => <label key={i.item_key} className="mr-4 inline-block text-sm"><input name="specialty" type="checkbox" value={i.item_key} className="mr-1" />{i.item_name}</label>)}</fieldset><button disabled={busy} className={button}>Save job-specific scope</button></form>}
+      {data.inspections.slice().reverse().map(i => <details key={i.id} className="rounded-xl border p-4"><summary className="cursor-pointer font-bold">{new Date(i.created_at).toLocaleString()} Â· {i.ready ? "Ready" : "Exceptions â€” not ready"} Â· Job {i.job_id}</summary><p className="my-2 text-sm">Employee: {i.employee_id}</p><a className="underline" href={`/jobs?jobId=${i.job_id}`}>Open job</a>{i.results.map(r => <p key={r.key} className="mt-2 text-sm">{i.requirements.find(req => req.key === r.key)?.name ?? r.key}: {r.status} Â· {r.quantity} Â· {r.notes}</p>)}</details>)}
+      {!data.inspections.length && <p>No inspections have been recorded.</p>}
+    </>}
+    {section === "Restocking Requests" && <>
+      <form className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" onSubmit={e => submit(e, "inventory_request_restock", f => ({ p_location: location, p_item: itemKey, p_current: Number(f.get("current")), p_quantity: Number(f.get("quantity")), p_reason: f.get("reason"), p_priority: f.get("priority"), p_notes: f.get("notes") || null }))}>
+        <Field label="Assigned location">{selectLocation}</Field><Field label="Item">{selectItem}</Field>
+        <Field label="Observed available quantity"><input className={control} name="current" type="number" min="0" step="0.001" required value={observed} onChange={e => setObservations(previous => ({ ...previous, [`${location}:${itemKey}`]: Number(e.target.value) }))} /></Field>
+        <Field label="Requested quantity"><input key={`${location}:${itemKey}:${observed}:quantity`} className={control} name="quantity" type="number" min="0.001" step="0.001" required defaultValue={threshold ? Math.max(0, threshold.target - observed) : ""} /></Field>
+        <Field label="Priority"><select name="priority" className={control}><option value="routine">Routine</option><option value="high">High â€” before next assignment</option><option value="urgent">Urgent â€” current assignment affected</option></select></Field>
+        <Field label="Reason"><input name="reason" className={control} required /></Field><Field label="Notes"><textarea name="notes" className={control} /></Field><button className={button} disabled={busy}>Submit request</button>
+      </form>
+      {data.requests.slice().reverse().map(r => <article key={r.id} className="space-y-2 rounded-xl border bg-white p-4"><h2 className="font-bold">{itemName(r.item_key)} â€” {locationName(r.location_id)}</h2><p className="text-sm">{r.priority} Â· {r.status} Â· requested {r.requested_quantity}, issued {r.issued_quantity}, received {r.received_quantity}</p><p>{r.reason}</p>
+        {manager && <div className="flex flex-wrap gap-2">{(r.status === "submitted" ? ["approved", "declined", "cancelled"] : r.status === "approved" ? ["awaiting_purchase", "ready"] : r.status === "awaiting_purchase" ? ["ready"] : r.status === "received" && r.received_quantity === r.requested_quantity ? ["completed"] : []).map(status => <button key={status} type="button" className={button} disabled={busy} onClick={() => void act("inventory_update_request", { p_id: r.id, p_status: status })}>{status.replaceAll("_", " ")}</button>)}</div>}
+        {["issued", "received"].includes(r.status) && r.received_quantity < r.issued_quantity && <form className="flex flex-wrap items-end gap-2" onSubmit={e => submit(e, "inventory_update_request", f => ({ p_id: r.id, p_status: "received", p_received: Number(f.get("received")) }))}><Field label="Total quantity received so far"><input className={control} type="number" name="received" required min={r.received_quantity} max={r.issued_quantity} step="0.001" defaultValue={r.issued_quantity} /></Field><button className={button} disabled={busy}>Acknowledge receipt</button></form>}
+      </article>)}
+    </>}
+    {section === "Chemical Formula Library" && <><p className="rounded-xl bg-amber-50 p-4">Only manufacturer-verified, released formulas are available to employees. Independent preparation also requires practical competency authorization. Use 24 fl oz bottles with identification labels at the top.</p>{data.formulas.map(f => <article key={f.id} className="rounded-xl border p-4"><h2 className="font-bold">{f.name} Â· version {f.version} Â· {f.status}</h2><p className="mt-2 whitespace-pre-wrap">{f.preparation}</p>{f.label_url && <a className="mr-4 underline" href={f.label_url} target="_blank" rel="noreferrer">Product label</a>}{f.sds_url && <a className="underline" href={f.sds_url} target="_blank" rel="noreferrer">Safety Data Sheet</a>}</article>)}{data.formulas.length === 0 && <p>No released formulas are available.</p>}</>}
+    {section === "Inventory Transactions" && <div className="space-y-2">{data.transactions.slice().reverse().map(t => <article key={t.id} className="rounded-xl border p-3"><strong>{t.transaction_type} Â· {itemName(t.item_key)} Â· {t.quantity_delta > 0 ? "+" : ""}{t.quantity_delta}</strong><p className="text-sm">{locationName(t.location_id)} Â· {new Date(t.created_at).toLocaleString()}</p><p className="text-sm">{t.reason}</p><p className="break-all text-xs text-neutral-500">Movement: {t.movement_id}</p></article>)}{!data.transactions.length && <p>No stock movements have been recorded.</p>}</div>}
+    {section === "Chemical Formula Library" && profile?.role === "Master Admin" && data.formulas.filter(f => !data.formulas.some(newer => newer.name === f.name && newer.version > f.version)).map(f => <article className="rounded-xl border p-4" key={f.id}><h2 className="font-bold">{f.name} â€” management verification</h2><ChemicalFormulaReview formula={f} busy={busy} act={act} /></article>)}
+    {section === "Kit Standards" && profile?.role === "Master Admin" && <KitStandardEditor data={data} busy={busy} act={act} />}
+    {section === "Equipment Maintenance" && <EquipmentMaintenancePanel data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
+  </main>;
+}

@@ -1,0 +1,13 @@
+"use client";
+import { INVENTORY_TRAINING_MODULES } from "@/lib/onboarding/inventoryTraining";
+import type { InventoryData } from "@/lib/services/inventory";
+export function InventoryTrainingPanel({ data, manager, busy, act }: { data: InventoryData; manager: boolean; busy: boolean; act: (name: string, args: Record<string, unknown>) => Promise<void> }) {
+  return <section className="space-y-3"><h2 className="text-lg font-bold">Training &amp; competency</h2><p>Independent chemical preparation: {data.chemicalAuthorized ? "authorized by recorded practical assessment and employee acknowledgment" : "not authorized"}.</p>
+    {INVENTORY_TRAINING_MODULES.map(module => <details className="rounded-xl border p-3" key={module.id}><summary className="cursor-pointer font-bold">{module.name} · {module.sop}</summary><p className="mt-2 text-sm">{module.content}</p>
+      {data.training.map(record => { const assessment = record.assessments[module.id]; return <div className="mt-3 rounded border p-3 text-sm" key={record.case_id}><strong>{record.employee_name}</strong><p>{assessment ? `${assessment.passed ? "Passed" : "Not passed"} · ${assessment.practical ? "Practical assessment recorded" : "No practical assessment"} · ${assessment.acknowledged_at ? "Employee acknowledged" : "Acknowledgment pending"}` : "Not assessed"}</p>{assessment && <><p>Trainer: {assessment.trainer} · {new Date(assessment.training_date).toLocaleString()}</p><p>{assessment.notes}</p>{!manager && !assessment.acknowledged_at && <button className="mt-2 rounded bg-[#143d1a] p-2 text-white disabled:opacity-50" disabled={busy} onClick={() => void act("inventory_acknowledge_training", { p_case: record.case_id, p_module: module.id })}>Acknowledge training received</button>}</>}
+        {manager && <form className="mt-2 grid gap-2" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); void act("inventory_assess_training", { p_case: record.case_id, p_module: module.id, p_passed: f.get("passed") === "on", p_practical: f.get("practical") === "on", p_notes: f.get("notes") }); }}><label><input type="checkbox" name="passed" className="mr-2" />Assessment passed</label><label><input type="checkbox" name="practical" className="mr-2" />Observed practical assessment completed</label><label>Management notes<textarea required name="notes" className="mt-1 w-full rounded border p-2" /></label><button disabled={busy} className="rounded bg-[#143d1a] p-2 text-white disabled:opacity-50">Record actual assessment</button></form>}
+      </div>; })}
+    </details>)}
+    {!data.training.length && <p>No existing onboarding training record is available. Management can open the employee’s record under Team → Employee Onboarding.</p>}
+  </section>;
+}

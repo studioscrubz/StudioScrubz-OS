@@ -5,6 +5,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 export const OPERATIONAL_TABLES = [
+  "technician_restock_requests", "technician_equipment_maintenance", "technician_inventory_stock", "technician_equipment_assets", "technician_kit_assignments", "job_inventory_inspections",
   "internal_schedule_events", "internal_schedule_event_attendees",
   "porter_notification_events",
   "job_assignment_events", "job_crew_technicians",
