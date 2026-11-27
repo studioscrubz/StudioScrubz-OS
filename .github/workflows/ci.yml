@@ -30,7 +30,7 @@ jobs:
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_readiness_postgres.sql
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_training_maintenance_postgres.sql
       - name: Verify concurrent stock movements and retries
-        run: sudo -u postgres "$(command -v node)" scripts/test-inventory-concurrency.mjs studioscrubz_inventory_test
+        run: sudo -u postgres "$(command -v node)" --input-type=module - studioscrubz_inventory_test < scripts/test-inventory-concurrency.mjs
 
   manage-job-ui:
     runs-on: ubuntu-latest
