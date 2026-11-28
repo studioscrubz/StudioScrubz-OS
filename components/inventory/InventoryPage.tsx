@@ -10,14 +10,23 @@ import { SimpleInventoryPanel, type SimpleInventoryTab } from "@/components/inve
 import { KitStandardEditor } from "@/components/inventory/KitStandardEditor";
 import { inventoryAction, loadInventory, stockThreshold, type InventoryData } from "@/lib/services/inventory";
 
-const sections = ["Chemical Safety Verification", "Inventory Dashboard", "Master Inventory", "Kit Standards", "Assigned Kits", "Equipment Inspections", "Restocking Requests", "Chemical Formula Library", "Equipment Maintenance", "Inventory Transactions"] as const;
-const primarySections = [
+const dailySections = ["Catalog", "Restock Checklist", "Equipment"] as const satisfies readonly SimpleInventoryTab[];
+const managementSections = [
+  ["Overview", "Inventory Dashboard"],
   ["Supplies", "Master Inventory"],
   ["Cleaning Kits", "Assigned Kits"],
   ["Requests", "Restocking Requests"],
-  ["Equipment", "Equipment Maintenance"],
+  ["Equipment Maintenance", "Equipment Maintenance"],
+  ["Equipment Inspections", "Equipment Inspections"],
+  ["Chemical Formula Library", "Chemical Formula Library"],
 ] as const;
-const advancedSections = ["Chemical Safety Verification", "Kit Standards", "Equipment Inspections", "Chemical Formula Library", "Inventory Transactions"] as const;
+const managerSections = [
+  ["Kit Standards", "Kit Standards"],
+  ["Inventory Transactions", "Inventory Transactions"],
+] as const;
+const masterSections = [["Chemical Safety Verification", "Chemical Safety Verification"]] as const;
+type ManagementSection = (typeof managementSections | typeof managerSections | typeof masterSections)[number][1];
+type InventorySection = SimpleInventoryTab | ManagementSection;
 const control = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900";
 const button = "rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50";
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block text-sm font-semibold">{label}{children}</label>; }
@@ -28,12 +37,10 @@ export function InventoryPage() {
   const manager = Boolean(profile && ["Master Admin", "Manager"].includes(profile.role));
   const [assignees,setAssignees] = useState<{id:string;name:string}[]>([]);
   const [assigning,setAssigning] = useState<string|null>(null);
-  const [section, setSection] = useState<typeof sections[number]>("Inventory Dashboard");
-  const [simpleTab,setSimpleTab] = useState<SimpleInventoryTab>("Catalog");
-  const [advanced,setAdvanced] = useState(false);
+  const [section, setSection] = useState<InventorySection>("Catalog");
+  const simpleTab = dailySections.find(tab => tab === section);
   const [movementKey, setMovementKey] = useState(() => crypto.randomUUID());
   const [movementType, setMovementType] = useState("purchase");
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [data, setData] = useState<InventoryData | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { if (profile?.role === "Master Admin" && profile.is_active) void inventoryAction<{id:string;name:string}[]>("inventory_kit_assignees", {}).then(setAssignees).catch(e=>setError(e instanceof Error?e.message:"Unable to load technicians")); }, [profile?.role,profile?.is_active]);
@@ -76,18 +83,23 @@ export function InventoryPage() {
   function submit(event: FormEvent<HTMLFormElement>, name: string, build: (form: FormData) => Record<string, unknown>) { event.preventDefault(); void act(name, build(new FormData(event.currentTarget))); }
   return <main className="space-y-5 text-[#143d1a]">
     <header><h1 className="text-2xl font-extrabold">Inventory &amp; Equipment</h1><p className="mt-1 text-sm text-neutral-600">Manage your standard products, cleaning kits, supply requests and equipment. Complete inspections and preparation during paid working time.</p></header>
-    <nav aria-label="Daily operations" className="flex flex-wrap gap-2">
-      {(["Catalog","Restock Checklist","Equipment"] as const).map(tab=><button key={tab} type="button" onClick={()=>{setAdvanced(false);setSimpleTab(tab);}} aria-current={!advanced && simpleTab===tab?"page":undefined} className={!advanced && simpleTab===tab?button:"rounded-lg border px-3 py-2 text-sm font-semibold"}>{tab}</button>)}
-      <button type="button" aria-expanded={advanced} onClick={()=>setAdvanced(v=>!v)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Advanced settings</button>
-    </nav>
-    {!advanced && <SimpleInventoryPanel key={simpleTab} data={data} tab={simpleTab} manager={manager} refresh={refresh}/>}
-    {advanced && <>
-    <nav aria-label="Inventory sections" className="flex flex-wrap gap-2">
-      <button type="button" onClick={() => setSection("Inventory Dashboard")} aria-current={section === "Inventory Dashboard" ? "page" : undefined} className={section === "Inventory Dashboard" ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>Overview</button>
-      {primarySections.map(([label, target]) => <button type="button" key={target} onClick={() => setSection(target)} aria-current={section === target ? "page" : undefined} className={section === target ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}
-      <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(v => !v)} className="rounded-lg border px-3 py-2 text-sm font-semibold">More</button>
-      {showAdvanced && <div className="flex w-full flex-wrap gap-2">{advancedSections.filter(label => label === "Chemical Safety Verification" ? profile?.role === "Master Admin" : manager || label === "Chemical Formula Library" || label === "Equipment Inspections").map(label => <button type="button" key={label} onClick={() => setSection(label)} aria-current={section === label ? "page" : undefined} className={section === label ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}</div>}
-    </nav>
+    <div className="max-w-xs">
+      <Field label="Inventory view">
+        <select className={control} value={section} onChange={event => setSection(event.target.value as InventorySection)}>
+          <optgroup label="Daily operations">
+            {dailySections.map(tab => <option key={tab}>{tab}</option>)}
+          </optgroup>
+          <optgroup label="Advanced settings">
+            {[
+              ...managementSections,
+              ...(manager ? managerSections : []),
+              ...(profile?.role === "Master Admin" ? masterSections : []),
+            ].map(([label, target]) => <option key={target} value={target}>{label}</option>)}
+          </optgroup>
+        </select>
+      </Field>
+    </div>
+    {simpleTab ? <SimpleInventoryPanel key={simpleTab} data={data} tab={simpleTab} manager={manager} refresh={refresh} /> : <>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}{notice && <p role="status">{notice}</p>}
     {section === "Inventory Dashboard" && <>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{([
@@ -95,7 +107,7 @@ export function InventoryPage() {
         ["Assigned kits", data.assignments.filter(k => !k.returned_at).length, "Assigned Kits"],
         ["Pending requests", openRequests.length, "Restocking Requests"],
         ["Equipment issues", data.assets.filter(a => ["out_of_service", "missing", "needs_maintenance"].includes(a.condition)).length, "Equipment Maintenance"],
-      ] as [string, number, typeof sections[number]][]).map(([label, count, target]) => <button type="button" className="rounded-xl border bg-white p-4 text-left" key={label} onClick={() => setSection(target)}><span className="block text-xs">{label}</span><strong className="text-2xl">{count}</strong></button>)}</div>
+      ] as [string, number, ManagementSection][]).map(([label, count, target]) => <button type="button" className="rounded-xl border bg-white p-4 text-left" key={label} onClick={() => setSection(target)}><span className="block text-xs">{label}</span><strong className="text-2xl">{count}</strong></button>)}</div>
       <h2 className="font-bold">Recorded low stock</h2>{lowStock.length ? lowStock.map(({ loc, item, stock }) => <p key={`${loc.id}:${item.item_key}`} className="rounded-lg border border-amber-300 p-3">{loc.name}: {item.item_name} - {stock.quantity} {item.unit}</p>) : <p>No recorded stock is at its restocking threshold.</p>}
     </>}
     {section === "Master Inventory" && <>
