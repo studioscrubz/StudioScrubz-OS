@@ -33,7 +33,6 @@ export function InventoryPage() {
   const [advanced,setAdvanced] = useState(false);
   const [movementKey, setMovementKey] = useState(() => crypto.randomUUID());
   const [movementType, setMovementType] = useState("purchase");
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [data, setData] = useState<InventoryData | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { if (profile?.role === "Master Admin" && profile.is_active) void inventoryAction<{id:string;name:string}[]>("inventory_kit_assignees", {}).then(setAssignees).catch(e=>setError(e instanceof Error?e.message:"Unable to load technicians")); }, [profile?.role,profile?.is_active]);
@@ -76,18 +75,16 @@ export function InventoryPage() {
   function submit(event: FormEvent<HTMLFormElement>, name: string, build: (form: FormData) => Record<string, unknown>) { event.preventDefault(); void act(name, build(new FormData(event.currentTarget))); }
   return <main className="space-y-5 text-[#143d1a]">
     <header><h1 className="text-2xl font-extrabold">Inventory &amp; Equipment</h1><p className="mt-1 text-sm text-neutral-600">Manage your standard products, cleaning kits, supply requests and equipment. Complete inspections and preparation during paid working time.</p></header>
-    <nav aria-label="Daily operations" className="flex flex-wrap gap-2">
-      {(["Catalog","Restock Checklist","Equipment"] as const).map(tab=><button key={tab} type="button" onClick={()=>{setAdvanced(false);setSimpleTab(tab);}} aria-current={!advanced && simpleTab===tab?"page":undefined} className={!advanced && simpleTab===tab?button:"rounded-lg border px-3 py-2 text-sm font-semibold"}>{tab}</button>)}
-      <button type="button" aria-expanded={advanced} onClick={()=>setAdvanced(v=>!v)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Advanced settings</button>
+    <nav aria-label="Inventory navigation" className="flex items-center gap-2">
+      <label className="sr-only" htmlFor="inventory-view">Inventory view</label>
+      <select id="inventory-view" className="w-full max-w-xs rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold" value={advanced ? `advanced:${section}` : `daily:${simpleTab}`} onChange={e=>{const value=e.target.value; if(value.startsWith("daily:")){setSimpleTab(value.slice(6) as SimpleInventoryTab);setAdvanced(false);}else{setSection(value.slice(9) as typeof sections[number]);setAdvanced(true);}}}>
+        <optgroup label="Daily operations">{(["Catalog","Restock Checklist","Equipment"] as const).map(tab=><option key={tab} value={`daily:${tab}`}>{tab}</option>)}</optgroup>
+        <optgroup label="Management"><option value="advanced:Inventory Dashboard">Overview</option>{primarySections.map(([label,target])=><option key={target} value={`advanced:${target}`}>{target==="Equipment Maintenance"?"Equipment Maintenance":label}</option>)}</optgroup>
+        <optgroup label="Advanced settings">{advancedSections.filter(label=>label==="Chemical Safety Verification"?profile?.role==="Master Admin":manager||label==="Chemical Formula Library"||label==="Equipment Inspections").map(label=><option key={label} value={`advanced:${label}`}>{label}</option>)}</optgroup>
+      </select>
     </nav>
     {!advanced && <SimpleInventoryPanel key={simpleTab} data={data} tab={simpleTab} manager={manager} refresh={refresh}/>}
     {advanced && <>
-    <nav aria-label="Inventory sections" className="flex flex-wrap gap-2">
-      <button type="button" onClick={() => setSection("Inventory Dashboard")} aria-current={section === "Inventory Dashboard" ? "page" : undefined} className={section === "Inventory Dashboard" ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>Overview</button>
-      {primarySections.map(([label, target]) => <button type="button" key={target} onClick={() => setSection(target)} aria-current={section === target ? "page" : undefined} className={section === target ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}
-      <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(v => !v)} className="rounded-lg border px-3 py-2 text-sm font-semibold">More</button>
-      {showAdvanced && <div className="flex w-full flex-wrap gap-2">{advancedSections.filter(label => label === "Chemical Safety Verification" ? profile?.role === "Master Admin" : manager || label === "Chemical Formula Library" || label === "Equipment Inspections").map(label => <button type="button" key={label} onClick={() => setSection(label)} aria-current={section === label ? "page" : undefined} className={section === label ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}</div>}
-    </nav>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}{notice && <p role="status">{notice}</p>}
     {section === "Inventory Dashboard" && <>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{([
