@@ -61,9 +61,6 @@ const navItems: Array<NavLink | NavGroup> = [
   { label: "My Leads", href: "/lead-rep/leads", marker: "L", permission: "leadRep.leads.viewOwn" },
   { label: "Commissions", href: "/lead-rep/commissions", marker: "$", permission: "leadRep.commissions.viewOwn" },
   { label: "Dashboard", href: "/", marker: "D", permission: "dashboard.view" },
-  { label: "Operations", marker: "O", children: [
-    { label: "Inventory & Equipment", href: "/inventory", marker: "I", permission: "inventory.view" },
-  ] },
   { label: "Work", marker: "W", children: [
     { label: "Schedule", href: "/schedule", marker: "S", permission: "schedule.view" },
     { label: "Jobs", href: "/jobs", marker: "J", permission: "jobs.view" },
@@ -94,6 +91,9 @@ const navItems: Array<NavLink | NavGroup> = [
     { label: "Job Opportunities", href: "/contractors/opportunities", marker: "O", permission: "contractors.view" },
     { label: "Scheduled Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
     { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
+  ] },
+  { label: "Operations", marker: "O", children: [
+    { label: "Inventory & Equipment", href: "/inventory", marker: "I", permission: "inventory.view" },
   ] },
   { label: "Billing & Finance", marker: "F", children: [
     { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
