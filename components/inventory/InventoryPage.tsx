@@ -3,21 +3,21 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EquipmentMaintenancePanel } from "@/components/inventory/EquipmentMaintenancePanel";
-import { ChemicalFormulaReview } from "@/components/inventory/ChemicalFormulaReview";
+import { ChemicalLibrary, ChemicalSafetyVerification } from "@/components/inventory/ChemicalLibrary";
 import { InventoryTrainingPanel } from "@/components/inventory/InventoryTrainingPanel";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
 import { SimpleInventoryPanel, type SimpleInventoryTab } from "@/components/inventory/SimpleInventoryPanel";
 import { KitStandardEditor } from "@/components/inventory/KitStandardEditor";
 import { inventoryAction, loadInventory, stockThreshold, type InventoryData } from "@/lib/services/inventory";
 
-const sections = ["Inventory Dashboard", "Master Inventory", "Kit Standards", "Assigned Kits", "Equipment Inspections", "Restocking Requests", "Chemical Formula Library", "Equipment Maintenance", "Inventory Transactions"] as const;
+const sections = ["Chemical Safety Verification", "Inventory Dashboard", "Master Inventory", "Kit Standards", "Assigned Kits", "Equipment Inspections", "Restocking Requests", "Chemical Formula Library", "Equipment Maintenance", "Inventory Transactions"] as const;
 const primarySections = [
   ["Supplies", "Master Inventory"],
   ["Cleaning Kits", "Assigned Kits"],
   ["Requests", "Restocking Requests"],
   ["Equipment", "Equipment Maintenance"],
 ] as const;
-const advancedSections = ["Kit Standards", "Equipment Inspections", "Chemical Formula Library", "Inventory Transactions"] as const;
+const advancedSections = ["Chemical Safety Verification", "Kit Standards", "Equipment Inspections", "Chemical Formula Library", "Inventory Transactions"] as const;
 const control = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900";
 const button = "rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50";
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block text-sm font-semibold">{label}{children}</label>; }
@@ -83,7 +83,7 @@ export function InventoryPage() {
       <button type="button" onClick={() => setSection("Inventory Dashboard")} aria-current={section === "Inventory Dashboard" ? "page" : undefined} className={section === "Inventory Dashboard" ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>Overview</button>
       {primarySections.map(([label, target]) => <button type="button" key={target} onClick={() => setSection(target)} aria-current={section === target ? "page" : undefined} className={section === target ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}
       <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(v => !v)} className="rounded-lg border px-3 py-2 text-sm font-semibold">More</button>
-      {showAdvanced && <div className="flex w-full flex-wrap gap-2">{advancedSections.filter(label => manager || label === "Chemical Formula Library" || label === "Equipment Inspections").map(label => <button type="button" key={label} onClick={() => setSection(label)} aria-current={section === label ? "page" : undefined} className={section === label ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}</div>}
+      {showAdvanced && <div className="flex w-full flex-wrap gap-2">{advancedSections.filter(label => label === "Chemical Safety Verification" ? profile?.role === "Master Admin" : manager || label === "Chemical Formula Library" || label === "Equipment Inspections").map(label => <button type="button" key={label} onClick={() => setSection(label)} aria-current={section === label ? "page" : undefined} className={section === label ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}</div>}
     </nav>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}{notice && <p role="status">{notice}</p>}
     {section === "Inventory Dashboard" && <>
@@ -140,9 +140,9 @@ export function InventoryPage() {
         {["issued", "received"].includes(r.status) && r.received_quantity < r.issued_quantity && <form className="flex flex-wrap items-end gap-2" onSubmit={e => submit(e, "inventory_update_request", f => ({ p_id: r.id, p_status: "received", p_received: Number(f.get("received")) }))}><Field label="Total quantity received so far"><input className={control} type="number" name="received" required min={r.received_quantity} max={r.issued_quantity} step="0.001" defaultValue={r.issued_quantity} /></Field><button className={button} disabled={busy}>Acknowledge receipt</button></form>}
       </article>)}
     </>}
-    {section === "Chemical Formula Library" && <><p className="rounded-xl bg-amber-50 p-4">Only manufacturer-verified, released formulas are available to employees. Independent preparation also requires practical competency authorization. Use 24 fl oz bottles with identification labels at the top.</p>{data.formulas.filter(f => !data.formulas.some(newer => newer.name === f.name && newer.version > f.version) && (manager || f.status === "released")).map(f => <article key={f.id} className="rounded-xl border p-4"><h2 className="font-bold">{f.name}</h2><p className={f.status === "released" ? "mt-1 text-sm font-semibold text-green-800" : "mt-1 text-sm font-semibold text-amber-800"}>{f.status === "released" ? "Approved for Use" : f.status === "conflict" ? "Safety Conflict - Do Not Use" : f.status === "unverified" ? "Pending Safety Verification" : "Not Approved for Use"}</p>{f.status === "released" ? <p className="mt-2 whitespace-pre-wrap">{f.preparation}</p> : <details className="mt-2 text-sm"><summary className="cursor-pointer">Management review only - do not prepare or use</summary><p className="mt-2 whitespace-pre-wrap">{f.preparation}</p></details>}{f.label_url && <a className="mr-4 underline" href={f.label_url} target="_blank" rel="noreferrer">Product label</a>}{f.sds_url && <a className="underline" href={f.sds_url} target="_blank" rel="noreferrer">Safety Data Sheet</a>}</article>)}{!data.formulas.some(f => manager || f.status === "released") && <p>No approved preparation instructions are available.</p>}</>}
+    {section === "Chemical Formula Library" && <ChemicalLibrary data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
+    {section === "Chemical Safety Verification" && <ChemicalSafetyVerification data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
     {section === "Inventory Transactions" && <div className="space-y-2">{data.transactions.slice().reverse().map(t => <article key={t.id} className="rounded-xl border p-3"><strong>{t.transaction_type} | {itemName(t.item_key)} | {t.quantity_delta > 0 ? "+" : ""}{t.quantity_delta}</strong><p className="text-sm">{locationName(t.location_id)} | {new Date(t.created_at).toLocaleString()}</p><p className="text-sm">{t.reason}</p><p className="break-all text-xs text-neutral-500">Movement: {t.movement_id}</p></article>)}{!data.transactions.length && <p>No stock movements have been recorded.</p>}</div>}
-    {section === "Chemical Formula Library" && profile?.role === "Master Admin" && data.formulas.filter(f => !data.formulas.some(newer => newer.name === f.name && newer.version > f.version)).map(f => <article className="rounded-xl border p-4" key={f.id}><h2 className="font-bold">{f.name} - management verification</h2><p className="text-xs text-neutral-600">Current record version: {f.version}</p><ChemicalFormulaReview formula={f} busy={busy} act={act} /></article>)}
     {section === "Kit Standards" && profile?.role === "Master Admin" && <KitStandardEditor data={data} busy={busy} act={act} />}
     {section === "Equipment Maintenance" && <EquipmentMaintenancePanel data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
     </>}
