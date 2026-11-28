@@ -93,6 +93,7 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center">
           <dl className="grid gap-4 text-sm grid-cols-1">
             <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Commercial Cleaning</dd></div>
+            <div><dt className="font-bold text-neutral-500">Location Serviced</dt><dd className="mt-1 font-bold text-[#143d1a]">Lincoln Heights, CA</dd></div>
             <div><dt className="font-bold text-neutral-500">Specialty Detail</dt><dd className="mt-1 font-bold text-[#143d1a]">Refrigerator Detailing</dd></div>
           </dl>
         <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-4 py-5">
