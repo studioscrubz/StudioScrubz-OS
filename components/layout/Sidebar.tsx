@@ -92,9 +92,6 @@ const navItems: Array<NavLink | NavGroup> = [
     { label: "Scheduled Jobs", href: "/contractors/jobs", marker: "J", permission: "contractors.view" },
     { label: "Contractor Communications", href: "/contractors/messages", marker: "C", permission: "contractors.view" },
   ] },
-  { label: "Operations", marker: "O", children: [
-    { label: "Inventory & Equipment", href: "/inventory", marker: "I", permission: "inventory.view" },
-  ] },
   { label: "Billing & Finance", marker: "F", children: [
     { label: "Invoices", href: "/invoices", marker: "I", permission: "invoices.view" },
     { label: "Service Agreements", href: "/agreements", marker: "A", permission: "agreements.view" },
@@ -115,6 +112,9 @@ const navItems: Array<NavLink | NavGroup> = [
     { label: "Applications", href: "/applications", marker: "", permission: "jobApplications.manage" },
     { label: "Background Screening", href: "/employees/background-screening", marker: "", permission: "backgroundScreening.manage" },
     { label: "Employee Onboarding", href: "/employees/onboarding", marker: "", permission: "employeeOnboarding.manage" },
+  ] },
+  { label: "Operations", marker: "O", children: [
+    { label: "Inventory & Equipment", href: "/inventory", marker: "I", permission: "inventory.view" },
   ] },
   { label: "Settings", marker: "S", children: [
     { label: "Appearance", href: "/settings", marker: "", permission: "appearance.view" },
