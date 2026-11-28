@@ -25,7 +25,7 @@ export async function inventoryAction<T = unknown>(name: string, args: Record<st
   const run = async () => {
     const { data, error } = await client().rpc(name, args);
     if (error) throw new Error(error.message);
-    if (typeof window !== "undefined" && !["inventory_training_records", "inventory_chemical_authorization", "inventory_job_requirements"].includes(name)) window.dispatchEvent(new Event("studioscrubz:inventory-updated"));
+    if (typeof window !== "undefined" && !["inventory_training_records", "inventory_chemical_authorization", "inventory_job_requirements", "inventory_acknowledgeable_assets"].includes(name)) window.dispatchEvent(new Event("studioscrubz:inventory-updated"));
     return data as T;
   };
   return ["inventory_request_restock", "inventory_report_equipment", "inventory_submit_inspection", "inventory_submit_supply_checklist", "inventory_finish_checklist_request"].includes(name) ? withImmediateAttentionPush(run) : run();
@@ -37,7 +37,7 @@ async function rows<T>(table: string, sort: string): Promise<T[]> {
   return (data ?? []) as T[];
 }
 export async function loadInventory() {
-  const [items, locations, stock, requests, transactions, formulas, assets, maintenance, kits, assignments, inspections, training, chemicalAuthorized, kitMembers] = await Promise.all([
+  const [items, locations, stock, requests, transactions, formulas, assets, maintenance, kits, assignments, inspections, training, chemicalAuthorized, kitMembers, acknowledgeableAssetIds] = await Promise.all([
     rows<InventoryItem>("technician_kit_standard_items", "item_name"),
     rows<InventoryLocation>("technician_inventory_locations", "name"),
     rows<InventoryStock>("technician_inventory_stock", "item_key"),
@@ -52,8 +52,9 @@ export async function loadInventory() {
     inventoryAction<InventoryTraining[]>("inventory_training_records", {}),
     inventoryAction<boolean>("inventory_chemical_authorization", {}),
     rows<KitMember>("technician_kit_members", "item_key"),
+    inventoryAction<string[]>("inventory_acknowledgeable_assets", {}),
   ]);
-  return { items, locations, stock, requests, transactions, formulas, assets, maintenance, kits, assignments, inspections, training, chemicalAuthorized, kitMembers, loadedAt: Date.now() };
+  return { items, locations, stock, requests, transactions, formulas, assets, maintenance, kits, assignments, inspections, training, chemicalAuthorized, kitMembers, acknowledgeableAssetIds, loadedAt: Date.now() };
 }
 export type InventoryData = Awaited<ReturnType<typeof loadInventory>>;
 export function stockThreshold(item: InventoryItem, stock?: InventoryStock) {
