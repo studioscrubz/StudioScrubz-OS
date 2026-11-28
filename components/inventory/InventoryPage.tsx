@@ -16,7 +16,6 @@ const managementSections = [
   ["Supplies", "Master Inventory"],
   ["Cleaning Kits", "Assigned Kits"],
   ["Requests", "Restocking Requests"],
-  ["Equipment Maintenance", "Equipment Maintenance"],
   ["Equipment Inspections", "Equipment Inspections"],
   ["Chemical Formula Library", "Chemical Formula Library"],
 ] as const;
@@ -25,7 +24,7 @@ const managerSections = [
   ["Inventory Transactions", "Inventory Transactions"],
 ] as const;
 const masterSections = [["Chemical Safety Verification", "Chemical Safety Verification"]] as const;
-type ManagementSection = (typeof managementSections | typeof managerSections | typeof masterSections)[number][1];
+type ManagementSection = "Equipment Maintenance" | (typeof managementSections | typeof managerSections | typeof masterSections)[number][1];
 type InventorySection = SimpleInventoryTab | ManagementSection;
 const control = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900";
 const button = "rounded-lg bg-[#143d1a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50";
@@ -88,6 +87,7 @@ export function InventoryPage() {
         <select className={control} value={section} onChange={event => setSection(event.target.value as InventorySection)}>
           <optgroup label="Daily operations">
             {dailySections.map(tab => <option key={tab}>{tab}</option>)}
+            <option value="Equipment Maintenance">Equipment Log</option>
           </optgroup>
           <optgroup label="Advanced settings">
             {[
@@ -99,6 +99,11 @@ export function InventoryPage() {
         </select>
       </Field>
     </div>
+    {simpleTab === "Equipment" && (
+      <button type="button" className={button} onClick={() => setSection("Equipment Maintenance")}>
+        {manager ? "Add equipment or open log" : "Open equipment log"}
+      </button>
+    )}
     {simpleTab ? <SimpleInventoryPanel key={simpleTab} data={data} tab={simpleTab} manager={manager} refresh={refresh} /> : <>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}{notice && <p role="status">{notice}</p>}
     {section === "Inventory Dashboard" && <>
@@ -158,7 +163,12 @@ export function InventoryPage() {
     {section === "Chemical Safety Verification" && <ChemicalSafetyVerification data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
     {section === "Inventory Transactions" && <div className="space-y-2">{data.transactions.slice().reverse().map(t => <article key={t.id} className="rounded-xl border p-3"><strong>{t.transaction_type} | {itemName(t.item_key)} | {t.quantity_delta > 0 ? "+" : ""}{t.quantity_delta}</strong><p className="text-sm">{locationName(t.location_id)} | {new Date(t.created_at).toLocaleString()}</p><p className="text-sm">{t.reason}</p><p className="break-all text-xs text-neutral-500">Movement: {t.movement_id}</p></article>)}{!data.transactions.length && <p>No stock movements have been recorded.</p>}</div>}
     {section === "Kit Standards" && profile?.role === "Master Admin" && <KitStandardEditor data={data} busy={busy} act={act} />}
-    {section === "Equipment Maintenance" && <EquipmentMaintenancePanel data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
+    {section === "Equipment Maintenance" && (
+      <section aria-labelledby="equipment-log-heading" className="space-y-4">
+        <h2 id="equipment-log-heading" className="text-lg font-bold">Equipment Log</h2>
+        <EquipmentMaintenancePanel data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />
+      </section>
+    )}
     </>}
   </main>;
 }
