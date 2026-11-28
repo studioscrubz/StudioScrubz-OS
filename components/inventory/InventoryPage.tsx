@@ -28,7 +28,6 @@ export function InventoryPage() {
   const manager = Boolean(profile && ["Master Admin", "Manager"].includes(profile.role));
   const [assignees,setAssignees] = useState<{id:string;name:string}[]>([]);
   const [assigning,setAssigning] = useState<string|null>(null);
-  useEffect(() => { if (profile?.role === "Master Admin" && profile.is_active) void inventoryAction<{id:string;name:string}[]>("inventory_kit_assignees", {}).then(setAssignees).catch(e=>setError(e instanceof Error?e.message:"Unable to load technicians")); }, [profile?.role,profile?.is_active]);
   const [section, setSection] = useState<typeof sections[number]>("Inventory Dashboard");
   const [simpleTab,setSimpleTab] = useState<SimpleInventoryTab>("Catalog");
   const [advanced,setAdvanced] = useState(false);
@@ -37,6 +36,7 @@ export function InventoryPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [data, setData] = useState<InventoryData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => { if (profile?.role === "Master Admin" && profile.is_active) void inventoryAction<{id:string;name:string}[]>("inventory_kit_assignees", {}).then(setAssignees).catch(e=>setError(e instanceof Error?e.message:"Unable to load technicians")); }, [profile?.role,profile?.is_active]);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [location, setLocation] = useState("");
