@@ -4,7 +4,7 @@ import { withImmediateAttentionPush } from "@/lib/push/client";
 export type InventoryItem = { item_key: string; item_name: string; kit: string; target: number; restock_at: number | null; unit: string; standard_version: string; stock_state: string; parent_key: string | null };
 export type InventoryLocation = { id: string; name: string; location_type: string; employee_id: string | null; crew_id: string | null };
 export type InventoryStock = { location_id: string; item_key: string; quantity: number; capacity: number | null };
-export type RestockRequest = { id: string; location_id: string; item_key: string; current_quantity: number; requested_quantity: number; issued_quantity: number; received_quantity: number; reason: string; priority: string; status: string; created_at: string };
+export type RestockRequest = { id: string; location_id: string; item_key: string; current_quantity: number | null; requested_quantity: number | null; checklist_only?: boolean; issued_quantity: number; received_quantity: number; reason: string; priority: string; status: string; created_at: string };
 export type InventoryTransaction = { id: string; location_id: string; item_key: string; quantity_delta: number; transaction_type: string; reason: string; created_at: string; movement_id: string };
 export type ChemicalFormula = { id: string; name: string; version: number; status: string; preparation: string; label_url: string | null; sds_url: string | null };
 export type EquipmentAsset = { id: string; equipment_number: string; item_key: string; location_id: string | null; condition: string; acknowledged_at: string | null; maintenance_interval: string | null; maintenance_due_at: string | null; manufacturer_instructions: string | null };
@@ -28,7 +28,7 @@ export async function inventoryAction<T = unknown>(name: string, args: Record<st
     if (typeof window !== "undefined" && !["inventory_training_records", "inventory_chemical_authorization", "inventory_job_requirements"].includes(name)) window.dispatchEvent(new Event("studioscrubz:inventory-updated"));
     return data as T;
   };
-  return ["inventory_request_restock", "inventory_report_equipment", "inventory_submit_inspection"].includes(name) ? withImmediateAttentionPush(run) : run();
+  return ["inventory_request_restock", "inventory_report_equipment", "inventory_submit_inspection", "inventory_submit_supply_checklist", "inventory_finish_checklist_request"].includes(name) ? withImmediateAttentionPush(run) : run();
 }
 export async function getInventoryRestockAlerts() { return rows<RestockRequest>("technician_restock_requests", "created_at"); }
 async function rows<T>(table: string, sort: string): Promise<T[]> {
