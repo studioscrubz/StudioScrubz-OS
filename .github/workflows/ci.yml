@@ -24,11 +24,13 @@ jobs:
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127122018_inventory_equipment_management.sql
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127124030_inventory_readiness_integration.sql
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127124955_inventory_training_and_kit_assignments.sql
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261128050500_inventory_simple_checklists.sql
       - name: Verify ledger isolation and readiness integration
         run: |
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_postgres.sql
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_readiness_postgres.sql
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_training_maintenance_postgres.sql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_simple_checklists_postgres.sql
       - name: Verify concurrent stock movements and retries
         run: sudo -u postgres "$(command -v node)" --input-type=module - studioscrubz_inventory_test < scripts/test-inventory-concurrency.mjs
 
