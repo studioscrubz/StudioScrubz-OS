@@ -47,7 +47,7 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
           <h2 id="commercial-project-title" className="mt-4 text-2xl font-extrabold leading-tight tracking-[-.035em] text-[#143d1a] sm:text-3xl">Starbucks — Commercial High-Dusting Services</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center">
           <dl className="grid gap-4 text-sm grid-cols-1">
-            <div><dt className="font-bold text-neutral-500">Locations Serviced</dt><dd className="mt-1 text-lg font-extrabold text-[#143d1a]">Los Angeles County and Ventura County</dd></div>
+            <div><dt className="font-bold text-neutral-500">Locations Serviced</dt><dd className="mt-1 font-bold text-[#143d1a]">Los Angeles County and Ventura County</dd></div>
             <div><dt className="font-bold text-neutral-500">Service Type</dt><dd className="mt-1 font-bold text-[#143d1a]">Commercial High Dusting</dd></div>
             <div><dt className="font-bold text-neutral-500">Project Arrangement</dt><dd className="mt-1 font-bold text-[#143d1a]">LJ Facility Services Subcontract</dd></div>
           </dl>
