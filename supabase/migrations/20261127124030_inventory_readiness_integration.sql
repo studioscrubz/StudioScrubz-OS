@@ -1,4 +1,15 @@
 -- Extends existing custody and clearance; inspection history retains its own requirements snapshot.
+-- Stage new gates disabled so database-first deployment cannot block the currently deployed UI.
+create table public.inventory_rollout (
+ singleton boolean primary key default true check(singleton), enabled boolean not null default false,
+ activated_at timestamptz, activation_commit text
+);
+insert into public.inventory_rollout(singleton,enabled) values(true,false);
+alter table public.inventory_rollout enable row level security;
+revoke all on public.inventory_rollout from public,anon,authenticated;
+create trigger inventory_audit after update on public.inventory_rollout for each row execute function private.inventory_audit();
+create function private.inventory_enabled() returns boolean language sql stable security definer set search_path='' as $$ select coalesce((select enabled from public.inventory_rollout where singleton),false) $$;
+revoke all on function private.inventory_enabled() from public,anon,authenticated;
 create table public.technician_kit_definitions (
  id text primary key, name text not null, service_names text[] not null default '{}', version integer not null default 1 check(version>0)
 );
@@ -142,6 +153,7 @@ alter function public.confirm_job_equipment_responsibility(uuid) rename to confi
 revoke all on function public.confirm_job_equipment_responsibility_before_inventory(uuid) from public,anon,authenticated;
 create function public.confirm_job_equipment_responsibility(p_job_id uuid) returns void language plpgsql security definer set search_path='' as $$
 declare latest public.job_inventory_inspections; j public.jobs; assignment_id uuid; begin
+ if not private.inventory_enabled() then perform public.confirm_job_equipment_responsibility_before_inventory(p_job_id); return; end if;
  if not private.inventory_employee() or public.current_employee_id() is distinct from private.inventory_job_worker(p_job_id) then raise exception 'Assigned verifier required' using errcode='42501'; end if;
  perform id from public.jobs where id=p_job_id for update;
  select i.* into latest from public.job_inventory_inspections i join public.employee_work_sessions s on s.id=i.work_session_id and s.clock_out is null
@@ -181,6 +193,7 @@ alter function public.start_operational_job(uuid) rename to start_operational_jo
 alter function public.start_operational_job_with_presence(uuid,jsonb) rename to start_operational_job_with_presence_before_inventory;
 revoke all on function public.start_operational_job_before_inventory(uuid),public.start_operational_job_with_presence_before_inventory(uuid,jsonb) from public,anon,authenticated;
 create function public.start_operational_job(p_job_id uuid) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$ begin
+ if not private.inventory_enabled() then return public.start_operational_job_before_inventory(p_job_id); end if;
  perform id from public.jobs where id=p_job_id for update;
  perform private.inventory_require_ready(p_job_id);
  if exists(select 1 from public.jobs where id=p_job_id and assigned_crew_id is null and assigned_employee_id=public.current_employee_id()) then
@@ -190,6 +203,7 @@ create function public.start_operational_job(p_job_id uuid) returns public.jobs_
  return public.start_operational_job_before_inventory(p_job_id);
 end $$;
 create function public.start_operational_job_with_presence(p_job_id uuid,p_presence jsonb) returns public.jobs_operational_safe language plpgsql security definer set search_path='' as $$ begin
+ if not private.inventory_enabled() then return public.start_operational_job_with_presence_before_inventory(p_job_id,p_presence); end if;
  perform id from public.jobs where id=p_job_id for update;
  perform private.inventory_require_ready(p_job_id);
  return public.start_operational_job_with_presence_before_inventory(p_job_id,p_presence);
@@ -219,8 +233,22 @@ create or replace function private.guard_lead_equipment_assignment() returns tri
 end $$;
 create or replace function private.guard_lead_equipment_job_start() returns trigger language plpgsql security definer set search_path='' as $$
 declare worker uuid; begin
+ if not private.inventory_enabled() then
+if new.status='In Progress' and old.status is distinct from new.status and not exists(
+    select 1 from public.crews c join public.job_equipment_responsibility_tasks t on t.job_id=new.id
+    join public.user_profiles u on u.id=new.equipment_responsibility_confirmed_by
+    where c.id=new.assigned_crew_id and c.status='Active' and c.archived_at is null
+      and t.crew_id=c.id and t.crew_lead_employee_id=c.crew_lead_id
+      and t.responsible_employee_id=c.crew_lead_id and u.employee_id=c.crew_lead_id
+      and new.equipment_responsibility_confirmed_at is not null
+      and exists(select 1 from public.job_equipment_assignments a where a.job_id=new.id and a.employee_id=c.crew_lead_id and a.released_at is null)
+      and not exists(select 1 from public.job_equipment_assignments a where a.job_id=new.id and a.employee_id<>c.crew_lead_id and a.released_at is null)
+      and not exists(select 1 from public.job_equipment_handoffs h where h.job_id=new.id and h.acknowledged_at is null)
+  ) then raise exception 'Assigned Crew Lead must accept and confirm equipment responsibility before starting.'; end if;
+ return new;
+ end if;
  if new.status='In Progress' and old.status is distinct from new.status then
- perform private.inventory_require_ready(new.id);
+ if private.inventory_enabled() then perform private.inventory_require_ready(new.id); end if;
  worker:=private.inventory_job_worker(new.id);
  if not exists(select 1 from public.job_equipment_responsibility_tasks t join public.user_profiles u on u.id=new.equipment_responsibility_confirmed_by
  where t.job_id=new.id and t.responsible_employee_id=worker and u.employee_id=worker and new.equipment_responsibility_confirmed_at is not null

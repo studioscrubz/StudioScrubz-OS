@@ -1,6 +1,7 @@
 -- Run ONLY in a disposable database restored from the production schema, without production data.
 \set ON_ERROR_STOP on
 begin;
+update public.inventory_rollout set enabled=true;
 insert into auth.users(id,aud,role,email,created_at,updated_at) values
  ('e1000000-0000-0000-0000-000000000001','authenticated','authenticated','inventory-solo@example.invalid',now(),now()),
  ('e1000000-0000-0000-0000-000000000002','authenticated','authenticated','inventory-lead@example.invalid',now(),now());

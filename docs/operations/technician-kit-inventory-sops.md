@@ -1,5 +1,5 @@
 # StudioScrubz operational standards — v1.0
-Management-approved policy baseline. Chemical formulas are NOT released for employee use until actual SKU labels and SDS are reviewed and signed off. No production deployment authorized.
+Management-approved policy baseline. Chemical formulas are NOT released for employee use until actual SKU labels and SDS are reviewed and signed off. Production deployment of the integrated inventory implementation is authorized after applicable release checks pass.
 
 ## SOP-KIT-001 — Technician kit and readiness
 Crew Lead owns crew readiness; solo technician owns own readiness. All checks and maintenance occur on paid time.
