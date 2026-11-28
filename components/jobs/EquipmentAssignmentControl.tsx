@@ -8,6 +8,7 @@ import {
   setJobEquipmentResponsibility,
 } from "@/lib/services/equipmentAccountability";
 import type { EligibleJobTech } from "@/types/job";
+import { EquipmentReadinessChecklist } from "@/components/inventory/EquipmentReadinessChecklist";
 
 type Props = {
   jobId: string;
@@ -24,14 +25,14 @@ export function EquipmentAssignmentControl({ jobId, crewLeadId, employeeId, tech
   const [responsibleId, setResponsibleId] = useState<string | null>(null);
   const [status, setStatus] = useState("Pending Assignment");
   const [confirmed, setConfirmed] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loadedJobId, setLoadedJobId] = useState<string | null>(null);
+  const loading = loadedJobId !== jobId;
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     void Promise.all([getJobEquipmentResponsibility(jobId), getEquipmentConfirmation(jobId)])
       .then(([task, isConfirmed]) => {
         if (!active) return;
@@ -43,7 +44,7 @@ export function EquipmentAssignmentControl({ jobId, crewLeadId, employeeId, tech
       .catch(cause => {
         if (active) setError(cause instanceof Error ? cause.message : "Unable to load equipment responsibility.");
       })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => { if (active) setLoadedJobId(jobId); });
     return () => { active = false; };
   }, [jobId, crewLeadId]);
 
@@ -86,6 +87,7 @@ export function EquipmentAssignmentControl({ jobId, crewLeadId, employeeId, tech
       {!assignedToLead && disabled && <p className="text-xs text-amber-800">Crew Lead responsibility must be reconciled before the job starts.</p>}
     </div>}
     {notice && <p role="status" className="mt-2 text-xs font-bold text-[#143d1a]">{notice}</p>}
+    {!loading && assignedToLead && <EquipmentReadinessChecklist key={jobId} jobId={jobId} disabled={disabled || saving} onConfirmed={() => setConfirmed(true)} />}
     {error && <p role="alert" className="mt-2 text-xs font-bold text-red-700">{error}</p>}
   </section>;
 }

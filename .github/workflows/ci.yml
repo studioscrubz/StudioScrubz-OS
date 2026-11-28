@@ -8,6 +8,30 @@ permissions:
   contents: read
 
 jobs:
+  inventory-native-postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start existing native PostgreSQL test service
+        run: sudo systemctl start postgresql.service
+      - name: Extend existing equipment release fixture
+        run: |
+          sudo -u postgres createdb studioscrubz_inventory_test
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_native_fixture.sql
+      - name: Apply exact inventory migrations atomically
+        run: |
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127122018_inventory_equipment_management.sql
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127124030_inventory_readiness_integration.sql
+          sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127124955_inventory_training_and_kit_assignments.sql
+      - name: Verify ledger isolation and readiness integration
+        run: |
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_postgres.sql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_readiness_postgres.sql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_training_maintenance_postgres.sql
+      - name: Verify concurrent stock movements and retries
+        run: sudo -u postgres "$(command -v node)" --input-type=module - studioscrubz_inventory_test < scripts/test-inventory-concurrency.mjs
+
   manage-job-ui:
     runs-on: ubuntu-latest
     steps:
@@ -98,6 +122,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: Lint inventory implementation
+        run: npx eslint components/inventory components/jobs/EquipmentAssignmentControl.tsx lib/services/inventory.ts lib/onboarding/inventoryTraining.ts scripts/compare-lint-baseline.mjs scripts/test-inventory-concurrency.mjs
       - run: npm run test:contracts
       - run: node --test tests/profitability*.test.mjs
       - run: node --test tests/profitability*.test.mjs

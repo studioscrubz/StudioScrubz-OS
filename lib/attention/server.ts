@@ -6,6 +6,7 @@ import type { UserProfile } from "@/types/auth";
 import type { JobWithRelations } from "@/types/job";
 import type { EquipmentResponsibilityAttention } from "@/lib/services/equipmentAccountability";
 import type { TimeOffNotification } from "@/lib/services/timeOff";
+import type { RestockRequest } from "@/lib/services/inventory";
 
 type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type ContractorPushRequest = NonNullable<AttentionRuleInput["contractorRequestReviews"]>[number] & {
@@ -23,6 +24,8 @@ type Snapshot = Omit<AttentionRuleInput, "profile" | "states" | "jobRouteIds" | 
 };
 
 export async function loadAttentionServerSnapshot(db: AdminClient, now = new Date()): Promise<Snapshot> {
+  const inventoryClient = db as unknown as { from: (table: string) => { select: (fields: string) => PromiseLike<{ data: RestockRequest[] | null; error: { message: string } | null }> } };
+  const inventoryRequestPromise = query(inventoryClient.from("technician_restock_requests").select("*"));
   const [estimates, jobs, walkthroughs, proposals, agreements, invoices, communications, timeEntries, states, settings, crewMembers, crews, occurrences, invoiceLines, fieldDiscoveries, changeRequestDecisions, porterNotifications, laborThresholdEvents, eventAttendees, equipmentResponsibilityTasks, timeOffNotifications, jobAssignmentEvents, contractorPushRequests] = await Promise.all([
     query(db.from("estimates").select("*, client:clients!estimates_client_id_fkey(*), property:properties!estimates_property_id_fkey(*)")),
     query(db.from("jobs").select("*, proposal:proposals!jobs_proposal_id_fkey(*), client:clients!jobs_client_id_fkey(*), property:properties!jobs_property_id_fkey(*)")),
@@ -59,9 +62,10 @@ export async function loadAttentionServerSnapshot(db: AdminClient, now = new Dat
     ...(invoices as Array<{ job_id: string | null; status: string }>).filter((row) => row.job_id && !["Cancelled", "Archived"].includes(row.status)).map((row) => row.job_id!),
     ...(invoiceLines as Array<{ job_id: string }>).map((row) => row.job_id), ...contractJobIds,
   ])];
+  const inventoryRequests = await inventoryRequestPromise;
   const responsibilityTasks=(equipmentResponsibilityTasks as Array<Omit<EquipmentResponsibilityAttention,"task_id"|"job_number">&{id:string;job:{job_number:string}|null}>).map(row=>({task_id:row.id,job_id:row.job_id,job_number:row.job?.job_number??"Job",crew_id:row.crew_id,crew_lead_employee_id:row.crew_lead_employee_id,responsible_employee_id:row.responsible_employee_id,status:row.status,revision:row.revision,assigned_at:row.assigned_at,created_at:row.created_at,updated_at:row.updated_at}));
   const timeOffRows=(timeOffNotifications as Array<{id:string;request_id:string;recipient_user_id:string;event_type:TimeOffNotification["event_type"];request_revision:number;created_at:string;request:{status:string;start_date:string;end_date:string;employee:{first_name:string;last_name:string;preferred_name:string|null}|null}|null}>).flatMap(row=>row.request?[{id:row.id,request_id:row.request_id,recipient_user_id:row.recipient_user_id,event_type:row.event_type,request_revision:row.request_revision,created_at:row.created_at,status:row.request.status,start_date:row.request.start_date,end_date:row.request.end_date,employee_name:row.request.employee?.preferred_name||`${row.request.employee?.first_name??""} ${row.request.employee?.last_name??""}`.trim()||"Employee"}]:[]);
-  return { jobAssignmentEvents, jobIdsByEmployee, contractorPushRequests, equipmentResponsibilityTasks:responsibilityTasks,timeOffNotifications:timeOffRows,eventAttendees, porterNotifications: (porterNotifications as AttentionRuleInput["porterNotifications"])?.filter((event) => !event.expires_at || Date.parse(event.expires_at) > now.getTime()), laborThresholdEvents, fieldDiscoveries, changeRequestDecisions, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: (settings[0] as { timezone?: string | null } | undefined)?.timezone ?? null, agreementProposalIds: (agreements as Array<{ proposal_id: string | null }>).map((row) => row.proposal_id), contractJobIds, crewIdsByEmployee, now } as unknown as Snapshot;
+  return { inventoryRequests, jobAssignmentEvents, jobIdsByEmployee, contractorPushRequests, equipmentResponsibilityTasks:responsibilityTasks,timeOffNotifications:timeOffRows,eventAttendees, porterNotifications: (porterNotifications as AttentionRuleInput["porterNotifications"])?.filter((event) => !event.expires_at || Date.parse(event.expires_at) > now.getTime()), laborThresholdEvents, fieldDiscoveries, changeRequestDecisions, estimates, jobs, walkthroughs, proposals, agreements, invoices, financiallyResolvedJobIds, communications, timeEntries, states, timezone: (settings[0] as { timezone?: string | null } | undefined)?.timezone ?? null, agreementProposalIds: (agreements as Array<{ proposal_id: string | null }>).map((row) => row.proposal_id), contractJobIds, crewIdsByEmployee, now } as unknown as Snapshot;
 }
 
 export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapshot, activeOperationsManagerIds: ReadonlySet<string>) {
@@ -72,6 +76,7 @@ export function attentionItemsForProfile(profile: UserProfile, snapshot: Snapsho
     ? snapshot.jobs.filter((job) => management || Boolean(profile.employee_id && job.assigned_employee_id === profile.employee_id) || Boolean(job.assigned_crew_id && crewIds.has(job.assigned_crew_id)) || Boolean(profile.employee_id && snapshot.jobIdsByEmployee.get(profile.employee_id)?.has(job.id))).map((job) => profile.role === "Master Admin" ? job : operationalJob(job)) : [];
   const visibleTimeEntries = hasPermission(profile, "timeClock.view") ? snapshot.timeEntries.filter((entry) => management || entry.employee_id === profile.employee_id || Boolean(entry.crew_id && crewIds.has(entry.crew_id))) : [];
   const input: AttentionRuleInput = {
+    inventoryRequests: hasPermission(profile, "inventory.manage") ? snapshot.inventoryRequests : [],
     jobAssignmentEvents:(snapshot.jobAssignmentEvents??[]).filter(event=>event.recipient_user_id===profile.id),
     profile,
     contractorRequestReviews: snapshot.contractorPushRequests.filter(request => {
