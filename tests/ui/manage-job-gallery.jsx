@@ -2,6 +2,8 @@
 import { createRoot } from 'react-dom/client';
 import { JobModal, JobCard } from '../../components/jobs/JobsPage';
 import { CrewManager } from '../../components/employees/CrewManager';
+import { InventoryPage } from '../../components/inventory/InventoryPage';
+import { EquipmentReadinessChecklist } from '../../components/inventory/EquipmentReadinessChecklist';
 
 const employee = (id,first_name,last_name) => ({id,first_name,last_name,preferred_name:null,employment_status:'Active',department:'Scrub Technicians'});
 const lead=employee('lead','Crystal','Garcia'),member=employee('member','Kris','Greer');
@@ -19,6 +21,9 @@ let trip=null;
 let photos=[];
 let gps={configured:false,radiusMeters:null,lastCheck:null,employeeChecks:[],exceptions:[]};
 window.fixture={calls,call(name,...args){calls.push({name,args});switch(name){
+case 'loadInventory':return Promise.resolve({items:[{item_key:'trash',item_name:'Trash bags',kit:'essentials',target:20,restock_at:5,unit:'bags',standard_version:'1.0',stock_state:'available',parent_key:null}],locations:[{id:'location',name:'Assigned Technician Kit',location_type:'individual',employee_id:'lead'}],stock:[{location_id:'location',item_key:'trash',quantity:5,capacity:null}],requests:[],transactions:[],formulas:new URLSearchParams(location.search).has('inventory-tech')?[]:[{id:'formula',name:'Disinfectant',version:1,status:'unverified',preparation:'Candidate only — not an employee instruction'}],assets:[],maintenance:[],kits:[{id:'standard',name:'Standard Cleaning',version:1,service_names:['Standard Cleaning']}],assignments:[],inspections:[],training:[],kitMembers:[{kit_id:'standard',item_key:'trash',minimum_quantity:1}],chemicalAuthorized:false,loadedAt:Date.now()});
+case 'stockThreshold':return {target:args[0].target,threshold:args[0].restock_at};
+case 'inventoryAction':if(args[0]==='inventory_job_requirements')return Promise.resolve([{key:'trash',name:'Trash bags',minimum:1,target:20,threshold:5,unit:'bags',version:'1.0'}]);if(args[0]==='inventory_submit_inspection')return Promise.resolve(args[1].p_results.every(r=>r.status==='checked'&&r.quantity>=1));return Promise.resolve();
 case 'getCrews':return Promise.resolve([...crews]);
 case 'createCrew':{const created={...args[0],id:'created',members:[],crew_lead:null};crews=[...crews,created];return Promise.resolve(created);}
 case 'updateCrew':{crews=crews.map(c=>c.id===args[0]?{...c,...args[1]}:c);return Promise.resolve(crews.find(c=>c.id===args[0]));}
@@ -59,7 +64,11 @@ window.fetch=(input,init)=>{
 };
 const mutate=async(fn)=>{try{await fn();}catch(e){console.error(e);}};
 const readonly=new URLSearchParams(location.search).has('readonly');
-createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('crews')
+createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('inventory-readiness')
+ ? <EquipmentReadinessChecklist jobId="job"/>
+ : new URLSearchParams(location.search).has('inventory')
+ ? <InventoryPage/>
+ : new URLSearchParams(location.search).has('crews')
  ? <CrewManager employees={[lead,member]} close={()=>{}} changed={async()=>{}}/>
  : new URLSearchParams(location.search).has('card')
  ? <JobCard job={job} open={()=>calls.push({name:'openManageJob',args:[]})} timeEntries={[]} employeeId="lead" role="Master Admin" activeCrew={crew} activeTechs={[]} canComplete canDelete={false} busy={false} requestDelete={()=>{}} act={mutate}/>

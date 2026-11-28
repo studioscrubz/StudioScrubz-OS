@@ -20,7 +20,9 @@ jobs:
           sudo -u postgres createdb studioscrubz_inventory_test
           sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_native_fixture.sql
       - name: Apply exact inventory migrations atomically
+        # First prove a rollback restores the original schema and lifecycle entrypoints.
         run: |
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/tests/inventory_migration_rollback.sql
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127122018_inventory_equipment_management.sql
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127124030_inventory_readiness_integration.sql
           sudo -u postgres psql -1 -v ON_ERROR_STOP=1 -d studioscrubz_inventory_test -f supabase/migrations/20261127124955_inventory_training_and_kit_assignments.sql

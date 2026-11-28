@@ -37,7 +37,7 @@ create function private.inventory_offboarding_recovery() returns trigger languag
  if (new.employment_status is distinct from old.employment_status or new.archived_at is distinct from old.archived_at) and
  (new.employment_status<>'Active' or new.archived_at is not null) then
  update public.technician_kit_assignments k set return_required=true from public.technician_inventory_locations l
- where l.id=k.location_id and l.employee_id=new.id and k.returned_at is null;
+ where l.id=k.location_id and (l.employee_id=new.id or exists(select 1 from public.crews c where c.id=l.crew_id and c.crew_lead_id=new.id)) and k.returned_at is null;
  insert into public.technician_inventory_audit(table_name,record_id,actor,before_row,after_row)
  values('employees_equipment_recovery',new.id::text,auth.uid(),jsonb_build_object('employment_status',old.employment_status),jsonb_build_object('employment_status',new.employment_status,'equipment_recovery_required',true));
  end if;
@@ -45,6 +45,17 @@ create function private.inventory_offboarding_recovery() returns trigger languag
 end $$;
 create trigger inventory_offboarding_recovery after update of employment_status,archived_at on public.employees for each row execute function private.inventory_offboarding_recovery();
 revoke all on function private.inventory_offboarding_recovery() from public,anon,authenticated;
+create function private.inventory_assignment_maintenance_due() returns trigger language plpgsql security definer set search_path='' as $$ begin
+ if new.status='Completed' and old.status is distinct from new.status then
+ update public.technician_equipment_assets a set maintenance_due_at=least(a.maintenance_due_at,
+ case when a.maintenance_interval='after_assignment' then now() else (date_trunc('day',now() at time zone 'America/Los_Angeles')+interval '1 day') at time zone 'America/Los_Angeles' end)
+ from public.technician_inventory_locations l where l.id=a.location_id and
+ (l.employee_id=new.assigned_employee_id or l.crew_id=new.assigned_crew_id) and a.condition<>'retired' and a.maintenance_interval in ('after_assignment','end_of_day');
+ end if;
+ return new;
+end $$;
+create trigger inventory_assignment_maintenance_due after update of status on public.jobs for each row execute function private.inventory_assignment_maintenance_due();
+revoke all on function private.inventory_assignment_maintenance_due() from public,anon,authenticated;
 
 create function public.inventory_training_records() returns jsonb language sql stable security definer set search_path='' as $$
  select coalesce(jsonb_agg(jsonb_build_object('case_id',c.id,'employee_id',c.employee_id,'employee_name',concat_ws(' ',e.first_name,e.last_name),'assessments',coalesce(s.inventory_assessments,'{}'::jsonb))),'[]'::jsonb)

@@ -427,7 +427,9 @@ returns void language plpgsql security definer set search_path='' as $$ declare 
  update public.technician_equipment_maintenance set status=p_status,resolution=p_resolution,
  completed_by=case when p_status='completed' then auth.uid() end,completed_at=case when p_status='completed' then now() end where id=p_report;
  if p_status='completed' then
- update public.technician_equipment_assets set maintenance_due_at=p_next_due where id=r.asset_id;
+ update public.technician_equipment_assets set maintenance_due_at=coalesce(p_next_due,
+ case maintenance_interval when 'weekly' then now()+interval '7 days' when 'monthly' then now()+interval '1 month'
+ when 'end_of_day' then (date_trunc('day',now() at time zone 'America/Los_Angeles')+interval '1 day') at time zone 'America/Los_Angeles' end) where id=r.asset_id;
  -- A separate explicit condition review is required to return the asset to service.
  end if;
 end $$;

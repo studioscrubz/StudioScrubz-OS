@@ -1,6 +1,49 @@
 import { test, expect } from '@playwright/test';
 declare global { interface Window { fixture: { calls: Array<{name:string;args:unknown[]}> } } }
 
+test('inventory has nine usable sections and responsive replenishment forms',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/?inventory=1');
+ await expect(page.getByRole('heading',{name:'Inventory & Equipment',exact:true})).toBeVisible();
+ const nav=page.getByRole('navigation',{name:'Inventory sections'});
+ await expect(nav.getByRole('button')).toHaveCount(9);
+ for(const label of ['Master Inventory','Kit Standards','Assigned Kits','Equipment Inspections','Restocking Requests','Chemical Formula Library','Equipment Maintenance','Inventory Transactions']){
+   await nav.getByRole('button',{name:label,exact:true}).click();
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ }
+ await nav.getByRole('button',{name:'Restocking Requests',exact:true}).click();
+ await page.getByLabel('Assigned location',{exact:true}).selectOption('location');
+ await page.getByLabel('Item',{exact:true}).selectOption('trash');
+ await expect(page.getByLabel('Requested quantity',{exact:true})).toHaveValue('15');
+ await page.getByLabel('Observed available quantity').fill('2');
+ await expect(page.getByLabel('Requested quantity',{exact:true})).toHaveValue('18');
+ await page.getByLabel('Reason',{exact:true}).fill('Supplies required before next assignment');
+ await page.getByRole('button',{name:'Submit request',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.fixture.calls.some(c=>c.name==='inventoryAction'&&c.args[0]==='inventory_request_restock'&&(c.args[1] as {p_quantity:number}).p_quantity===18))).toBe(true);
+ expect(errors).toEqual([]);
+});
+
+test('technicians do not receive chemical candidates or management mutation controls',async({page})=>{
+ await page.goto('/?inventory=1&inventory-tech=1');
+ await page.getByRole('navigation').getByRole('button',{name:'Chemical Formula Library',exact:true}).click();
+ await expect(page.getByText('No released formulas are available.',{exact:true})).toBeVisible();
+ await expect(page.getByText('Candidate only — not an employee instruction')).toHaveCount(0);
+ await page.getByRole('navigation').getByRole('button',{name:'Assigned Kits',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Create inventory location',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Record kit assignment',exact:true})).toHaveCount(0);
+});
+
+test('Check Equipment begins payable preparation and has no mandatory Not Needed option',async({page})=>{
+ await page.goto('/?inventory-readiness=1');
+ await page.getByRole('button',{name:'Check Equipment — begin paid preparation',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.fixture.calls.some(c=>c.name==='inventoryAction'&&c.args[0]==='inventory_begin_preparation'))).toBe(true);
+ await expect(page.getByRole('option',{name:'Not Needed',exact:true})).toHaveCount(0);
+ await page.getByLabel('Inspection result').selectOption('checked');
+ await page.getByLabel('Available quantity (bags)').fill('3');
+ await page.getByRole('button',{name:'Save inspection and verify readiness',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('Equipment readiness confirmed');
+});
+
 test('job roster picker loads job selections and enforces capacity without permanent membership controls',async({page})=>{
  await page.goto('/');
  await page.locator('summary').filter({hasText:'Assigned Crew'}).click();

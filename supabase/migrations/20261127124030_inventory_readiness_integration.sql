@@ -44,9 +44,8 @@ create function private.inventory_job_worker(p_job uuid) returns uuid language s
  from public.jobs j where j.id=p_job and j.archived_at is null and j.status not in ('Completed','Cancelled','Archived')
 $$;
 revoke all on function private.inventory_job_worker(uuid) from public,anon,authenticated;
-create function public.inventory_job_requirements(p_job uuid) returns jsonb language plpgsql stable security definer set search_path='' as $$
+create function private.inventory_job_requirements(p_job uuid) returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare v_kit text; specialties text[]; result jsonb; begin
- if not private.inventory_manager() and not (private.inventory_employee() and public.current_employee_id()=private.inventory_job_worker(p_job)) then raise exception 'Assigned equipment verifier required' using errcode='42501'; end if;
  select s.kit_id,s.specialty_items into v_kit,specialties from public.job_inventory_kit_scope s where s.job_id=p_job;
  if v_kit is null then
  select d.id into v_kit from public.technician_kit_definitions d join public.jobs_operational_safe j on j.id=p_job and j.division='Residential' and j.service_name=any(d.service_names);
@@ -66,6 +65,11 @@ declare v_kit text; specialties text[]; result jsonb; begin
  union all select 'safety:adequate','Supplies sufficient for assigned scope of work',1,1,null,'confirmation','1'
  ) x;
  return result;
+end $$;
+revoke all on function private.inventory_job_requirements(uuid) from public,anon,authenticated;
+create function public.inventory_job_requirements(p_job uuid) returns jsonb language plpgsql stable security definer set search_path='' as $$ begin
+ if not private.inventory_manager() and not (private.inventory_employee() and public.current_employee_id()=private.inventory_job_worker(p_job)) then raise exception 'Assigned equipment verifier required' using errcode='42501'; end if;
+ return private.inventory_job_requirements(p_job);
 end $$;
 create function public.inventory_set_job_scope(p_job uuid,p_kit text,p_specialties text[]) returns void language plpgsql security definer set search_path='' as $$ begin
  if not private.inventory_manager() then raise exception 'Inventory manager required' using errcode='42501'; end if;
@@ -167,7 +171,7 @@ declare worker uuid:=private.inventory_job_worker(p_job); latest public.job_inve
  select i.* into latest from public.job_inventory_inspections i join public.employee_work_sessions s on s.id=i.work_session_id and s.clock_out is null
  where i.job_id=p_job and i.employee_id=worker order by i.inspection_sequence desc limit 1;
  if latest.id is null or not latest.ready then raise exception 'Assigned verifier must complete equipment inspection before start'; end if;
- if latest.requirements<>public.inventory_job_requirements(p_job) then raise exception 'Kit requirements changed; repeat inspection'; end if;
+ if latest.requirements<>private.inventory_job_requirements(p_job) then raise exception 'Kit requirements changed; repeat inspection'; end if;
  if not exists(select 1 from public.jobs where id=p_job and equipment_responsibility_confirmed_at>=latest.created_at) then raise exception 'Equipment custody confirmation required after inspection'; end if;
  if exists(select 1 from public.technician_equipment_assets a join public.technician_inventory_locations l on l.id=a.location_id join public.jobs j on j.id=p_job
  where (l.employee_id=worker or l.crew_id=j.assigned_crew_id) and a.condition in ('needs_maintenance','out_of_service','missing')) then raise exception 'Resolve unsafe or missing assigned equipment before start'; end if;
