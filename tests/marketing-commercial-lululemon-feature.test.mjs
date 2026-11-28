@@ -8,8 +8,9 @@ test("commercial page features recurring lululemon service alongside existing St
  assert.match(commercial,/Starbucks — Commercial High-Dusting Services/);
  assert.match(commercial,/lululemon — Recurring Retail Cleaning/);
  assert.match(commercial,/Women&apos;s Audio Mission Academy/);
- assert.match(commercial,/Downtown Disney, Anaheim/);
- assert.doesNotMatch(commercial,/Service Frequency/);
+ assert.match(commercial,/Locations Serviced<\/dt><dd[^>]*>Los Angeles County and Ventura County<\/dd>/);
+ assert.match(commercial,/Location Serviced<\/dt><dd[^>]*>Orange County<\/dd>/);
+ assert.doesNotMatch(commercial,/Downtown Disney|Anaheim|twice-weekly/i);
  assert.match(commercial,/alt="lululemon logo"/);
  assert.match(commercial,/\/branding\/lululemon-logo\.svg/);
 });
