@@ -29,7 +29,7 @@ export function SimpleInventoryPanel({ data, tab, manager, refresh }: { data: In
   const selected = Object.fromEntries(Object.entries(choices).filter(([key]) => list.some(i => i.item_key === key)));
   const requested = Object.entries(selected).filter(([,value]) => value !== "good");
   const name = (key:string) => data.items.find(i => i.item_key === key)?.item_name ?? key;
-  const locationName = (key:string) => data.locations.find(l => l.id === key)?.name ?? "Assigned supplies";
+  const locationName = (key:string) => { const loc=data.locations.find(l => l.id === key)?.name ?? "Assigned supplies"; const kits=data.assignments.filter(k=>k.location_id===key && !k.returned_at).map(k=>k.kit_number); return kits.length===1 ? `${kits[0]} | ${loc}` : loc; };
   const requests = data.requests.filter(r => !["completed","declined","cancelled"].includes(r.status) && equipmentKeys.has(r.item_key) === isEquipment);
   const closed = data.requests.filter(r => r.checklist_only && ["completed","declined","cancelled"].includes(r.status) && equipmentKeys.has(r.item_key) === isEquipment);
   function choose(key:string,value:Choice) {
@@ -53,6 +53,7 @@ export function SimpleInventoryPanel({ data, tab, manager, refresh }: { data: In
   }
   return <section className="space-y-4">
     <p className="text-sm text-neutral-600">{tab==="Catalog"?"Your approved StudioScrubz products and kit standards.":isEquipment?"Check equipment condition. Report missing or unsafe tools; do not use unsafe equipment.":"Select Good or Restock for the items you check. Leave anything not checked unselected."}</p>
+    {tab!=="Catalog" && !manager && data.assignments.filter(k=>!k.returned_at).map(k=><p key={k.id} className="rounded-lg border p-3 font-bold">{k.kit_number} | General Essential Kit</p>)}
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
     {notice && <p role="status" className="rounded-lg bg-green-50 p-3">{notice}</p>}
     {tab!=="Catalog" && requests.length>0 && <section className="space-y-2 rounded-xl border bg-white p-3">
