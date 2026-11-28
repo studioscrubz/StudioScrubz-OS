@@ -6,6 +6,7 @@ import { EquipmentMaintenancePanel } from "@/components/inventory/EquipmentMaint
 import { ChemicalFormulaReview } from "@/components/inventory/ChemicalFormulaReview";
 import { InventoryTrainingPanel } from "@/components/inventory/InventoryTrainingPanel";
 import { useOperationalRealtime } from "@/components/realtime/OperationalRealtimeProvider";
+import { SimpleInventoryPanel, type SimpleInventoryTab } from "@/components/inventory/SimpleInventoryPanel";
 import { KitStandardEditor } from "@/components/inventory/KitStandardEditor";
 import { inventoryAction, loadInventory, stockThreshold, type InventoryData } from "@/lib/services/inventory";
 
@@ -26,6 +27,8 @@ export function InventoryPage() {
   const allowed = Boolean(profile?.is_active && ["Master Admin", "Manager", "Crew Lead", "Scrub Technician"].includes(profile.role));
   const manager = Boolean(profile && ["Master Admin", "Manager"].includes(profile.role));
   const [section, setSection] = useState<typeof sections[number]>("Inventory Dashboard");
+  const [simpleTab,setSimpleTab] = useState<SimpleInventoryTab>("Catalog");
+  const [advanced,setAdvanced] = useState(false);
   const [movementKey, setMovementKey] = useState(() => crypto.randomUUID());
   const [movementType, setMovementType] = useState("purchase");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -56,7 +59,7 @@ export function InventoryPage() {
   const current = selectedStock?.quantity ?? 0;
   const observed = observations[`${location}:${itemKey}`] ?? current;
   const leafItems = data.items.filter(row => row.stock_state !== "aggregate");
-  const openRequests = data.requests.filter(row => !["completed", "declined", "cancelled"].includes(row.status));
+  const openRequests = data.requests.filter(row => !row.checklist_only && !["completed", "declined", "cancelled"].includes(row.status));
   const lowStock = data.locations.flatMap(loc => leafItems.filter(i => {
     const stock = data.stock.find(s => s.location_id === loc.id && s.item_key === i.item_key);
     const limits = stockThreshold(i, stock);
@@ -70,6 +73,12 @@ export function InventoryPage() {
   function submit(event: FormEvent<HTMLFormElement>, name: string, build: (form: FormData) => Record<string, unknown>) { event.preventDefault(); void act(name, build(new FormData(event.currentTarget))); }
   return <main className="space-y-5 text-[#143d1a]">
     <header><h1 className="text-2xl font-extrabold">Inventory &amp; Equipment</h1><p className="mt-1 text-sm text-neutral-600">Manage your standard products, cleaning kits, supply requests and equipment. Complete inspections and preparation during paid working time.</p></header>
+    <nav aria-label="Daily operations" className="flex flex-wrap gap-2">
+      {(["Catalog","Restock Checklist","Equipment"] as const).map(tab=><button key={tab} type="button" onClick={()=>{setAdvanced(false);setSimpleTab(tab);}} aria-current={!advanced && simpleTab===tab?"page":undefined} className={!advanced && simpleTab===tab?button:"rounded-lg border px-3 py-2 text-sm font-semibold"}>{tab}</button>)}
+      <button type="button" aria-expanded={advanced} onClick={()=>setAdvanced(v=>!v)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Advanced settings</button>
+    </nav>
+    {!advanced && <SimpleInventoryPanel key={simpleTab} data={data} tab={simpleTab} manager={manager} refresh={refresh}/>}
+    {advanced && <>
     <nav aria-label="Inventory sections" className="flex flex-wrap gap-2">
       <button type="button" onClick={() => setSection("Inventory Dashboard")} aria-current={section === "Inventory Dashboard" ? "page" : undefined} className={section === "Inventory Dashboard" ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>Overview</button>
       {primarySections.map(([label, target]) => <button type="button" key={target} onClick={() => setSection(target)} aria-current={section === target ? "page" : undefined} className={section === target ? button : "rounded-lg border px-3 py-2 text-sm font-semibold"}>{label}</button>)}
@@ -95,7 +104,7 @@ export function InventoryPage() {
         <Field label="What are you doing?"><select name="type" value={movementType} onChange={e => setMovementType(e.target.value)} className={control}>{["purchase", "issue", "consumption", "return", "transfer", "adjustment", "laundry_return", "damage", "loss", ...(profile?.role === "Master Admin" ? ["disposal"] : [])].map(t => <option key={t}>{t}</option>)}</select></Field>
         {(movementType === "purchase" ? ["destination"] : ["consumption", "loss", "damage", "disposal"].includes(movementType) ? ["source"] : ["source", "destination"]).map(name => <Field key={name} label={name === "source" ? "Source (leave empty for purchase)" : "Destination (leave empty for consumption/loss)"}><select name={name} className={control}><option value="">None</option>{data.locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Field>)}
         <Field label={`Quantity (${item?.unit ?? "select an item above"})`}><input className={control} name="quantity" type="number" required min="0.001" step="0.001" /></Field>
-        <Field label="Approved request (optional)"><select name="request" className={control}><option value="">None</option>{openRequests.filter(r => ["approved", "ready", "issued"].includes(r.status)).map(r => <option key={r.id} value={r.id}>{locationName(r.location_id)} â€” {itemName(r.item_key)} ({r.requested_quantity - r.issued_quantity} remaining)</option>)}</select></Field>
+        <Field label="Approved request (optional)"><select name="request" className={control}><option value="">None</option>{openRequests.filter(r => ["approved", "ready", "issued"].includes(r.status)).map(r => <option key={r.id} value={r.id}>{locationName(r.location_id)} â€” {itemName(r.item_key)} ({(r.requested_quantity ?? 0) - r.issued_quantity} remaining)</option>)}</select></Field>
         <Field label="Reason"><input className={control} name="reason" required /></Field><button disabled={busy || !item} className={button}>Record movement</button>
       </form>}
       {manager && item && <form className="flex flex-wrap items-end gap-3" onSubmit={e => submit(e, "inventory_set_capacity", f => ({ p_location: location, p_item: itemKey, p_capacity: Number(f.get("capacity")) }))}><Field label="Actual container capacity"><input className={control} name="capacity" required type="number" min="0.001" step="0.001" /></Field><button className={button} disabled={busy || !location}>Save capacity</button></form>}
@@ -126,7 +135,7 @@ export function InventoryPage() {
         <Field label="Priority"><select name="priority" className={control}><option value="routine">Routine</option><option value="high">High â€” before next assignment</option><option value="urgent">Urgent â€” current assignment affected</option></select></Field>
         <Field label="Reason"><input name="reason" className={control} required /></Field><Field label="Notes"><textarea name="notes" className={control} /></Field><button className={button} disabled={busy}>Submit request</button>
       </form>
-      {data.requests.slice().reverse().map(r => <article key={r.id} className="space-y-2 rounded-xl border bg-white p-4"><h2 className="font-bold">{itemName(r.item_key)} â€” {locationName(r.location_id)}</h2><p className="text-sm">{r.priority} Â· {r.status} Â· requested {r.requested_quantity}, issued {r.issued_quantity}, received {r.received_quantity}</p><p>{r.reason}</p>
+      {data.requests.filter(r => !r.checklist_only).slice().reverse().map(r => <article key={r.id} className="space-y-2 rounded-xl border bg-white p-4"><h2 className="font-bold">{itemName(r.item_key)} â€” {locationName(r.location_id)}</h2><p className="text-sm">{r.priority} Â· {r.status} Â· requested {r.requested_quantity}, issued {r.issued_quantity}, received {r.received_quantity}</p><p>{r.reason}</p>
         {manager && <div className="flex flex-wrap gap-2">{(r.status === "submitted" ? ["approved", "declined", "cancelled"] : r.status === "approved" ? ["awaiting_purchase", "ready"] : r.status === "awaiting_purchase" ? ["ready"] : r.status === "received" && r.received_quantity === r.requested_quantity ? ["completed"] : []).map(status => <button key={status} type="button" className={button} disabled={busy} onClick={() => void act("inventory_update_request", { p_id: r.id, p_status: status })}>{status.replaceAll("_", " ")}</button>)}</div>}
         {["issued", "received"].includes(r.status) && r.received_quantity < r.issued_quantity && <form className="flex flex-wrap items-end gap-2" onSubmit={e => submit(e, "inventory_update_request", f => ({ p_id: r.id, p_status: "received", p_received: Number(f.get("received")) }))}><Field label="Total quantity received so far"><input className={control} type="number" name="received" required min={r.received_quantity} max={r.issued_quantity} step="0.001" defaultValue={r.issued_quantity} /></Field><button className={button} disabled={busy}>Acknowledge receipt</button></form>}
       </article>)}
@@ -136,5 +145,6 @@ export function InventoryPage() {
     {section === "Chemical Formula Library" && profile?.role === "Master Admin" && data.formulas.filter(f => !data.formulas.some(newer => newer.name === f.name && newer.version > f.version)).map(f => <article className="rounded-xl border p-4" key={f.id}><h2 className="font-bold">{f.name} â€” management verification</h2><ChemicalFormulaReview formula={f} busy={busy} act={act} /></article>)}
     {section === "Kit Standards" && profile?.role === "Master Admin" && <KitStandardEditor data={data} busy={busy} act={act} />}
     {section === "Equipment Maintenance" && <EquipmentMaintenancePanel data={data} manager={manager} master={profile?.role === "Master Admin"} busy={busy} act={act} />}
+    </>}
   </main>;
 }
