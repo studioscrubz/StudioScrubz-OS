@@ -72,12 +72,14 @@ export function SimpleInventoryPanel({ data, tab, manager, refresh }: { data: In
     {categories.map(group=>{
       const rows=list.filter(i=>category(i)===group && (tab!=="Catalog" || i.stock_state!=="clean" || i.parent_key==="microfiber"));
       if (group === categories[0]) rows.sort((a, b) => essentialsOrder(a) - essentialsOrder(b));
-      return rows.length>0 && <section key={group} className="rounded-xl border bg-white p-3"><h2 className="mb-2 font-bold">{group}</h2>{rows.map(item=><div
-        className={tab === "Catalog" && item.parent_key === "microfiber" ? "ml-4 border-l border-t py-3 pl-3" : "border-t py-3"}
-        key={item.item_key}
-      ><strong className="text-sm">{item.item_name}</strong><p className="text-xs text-neutral-600">{standard(item)}</p>
+      return rows.length>0 && <section key={group} className="rounded-xl border bg-white p-3"><h2 className="mb-2 font-bold">{group}</h2>{rows.map(item => {
+        const isMicrofiberColor = tab === "Catalog" && item.parent_key === "microfiber";
+        return <div className={isMicrofiberColor ? "relative ml-4 py-3 pl-4" : "border-t py-3"} key={item.item_key}>
+          {isMicrofiberColor && <span aria-hidden="true" className="absolute left-0 text-sm">-</span>}
+          <strong className="text-sm">{item.item_name}</strong><p className="text-xs text-neutral-600">{standard(item)}</p>
       {tab!=="Catalog" && <div className="mt-2 flex flex-wrap gap-2">{(isEquipment?([["Good","good"],["Needs repair","repair"],["Missing","missing"]] as const):([["Good","good"],["Restock","restock"]] as const)).map(([label,value])=><button key={value} type="button" aria-pressed={choices[item.item_key]===value} disabled={busy} onClick={()=>choose(item.item_key,value)} className={choices[item.item_key]===value ? primary:"rounded-lg border px-4 py-2 text-sm font-semibold"}>{label}</button>)}</div>}
-      </div>)}</section>;
+      </div>;
+      })}</section>;
     })}
     {tab!=="Catalog" && <section className="sticky bottom-0 space-y-2 rounded-xl border bg-white p-3 shadow"><h2 className="font-bold">{requested.length} {isEquipment?"equipment issues":"items to restock"}</h2>{requested.map(([key,value])=><p key={key} className="text-sm">{name(key)} — {value}</p>)}<button className={primary+" w-full"} type="button" disabled={busy || !Object.keys(selected).length} onClick={()=>void send()}>{busy?"Saving…":"Submit checklist"}</button></section>}
     {tab!=="Catalog" && closed.length>0 && <details className="rounded-lg border p-3"><summary className="font-semibold">Request history</summary>{closed.slice().reverse().map(r=><p key={r.id} className="border-t py-2 text-sm">{name(r.item_key)} · {locationName(r.location_id)} · {r.status}</p>)}</details>}
