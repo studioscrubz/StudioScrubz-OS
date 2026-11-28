@@ -12,6 +12,12 @@ function category(item: InventoryItem) {
   if (["measure_cup","measure_spoons","funnel","goggles","spill_tray","chemical_gloves","labels","marker"].includes(item.item_key)) return categories[5];
   return item.kit === "essentials" ? categories[0] : item.kit === "standard" ? categories[1] : item.kit === "deep" ? categories[2] : categories[3];
 }
+function essentialsOrder(item: InventoryItem) {
+  if (item.item_key === "paper") return 1;
+  if (item.item_key === "microfiber") return 2;
+  if (item.parent_key === "microfiber") return 3;
+  return 0;
+}
 function standard(item: InventoryItem) {
   if (item.item_key === "bulk_alcohol") return "Any container size · restock at 25%";
   return `Standard: ${item.target} ${item.unit}${item.restock_at == null ? "" : ` · restock at ${item.restock_at}`}`;
@@ -65,6 +71,7 @@ export function SimpleInventoryPanel({ data, tab, manager, refresh }: { data: In
     </section>}
     {categories.map(group=>{
       const rows=list.filter(i=>category(i)===group && (tab!=="Catalog" || i.stock_state!=="clean" || i.parent_key==="microfiber"));
+      if (group === categories[0]) rows.sort((a, b) => essentialsOrder(a) - essentialsOrder(b));
       return rows.length>0 && <section key={group} className="rounded-xl border bg-white p-3"><h2 className="mb-2 font-bold">{group}</h2>{rows.map(item=><div className="border-t py-3" key={item.item_key}><strong className="text-sm">{item.item_name}</strong><p className="text-xs text-neutral-600">{standard(item)}</p>
       {tab!=="Catalog" && <div className="mt-2 flex flex-wrap gap-2">{(isEquipment?([["Good","good"],["Needs repair","repair"],["Missing","missing"]] as const):([["Good","good"],["Restock","restock"]] as const)).map(([label,value])=><button key={value} type="button" aria-pressed={choices[item.item_key]===value} disabled={busy} onClick={()=>choose(item.item_key,value)} className={choices[item.item_key]===value ? primary:"rounded-lg border px-4 py-2 text-sm font-semibold"}>{label}</button>)}</div>}
       </div>)}</section>;
