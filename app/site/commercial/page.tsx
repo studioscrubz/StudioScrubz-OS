@@ -97,7 +97,11 @@ export default function CommercialPage(){return <><ServicePageJsonLd name="Comme
             <div><dt className="font-bold text-neutral-500">Specialty Detail</dt><dd className="mt-1 font-bold text-[#143d1a]">Refrigerator Detailing</dd></div>
           </dl>
         <div className="flex min-h-40 flex-col items-center justify-center rounded-[1.6rem] bg-[#f4f7f1] px-4 py-5">
-          <div aria-label="Women’s Audio Mission Academy project" className="flex size-40 flex-col items-center justify-center rounded-full border-[10px] border-[#e93431] bg-white px-4 text-center shadow-[inset_0_0_0_5px_#141414]"><span className="text-[10px] font-black uppercase tracking-[.12em] text-[#141414]">Women&apos;s Audio Mission</span><span className="mt-2 text-4xl font-black tracking-[-.08em] text-[#e93431]">WAM</span><span className="mt-2 text-xs font-black uppercase tracking-[.18em] text-[#141414]">Academy</span></div>
+          <div role="img" aria-label="Women’s Audio Mission Academy project" className="flex size-40 shrink-0 flex-col items-center justify-center gap-1.5 rounded-full border-[10px] border-[#e93431] bg-white text-center shadow-[inset_0_0_0_5px_#141414]">
+            <span className="text-[10px] leading-tight font-black uppercase tracking-[.08em] text-[#141414]">Women&apos;s Audio<br />Mission</span>
+            <span className="text-[38px] leading-none font-black tracking-[-.08em] text-[#e93431]">WAM</span>
+            <span className="text-[10px] leading-tight font-black uppercase tracking-[.14em] text-[#141414]">Academy</span>
+          </div>
           
         </div>
           </div>
